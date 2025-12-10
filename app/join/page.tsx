@@ -17,7 +17,8 @@ export default function JoinPage() {
         role: 'Developer',
         company: '',
         referral_source: 'Twitter/X',
-        hasApp: false
+        hasApp: false,
+        contribution: ''
     });
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -41,6 +42,7 @@ export default function JoinPage() {
             role: formData.role,
             company: formData.company,
             referral_source: formData.referral_source,
+            referral_detail: formData.contribution,
             wants_ecosystem_consideration: formData.hasApp
         }]);
 
@@ -208,6 +210,16 @@ export default function JoinPage() {
                             <label htmlFor="hasApp" className="text-sm text-text-secondary select-none">
                                 I have an AI app for ecosystem consideration
                             </label>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-text-secondary mb-1">Contribution & Skills</label>
+                            <textarea
+                                className="w-full bg-obsidian-surface border border-obsidian-border rounded-md px-4 py-3 text-text-primary focus:outline-none focus:border-accent-violet h-24 resize-none"
+                                placeholder="Tell us about your skills, resources, or how you plan to help..."
+                                value={formData.contribution}
+                                onChange={e => setFormData({ ...formData, contribution: e.target.value })}
+                            />
                         </div>
 
                         <Button type="submit" className="w-full mt-4" disabled={loading}>
