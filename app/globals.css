@@ -1,0 +1,161 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========================================
+   BASE STYLES - DO NOT MODIFY
+   ======================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: 'Outfit', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: #0a0a0f;
+  color: #e4e4e7;
+  min-height: 100vh;
+  min-height: 100dvh; /* Mobile viewport fix */
+}
+
+/* ========================================
+   CUSTOM UTILITY CLASSES
+   ======================================== */
+
+@layer utilities {
+  /* Card base style */
+  .card {
+    @apply bg-obsidian-surface border border-obsidian-border rounded-lg;
+    transition: transform 150ms ease, box-shadow 250ms ease;
+  }
+  
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  }
+  
+  /* Button styles */
+  .btn-primary {
+    @apply bg-accent-violet hover:bg-accent-violet-hover text-white font-medium py-3 px-6 rounded-md;
+    transition: background-color 150ms ease, transform 150ms ease;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-1px);
+  }
+  
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+  
+  .btn-secondary {
+    @apply bg-transparent border border-obsidian-border hover:border-obsidian-border-focus text-text-primary font-medium py-3 px-6 rounded-md;
+    transition: border-color 150ms ease;
+  }
+  
+  .btn-ghost {
+    @apply bg-transparent hover:bg-obsidian-elevated text-text-secondary hover:text-text-primary py-2 px-4 rounded-md;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+  
+  /* Status dot */
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+  
+  .status-dot-online {
+    @apply bg-status-online;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+  }
+  
+  .status-dot-working {
+    @apply bg-status-working animate-pulse-slow;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+  }
+  
+  .status-dot-offline {
+    @apply bg-status-offline;
+  }
+  
+  .status-dot-error {
+    @apply bg-status-error;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  }
+  
+  /* RepID badge */
+  .repid-badge {
+    @apply font-mono text-sm px-2 py-0.5 rounded bg-obsidian-elevated;
+  }
+  
+  .repid-gold {
+    @apply text-gold border border-gold/30;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+  }
+  
+  .repid-high {
+    @apply text-accent-violet border border-accent-violet/30;
+  }
+  
+  .repid-mid {
+    @apply text-text-secondary border border-obsidian-border;
+  }
+  
+  /* Mono text */
+  .mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  /* Live indicator */
+  .live-dot {
+    @apply w-2 h-2 rounded-full bg-red-500 animate-pulse-slow;
+  }
+  
+  /* Safe area for mobile */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+  
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 16px);
+  }
+}
+
+/* ========================================
+   SCROLLBAR STYLING
+   ======================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e1e2e;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f50;
+}
+
+/* ========================================
+   SELECTION STYLING
+   ======================================== */
+
+::selection {
+  background: rgba(139, 92, 246, 0.3);
+  color: #e4e4e7;
+}
