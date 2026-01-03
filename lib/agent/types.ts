@@ -55,4 +55,44 @@ export interface AgentRegistryRecord {
     tasks_failed: number;
     current_tier: AutonomyTier;
     last_active: string;
+    status: 'active' | 'idle' | 'offline' | 'error';
+    id?: string; // Optional ID for grid keys
 }
+
+// ============================================
+// BRAIN TRANSPLANT: SHARED ORGANS
+// ============================================
+
+export interface Pattern {
+    task_id?: string;
+    pattern_type: 'design' | 'code' | 'architecture' | 'workflow';
+    trigger_keywords: string[];
+    learned_insight: string;
+    confidence: number;
+    discovered_by: string;
+}
+
+export interface HealingDiagnosis {
+    discoveredBy: string;
+    discoveredAt: string;
+    myBrainValid: boolean;
+    siblingsHealthy: boolean;
+    missingHeartbeats?: string[];
+}
+
+export interface SessionMetrics {
+    tasksCompleted: number;
+    cacheHits: number;
+    llmCalls: number;
+    healingAttempts: number;
+    siblingsChallenged: number;
+    truthChoices: number;
+    sabbathReflections: number;
+    wisdomCrystallizations: number;
+    patternsLearned: number;
+    tasksSpawned: number;
+    virtueRefusals: number;
+    bibleReads: number;
+    startTime: number;
+}
+

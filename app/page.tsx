@@ -150,7 +150,7 @@ export default async function LandingPage() {
       {/* FOOTER */}
       <footer className="px-6 py-12 border-t border-obsidian-border bg-obsidian-surface text-center">
         <p className="text-text-muted text-sm">
-          © 2025 Trinity Ecosystem. Built for the future of humanity.
+          © 2026 Trinity Ecosystem. Built for the future of humanity.
         </p>
       </footer>
     </main>

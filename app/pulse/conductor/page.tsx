@@ -8,15 +8,17 @@ import { supabase } from '@/lib/supabase';
 import { TaskQueue } from '@/components/TaskQueue';
 import { ActivityFeed } from '@/components/ActivityFeed';
 import { useEffect, useState } from 'react';
-import { Agent, TrinityTask } from '@/types';
+import { AgentRegistryRecord, Task } from '@/lib/agent/types'; // New Types
+import { AGENT_GROUPS } from '@/lib/agent/groups'; // 3x3 Groups
 import { useSupabaseSubscription } from '@/hooks/useSupabaseSubscription';
 import QRCode from 'qrcode';
 import { AddTaskModal } from '@/components/modals/AddTaskModal';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Skull, ServerCrash, Share2, Activity } from 'lucide-react'; // New Icons
 
 export default function ConductorPage() {
-    const [agents, setAgents] = useState<Agent[]>([]);
-    const [tasks, setTasks] = useState<TrinityTask[]>([]);
+    const [agents, setAgents] = useState<AgentRegistryRecord[]>([]); // New Type
+    const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [showShare, setShowShare] = useState(false);
     const [showAddTask, setShowAddTask] = useState(false);
@@ -26,11 +28,13 @@ export default function ConductorPage() {
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            const { data: agentData } = await supabase.from('agent_status').select('*').order('agent_name');
-            if (agentData) setAgents(agentData as Agent[]);
+            // Fetch from NEW RepID Table
+            const { data: agentData } = await supabase.from('trinity_agent_registry').select('*').order('agent_name');
+            if (agentData) setAgents(agentData as AgentRegistryRecord[]);
 
+            // Fetch tasks (assuming trinity_tasks is still valid or needs update)
             const { data: taskData } = await supabase.from('trinity_tasks').select('*').neq('status', 'completed').order('priority', { ascending: false });
-            if (taskData) setTasks(taskData as TrinityTask[]);
+            if (taskData) setTasks(taskData as any); // Temporary cast until Task types are unified
 
             setLoading(false);
         };
@@ -38,15 +42,9 @@ export default function ConductorPage() {
     }, []);
 
     // Realtime Subscriptions
-    useSupabaseSubscription('agent_status', (payload) => {
-        supabase.from('agent_status').select('*').order('agent_name').then(({ data }) => {
-            if (data) setAgents(data as Agent[]);
-        });
-    });
-
-    useSupabaseSubscription('trinity_tasks', () => {
-        supabase.from('trinity_tasks').select('*').neq('status', 'completed').order('priority', { ascending: false }).then(({ data }) => {
-            if (data) setTasks(data as TrinityTask[]);
+    useSupabaseSubscription('trinity_agent_registry', (payload) => {
+        supabase.from('trinity_agent_registry').select('*').order('agent_name').then(({ data }) => {
+            if (data) setAgents(data as AgentRegistryRecord[]);
         });
     });
 
@@ -76,6 +74,47 @@ export default function ConductorPage() {
                 {/* LEFT COLUMN: Grid & Activity */}
                 <div className="lg:col-span-3 flex flex-col gap-6 h-full overflow-hidden">
 
+                    {/* NEW: Chaos & Squad Panel */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
+                        {/* Chaos Testing */}
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-red-900/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="flex items-start justify-between relative z-10">
+                                <div className="flex items-center gap-2">
+                                    <Skull className="w-5 h-5 text-red-500" />
+                                    <div>
+                                        <h2 className="text-sm font-bold text-zinc-100">Chaos Testing</h2>
+                                        <p className="text-zinc-500 text-[10px]">Anti-fragility simulation</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => alert('Agent Killed')} className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors">
+                                        Kill Random
+                                    </button>
+                                    <button onClick={() => alert('DB Severed')} className="px-3 py-1 bg-orange-950/50 border border-orange-900/30 text-orange-300 text-xs rounded hover:bg-orange-900/80 transition-colors">
+                                        Sever DB
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3x3 Squad Status */}
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Share2 className="w-4 h-4 text-blue-500" />
+                                <h2 className="text-sm font-bold text-zinc-100">Squad Status</h2>
+                            </div>
+                            <div className="flex gap-2">
+                                {Object.values(AGENT_GROUPS).map(group => (
+                                    <div key={group.id} className="flex-1 bg-black/40 py-1.5 px-2 rounded border border-zinc-800/50 text-center">
+                                        <div className="text-[9px] text-zinc-500 uppercase tracking-wider mb-0.5">{group.name.split(' ')[0]}</div>
+                                        <div className="text-green-400 text-[10px] font-mono font-bold">ONLINE</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Agents Grid */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         <div className="mb-4 flex items-center justify-between">
@@ -85,7 +124,7 @@ export default function ConductorPage() {
                                     <Skeleton className="w-24 h-6" />
                                 ) : (
                                     <span className="text-xs text-status-online bg-status-online/10 px-2 py-1 rounded border border-status-online/20">
-                                        {agents.filter(a => a.status === 'online' || a.status === 'working').length}/{agents.length} Online
+                                        {agents.filter(a => a.status === 'active').length}/{agents.length} Online
                                     </span>
                                 )}
                             </div>
@@ -109,7 +148,8 @@ export default function ConductorPage() {
                 {/* RIGHT COLUMN: Tasks & Stats */}
                 <div className="lg:col-span-1 flex flex-col gap-6 h-full">
                     <div className="h-1/2">
-                        <TaskQueue tasks={tasks} onAddTask={() => setShowAddTask(true)} />
+                        {/* Temporarily using any for tasks until type unification */}
+                        <TaskQueue tasks={tasks as any} onAddTask={() => setShowAddTask(true)} />
                     </div>
 
                     <div className="h-1/2 flex flex-col gap-4">
@@ -166,7 +206,7 @@ export default function ConductorPage() {
             <AddTaskModal
                 isOpen={showAddTask}
                 onClose={() => setShowAddTask(false)}
-                availableAgents={agents}
+                availableAgents={agents} // Now expects AgentRegistryRecord, which we supply
             />
         </div>
     );

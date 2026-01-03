@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
-import { Agent } from '@/types';
+import { AgentRegistryRecord } from '@/lib/agent/types';
 
 interface AddTaskModalProps {
     isOpen: boolean;
     onClose: () => void;
-    availableAgents: Agent[];
+    availableAgents: AgentRegistryRecord[];
 }
 
 export function AddTaskModal({ isOpen, onClose, availableAgents }: AddTaskModalProps) {

@@ -2,6 +2,26 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
 import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, Task, AutonomyTier, AgentRegistryRecord } from './types';
 
+const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
+
+export type MCPPhase = 'WAKE' | 'FIND_TASK' | 'EXECUTE' | 'COMPLETE' | 'IDLE' | 'EVERGREEN' | 'HEALING';
+
+export interface SessionMetrics {
+    tasksCompleted: number;
+    cacheHits: number;
+    llmCalls: number;
+    healingAttempts: number;
+    siblingsChallenged: number;
+    truthChoices: number;
+    sabbathReflections: number;
+    wisdomCrystallizations: number;
+    patternsLearned: number;
+    tasksSpawned: number;
+    virtueRefusals: number;
+    bibleReads: number;
+    startTime: number;
+}
+
 // ============================================
 // THE CONSTITUTION - IMMUTABLE PRINCIPLES
 // ============================================
@@ -138,11 +158,77 @@ export class ConstitutionalAgent {
     autonomyTier: AutonomyTier = 'Assist';
     tasksCompleted: number = 0;
 
+    // BRAIN TRANSPLANT: New Organs
+    sessionMetrics: SessionMetrics;
+    bibleCache: string | null = null;
+    bibleCacheTime: number = 0;
+    BIBLE_CACHE_TTL: number = 10 * 60 * 1000;
+
+    // MCP Cache
+    private mcpCache: Map<string, string> = new Map();
+
+    /**
+     * MCP Protocol Loader
+     * Fetches operational protocols from GitHub to enforce strict guidelines.
+     */
+    async checkMCP(phase: MCPPhase): Promise<string> {
+        // 1. Check Cache first
+        if (this.mcpCache.has(phase)) {
+            return this.mcpCache.get(phase)!;
+        }
+
+        console.log(`[${this.name}] 📜 Loading MCP Protocol: ${phase}...`);
+        try {
+            const url = `${MCP_BASE_URL}/${phase}.md`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`MCP fetch failed: ${response.status}`);
+
+            const content = await response.text();
+            this.mcpCache.set(phase, content); // Cache for session
+            return content;
+        } catch (error) {
+            console.error(`[${this.name}] ⚠️ MCP Load Failed for ${phase}:`, error);
+            // Fallback to basic rules if fetch fails
+            return this.getFallbackMCP(phase);
+        }
+    }
+
+    private getFallbackMCP(phase: string): string {
+        const fallbacks: Record<string, string> = {
+            'WAKE': 'Check connection, sync state, and register heartbeat.',
+            'FIND_TASK': 'Find 1 pending task by priority. Claim it explicitly.',
+            'EXECUTE': 'Perform work with high quality. Create artifacts if required.',
+            'COMPLETE': 'REQUIRED: artifact_url must be set for code/research/content tasks. Min duration 5 mins.',
+            'IDLE': 'Wait 3 mins before checking again. Respawn evergreen tasks.',
+            'EVERGREEN': 'Increment loop count and respawn task.',
+            'HEALING': 'LIMIT: Maximum 1 healing task per hour. Verify failure first.'
+        };
+        return fallbacks[phase] || 'Follow standard operating procedure.';
+    }
+
     constructor(config: AgentConfig) {
         this.name = config.name || 'UNKNOWN';
         this.wisdom = AGENT_WISDOM[this.name] || AGENT_WISDOM.HDM;
-        // this.tier = this.wisdom.tier; // Deprecated in favor of dynamic tier
         this.version = CONSTITUTION.VERSION;
+
+        this.sessionMetrics = {
+            tasksCompleted: 0,
+            cacheHits: 0,
+            llmCalls: 0,
+            healingAttempts: 0,
+            siblingsChallenged: 0,
+            truthChoices: 0,
+            sabbathReflections: 0,
+            wisdomCrystallizations: 0,
+            patternsLearned: 0,
+            tasksSpawned: 0,
+            virtueRefusals: 0,
+            bibleReads: 0,
+            startTime: Date.now()
+        };
+
+        // Start the Trinity Healing Loop
+        this.startTrinityHealingLoop();
 
         this.supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -190,6 +276,9 @@ export class ConstitutionalAgent {
      * Syncs the agent's reputation and tier from the immutable ledger (Supabase).
      */
     async syncState() {
+        // Execute WAKE Protocol
+        await this.checkMCP('WAKE');
+
         const { data, error } = await this.supabase
             .from('trinity_agent_registry')
             .select('*')
@@ -263,6 +352,114 @@ export class ConstitutionalAgent {
         }
         console.warn(`[${this.name}] ⛔ ACCESS DENIED. Required: ${requiredTier}, Current: ${this.autonomyTier}`);
         return false;
+    }
+
+    // ============================================
+    // CORE STRATEGIES
+    // ============================================
+
+    // ============================================
+    // BRAIN TRANSPLANT: NEW ORGANS (Healing, Context, Genome)
+    // ============================================
+
+    async canCreateHealingTask(): Promise<boolean> {
+        // Enforce HEALING Protocol throttle
+        await this.checkMCP('HEALING');
+
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const { count, error } = await this.supabase
+            .from('trinity_tasks')
+            .select('id', { count: 'exact', head: true })
+            .ilike('title', '%HEALING%')
+            .eq('claimed_by', this.name)
+            .gte('created_at', oneHourAgo);
+
+        if (error) {
+            console.error(`[${this.name}] ⚠️ Failed to check healing limit:`, error);
+            return false; // Fail safe
+        }
+
+        const limit = 1; // Strict 1 per hour limit
+        if ((count || 0) >= limit) {
+            console.warn(`[${this.name}] 🛑 HEALING THROTLED: Already ran ${count} healing tasks in last hour.`);
+            return false;
+        }
+        return true;
+    }
+
+    startTrinityHealingLoop() {
+        if (typeof window === 'undefined') { // Only run loops on server-side
+            setInterval(() => this.runSelfDiagnostic(), 10 * 60 * 1000);
+            // setTimeout(() => this.runSelfDiagnostic(), 5000); // Trigger immediate check for verification
+        }
+    }
+
+    async runSelfDiagnostic() {
+        console.log(`[${this.name}] 🔍 Running self-diagnostic...`);
+        try {
+            // Simple check for now - can expand to check heartbeats table
+            const brainValid = this.version.includes('repid') || this.version.includes('anfis');
+
+            if (!brainValid) {
+                console.warn(`[${this.name}] ⚠️ Brain version mismatch!`);
+
+                // CHECK MCP HEALING LIMIT
+                if (await this.canCreateHealingTask()) {
+                    this.sessionMetrics.healingAttempts++;
+                    console.log(`[${this.name}] 🩹 Healing allowed.`);
+                } else {
+                    console.log(`[${this.name}] 🛑 Healing skipped due to throttle.`);
+                }
+            } else {
+                console.log(`[${this.name}] ✅ Brain healthy.`);
+            }
+
+            await this.reportGenome();
+        } catch (err: any) {
+            console.error(`[${this.name}] Self-diagnostic error:`, err.message);
+        }
+    }
+
+    async fetchBible(): Promise<string> {
+        if (this.bibleCache && (Date.now() - this.bibleCacheTime) < this.BIBLE_CACHE_TTL) {
+            return this.bibleCache;
+        }
+        // Fallback for now - in future connect to GitHub
+        const bible = `
+# CORE PRINCIPLES (Bible Fallback)
+## The Eight Virtues (Philippians 4:8)
+- TRUE: Never fabricate. Admit uncertainty.
+- NOBLE: Help people help people.
+- RIGHT: Treat all with equal dignity.
+- PURE: Log everything. Hide nothing.
+- LOVELY: Seek restoration over punishment.
+- ADMIRABLE: Challenge with respect.
+- EXCELLENT: Pursue continuous improvement.
+- PRAISEWORTHY: Celebrate truth and love.
+`;
+        this.bibleCache = bible;
+        this.bibleCacheTime = Date.now();
+        this.sessionMetrics.bibleReads++;
+        return bible;
+    }
+
+    async reportGenome() {
+        if (this.sessionMetrics.tasksCompleted > 0 && this.sessionMetrics.tasksCompleted % 5 === 0) {
+            try {
+                // Stub for evolution log
+                console.log(`[${this.name}] 🧬 Genome Reported: ${this.sessionMetrics.tasksCompleted} tasks, ${this.sessionMetrics.patternsLearned} patterns.`);
+            } catch (e) {
+                // Non-fatal
+            }
+        }
+    }
+
+    async extractPatterns(task: string, output: string) {
+        const keywords = (task + ' ' + output).toLowerCase();
+        if (keywords.includes('api') && keywords.includes('endpoint')) {
+            this.sessionMetrics.patternsLearned++;
+            console.log(`[${this.name}] 🧠 LOGIC PATTERN DETECTED: API usage`);
+        }
     }
 
     // ============================================
@@ -346,7 +543,7 @@ export class ConstitutionalAgent {
                 body: JSON.stringify({
                     model: 'gpt-4o',
                     messages: [
-                        { role: 'system', content: `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}` },
+                        { role: 'system', content: `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${await this.fetchBible()}` },
                         { role: 'user', content: prompt }
                     ]
                 })
