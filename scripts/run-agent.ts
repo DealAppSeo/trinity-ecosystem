@@ -17,13 +17,32 @@ async function startAgent() {
 
     console.log(`✅ ${agentName} is ONLINE (Tier: ${agent.autonomyTier}, Rep: ${agent.reputationScore})`);
 
-    // The ConstitutionalAgent starts its healing loop in the constructor.
-    // We just need to keep the process alive.
-    // In a real implementation, we might call a main loop here like `agent.runLoop()`
+    // START HTTP SERVER FOR RAILWAY/UPTIME ROBOT
+    // Railway requires the app to listen on PORT (usually 3000)
+    const http = require('http');
+    const port = process.env.PORT || 3000;
 
-    // Keep process alive
+    const server = http.createServer((req: any, res: any) => {
+        if (req.url === '/health' || req.url === '/') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                status: 'online',
+                agent: agentName,
+                uptime: process.uptime()
+            }));
+        } else {
+            res.writeHead(404);
+            res.end();
+        }
+    });
+
+    server.listen(port, () => {
+        console.log(`[${agentName}] 🌍 Health Server listening on port ${port}`);
+    });
+
+    // Keep process alive logic is now handled by the server listening
+    // Heartbeat log every minute
     setInterval(() => {
-        // Heartbeat log every minute
         console.log(`[${agentName}] ❤️ Heartbeat - Process Active`);
     }, 60000);
 }
