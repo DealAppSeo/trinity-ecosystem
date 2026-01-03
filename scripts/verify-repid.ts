@@ -35,7 +35,7 @@ async function verifyRepID() {
     console.log("🏋️ Simulating Successful Task Completion...");
     await agent.updateReputation(true);
 
-    if (agent.reputationScore !== 11) {
+    if ((agent.reputationScore as number) !== 11) {
         console.error(`❌ FAIL: Reputation should increase to 11. Got: ${agent.reputationScore}`);
         process.exit(1);
     }

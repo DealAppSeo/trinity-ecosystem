@@ -6,13 +6,13 @@ import { CostTicker } from '@/components/CostTicker';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
-import { Agent } from '@/types';
+import { AgentRegistryRecord } from '@/lib/agent/types';
 import { useSupabaseSubscription } from '@/hooks/useSupabaseSubscription';
 import { SignalUnlockModal } from '@/components/modals/SignalUnlockModal';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 export default function WatchPage() {
-    const [agents, setAgents] = useState<Agent[]>([]);
+    const [agents, setAgents] = useState<AgentRegistryRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [greetingPlayed, setGreetingPlayed] = useState(false);
     const [showSignalModal, setShowSignalModal] = useState(false);
@@ -22,8 +22,8 @@ export default function WatchPage() {
     useEffect(() => {
         const fetchAgents = async () => {
             setLoading(true);
-            const { data } = await supabase.from('agent_status').select('*').order('agent_name');
-            if (data) setAgents(data as Agent[]);
+            const { data } = await supabase.from('trinity_agent_registry').select('*').order('agent_name');
+            if (data) setAgents(data as AgentRegistryRecord[]);
             setLoading(false);
         };
         fetchAgents();
@@ -44,9 +44,9 @@ export default function WatchPage() {
     }, [greetingPlayed]);
 
     // Realtime
-    useSupabaseSubscription('agent_status', () => {
-        supabase.from('agent_status').select('*').order('agent_name').then(({ data }) => {
-            if (data) setAgents(data as Agent[]);
+    useSupabaseSubscription('trinity_agent_registry', () => {
+        supabase.from('trinity_agent_registry').select('*').order('agent_name').then(({ data }) => {
+            if (data) setAgents(data as AgentRegistryRecord[]);
         });
     });
 
