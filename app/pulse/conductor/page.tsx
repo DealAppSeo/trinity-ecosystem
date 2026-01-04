@@ -63,6 +63,35 @@ export default function ConductorPage() {
         }
     };
 
+    // --- CAPTAIN FEATURES ---
+    const [northStar, setNorthStar] = useState('');
+    const [isSavingNS, setIsSavingNS] = useState(false);
+
+    useEffect(() => {
+        // Fetch initial config
+        fetch('/api/captain').then(r => r.json()).then(data => {
+            if (data?.north_star_directive) setNorthStar(data.north_star_directive);
+        });
+    }, []);
+
+    const updateNorthStar = async () => {
+        setIsSavingNS(true);
+        await fetch('/api/captain', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'UPDATE_NORTH_STAR', north_star: northStar })
+        });
+        setIsSavingNS(false);
+    };
+
+    const wakeTrinity = async () => {
+        if (!confirm('⚠️ WAKE ALL AGENTS? This will signal the swarm to startup.')) return;
+        await fetch('/api/captain', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_WAKE' })
+        });
+        alert('SIGNAL SENT: SYSTEM_WAKE');
+    };
+
     return (
         <div className="min-h-screen bg-obsidian-base flex flex-col">
             <Header
@@ -70,8 +99,29 @@ export default function ConductorPage() {
                 showLive
                 viewerCount={stats.online_agents} // Real active agents count
                 rightContent={
-                    <div className="flex gap-2 text-xs text-white/30 font-mono items-center">
-                        CONNECTED: CONTROLLER.AITRINITYSYMPHONY.COM
+                    <div className="flex gap-4 items-center">
+                        <div className="flex gap-2 text-xs text-white/30 font-mono items-center">
+                            CONNECTED: CONTROLLER.AITRINITYSYMPHONY.COM
+                        </div>
+                        {/* CAPTAIN CONTROLS */}
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={northStar}
+                                onChange={(e) => setNorthStar(e.target.value)}
+                                onBlur={updateNorthStar}
+                                placeholder="Set North Star Directive..."
+                                className="bg-zinc-900 border border-zinc-700 text-xs px-3 py-1.5 rounded w-64 text-zinc-300 focus:border-accent-violet focus:outline-none transition-colors"
+                            />
+                            {stats.online_agents === 0 && (
+                                <button
+                                    onClick={wakeTrinity}
+                                    className="px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-200 text-xs font-bold rounded border border-red-700 animate-pulse flex items-center gap-2"
+                                >
+                                    <Share2 className="w-3 h-3" /> WAKE
+                                </button>
+                            )}
+                        </div>
                     </div>
                 }
             />

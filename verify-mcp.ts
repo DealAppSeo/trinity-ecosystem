@@ -20,7 +20,7 @@ async function verifyMCP() {
 
     // 2. Test Fallback (Fake Phase)
     console.log("2️⃣ Testing Fallback Logic...");
-    // @ts-ignore
+    // @ts-expect-error Testing fallback with invalid phase
     const fallback = await agent.checkMCP('UNKNOWN_PHASE');
     if (fallback.includes('standard operating procedure')) {
         console.log("✅ Fallback Logic Works");

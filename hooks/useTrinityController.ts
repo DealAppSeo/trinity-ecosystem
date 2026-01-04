@@ -8,8 +8,32 @@ export function useTrinityController() {
     const [loading, setLoading] = useState(true);
     // const supabase = createClient(); // REMOVED: Using imported singleton
 
+    const fetchData = async () => {
+        setLoading(true);
+
+        // Fetch Agents
+        const { data: agentData } = await supabase
+            .from('trinity_agent_registry')
+            .select('*')
+            .order('reputation_score', { ascending: false });
+
+        if (agentData) setAgents(agentData as AgentRegistryRecord[]);
+
+        // Fetch Recent Tasks
+        const { data: taskData } = await supabase
+            .from('trinity_tasks')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (taskData) setTasks(taskData as Task[]);
+
+        setLoading(false);
+    };
+
     useEffect(() => {
         // 1. Initial Fetch
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchData();
 
         // 2. Real-time Subscription (Agents)
@@ -39,29 +63,6 @@ export function useTrinityController() {
             supabase.removeChannel(taskSub);
         };
     }, []);
-
-    const fetchData = async () => {
-        setLoading(true);
-
-        // Fetch Agents
-        const { data: agentData } = await supabase
-            .from('trinity_agent_registry')
-            .select('*')
-            .order('reputation_score', { ascending: false });
-
-        if (agentData) setAgents(agentData as AgentRegistryRecord[]);
-
-        // Fetch Recent Tasks
-        const { data: taskData } = await supabase
-            .from('trinity_tasks')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(20);
-
-        if (taskData) setTasks(taskData as Task[]);
-
-        setLoading(false);
-    };
 
     const createTask = async (title: string, priority: string = 'medium') => {
         await supabase.from('trinity_tasks').insert({

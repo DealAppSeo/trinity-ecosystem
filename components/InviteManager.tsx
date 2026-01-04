@@ -16,10 +16,6 @@ export default function InviteManager({ supabase }: { supabase: any }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
 
-    useEffect(() => {
-        fetchInvites();
-    }, []);
-
     const fetchInvites = async () => {
         setIsLoading(true);
         const { data } = await supabase
@@ -30,6 +26,11 @@ export default function InviteManager({ supabase }: { supabase: any }) {
         if (data) setInvites(data);
         setIsLoading(false);
     };
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        fetchInvites();
+    }, []);
 
     const createInvite = async () => {
         setIsCreating(true);

@@ -35,7 +35,8 @@ export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGr
     }, {} as Record<string, any[]>);
 
     // Order: Orchestration -> Alpha -> Beta -> Gamma
-    const groupOrder = ['ORCHESTRATION', 'ALPHA', 'BETA', 'GAMMA'];
+    // Order: Alpha -> Beta -> Gamma
+    const groupOrder = ['ALPHA', 'BETA', 'GAMMA'];
 
     return (
         <div className="space-y-6">

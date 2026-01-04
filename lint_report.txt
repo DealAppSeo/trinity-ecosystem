@@ -1,0 +1,234 @@
+﻿
+> trinity-symphony@0.1.0 lint
+> eslint
+
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\access-gate\page.tsx
+  11:11  warning  'router' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  38:18  warning  'err' is defined but never used              @typescript-eslint/no-unused-vars
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\api\agents\route.ts
+  31:65  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  36:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  43:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  44:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  46:49  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  66:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\api\cron\retro\route.ts
+  29:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\api\stats\route.ts
+  44:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\api\tasks\[id]\assign\route.ts
+  38:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\api\tasks\route.ts
+  33:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  70:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\controller\page.tsx
+  3:10  warning  'useEffect' is defined but never used            @typescript-eslint/no-unused-vars
+  6:10  warning  'supabase' is defined but never used             @typescript-eslint/no-unused-vars
+  7:10  warning  'AgentRegistryRecord' is defined but never used  @typescript-eslint/no-unused-vars
+  7:31  warning  'Task' is defined but never used                 @typescript-eslint/no-unused-vars
+  9:82  warning  'Users' is defined but never used                @typescript-eslint/no-unused-vars
+  9:89  warning  'Zap' is defined but never used                  @typescript-eslint/no-unused-vars
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\join\page.tsx
+  134:75  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\pulse\conductor\page.tsx
+   6:10  warning  'Button' is defined but never used                     @typescript-eslint/no-unused-vars
+  13:25  warning  'AlertTriangle' is defined but never used              @typescript-eslint/no-unused-vars
+  17:42  error    Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  18:40  error    Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  54:11  warning  'handleAssignTask' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  61:18  warning  'e' is defined but never used                          @typescript-eslint/no-unused-vars
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\pulse\watch\page.tsx
+  42:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\app\pulse\watch\page.tsx:42:13
+  40 |             window.speechSynthesis.speak(msg);
+  41 |             localStorage.setItem('mel_greeted', 'true');
+> 42 |             setGreetingPlayed(true);
+     |             ^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  43 |         }
+  44 |     }, [greetingPlayed]);
+  45 |  react-hooks/set-state-in-effect
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\components\AgentGrid.tsx
+    3:10  warning  'Activity' is defined but never used      @typescript-eslint/no-unused-vars
+    3:20  warning  'Shield' is defined but never used        @typescript-eslint/no-unused-vars
+    3:28  warning  'Zap' is defined but never used           @typescript-eslint/no-unused-vars
+    3:33  warning  'Database' is defined but never used      @typescript-eslint/no-unused-vars
+    3:48  warning  'Eye' is defined but never used           @typescript-eslint/no-unused-vars
+    6:13  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   11:36  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   35:29  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   56:54  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  108:63  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\components\InviteManager.tsx
+  14:65  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-explicit-any
+  20:9   error    Error: Cannot access variable before it is declared
+
+`fetchInvites` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\components\InviteManager.tsx:20:9
+  18 |
+  19 |     useEffect(() => {
+> 20 |         fetchInvites();
+     |         ^^^^^^^^^^^^ `fetchInvites` accessed before it is declared
+  21 |     }, []);
+  22 |
+  23 |     const fetchInvites = async () => {
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\components\InviteManager.tsx:23:5
+  21 |     }, []);
+  22 |
+> 23 |     const fetchInvites = async () => {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 24 |         setIsLoading(true);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |         const { data } = await supabase
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |             .from('trinity_access_invites')
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 27 |             .select('*')
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 28 |             .order('created_at', { ascending: false })
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |             .limit(10);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 30 |         if (data) setInvites(data);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 31 |         setIsLoading(false);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 32 |     };
+     | ^^^^^^^ `fetchInvites` is declared here
+  33 |
+  34 |     const createInvite = async () => {
+  35 |         setIsCreating(true);  react-hooks/immutability
+  21:8   warning  React Hook useEffect has a missing dependency: 'fetchInvites'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/exhaustive-deps
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\components\modals\AddTaskModal.tsx
+   5:10  warning  'supabase' is defined but never used      @typescript-eslint/no-unused-vars
+  51:23  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\hooks\useSupabaseSubscription.ts
+   9:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  19:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\hooks\useTrinityController.ts
+  13:9  error  Error: Cannot access variable before it is declared
+
+`fetchData` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\hooks\useTrinityController.ts:13:9
+  11 |     useEffect(() => {
+  12 |         // 1. Initial Fetch
+> 13 |         fetchData();
+     |         ^^^^^^^^^ `fetchData` accessed before it is declared
+  14 |
+  15 |         // 2. Real-time Subscription (Agents)
+  16 |         const agentSub = supabase
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\hooks\useTrinityController.ts:43:5
+  41 |     }, []);
+  42 |
+> 43 |     const fetchData = async () => {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 44 |         setLoading(true);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 45 |
+     ΓÇª
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 63 |         setLoading(false);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 64 |     };
+     | ^^^^^^^ `fetchData` is declared here
+  65 |
+  66 |     const createTask = async (title: string, priority: string = 'medium') => {
+  67 |         await supabase.from('trinity_tasks').insert({  react-hooks/immutability
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\lib\agent\ConstitutionalAgent.ts
+    3:38  warning  'ProviderConfig' is defined but never used    @typescript-eslint/no-unused-vars
+  142:39  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  282:23  warning  'error' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  428:27  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  575:23  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  631:21  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  703:18  warning  'e' is defined but never used                 @typescript-eslint/no-unused-vars
+  703:21  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  729:21  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  781:21  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  790:58  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  806:18  warning  'err' is defined but never used               @typescript-eslint/no-unused-vars
+  830:18  warning  'err' is defined but never used               @typescript-eslint/no-unused-vars
+  847:23  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  918:35  warning  'options' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  918:44  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  943:25  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\lib\agent\GCM.ts
+  58:18  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\lib\agent\groups.ts
+  2:10  warning  'WisdomProfile' is defined but never used  @typescript-eslint/no-unused-vars
+  3:10  warning  'AGENT_WISDOM' is defined but never used   @typescript-eslint/no-unused-vars
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\reference\constitutional-agent-base.js
+   6:9   warning  'createClient' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   6:26  error    A `require()` style import is forbidden            @typescript-eslint/no-require-imports
+   7:9   warning  'Redis' is assigned a value but never used         @typescript-eslint/no-unused-vars
+   7:19  error    A `require()` style import is forbidden            @typescript-eslint/no-require-imports
+   8:7   warning  'crypto' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   8:16  error    A `require()` style import is forbidden            @typescript-eslint/no-require-imports
+  13:7   warning  'CONSTITUTION' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\scripts\run-agent.ts
+  22:18  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+  25:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  25:54  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\scripts\verify-transplant.ts
+  14:7  warning  '__dirname' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\trinity-apm.js
+  1:1  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\trinity-gcm.js
+  1:1  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\trinity-hdm.js
+  1:1  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\trinity-mel.js
+  1:1  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\trinity-nexus.js
+  1:1  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\trinity-torch.js
+  1:1  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\trinity-veritas.js
+  1:1  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\trinity-w3c.js
+  1:1  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-ecosystem\verify-mcp.ts
+  23:5  error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+
+Γ£û 85 problems (52 errors, 33 warnings)
+

@@ -131,7 +131,7 @@ export default function JoinPage() {
                 <Card className="max-w-lg w-full p-8" elevated>
                     <div className="text-center mb-8">
                         <h2 className="text-2xl font-bold text-text-primary mb-2">One Last Thing</h2>
-                        <p className="text-text-secondary">Tell us how you'll contribute to the ecosystem.</p>
+                        <p className="text-text-secondary">Tell us how you&apos;ll contribute to the ecosystem.</p>
                     </div>
 
                     <form onSubmit={handleDetailsSubmit} className="space-y-4">

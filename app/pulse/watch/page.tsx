@@ -14,7 +14,6 @@ import { Skeleton } from '@/components/ui/Skeleton';
 export default function WatchPage() {
     const [agents, setAgents] = useState<AgentRegistryRecord[]>([]);
     const [loading, setLoading] = useState(true);
-    const [greetingPlayed, setGreetingPlayed] = useState(false);
     const [showSignalModal, setShowSignalModal] = useState(false);
     const [signalUnlocked, setSignalUnlocked] = useState(false);
 
@@ -30,7 +29,7 @@ export default function WatchPage() {
 
         // Mel Greeting Logic (Try to play on mount)
         const hasVisited = localStorage.getItem('mel_greeted');
-        if (!hasVisited && !greetingPlayed) {
+        if (!hasVisited) {
             const msg = new SpeechSynthesisUtterance("Welcome to the Trinity Pulse. Observe the symphony of intelligence.");
             const voices = window.speechSynthesis.getVoices();
             const femaleVoice = voices.find(v => v.name.includes('Female') || v.name.includes('Google US English'));
@@ -39,9 +38,8 @@ export default function WatchPage() {
             // This might be blocked by browsers, but we try anyway
             window.speechSynthesis.speak(msg);
             localStorage.setItem('mel_greeted', 'true');
-            setGreetingPlayed(true);
         }
-    }, [greetingPlayed]);
+    }, []);
 
     // Realtime
     useSupabaseSubscription('trinity_agent_registry', () => {

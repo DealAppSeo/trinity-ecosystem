@@ -479,7 +479,7 @@ export class ConstitutionalAgent {
         const localTypes = ['self-healing', 'system', 'wake', 'heartbeat', 'meta', 'status_check'];
         const localTitles = ['[HEALING]', '[WAKE]', '[SYSTEM]', '[HEARTBEAT]'];
 
-        if (localTypes.includes(task.task_type)) return true;
+        if (task.task_type && localTypes.includes(task.task_type)) return true;
         if (task.title && localTitles.some(t => task.title.includes(t))) return true;
         return false;
     }
@@ -526,7 +526,7 @@ export class ConstitutionalAgent {
             await this.supabase.from('trinity_tasks').update({ status: 'in_progress', claimed_by: this.name, started_at: new Date().toISOString() }).eq('id', task.id);
 
             // Context & Prompt - SIMPLIFIED FOR TRANSPLANT
-            const enrichedDescription = task.description + "\nContext: " + (task.context || '');
+            const enrichedDescription = task.description + "\nContext: " + ((task as any).context || '');
             const prompt = `${enrichedDescription}\n\nTask: ${task.title}\nRole: ${this.name}`;
 
             // Call LLM
@@ -537,13 +537,13 @@ export class ConstitutionalAgent {
 
             // Artifact Logic
             let externalArtifactUrl: string | null = null;
-            if (['content', 'research', 'code'].includes(task.task_type) || task.requires_external_artifact) {
+            if ((task.task_type && ['content', 'research', 'code'].includes(task.task_type)) || task.requires_external_artifact) {
                 const dbArtifactLink = await this.saveArtifact(task.id, result.output, 'text_content');
                 if (dbArtifactLink) externalArtifactUrl = dbArtifactLink;
             }
 
             // CRITICAL: BLOCK COMPLETION IF ARTIFACT MISSING for specific types
-            if (task.task_type !== 'self-healing' && !externalArtifactUrl && !['system', 'meta'].includes(task.task_type)) {
+            if (task.task_type !== 'self-healing' && !externalArtifactUrl && (!task.task_type || !['system', 'meta'].includes(task.task_type))) {
                 console.log(`[BLOCK] Task ${task.id} needs artifact`);
                 // For now, log but don't crash loop. In strict mode, throw.
                 // throw new Error('Artifact required'); 

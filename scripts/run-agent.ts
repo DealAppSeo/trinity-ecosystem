@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 import { ConstitutionalAgent } from '../lib/agent/ConstitutionalAgent';
+import http, { IncomingMessage, ServerResponse } from 'http'; // Added import for http and types
 
 const agentName = process.argv[2];
 
@@ -19,10 +20,9 @@ async function startAgent() {
 
     // START HTTP SERVER FOR RAILWAY/UPTIME ROBOT
     // Railway requires the app to listen on PORT (usually 3000)
-    const http = require('http');
     const port = process.env.PORT || 3000;
 
-    const server = http.createServer((req: any, res: any) => {
+    const server = http.createServer((req: IncomingMessage, res: ServerResponse) => { // Fixed types
         if (req.url === '/health' || req.url === '/') {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({

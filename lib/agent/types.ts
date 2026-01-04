@@ -44,6 +44,8 @@ export interface Task {
     github_issue_number?: number;
     requires_external_artifact?: boolean;
     transaction_hash?: string; // Proto-DAG audit trail
+    task_type?: string;
+    context?: string;
 }
 
 export type AutonomyTier = 'Assist' | 'Approve' | 'Act' | 'Learn';
