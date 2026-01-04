@@ -40,11 +40,10 @@ async function startAgent() {
         console.log(`[${agentName}] 🌍 Health Server listening on port ${port}`);
     });
 
-    // Keep process alive logic is now handled by the server listening
-    // Heartbeat log every minute
-    setInterval(() => {
-        console.log(`[${agentName}] ❤️ Heartbeat - Process Active`);
-    }, 60000);
+    // START MAIN AGENT LOOP
+    // This will run forever, checking tasks and sending heartbeats to Supabase
+    console.log(`[${agentName}] 🚀 Starting Trinity Healing Loop...`);
+    await agent.startTrinityHealingLoop();
 }
 
 startAgent().catch(err => {

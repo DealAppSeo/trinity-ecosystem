@@ -24,25 +24,34 @@ export function AddTaskModal({ isOpen, onClose, availableAgents }: AddTaskModalP
         e.preventDefault();
         setLoading(true);
 
-        const { error } = await supabase.from('trinity_tasks').insert([{
-            title,
-            description,
-            priority,
-            assigned_agent: assignedAgent || null,
-            status: 'pending' // Default status
-        }]);
+        try {
+            const res = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title,
+                    description,
+                    priority,
+                    agent_assigned: assignedAgent || null,
+                    task_type: 'general'
+                })
+            });
 
-        setLoading(false);
+            const data = await res.json();
 
-        if (error) {
-            alert('Failed to add task: ' + error.message);
-        } else {
+            if (!res.ok) throw new Error(data.error || 'Failed to create task');
+
             onClose();
             // Reset form
             setTitle('');
             setDescription('');
             setPriority(5);
             setAssignedAgent('');
+
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setLoading(false);
         }
     };
 

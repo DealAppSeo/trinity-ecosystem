@@ -4,56 +4,63 @@ import { Header } from '@/components/Header';
 import { AgentGrid } from '@/components/AgentGrid';
 import { CostTicker } from '@/components/CostTicker';
 import { Button } from '@/components/ui/Button';
-import { supabase } from '@/lib/supabase';
 import { TaskQueue } from '@/components/TaskQueue';
 import { ActivityFeed } from '@/components/ActivityFeed';
-import { useEffect, useState } from 'react';
-import { AgentRegistryRecord, Task } from '@/lib/agent/types'; // New Types
-import { AGENT_GROUPS } from '@/lib/agent/groups'; // 3x3 Groups
-import { useSupabaseSubscription } from '@/hooks/useSupabaseSubscription';
-import QRCode from 'qrcode';
+import { useEffect, useState, useCallback } from 'react';
 import { AddTaskModal } from '@/components/modals/AddTaskModal';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Skull, ServerCrash, Share2, Activity } from 'lucide-react'; // New Icons
+import InviteManager from '@/components/InviteManager';
+import { Skull, Share2, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/lib/supabase'; // Used for InviteManager
 
 export default function ConductorPage() {
-    const [agents, setAgents] = useState<AgentRegistryRecord[]>([]); // New Type
-    const [tasks, setTasks] = useState<Task[]>([]);
+    const [agents, setAgents] = useState<any[]>([]);
+    const [tasks, setTasks] = useState<any[]>([]);
+    const [stats, setStats] = useState({ online_agents: 0, tasks_completed_24h: 0, active_tasks: 0 });
     const [loading, setLoading] = useState(true);
-    const [showShare, setShowShare] = useState(false);
     const [showAddTask, setShowAddTask] = useState(false);
-    const [qrUrl, setQrUrl] = useState('');
 
-    // Initial Data Fetch
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            // Fetch from NEW RepID Table
-            const { data: agentData } = await supabase.from('trinity_agent_registry').select('*').order('agent_name');
-            if (agentData) setAgents(agentData as AgentRegistryRecord[]);
+    // Polling Fetcher
+    const refreshData = useCallback(async () => {
+        try {
+            const [agentsRes, tasksRes, statsRes] = await Promise.all([
+                fetch('/api/agents'),
+                fetch('/api/tasks'),
+                fetch('/api/stats')
+            ]);
 
-            // Fetch tasks (assuming trinity_tasks is still valid or needs update)
-            const { data: taskData } = await supabase.from('trinity_tasks').select('*').neq('status', 'completed').order('priority', { ascending: false });
-            if (taskData) setTasks(taskData as any); // Temporary cast until Task types are unified
+            if (agentsRes.ok) setAgents(await agentsRes.json());
+            if (tasksRes.ok) setTasks(await tasksRes.json());
+            if (statsRes.ok) setStats(await statsRes.json());
 
-            setLoading(false);
-        };
-        fetchData();
+        } catch (error) {
+            console.error('Polling Error:', error);
+        }
     }, []);
 
-    // Realtime Subscriptions
-    useSupabaseSubscription('trinity_agent_registry', (payload) => {
-        supabase.from('trinity_agent_registry').select('*').order('agent_name').then(({ data }) => {
-            if (data) setAgents(data as AgentRegistryRecord[]);
-        });
-    });
+    // Initial Fetch + Interval
+    useEffect(() => {
+        const init = async () => {
+            setLoading(true);
+            await refreshData();
+            setLoading(false);
+        };
+        init();
 
-    const generateInvite = async () => {
-        const code = Math.random().toString(36).substring(7);
-        const url = `https://aitrinitysymphony.com/pulse?i=${code}`;
-        const qr = await QRCode.toDataURL(url, { color: { dark: '#e4e4e7', light: '#00000000' } });
-        setQrUrl(qr);
-        setShowShare(true);
+        const interval = setInterval(refreshData, 10000); // 10s poll
+        return () => clearInterval(interval);
+    }, [refreshData]);
+
+    const handleAssignTask = async (taskId: string, agentName: string) => {
+        try {
+            await fetch(`/api/tasks/${taskId}/assign`, {
+                method: 'POST',
+                body: JSON.stringify({ agent: agentName })
+            });
+            refreshData(); // immediate refresh
+        } catch (e) {
+            alert('Assignment failed');
+        }
     };
 
     return (
@@ -61,10 +68,10 @@ export default function ConductorPage() {
             <Header
                 title="CONDUCTOR CONSOLE"
                 showLive
-                viewerCount={12}
+                viewerCount={stats.online_agents} // Real active agents count
                 rightContent={
-                    <div className="flex gap-2">
-                        <Button size="sm" variant="ghost" onClick={generateInvite}>Share Access</Button>
+                    <div className="flex gap-2 text-xs text-white/30 font-mono items-center">
+                        CONNECTED: CONTROLLER.AITRINITYSYMPHONY.COM
                     </div>
                 }
             />
@@ -74,7 +81,7 @@ export default function ConductorPage() {
                 {/* LEFT COLUMN: Grid & Activity */}
                 <div className="lg:col-span-3 flex flex-col gap-6 h-full overflow-hidden">
 
-                    {/* NEW: Chaos & Squad Panel */}
+                    {/* Chaos & Squad Panel */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
                         {/* Chaos Testing */}
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden group">
@@ -88,29 +95,38 @@ export default function ConductorPage() {
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => alert('Agent Killed')} className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors">
+                                    <button onClick={() => alert('Feature disabled in PROD')} className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors">
                                         Kill Random
                                     </button>
-                                    <button onClick={() => alert('DB Severed')} className="px-3 py-1 bg-orange-950/50 border border-orange-900/30 text-orange-300 text-xs rounded hover:bg-orange-900/80 transition-colors">
+                                    <button onClick={() => alert('Feature disabled in PROD')} className="px-3 py-1 bg-orange-950/50 border border-orange-900/30 text-orange-300 text-xs rounded hover:bg-orange-900/80 transition-colors">
                                         Sever DB
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        {/* 3x3 Squad Status */}
+                        {/* Squad Status Summary */}
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <Share2 className="w-4 h-4 text-blue-500" />
                                 <h2 className="text-sm font-bold text-zinc-100">Squad Status</h2>
                             </div>
                             <div className="flex gap-2">
-                                {Object.values(AGENT_GROUPS).map(group => (
-                                    <div key={group.id} className="flex-1 bg-black/40 py-1.5 px-2 rounded border border-zinc-800/50 text-center">
-                                        <div className="text-[9px] text-zinc-500 uppercase tracking-wider mb-0.5">{group.name.split(' ')[0]}</div>
-                                        <div className="text-green-400 text-[10px] font-mono font-bold">ONLINE</div>
-                                    </div>
-                                ))}
+                                {['Alpha', 'Beta', 'Gamma'].map(group => {
+                                    // Calculate online count for this group
+                                    const groupAgents = agents.filter(a => (a.group_name || '').toLowerCase().includes(group.toLowerCase()));
+                                    const onlineCount = groupAgents.filter(a => a.status === 'active').length;
+                                    const total = groupAgents.length || 3; // default to 3 if loading
+
+                                    return (
+                                        <div key={group} className="flex-1 bg-black/40 py-1.5 px-2 rounded border border-zinc-800/50 text-center">
+                                            <div className="text-[9px] text-zinc-500 uppercase tracking-wider mb-0.5">{group}</div>
+                                            <div className={`text-[10px] font-mono font-bold ${onlineCount === total ? 'text-green-400' : 'text-yellow-400'}`}>
+                                                {onlineCount}/{total} ONLINE
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -123,19 +139,27 @@ export default function ConductorPage() {
                                 {loading ? (
                                     <Skeleton className="w-24 h-6" />
                                 ) : (
-                                    <span className="text-xs text-status-online bg-status-online/10 px-2 py-1 rounded border border-status-online/20">
-                                        {agents.filter(a => a.status === 'active').length}/{agents.length} Online
+                                    <span className="text-xs text-status-online bg-status-online/10 px-2 py-1 rounded border border-status-online/20 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                        {stats.online_agents}/12 Systems Active
                                     </span>
                                 )}
                             </div>
                         </div>
 
-                        {loading ? (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
+                        {loading && agents.length === 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
                             </div>
                         ) : (
-                            <AgentGrid agents={agents} isConductor={true} />
+                            <AgentGrid
+                                agents={agents}
+                                isConductor={true}
+                                onAssignTask={(agentName) => {
+                                    /* Handle assignment in next iteration if UI supported */
+                                    console.log('Assign to', agentName);
+                                }}
+                            />
                         )}
                     </div>
 
@@ -147,35 +171,36 @@ export default function ConductorPage() {
 
                 {/* RIGHT COLUMN: Tasks & Stats */}
                 <div className="lg:col-span-1 flex flex-col gap-6 h-full">
-                    <div className="h-1/2">
-                        {/* Temporarily using any for tasks until type unification */}
-                        <TaskQueue tasks={tasks as any} onAddTask={() => setShowAddTask(true)} />
+
+                    {/* Invite Manager */}
+                    <div className="shrink-0">
+                        <InviteManager supabase={supabase} />
                     </div>
 
-                    <div className="h-1/2 flex flex-col gap-4">
-                        {/* Quick Actions / Stats */}
-                        <div className="p-4 bg-obsidian-surface border border-obsidian-border rounded-lg">
-                            <h3 className="text-sm font-bold text-text-primary mb-3">System Health</h3>
-                            <div className="space-y-2 text-sm text-text-secondary">
-                                <div className="flex justify-between">
-                                    <span>Response Time</span>
-                                    <span className="text-status-online font-mono">24ms</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Error Rate</span>
-                                    <span className="text-status-online font-mono">0.01%</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Tokens/sec</span>
-                                    <span className="text-accent-violet font-mono">842</span>
-                                </div>
-                            </div>
-                        </div>
+                    {/* Task Queue */}
+                    <div className="flex-1 flex flex-col min-h-0">
+                        <TaskQueue
+                            tasks={tasks}
+                            onAddTask={() => setShowAddTask(true)}
+                        />
+                    </div>
 
-                        <div className="flex-1 p-4 bg-obsidian-surface border border-obsidian-border rounded-lg flex flex-col justify-center items-center text-center">
-                            <h3 className="text-sm text-text-muted mb-2">Daily Efficiency</h3>
-                            <span className="text-4xl font-bold text-status-online">99.9%</span>
-                            <span className="text-xs text-text-muted mt-1">Optimization active</span>
+                    {/* Real Stats */}
+                    <div className="p-4 bg-obsidian-surface border border-obsidian-border rounded-lg shrink-0">
+                        <h3 className="text-sm font-bold text-text-primary mb-3">Network Stats</h3>
+                        <div className="space-y-2 text-sm text-text-secondary">
+                            <div className="flex justify-between">
+                                <span>Active Agents</span>
+                                <span className="text-status-online font-mono">{stats.online_agents}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Tasks (24h)</span>
+                                <span className="text-blue-400 font-mono">{stats.tasks_completed_24h}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Queue Load</span>
+                                <span className="text-accent-violet font-mono">{stats.active_tasks}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -184,29 +209,13 @@ export default function ConductorPage() {
 
             <CostTicker traditional={847.00} trinity={0.47} />
 
-            {/* Manual Modal Implementation (Share) */}
-            {showShare && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowShare(false)}>
-                    <div className="bg-obsidian-elevated border border-obsidian-border rounded-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold text-text-primary mb-4 text-center">Secure Invite Link</h3>
-                        <div className="bg-white p-4 rounded-lg mb-4 flex justify-center">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={qrUrl} alt="Invite QR" className="w-48 h-48" />
-                        </div>
-                        <p className="text-center text-text-muted text-sm mb-6">
-                            Scan to grant instant observatory access.
-                        </p>
-                        <Button className="w-full" onClick={() => setShowShare(false)}>
-                            Close
-                        </Button>
-                    </div>
-                </div>
-            )}
-
             <AddTaskModal
                 isOpen={showAddTask}
-                onClose={() => setShowAddTask(false)}
-                availableAgents={agents} // Now expects AgentRegistryRecord, which we supply
+                onClose={() => {
+                    setShowAddTask(false);
+                    refreshData(); // Refresh after add
+                }}
+                availableAgents={agents}
             />
         </div>
     );
