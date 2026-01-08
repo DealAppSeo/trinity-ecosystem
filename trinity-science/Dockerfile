@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies (Cached layer)
-RUN pip install --no-cache-dir fastapi uvicorn[standard] torch networkx scikit-fuzzy pydantic python-dotenv
+RUN pip install --no-cache-dir fastapi uvicorn[standard] numpy scipy torch networkx scikit-fuzzy pydantic python-dotenv requests
 
 # Copy all project files (including rewards.py, arbitrage.py)
 COPY . .
