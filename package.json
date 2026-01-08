@@ -6,15 +6,27 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "agent": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/run-agent.ts",
+    "test-context": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/test-context-pipe.ts",
+    "cleanup": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/execute-cleanup.ts"
   },
   "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "@supabase/mcp-server-postgrest": "^0.1.0",
     "@supabase/supabase-js": "^2.45.0",
+    "@types/pg": "^8.16.0",
+    "@types/puppeteer": "^5.4.7",
     "@upstash/redis": "^1.36.0",
     "clsx": "^2.1.1",
     "dotenv": "^16.6.1",
+    "googleapis": "^169.0.0",
+    "graphology": "^0.26.0",
     "lucide-react": "^0.562.0",
     "next": "^16.1.1",
+    "pg": "^8.16.3",
+    "playwright": "^1.57.0",
+    "puppeteer": "^24.34.0",
     "qrcode": "^1.5.4",
     "react": "^18",
     "react-dom": "^18",
@@ -22,6 +34,7 @@
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
+    "@modelcontextprotocol/server-github": "^2025.4.8",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18",

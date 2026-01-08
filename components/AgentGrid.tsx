@@ -73,14 +73,33 @@ export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGr
                                         </div>
 
                                         <div className="space-y-1">
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-zinc-500">Coord:</span>
-                                                <span className="text-zinc-300">{agent.llm_coordinator}</span>
+                                            {/* CURRENT TASK DISPLAY */}
+                                            <div className="min-h-[40px] mb-2">
+                                                {agent.currentTask ? (
+                                                    <div className="text-[10px] text-zinc-300 bg-zinc-800/50 p-1.5 rounded border-l-2 border-accent-violet">
+                                                        <div className="flex items-center gap-1 text-accent-violet font-bold mb-0.5">
+                                                            <Activity className="w-3 h-3 animate-pulse" />
+                                                            WORKING
+                                                        </div>
+                                                        <span className="line-clamp-2 leading-tight">{agent.currentTask.title}</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-[10px] text-zinc-600 italic py-1">
+                                                        Standing by for orders...
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-zinc-500">Ping:</span>
+
+                                            <div className="flex justify-between text-xs pt-2 border-t border-white/5">
+                                                <span className="text-zinc-500">Last Signal:</span>
                                                 <span className="text-zinc-400 font-mono">
-                                                    {agent.last_ping ? new Date(agent.last_ping).toLocaleTimeString() : 'Never'}
+                                                    {agent.lastHeartbeat ? (
+                                                        <span className="text-green-400">
+                                                            {Math.floor((Date.now() - new Date(agent.lastHeartbeat).getTime()) / 1000)}s ago
+                                                        </span>
+                                                    ) : (
+                                                        'Offline'
+                                                    )}
                                                 </span>
                                             </div>
                                         </div>

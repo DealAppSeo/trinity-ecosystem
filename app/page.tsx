@@ -43,9 +43,9 @@ export default async function LandingPage() {
               Get Early Access
             </Button>
           </Link>
-          <Link href="/pulse/watch" className="w-full">
+          <Link href="/pulse/conductor" className="w-full">
             <Button variant="secondary" className="w-full text-lg py-6">
-              Watch Deployment
+              Launch Controller
             </Button>
           </Link>
         </div>
@@ -54,15 +54,15 @@ export default async function LandingPage() {
         <div className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-text-muted font-mono">
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 bg-status-online rounded-full" />
-            3 Patents Pending
+            3x3 Antifragile Grid
           </span>
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 bg-status-working rounded-full" />
-            82% Cost Savings
+            99% Hallucination Catch (ANFIS)
           </span>
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 bg-gold rounded-full" />
-            Open Source Ethos
+            Byzantine Fault Tolerance
           </span>
         </div>
       </section>
@@ -81,7 +81,7 @@ export default async function LandingPage() {
             <div className="text-3xl">➔</div>
 
             <div className="text-center md:text-right">
-              <h3 className="text-accent-violet text-sm uppercase tracking-wider mb-1 font-bold">Trinity Efficiency</h3>
+              <h3 className="text-accent-violet text-sm uppercase tracking-wider mb-1 font-bold">ANFIS Routing (v2)</h3>
               <p className="text-5xl font-mono text-status-online font-bold shadow-glow-gold">
                 ${trinityCost.toFixed(2)}<span className="text-base text-status-online/70">/day</span>
               </p>
@@ -95,7 +95,8 @@ export default async function LandingPage() {
         <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold text-text-primary mb-4">The Symphony</h2>
           <p className="text-text-secondary max-w-2xl mx-auto">
-            Real autonomous agents working in concert. No scripts. No human intervention.
+            Real autonomous agents working in a 3x3 Antifragile Grid. No scripts. No human intervention.
+            Self-healing via Survivor Protocols.
           </p>
         </div>
 

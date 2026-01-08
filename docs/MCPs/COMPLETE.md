@@ -6,7 +6,8 @@ Pre-Completion Checklist:
 
 1. Artifact Requirement
    - Does task_type require artifact? (code, research, content, design, review = YES)
-   - Is artifact_url valid and accessible?
+   - **Is file created?**: Verify you successfully called `write_file`.
+   - **Record URL**: Use `file:///artifacts/[your_filename]` as the `artifact_url`.
    - STOP if missing
 
 2. Result Quality

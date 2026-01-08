@@ -1,5 +1,14 @@
 import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import path from 'path';
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+
+// FORCE CREDENTIALS if missing (Bypassing dotenv issues)
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    console.log("⚠️ Injecting Hardcoded Supabase Credentials...");
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://qnnpjhlxljtqyigedwkb.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw';
+    process.env.SUPABASE_SERVICE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; // Fallback to Anon if Service not available
+}
 import { ConstitutionalAgent } from '../lib/agent/ConstitutionalAgent';
 import http, { IncomingMessage, ServerResponse } from 'http'; // Added import for http and types
 

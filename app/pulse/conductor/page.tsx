@@ -10,65 +10,38 @@ import { useEffect, useState, useCallback } from 'react';
 import { AddTaskModal } from '@/components/modals/AddTaskModal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import InviteManager from '@/components/InviteManager';
-import { Skull, Share2, AlertTriangle } from 'lucide-react';
-import { supabase } from '@/lib/supabase'; // Used for InviteManager
+import { Skull, Share2, AlertTriangle, ServerCrash } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useTrinityController } from '@/hooks/useTrinityController';
+import { AGENT_GROUPS } from '@/lib/agent/groups';
 
 export default function ConductorPage() {
-    const [agents, setAgents] = useState<any[]>([]);
-    const [tasks, setTasks] = useState<any[]>([]);
+    // consolidated logic via hook
+    const { agents, tasks, logs, heartbeats, loading, createTask, refresh, killRandomAgent, triggerChaosEvent } = useTrinityController();
     const [stats, setStats] = useState({ online_agents: 0, tasks_completed_24h: 0, active_tasks: 0 });
-    const [loading, setLoading] = useState(true);
     const [showAddTask, setShowAddTask] = useState(false);
 
-    // Polling Fetcher
-    const refreshData = useCallback(async () => {
-        try {
-            const [agentsRes, tasksRes, statsRes] = await Promise.all([
-                fetch('/api/agents'),
-                fetch('/api/tasks'),
-                fetch('/api/stats')
-            ]);
-
-            if (agentsRes.ok) setAgents(await agentsRes.json());
-            if (tasksRes.ok) setTasks(await tasksRes.json());
-            if (statsRes.ok) setStats(await statsRes.json());
-
-        } catch (error) {
-            console.error('Polling Error:', error);
-        }
-    }, []);
-
-    // Initial Fetch + Interval
+    // Initial Fetch + Interval for Hook Refresh & Stats
     useEffect(() => {
-        const init = async () => {
-            setLoading(true);
-            await refreshData();
-            setLoading(false);
-        };
-        init();
+        refresh(); // initial load via hook
 
-        const interval = setInterval(refreshData, 10000); // 10s poll
+        const interval = setInterval(() => {
+            refresh();
+            // Fetch stats separately as they aren't in the hook yet (could assume from agents/tasks but simpler to keep fetch)
+            fetch('/api/stats').then(r => r.ok && r.json().then(setStats));
+        }, 10000);
+
         return () => clearInterval(interval);
-    }, [refreshData]);
+    }, [refresh]);
 
-    const handleAssignTask = async (taskId: string, agentName: string) => {
-        try {
-            await fetch(`/api/tasks/${taskId}/assign`, {
-                method: 'POST',
-                body: JSON.stringify({ agent: agentName })
-            });
-            refreshData(); // immediate refresh
-        } catch (e) {
-            alert('Assignment failed');
-        }
-    };
+    // Derived stats for UI if API fails or for instant updates
+    const onlineCount = agents.filter(a => a.status === 'active').length;
 
     // --- CAPTAIN FEATURES ---
     const [northStar, setNorthStar] = useState('');
     const [isSavingNS, setIsSavingNS] = useState(false);
 
     useEffect(() => {
-        // Fetch initial config
         fetch('/api/captain').then(r => r.json()).then(data => {
             if (data?.north_star_directive) setNorthStar(data.north_star_directive);
         });
@@ -95,12 +68,13 @@ export default function ConductorPage() {
     return (
         <div className="min-h-screen bg-obsidian-base flex flex-col">
             <Header
-                title="CONDUCTOR CONSOLE"
+                title="TRINITY V2 CONTROLLER (ANTIFRAGILE)"
                 showLive
-                viewerCount={stats.online_agents} // Real active agents count
+                viewerCount={onlineCount}
                 rightContent={
                     <div className="flex gap-4 items-center">
                         <div className="flex gap-2 text-xs text-white/30 font-mono items-center">
+                            <a href="/" className="hover:text-white transition-colors mr-4">Home</a>
                             CONNECTED: CONTROLLER.AITRINITYSYMPHONY.COM
                         </div>
                         {/* CAPTAIN CONTROLS */}
@@ -113,7 +87,7 @@ export default function ConductorPage() {
                                 placeholder="Set North Star Directive..."
                                 className="bg-zinc-900 border border-zinc-700 text-xs px-3 py-1.5 rounded w-64 text-zinc-300 focus:border-accent-violet focus:outline-none transition-colors"
                             />
-                            {stats.online_agents === 0 && (
+                            {onlineCount === 0 && (
                                 <button
                                     onClick={wakeTrinity}
                                     className="px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-200 text-xs font-bold rounded border border-red-700 animate-pulse flex items-center gap-2"
@@ -145,34 +119,40 @@ export default function ConductorPage() {
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => alert('Feature disabled in PROD')} className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors">
-                                        Kill Random
+                                    <button
+                                        onClick={() => confirm('Kill Random Agent?') && killRandomAgent()}
+                                        className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors flex items-center gap-1"
+                                    >
+                                        <Skull className="w-3 h-3" /> Kill Random
                                     </button>
-                                    <button onClick={() => alert('Feature disabled in PROD')} className="px-3 py-1 bg-orange-950/50 border border-orange-900/30 text-orange-300 text-xs rounded hover:bg-orange-900/80 transition-colors">
-                                        Sever DB
+                                    <button
+                                        onClick={() => confirm('Sever DB Connection?') && triggerChaosEvent('DB_SEVERED')}
+                                        className="px-3 py-1 bg-orange-950/50 border border-orange-900/30 text-orange-300 text-xs rounded hover:bg-orange-900/80 transition-colors flex items-center gap-1"
+                                    >
+                                        <ServerCrash className="w-3 h-3" /> Sever DB
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Squad Status Summary */}
+                        {/* Squad Status Summary (3x3 Grid) */}
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <Share2 className="w-4 h-4 text-blue-500" />
-                                <h2 className="text-sm font-bold text-zinc-100">Squad Status</h2>
+                                <h2 className="text-sm font-bold text-zinc-100">Squad Status ({Object.keys(AGENT_GROUPS).length})</h2>
                             </div>
-                            <div className="flex gap-2">
-                                {['Alpha', 'Beta', 'Gamma'].map(group => {
+                            <div className="grid grid-cols-4 gap-2"> {/* 4 cols for Orchestration + 3 Squads */}
+                                {Object.values(AGENT_GROUPS).map(group => {
                                     // Calculate online count for this group
-                                    const groupAgents = agents.filter(a => (a.group_name || '').toLowerCase().includes(group.toLowerCase()));
+                                    const groupAgents = agents.filter(a => group.members.includes(a.agent_name));
                                     const onlineCount = groupAgents.filter(a => a.status === 'active').length;
-                                    const total = groupAgents.length || 3; // default to 3 if loading
+                                    const total = group.members.length;
 
                                     return (
-                                        <div key={group} className="flex-1 bg-black/40 py-1.5 px-2 rounded border border-zinc-800/50 text-center">
-                                            <div className="text-[9px] text-zinc-500 uppercase tracking-wider mb-0.5">{group}</div>
+                                        <div key={group.id} className="bg-black/40 py-1.5 px-2 rounded border border-zinc-800/50 text-center">
+                                            <div className="text-[9px] text-zinc-500 uppercase tracking-wider mb-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{group.name.split(' ')[0]}</div>
                                             <div className={`text-[10px] font-mono font-bold ${onlineCount === total ? 'text-green-400' : 'text-yellow-400'}`}>
-                                                {onlineCount}/{total} ONLINE
+                                                {onlineCount}/{total}
                                             </div>
                                         </div>
                                     );
@@ -186,12 +166,12 @@ export default function ConductorPage() {
                         <div className="mb-4 flex items-center justify-between">
                             <h2 className="text-xl font-semibold text-text-primary">Symphony Grid</h2>
                             <div className="flex gap-2">
-                                {loading ? (
+                                {loading && agents.length === 0 ? (
                                     <Skeleton className="w-24 h-6" />
                                 ) : (
                                     <span className="text-xs text-status-online bg-status-online/10 px-2 py-1 rounded border border-status-online/20 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                        {stats.online_agents}/12 Systems Active
+                                        <span className={`w-2 h-2 rounded-full ${onlineCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                                        {onlineCount}/12 Systems Active
                                     </span>
                                 )}
                             </div>
@@ -215,6 +195,8 @@ export default function ConductorPage() {
 
                     {/* Activity Feed (Bottom) */}
                     <div className="h-48 shrink-0">
+                        {/* Passing logs to ActivityFeed if it supported it, or just relying on its internal fetch. 
+                            For now, assuming ActivityFeed fetches its own, but we could upgrade it later. */}
                         <ActivityFeed />
                     </div>
                 </div>
@@ -241,7 +223,7 @@ export default function ConductorPage() {
                         <div className="space-y-2 text-sm text-text-secondary">
                             <div className="flex justify-between">
                                 <span>Active Agents</span>
-                                <span className="text-status-online font-mono">{stats.online_agents}</span>
+                                <span className="text-status-online font-mono">{onlineCount}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span>Tasks (24h)</span>
@@ -249,7 +231,7 @@ export default function ConductorPage() {
                             </div>
                             <div className="flex justify-between">
                                 <span>Queue Load</span>
-                                <span className="text-accent-violet font-mono">{stats.active_tasks}</span>
+                                <span className="text-accent-violet font-mono">{tasks.length}</span>
                             </div>
                         </div>
                     </div>
@@ -263,7 +245,7 @@ export default function ConductorPage() {
                 isOpen={showAddTask}
                 onClose={() => {
                     setShowAddTask(false);
-                    refreshData(); // Refresh after add
+                    refresh(); // Refresh after add
                 }}
                 availableAgents={agents}
             />
