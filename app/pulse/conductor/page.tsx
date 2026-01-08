@@ -14,6 +14,7 @@ import { Skull, Share2, AlertTriangle, ServerCrash } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { AGENT_GROUPS } from '@/lib/agent/groups';
+import { RewardTuner } from '@/components/RewardTuner';
 
 export default function ConductorPage() {
     // consolidated logic via hook
@@ -28,7 +29,7 @@ export default function ConductorPage() {
         const interval = setInterval(() => {
             refresh();
             // Fetch stats separately as they aren't in the hook yet (could assume from agents/tasks but simpler to keep fetch)
-            fetch('/api/stats').then(r => r.ok && r.json().then(setStats));
+            fetch('/api/stats').then(r => { if (r.ok) r.json().then(setStats) });
         }, 10000);
 
         return () => clearInterval(interval);
@@ -106,7 +107,7 @@ export default function ConductorPage() {
                 <div className="lg:col-span-3 flex flex-col gap-6 h-full overflow-hidden">
 
                     {/* Chaos & Squad Panel */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
                         {/* Chaos Testing */}
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden group">
                             <div className="absolute inset-0 bg-red-900/5 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -159,6 +160,9 @@ export default function ConductorPage() {
                                 })}
                             </div>
                         </div>
+
+                        {/* Reward Tuner (ANFIS Control) */}
+                        <RewardTuner />
                     </div>
 
                     {/* Agents Grid */}
@@ -212,7 +216,7 @@ export default function ConductorPage() {
                     {/* Task Queue */}
                     <div className="flex-1 flex flex-col min-h-0">
                         <TaskQueue
-                            tasks={tasks}
+                            tasks={tasks as any}
                             onAddTask={() => setShowAddTask(true)}
                         />
                     </div>
@@ -237,7 +241,7 @@ export default function ConductorPage() {
                     </div>
                 </div>
 
-            </main>
+            </main >
 
             <CostTicker traditional={847.00} trinity={0.47} />
 
@@ -249,6 +253,6 @@ export default function ConductorPage() {
                 }}
                 availableAgents={agents}
             />
-        </div>
+        </div >
     );
 }

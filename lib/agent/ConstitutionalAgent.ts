@@ -610,7 +610,8 @@ export class ConstitutionalAgent {
             // A. Check Latency Opportunity (Via Python Brain)
             // Use dynamic import/require to avoid circular dependency/build issues
             const { ScienceClient } = require('../science/ScienceClient');
-            const science = new ScienceClient(); // Connects to local 8000
+            const scienceUrl = process.env.NEXT_PUBLIC_SCIENCE_URL || 'http://127.0.0.1:8000';
+            const science = new ScienceClient(scienceUrl);
 
             // Hardcoded simulation vals for now - in real prod, track actual latency
             const currentLatency = 2500; // ms

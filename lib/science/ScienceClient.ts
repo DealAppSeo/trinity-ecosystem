@@ -27,12 +27,35 @@ export interface GnnOutput {
     scores: number[];
 }
 
+export interface RewardConfig {
+    weights: Record<string, number>;
+}
+
 export class ScienceClient {
     private baseUrl: string;
     private fallbackMode: boolean = false;
 
     constructor(baseUrl: string = 'http://127.0.0.1:8000') {
         this.baseUrl = baseUrl;
+    }
+
+    /**
+     * Update the ANFIS Reward Configuration (God Mode).
+     */
+    async updateRewardConfig(config: RewardConfig): Promise<RewardConfig> {
+        try {
+            const res = await fetch(`${this.baseUrl}/anfis/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            if (!res.ok) throw new Error("Failed to update reward config");
+            return await res.json() as RewardConfig;
+        } catch (error) {
+            console.error("🧪 Update Reward Config Failed:", error);
+            throw error;
+        }
     }
 
     /**
