@@ -37,6 +37,28 @@ class GnnOutput(BaseModel):
     ranked_ids: List[str]
     scores: List[float]
 
+# --- Reward System Models ---
+
+class RewardInput(BaseModel):
+    action_type: Literal['REFERRAL', 'STAKE', 'COMPUTE', 'FEEDBACK']
+    network_need: float
+    saturation: float
+    diversity_score: float
+
+class RewardOutput(BaseModel):
+    base_value: float
+    multiplier: float
+    final_amount: float
+    reason: str
+
+class RewardConfig(BaseModel):
+    network_need_weight: float = 1.0
+    saturation_weight: float = 1.0
+    diversity_weight: float = 1.0
+
+# Global Config Logic
+current_config = RewardConfig()
+
 # --- Endpoints ---
 
 @app.get("/")
