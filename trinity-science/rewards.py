@@ -16,8 +16,11 @@ class AdaptiveRewardSystem:
 
         # --- Membership Functions ---
         
-        # Network Need: Low, Medium, High
-        self.network_need.automf(3)
+        # Network Need: Low, Med, High
+        # self.network_need.automf(3) # Generated 'poor', 'average', 'good' - causing crash
+        self.network_need['low'] = fuzz.trimf(self.network_need.universe, [0, 0, 0.5])
+        self.network_need['med'] = fuzz.trimf(self.network_need.universe, [0, 0.5, 1])
+        self.network_need['high'] = fuzz.trimf(self.network_need.universe, [0.5, 1, 1])
         
         # Saturation: Early (0.0-0.3), Mature (0.3-0.7), Saturated (0.7-1.0)
         self.saturation['early'] = fuzz.trimf(self.saturation.universe, [0, 0, 0.5])
