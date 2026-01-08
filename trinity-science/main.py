@@ -231,3 +231,29 @@ async def rank_gnn(data: GnnInput):
         ranked_ids=data.candidate_node_ids,
         scores=[0.9 - (i * 0.1) for i in range(len(data.candidate_node_ids))]
     )
+
+from router import router
+
+class RouterInput(BaseModel):
+    user_exp: int
+    latency_tol: float
+    task_comp: int
+
+class RouterOutput(BaseModel):
+    score: float
+    strategy: str
+    reason: str
+
+@app.post("/router/optimize", response_model=RouterOutput)
+async def optimize_route(data: RouterInput):
+    """
+    Get optimized routing strategy based on Ubiquitous ANFIS.
+    """
+    logger.info(f"Received Router Request: {data}")
+    result = router.route(data.user_exp, data.latency_tol, data.task_comp)
+    
+    return RouterOutput(
+        score=result['score'],
+        strategy=result['strategy'],
+        reason=result['reason']
+    )
