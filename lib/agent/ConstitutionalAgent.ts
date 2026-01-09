@@ -263,9 +263,9 @@ export class ConstitutionalAgent {
             searchWeb: async (query: string) => {
                 console.log(`[${this.name}] 🌐 SEARCHING WEB: "${query}"`);
                 return [
-                    { title: `${query} Guidelines`, url: 'https://example.com/guidelines', snippet: `Best practices for ${query}...` },
-                    { title: `Advanced ${query} Techniques`, url: 'https://arxiv.org/fake-paper', snippet: `Recent study on ${query} optimization...` },
-                    { title: `${query} Tutorial`, url: 'https://github.com/fake-repo/tutorial', snippet: `Step-by-step guide to ${query}...` }
+                    { title: `${query} Guidelines`, url: 'https://example.com/guidelines', content: `Best practices for ${query}...` },
+                    { title: `Advanced ${query} Techniques`, url: 'https://arxiv.org/fake-paper', content: `Recent study on ${query} optimization...` },
+                    { title: `${query} Tutorial`, url: 'https://github.com/fake-repo/tutorial', content: `Step-by-step guide to ${query}...` }
                 ];
             },
             browsePage: async (url: string, instructions: string) => {
