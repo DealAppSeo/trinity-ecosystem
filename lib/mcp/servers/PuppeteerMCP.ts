@@ -27,6 +27,9 @@ export class PuppeteerMCP implements MCPServer {
                         url: { type: 'string', description: 'The absolute URL to visit.' },
                     },
                     required: ['url']
+                },
+                execute: async (args: any) => {
+                    return await this.browsePage(args.url);
                 }
             },
             {
@@ -39,6 +42,9 @@ export class PuppeteerMCP implements MCPServer {
                         filename: { type: 'string', description: 'The filename to save as (without path), e.g. "google_home.png".' }
                     },
                     required: ['url', 'filename']
+                },
+                execute: async (args: any) => {
+                    return await this.takeScreenshot(args.url, args.filename);
                 }
             }
         ];
