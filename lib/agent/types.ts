@@ -59,6 +59,7 @@ export interface AgentRegistryRecord {
     last_active: string;
     status: 'active' | 'idle' | 'offline' | 'error';
     id?: string; // Optional ID for grid keys
+    system_prompt?: string; // Dynamic Directive from Control Plane
 }
 
 // ============================================

@@ -9,7 +9,14 @@
     "lint": "eslint",
     "agent": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/run-agent.ts",
     "test-context": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/test-context-pipe.ts",
-    "cleanup": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/execute-cleanup.ts"
+    "cleanup": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/execute-cleanup.ts",
+    "update-directives": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/update-directives.ts",
+    "test-directives": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/test-directives.ts",
+    "simulate-anfis": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/simulate-anfis-suggestion.ts",
+    "populate-inbox": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/populate-inbox.ts",
+    "simulate-chaos": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/simulate-chaos.ts",
+    "train-agents": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/train-agents.ts",
+    "scheduler": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/scheduler.ts"
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
@@ -20,6 +27,7 @@
     "@upstash/redis": "^1.36.0",
     "clsx": "^2.1.1",
     "dotenv": "^16.6.1",
+    "framer-motion": "^12.25.0",
     "googleapis": "^169.0.0",
     "graphology": "^0.26.0",
     "lucide-react": "^0.562.0",
@@ -30,6 +38,7 @@
     "qrcode": "^1.5.4",
     "react": "^18",
     "react-dom": "^18",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^2.5.2",
     "ts-node": "^10.9.2"
   },

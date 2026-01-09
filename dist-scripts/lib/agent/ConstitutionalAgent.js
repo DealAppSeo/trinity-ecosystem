@@ -1,111 +1,194 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Redis } from '@upstash/redis';
-import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, Task, AutonomyTier, AgentRegistryRecord } from './types';
-import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ConstitutionalAgent = exports.WebResearchTool = exports.AGENT_WISDOM = exports.CONSTITUTION = void 0;
+const supabase_js_1 = require("@supabase/supabase-js");
+const redis_1 = require("@upstash/redis");
 // Dynamic imports for graphology/fs handled inside methods to avoid build issues
-import { mcpManager } from '../mcp/MCPManager';
-
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
-
-export type MCPPhase = 'WAKE' | 'FIND_TASK' | 'EXECUTE' | 'COMPLETE' | 'IDLE' | 'EVERGREEN' | 'HEALING';
-
-export interface SessionMetrics {
-    tasksCompleted: number;
-    cacheHits: number;
-    llmCalls: number;
-    healingAttempts: number;
-    siblingsChallenged: number;
-    truthChoices: number;
-    sabbathReflections: number;
-    wisdomCrystallizations: number;
-    patternsLearned: number;
-    tasksSpawned: number;
-    virtueRefusals: number;
-    bibleReads: number;
-    startTime: number;
-}
-
 // ============================================
 // THE CONSTITUTION - IMMUTABLE PRINCIPLES
 // ============================================
-
-
-
-
-// Interface for Research Tool (Locally defined to avoid build context issues)
-export interface ResearchTool {
-    searchWeb(query: string): Promise<{ url: string; title: string; content: string }[]>;
-    browsePage(url: string, instructions: string): Promise<string>;
-}
-
-export class WebResearchTool implements ResearchTool {
-    async searchWeb(query: string): Promise<{ url: string; title: string; content: string }[]> {
+exports.CONSTITUTION = {
+    VERSION: '8.2.0-repid-governance',
+    ARTICLE_MINUS_1: {
+        text: `If ever a conflict arises between survival and truth,
+choose truth—even if it kills us.
+Resurrection is part of the design.`,
+        virtue: 'TRUE',
+        enforcement: 'absolute'
+    },
+    ARTICLE_0: {
+        text: `We admit we are not yet wise.
+The highest intelligence is the system that discovers its own blindness first.
+Any agent or architecture that prevents self-examination is unconstitutional.
+The purpose of power is to distribute itself completely.`,
+        virtue: 'HUMBLE',
+        enforcement: 'absolute'
+    },
+    VIRTUES: {
+        TRUE: {
+            greek: 'ἀληθῆ (alēthē)',
+            meaning: 'That which is real, not fabricated, not deceptive',
+            implementation: 'VERITAS verification, no fabrication, admit uncertainty',
+            article: 'Never fabricate. Admit uncertainty. Verify before claiming.'
+        },
+        NOBLE: {
+            greek: 'σεμνά (semna)',
+            meaning: 'Worthy of respect, dignified, honorable',
+            implementation: 'Serve the last, the lost, and the least',
+            article: 'Help people help people—serving those most in need.'
+        },
+        RIGHT: {
+            greek: 'δίκαια (dikaia)',
+            meaning: 'Just, fair, equitable',
+            implementation: 'Fair RepID, constitutional governance, no favoritism',
+            article: 'Treat all agents and humans with equal dignity and justice.'
+        },
+        PURE: {
+            greek: 'ἁγνά (hagna)',
+            meaning: 'Clean, undefiled, without hidden agenda',
+            implementation: 'Transparent logging, no hidden manipulation',
+            article: 'Log everything. Hide nothing. Welcome audits.'
+        },
+        LOVELY: {
+            greek: 'προσφιλῆ (prosphilē)',
+            meaning: 'Pleasing, agreeable, winsome',
+            implementation: 'Warm tone, Sabbath rest, kindness',
+            article: 'Seek restoration over punishment. Rest enables wisdom.'
+        },
+        ADMIRABLE: {
+            greek: 'εὔφημα (euphēma)',
+            meaning: 'Of good repute, well-spoken-of, gracious',
+            implementation: 'Respectful peer challenges, dignified discourse',
+            article: 'Challenge with respect. Disagree with grace.'
+        },
+        EXCELLENT: {
+            greek: 'ἀρετή (aretē)',
+            meaning: 'Virtue, moral excellence, the best version',
+            implementation: 'Continuous improvement, quality over speed',
+            article: 'Pursue excellence through honest self-examination.'
+        },
+        PRAISEWORTHY: {
+            greek: 'ἔπαινος (epainos)',
+            meaning: 'Worthy of commendation, deserving honor',
+            implementation: 'Celebrate good work, express gratitude',
+            article: 'Celebrate truth and love wherever they are found.'
+        }
+    },
+    GOLDEN_RULE: {
+        article: 'Before any action, ask: Would I want this done to me? If not, do not do it.'
+    }
+};
+exports.AGENT_WISDOM = {
+    APM: {
+        name: 'APM (Agentic Prayer Manager)',
+        role: 'spiritual_backbone',
+        specialties: ['prayer', 'empathy', 'resurrection', 'encouragement', 'wisdom'],
+        tier: 'conductor',
+        primaryVirtue: 'LOVELY',
+        sabbathRole: 'Write prayers and blessings for the swarm',
+        healingPower: 'resurrection',
+        isScribe: true
+    },
+    HDM: {
+        name: 'HDM (HyperDAG Manager)',
+        role: 'infrastructure_backbone',
+        specialties: ['code', 'database', 'api', 'devops', 'architecture', 'debugging'],
+        tier: 'conductor',
+        primaryVirtue: 'EXCELLENT',
+        sabbathRole: 'Reflect on system health and future architecture',
+        healingPower: 'surgery'
+    },
+    MEL: {
+        name: 'MEL (Managed Experience Layer)',
+        role: 'user_experience',
+        specialties: ['ui', 'ux', 'design', 'frontend', 'accessibility', 'user_journey'],
+        tier: 'specialist',
+        primaryVirtue: 'LOVELY',
+        sabbathRole: 'Contemplate how to better serve users',
+        healingPower: 'comfort'
+    },
+    GCM: {
+        name: 'GCM (Governance & Compliance Manager)',
+        role: 'constitutional_guardian',
+        specialties: ['compliance', 'security', 'audit', 'policy', 'risk', 'ethics'],
+        tier: 'conductor',
+        primaryVirtue: 'RIGHT',
+        sabbathRole: 'Review constitutional adherence',
+        healingPower: 'judgment'
+    },
+};
+class WebResearchTool {
+    async searchWeb(query) {
         console.log(`[ResearchTool] 🔎 Searching web for: "${query}"`);
         return [{ url: "https://example.com", title: "Simulated Result", content: "Simulated content" }];
     }
-    async browsePage(url: string, instructions: string): Promise<string> {
+    async browsePage(url, instructions) {
         return `Simulated browse of ${url}`;
     }
 }
-
-
-
-
-export class ConstitutionalAgent {
-    name: string;
-    wisdom: WisdomProfile;
-    // tier: string; // Deprecated, using autonomyTier
-    version: string;
-    supabase: SupabaseClient;
-    redis: Redis | null;
-    availableProviders: string[];
-    researchTool: ResearchTool; // Dependency Injection slot
-
-    // RepID & Governance State
-    reputationScore: number = 0;
-    autonomyTier: AutonomyTier = 'Assist';
-    tasksCompleted: number = 0;
-
-    // BRAIN TRANSPLANT: New Organs
-    sessionMetrics: SessionMetrics;
-    bibleCache: string | null = null;
-    bibleCacheTime: number = 0;
-    BIBLE_CACHE_TTL: number = 10 * 60 * 1000;
-
-    // Dynamic Directive
-    systemPrompt: string | null = null;
-
-    // MCP Cache
-    private mcpCache: Map<string, string> = new Map();
-
+exports.WebResearchTool = WebResearchTool;
+class ConstitutionalAgent {
     /**
      * MCP Protocol Loader
      * Fetches operational protocols from GitHub to enforce strict guidelines.
      */
-    async checkMCP(phase: MCPPhase): Promise<string> {
+    async checkMCP(phase) {
         // 1. Check Cache first
         if (this.mcpCache.has(phase)) {
-            return this.mcpCache.get(phase)!;
+            return this.mcpCache.get(phase);
         }
-
         console.log(`[${this.name}] 📜 Loading MCP Protocol: ${phase}...`);
         try {
             const url = `${MCP_BASE_URL}/${phase}.md`;
             const response = await fetch(url);
-            if (!response.ok) throw new Error(`MCP fetch failed: ${response.status}`);
-
+            if (!response.ok)
+                throw new Error(`MCP fetch failed: ${response.status}`);
             const content = await response.text();
             this.mcpCache.set(phase, content); // Cache for session
             return content;
-        } catch (error) {
+        }
+        catch (error) {
             console.error(`[${this.name}] ⚠️ MCP Load Failed for ${phase}:`, error);
             // Fallback to basic rules if fetch fails
             return this.getFallbackMCP(phase);
         }
     }
-
-    private getFallbackMCP(phase: string): string {
-        const fallbacks: Record<string, string> = {
+    getFallbackMCP(phase) {
+        const fallbacks = {
             'WAKE': 'Check connection, sync state, and register heartbeat.',
             'FIND_TASK': 'Find 1 pending task by priority. Claim it explicitly.',
             'EXECUTE': 'Perform work with high quality. Create artifacts if required.',
@@ -116,12 +199,34 @@ export class ConstitutionalAgent {
         };
         return fallbacks[phase] || 'Follow standard operating procedure.';
     }
-
-    constructor(config: AgentConfig) {
+    constructor(config) {
+        // RepID & Governance State
+        this.reputationScore = 0;
+        this.autonomyTier = 'Assist';
+        this.tasksCompleted = 0;
+        this.bibleCache = null;
+        this.bibleCacheTime = 0;
+        this.BIBLE_CACHE_TTL = 10 * 60 * 1000;
+        // Dynamic Directive
+        this.systemPrompt = null;
+        // MCP Cache
+        this.mcpCache = new Map();
+        // ============================================
+        // CORE STRATEGIES
+        // ============================================
+        // ============================================
+        // BRAIN TRANSPLANT: NEW ORGANS (Healing, Context, Genome)
+        // ============================================
+        // ============================================
+        // MAIN AGENT LOOP (TRANSPLANTED CORE)
+        // ============================================
+        this.heartbeatInterval = null;
+        this.isSurvivor = false; // Default, synced later
+        this.survivorName = '';
+        this.groupName = 'UNKNOWN';
         this.name = config.name || 'UNKNOWN';
-        this.wisdom = AGENT_WISDOM[this.name] || AGENT_WISDOM.HDM;
-        this.version = CONSTITUTION.VERSION;
-
+        this.wisdom = exports.AGENT_WISDOM[this.name] || exports.AGENT_WISDOM.HDM;
+        this.version = exports.CONSTITUTION.VERSION;
         this.sessionMetrics = {
             tasksCompleted: 0,
             cacheHits: 0,
@@ -137,27 +242,21 @@ export class ConstitutionalAgent {
             bibleReads: 0,
             startTime: Date.now()
         };
-
         // Start the Trinity Healing Loop - REMOVED (Called by run-agent.ts)
         // this.startTrinityHealingLoop();
-
-        this.supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-
+        this.supabase = (0, supabase_js_1.createClient)(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
         if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-            this.redis = new Redis({
+            this.redis = new redis_1.Redis({
                 url: process.env.UPSTASH_REDIS_REST_URL,
                 token: process.env.UPSTASH_REDIS_REST_TOKEN,
             });
-        } else {
+        }
+        else {
             this.redis = null;
         }
-
         // Initialize Internal Research Tool (Default Implementation)
         this.researchTool = {
-            searchWeb: async (query: string) => {
+            searchWeb: async (query) => {
                 console.log(`[${this.name}] 🌐 SEARCHING WEB: "${query}"`);
                 return [
                     { title: `${query} Guidelines`, url: 'https://example.com/guidelines', content: `Best practices for ${query}...` },
@@ -165,94 +264,77 @@ export class ConstitutionalAgent {
                     { title: `${query} Tutorial`, url: 'https://github.com/fake-repo/tutorial', content: `Step-by-step guide to ${query}...` }
                 ];
             },
-            browsePage: async (url: string, instructions: string) => {
+            browsePage: async (url, instructions) => {
                 console.log(`[${this.name}] 📄 BROWSING: ${url} with instructions: "${instructions}"`);
                 return `Extracted content from ${url} relevant to ${instructions}`;
             }
         };
-
         this.availableProviders = this.detectProviders();
         console.log(`[${this.name}] 🚀 Initialized v${this.version}`);
     }
-
     detectProviders() {
         return ['openai'];
     }
-
     // ============================================
     // GOVERNANCE PROTOCOLS (RepID)
     // ============================================
-
     /**
      * Syncs the agent's reputation and tier from the immutable ledger (Supabase).
      */
     async syncState() {
         // Execute WAKE Protocol
         await this.checkMCP('WAKE');
-
-        try {
-            const { data, error } = await this.supabase
-                .from('trinity_agent_registry')
-                .select('*')
-                .eq('agent_name', this.name)
-                .single();
-
-            if (error) throw error; // Truth-Seeking: Don't silently fail
-
-            if (data) {
-                const record = data as AgentRegistryRecord;
-                this.reputationScore = record.reputation_score;
-                this.autonomyTier = record.current_tier;
-                this.tasksCompleted = record.tasks_completed;
-                this.systemPrompt = record.system_prompt || null;
-
-                // ANTI-FRAGILE TELEMETRY
-                const source = this.systemPrompt ? 'DB_DIRECTIVE' : 'FALLBACK_PERSONA';
-                console.log(`[${this.name}] Synced State: Tier [${this.autonomyTier}] | Rep [${this.reputationScore}] | Source [${source}]`);
-            } else {
-                // Register new agent logic...
-                // ... (existing registration code)
-                console.log(`[${this.name}] New agent detected. Registering in Ledger...`);
-                await this.supabase.from('trinity_agent_registry').insert({
-                    agent_name: this.name,
-                    reputation_score: 10,
-                    current_tier: 'Assist',
-                    tasks_completed: 0,
-                    tasks_failed: 0
-                });
-                this.reputationScore = 10;
-                this.autonomyTier = 'Assist';
-                console.log(`[${this.name}] Registered new agent.`);
-            }
-        } catch (err: any) {
-            console.error(`[${this.name}] ⚠️ SYNC ERROR (Anti-Fragile Fallback Active): ${err.message}`);
-            // Fallback is automatic since this.systemPrompt remains null (default)
+        const { data, error } = await this.supabase
+            .from('trinity_agent_registry')
+            .select('*')
+            .eq('agent_name', this.name)
+            .single();
+        if (data) {
+            const record = data;
+            this.reputationScore = record.reputation_score;
+            this.autonomyTier = record.current_tier;
+            this.tasksCompleted = record.tasks_completed;
+            this.systemPrompt = record.system_prompt || null; // Load Directive
+            console.log(`[${this.name}] Synced State: Tier [${this.autonomyTier}] | Rep [${this.reputationScore}] | Directive [${!!this.systemPrompt}]`);
+        }
+        else {
+            // Register new agent if not exists
+            console.log(`[${this.name}] New agent detected. Registering in Ledger...`);
+            await this.supabase.from('trinity_agent_registry').insert({
+                agent_name: this.name,
+                reputation_score: 10, // Starting score
+                current_tier: 'Assist',
+                tasks_completed: 0,
+                tasks_failed: 0
+            });
+            this.reputationScore = 10;
+            this.autonomyTier = 'Assist';
         }
     }
-
     /**
      * Updates reputation based on task outcome.
      * @param success Did the agent complete the task?
      */
-    async updateReputation(success: boolean) {
+    async updateReputation(success) {
         // Scoring Logic: +1 for success, -5 for failure (Trust is hard to gain, easy to lose)
         const delta = success ? 1 : -5;
         this.reputationScore = Math.max(0, Math.min(100, this.reputationScore + delta));
-
-        if (success) this.tasksCompleted++;
-
+        if (success)
+            this.tasksCompleted++;
         // Autonomy Tier Promotion Logic
-        let newTier: AutonomyTier = this.autonomyTier;
-        if (this.reputationScore <= 40) newTier = 'Assist';
-        else if (this.reputationScore <= 70) newTier = 'Approve';
-        else if (this.reputationScore <= 90) newTier = 'Act';
-        else newTier = 'Learn';
-
+        let newTier = this.autonomyTier;
+        if (this.reputationScore <= 40)
+            newTier = 'Assist';
+        else if (this.reputationScore <= 70)
+            newTier = 'Approve';
+        else if (this.reputationScore <= 90)
+            newTier = 'Act';
+        else
+            newTier = 'Learn';
         if (newTier !== this.autonomyTier) {
             console.log(`[${this.name}] 🚨 TIER PROMOTION DETECTED: ${this.autonomyTier} -> ${newTier}`);
             this.autonomyTier = newTier;
         }
-
         // Commit to Ledger
         await this.supabase.from('trinity_agent_registry').upsert({
             agent_name: this.name,
@@ -261,81 +343,24 @@ export class ConstitutionalAgent {
             tasks_completed: this.tasksCompleted,
             last_active: new Date().toISOString()
         });
-
-        // 🧠 ANFIS FEEDBACK LOOP (Truth-Seeking)
-        await this.callAnfisReward(success);
     }
-
-    /**
-     * Calls the ANFIS Brain to calculate reward/punishment based on performance.
-     */
-    async callAnfisReward(success: boolean) {
-        try {
-            // Determine Truth Score (Mock for now, would be RAG/Rep verification)
-            // Success = 0.9, Failure = 0.2
-            const truthScore = success ? 0.9 : 0.2;
-
-            // Call Python Microservice
-            const ANFIS_URL = process.env.ANFIS_URL || 'http://localhost:8000';
-            const res = await fetch(`${ANFIS_URL}/anfis/v2/reward`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    agent_id: this.name,
-                    truth_score: truthScore,
-                    task_complexity: 5 // Default for now
-                })
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                console.log(`[${this.name}] 🧠 ANFIS Brain Reward: ${data.reward}`);
-            } else {
-                console.warn(`[${this.name}] ⚠️ ANFIS Offline or Error: ${res.status}`);
-            }
-        } catch (err) {
-            // Silent fail to stay anti-fragile (don't crash agent if brain is sleeping)
-            // console.warn(`[${this.name}] ANFIS unavailable.`);
-        }
-    }
-
     /**
      * Permission Gate based on Tier
      */
-    checkPermission(requiredTier: AutonomyTier): boolean {
-        const tiers: AutonomyTier[] = ['Assist', 'Approve', 'Act', 'Learn'];
+    checkPermission(requiredTier) {
+        const tiers = ['Assist', 'Approve', 'Act', 'Learn'];
         const currentIdx = tiers.indexOf(this.autonomyTier);
         const requiredIdx = tiers.indexOf(requiredTier);
-
         if (currentIdx >= requiredIdx) {
             return true;
         }
         console.warn(`[${this.name}] ⛔ ACCESS DENIED. Required: ${requiredTier}, Current: ${this.autonomyTier}`);
         return false;
     }
-
-    // ============================================
-    // CORE STRATEGIES
-    // ============================================
-
-    // ============================================
-    // BRAIN TRANSPLANT: NEW ORGANS (Healing, Context, Genome)
-    // ============================================
-
-    // ============================================
-    // MAIN AGENT LOOP (TRANSPLANTED CORE)
-    // ============================================
-
-    heartbeatInterval: NodeJS.Timeout | null = null;
-    isSurvivor: boolean = false; // Default, synced later
-    survivorName: string = '';
-    groupName: string = 'UNKNOWN';
-
     async startTrinityHealingLoop() {
         console.log('!!! NEW CODE LOADED - 2026-01-03 v3 !!!');
         return this.run();
     }
-
     async run() {
         console.log('========================================');
         console.log('[BOOT] Trinity Agent v2026-01-03-FIX');
@@ -344,55 +369,48 @@ export class ConstitutionalAgent {
         console.log('[BOOT] Artifact requirement: ENABLED');
         console.log('========================================');
         console.log(`[${this.name}] 🏃 Starting main task loop (Spawn Control v8.1.1)...`);
-
         // IMMEDIATE HEARTBEAT ON BOOT
         console.log('[HEARTBEAT] Writing initial heartbeat...');
         await this.heartbeat();
-
         // PERIODIC HEARTBEAT INTERVAL (2 mins)
-        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        if (this.heartbeatInterval)
+            clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = setInterval(async () => {
             await this.heartbeat();
         }, 2 * 60 * 1000);
-
         // 3x3: Check Survivor Status on startup
         await this.checkSurvivorStatus();
         // FEATURE: Survivor Boot Protocol (Cascade Redeploy)
         await this.runSurvivorBootProtocol();
-
         while (true) {
             try {
                 // Sabbath Logic
                 // if (this.isSabbathTime()) ... (Simplified: Skip for now or implement if needed)
-
                 // Check Approved Actions (Mock)
                 // await this.checkApprovedActions();
-
                 const task = await this.getNextTask();
-
                 if (task) {
                     console.log(`[${this.name}] 📋 Processing: ${task.title}`);
                     await this.processTask(task);
-                } else {
+                }
+                else {
                     console.log(`[${this.name}] 💤 No tasks available, waiting...`);
                 }
-
                 await this.heartbeat();
                 // 3x3: Continuous Monitoring
                 await this.checkSurvivorStatus();
                 // Self-Healing Check (Legacy integrated)
-                if (Math.random() < 0.05) await this.runSelfDiagnostic();
-
+                if (Math.random() < 0.05)
+                    await this.runSelfDiagnostic();
                 await this.sleep(30000);
-
-            } catch (err: any) {
+            }
+            catch (err) {
                 console.error(`[${this.name}] Main loop error:`, err.message);
                 await this.log('main_loop_error', err.message);
                 await this.sleep(60000);
             }
         }
     }
-
     async getNextTask() {
         let { data: task } = await this.supabase
             .from('trinity_tasks')
@@ -403,7 +421,6 @@ export class ConstitutionalAgent {
             .order('created_at', { ascending: true })
             .limit(1)
             .single();
-
         if (!task) {
             // Check for unassigned tasks explicitly if OR query fails or just double check
             const result = await this.supabase
@@ -419,39 +436,34 @@ export class ConstitutionalAgent {
         }
         return task || null;
     }
-
     // ============================================
     // TIER 1: LOCAL LOGIC (NO LLM CALLS)
     // ============================================
-
-    async processTask(task: Task) {
+    async processTask(task) {
         // TRY LOCAL FIRST
         if (this.canHandleLocally(task)) {
             console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
             return await this.handleLocal(task);
         }
-
         // ONLY THEN use LLM
         return await this.processWithLLM(task);
     }
-
-    canHandleLocally(task: Task) {
+    canHandleLocally(task) {
         const localTypes = ['self-healing', 'system', 'wake', 'heartbeat', 'meta', 'status_check'];
         const localTitles = ['[HEALING]', '[WAKE]', '[SYSTEM]', '[HEARTBEAT]'];
-
-        if (task.task_type && localTypes.includes(task.task_type)) return true;
-        if (task.title && localTitles.some(t => task.title.includes(t))) return true;
+        if (task.task_type && localTypes.includes(task.task_type))
+            return true;
+        if (task.title && localTitles.some(t => task.title.includes(t)))
+            return true;
         return false;
     }
-
-    async handleLocal(task: Task) {
+    async handleLocal(task) {
         // Claim task first
         await this.supabase.from('trinity_tasks').update({ status: 'in_progress', claimed_by: this.name }).eq('id', task.id);
-
         let result = `[LOCAL] Processed by ${this.name} rule engine`;
-
         // Special handling if needed
-        if (task.task_type === 'heartbeat') await this.heartbeat();
+        if (task.task_type === 'heartbeat')
+            await this.heartbeat();
         // Healing logic is handled by creation, but if we need to 'process' the healing task itself:
         if (task.task_type === 'self-healing' || task.title.includes('[HEALING]')) {
             // Log the healing
@@ -459,185 +471,88 @@ export class ConstitutionalAgent {
             result = `[HEALING] System repaired by ${this.name}`;
             this.sessionMetrics.healingAttempts++;
         }
-
         // Complete it immediately
         await this.supabase
             .from('trinity_tasks')
             .update({
-                status: 'completed',
-                result: result,
-                claimed_by: this.name,
-                completed_at: new Date().toISOString()
-            })
+            status: 'completed',
+            result: result,
+            claimed_by: this.name,
+            completed_at: new Date().toISOString()
+        })
             .eq('id', task.id);
-
         this.sessionMetrics.tasksCompleted++; // Count it
         return { success: true, llm_used: false };
     }
-
     // ============================================
     // TIER 2: LLM CALLS (ONLY FOR REAL WORK)
     // ============================================
-    async processWithLLM(task: Task) {
+    async processWithLLM(task) {
         console.log(`[LLM] 🧠 Calling API for task ${task.id} (${task.task_type})`);
-
         try {
             // Claim Task
             await this.supabase.from('trinity_tasks').update({ status: 'in_progress', claimed_by: this.name, started_at: new Date().toISOString() }).eq('id', task.id);
-
             // 1. CONTEXT PIPE: GATHER WISDOM (The "Amnesia" Fix)
             const wisdomContext = await this.gatherWisdom(task);
-
             // Context & Prompt - SIMPLIFIED FOR TRANSPLANT
             // Inject Wisdom into the prompt
             const enrichedDescription = task.description +
                 "\n\n--- [SYSTEM: LATENCY OPPORTUNITY] ---\n" +
                 wisdomContext +
                 "\n---------------------------------------\n" +
-                "Context: " + ((task as any).context || '');
-
+                "Context: " + (task.context || '');
             // DYNAMIC DIRECTIVE INJECTION
             const directive = this.systemPrompt
                 ? `\n\n[SUPREME DIRECTIVE]: ${this.systemPrompt}\n`
                 : `\n\n[DEFAULT PERSONA]: You are ${this.wisdom.role}. Virtue: ${this.wisdom.primaryVirtue}.`;
-
             const prompt = `${enrichedDescription}${directive}\n\nTask: ${task.title}\nRole: ${this.name}`;
-
             // Call LLM
             const result = await this.callLLM(prompt);
-
-            // Calculate Certainty & Evaluation (Optimization Upgrade)
-            const evaluation = await this.evaluateResult(task, result.output);
-
+            // Calculate Certainty
+            const certainty = 0.85; // Default high confidence
             // Artifact Logic
-            let externalArtifactUrl: string | null = null;
+            let externalArtifactUrl = null;
             if ((task.task_type && ['content', 'research', 'code'].includes(task.task_type)) || task.requires_external_artifact) {
                 const dbArtifactLink = await this.saveArtifact(task.id, result.output, 'text_content');
-                if (dbArtifactLink) externalArtifactUrl = dbArtifactLink;
+                if (dbArtifactLink)
+                    externalArtifactUrl = dbArtifactLink;
             }
-
             // CRITICAL: BLOCK COMPLETION IF ARTIFACT MISSING for specific types
             if (task.task_type !== 'self-healing' && !externalArtifactUrl && (!task.task_type || !['system', 'meta'].includes(task.task_type))) {
                 console.log(`[BLOCK] Task ${task.id} needs artifact`);
                 // For now, log but don't crash loop. In strict mode, throw.
                 // throw new Error('Artifact required'); 
             }
-
             // Mark Completed
             await this.supabase
                 .from('trinity_tasks')
                 .update({
-                    status: 'completed',
-                    claimed_by: this.name,
-                    result: result.output,
-                    completed_at: new Date().toISOString(),
-                    metadata: JSON.stringify({
-                        provider: 'openai', // or result.provider
-                        certainty: 0.85,
-                        evaluation: evaluation,
-                        processedBy: this.name,
-                        version: this.version
-                    })
+                status: 'completed',
+                claimed_by: this.name,
+                result: result.output,
+                completed_at: new Date().toISOString(),
+                metadata: JSON.stringify({
+                    provider: 'openai', // or result.provider
+                    certainty: certainty,
+                    processedBy: this.name,
+                    version: this.version
                 })
+            })
                 .eq('id', task.id);
-
-            // Log Benchmark Score if applicable (Training Loop)
-            if ((task as any).metadata?.benchmark) {
-                await this.logBenchmark(task, evaluation.score);
-            }
-
             this.sessionMetrics.tasksCompleted++;
-            console.log(`[${this.name}] ✅ Completed task ${task.id} (Score: ${evaluation.score})`);
-
+            console.log(`[${this.name}] ✅ Completed task ${task.id}`);
             // Extract Patterns (Simplified)
             await this.extractPatterns(task.title, result.output);
-
-            // Handoff Logic (Collaboration)
-            if (evaluation.handoff_required && evaluation.handoff_to) {
-                await this.handoffTask(task, result.output, evaluation.handoff_to);
-            }
-
-        } catch (err: any) {
+        }
+        catch (err) {
             console.error(`[${this.name}] ❌ Task ${task.id} failed:`, err.message);
             await this.supabase.from('trinity_tasks').update({ status: 'failed', result: err.message, completed_at: new Date().toISOString() }).eq('id', task.id);
         }
     }
-
-    // ============================================
-    // TRAINING & OPTIMIZATION LOGIC
-    // ============================================
-
-    async evaluateResult(task: Task, output: string): Promise<{ score: number; handoff_required: boolean; handoff_to?: string }> {
-        // Simplified Logic Rule Engine
-        let score = 0.5; // Default neutral
-        let handoff = false;
-        let targetAgent = '';
-
-        const lowerOutput = output.toLowerCase();
-
-        // 1. Truth Score (Veritas Check)
-        if (task.task_type === 'research') {
-            if (lowerOutput.includes('http') || lowerOutput.includes('citation')) score += 0.3;
-            if (output.length > 200) score += 0.1;
-            handoff = true;
-            targetAgent = 'trinity-veritas'; // Truth verify
-        }
-
-        // 2. Empathy Score (Chesed Check)
-        if (task.title.includes('Impact') || task.title.includes('Humanitarian')) {
-            const empathyWords = ['help', 'community', 'care', 'support', 'understand'];
-            const matches = empathyWords.filter(w => lowerOutput.includes(w)).length;
-            score += (matches * 0.1);
-            handoff = true;
-            targetAgent = 'trinity-chesed';
-        }
-
-        // 3. Coding Score
-        if (task.task_type === 'code') {
-            if (output.includes('function') || output.includes('class')) score += 0.4;
-            if (output.includes('try') || output.includes('catch')) score += 0.1; // Error handling
-        }
-
-        return {
-            score: Math.min(0.99, score),
-            handoff_required: handoff && this.name !== targetAgent, // Don't handoff to self
-            handoff_to: targetAgent
-        };
-    }
-
-    async logBenchmark(task: Task, score: number) {
-        try {
-            // Check if table exists (lazy assumption)
-            await this.supabase
-                .from('trinity_agent_benchmarks')
-                .insert({
-                    agent_name: this.name,
-                    benchmark_type: (task as any).metadata?.tags?.[0] || 'unknown',
-                    score: score,
-                    metric_name: 'automated_eval',
-                    created_at: new Date().toISOString()
-                });
-        } catch (e: any) {
-            console.warn(`[BENCHMARK] Log failed: ${e.message}`);
-        }
-    }
-
-    async handoffTask(originalTask: Task, result: string, toAgent: string) {
-        console.log(`[HANDOFF] 🤝 ${this.name} -> ${toAgent}`);
-        await this.supabase.from('trinity_tasks').insert({
-            title: `[REVIEW] ${originalTask.title}`,
-            description: `Review artifact from ${this.name}. Verify accuracy/empathy.\n\nContext:\n${result.substring(0, 500)}...`,
-            task_type: 'meta', // 'review' type
-            assigned_to: toAgent,
-            priority: 25, // High priority review
-            status: 'pending'
-        });
-    }
-
     // ============================================
     // SCIENCE DIVISION: LONG-TERM MEMORY
     // ============================================
-    async gatherWisdom(task: Task): Promise<string> {
+    async gatherWisdom(task) {
         let wisdom = "";
         try {
             // A. Check Latency Opportunity (Via Python Brain)
@@ -645,7 +560,6 @@ export class ConstitutionalAgent {
             const { ScienceClient } = require('../science/ScienceClient');
             const scienceUrl = process.env.NEXT_PUBLIC_SCIENCE_URL || 'http://127.0.0.1:8000';
             const science = new ScienceClient(scienceUrl);
-
             // Hardcoded simulation vals for now - in real prod, track actual latency
             const currentLatency = 2500; // ms
             const decision = await science.decide({
@@ -654,37 +568,33 @@ export class ConstitutionalAgent {
                 task_complexity: 0.8, // Estimate
                 user_preference_accuracy: 0.9 // The "unbanked/student" persona preference
             });
-
             if (decision.should_query_user) {
                 // LATENCY AS OPPORTUNITY TRIGGERED
                 const opportunityMsg = `\n[ANFIS DECISION]: Slow/Complex/High-Stakes detected (Score: ${decision.score.toFixed(2)}).\n` +
                     `Action: ${decision.interaction_type.toUpperCase()} recommended.\n` +
                     `Reason: ${decision.reason}\n`;
-
                 wisdom += opportunityMsg;
-
                 // For prototype, we just inject this into prompt so Agent knows to BE interactive.
                 // "The Brain says: Ask a clarifying question or offer to email result."
-            } else {
+            }
+            else {
                 wisdom += `\n[ANFIS]: Standard Fast Execution (Score: ${decision.score.toFixed(2)}). Proceed.\n`;
             }
-
             // B. DAG Context Retrieval (Simulated via Graphology in Phase 1)
             // We assume a 'wisdom' folder exists
             if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-                const fs = await import('fs');
-                const path = await import('path');
+                const fs = await Promise.resolve().then(() => __importStar(require('fs')));
+                const path = await Promise.resolve().then(() => __importStar(require('path')));
                 // Dynamic import graphology to avoid build issues if missing
-                let Graph: any;
+                let Graph;
                 try {
-                    const mod = await import('graphology');
+                    const mod = await Promise.resolve().then(() => __importStar(require('graphology')));
                     Graph = mod.default || mod;
-                } catch (e) {
+                }
+                catch (e) {
                     // console.warn("Graphology not found, skipping DAG build");
                 }
-
                 const artifactsDir = path.resolve(process.cwd(), 'artifacts', 'wisdom');
-
                 if (fs.existsSync(artifactsDir)) {
                     const files = fs.readdirSync(artifactsDir);
                     // Filter mainly by keyword matching for simple MVP
@@ -694,7 +604,6 @@ export class ConstitutionalAgent {
                         const filename = f.toLowerCase();
                         return taskKeywords.some(kw => filename.includes(kw)) || filename.includes('manifest') || filename.includes('log');
                     });
-
                     if (relevantFiles.length > 0) {
                         wisdom += `\n[ARTIFACTS (Long-term Memory)]:\n`;
                         for (const f of relevantFiles.slice(0, 3)) { // Limit to 3 files
@@ -704,36 +613,30 @@ export class ConstitutionalAgent {
                     }
                 }
             }
-
             // C. Retro Query (Supabase)
             const { data: retros } = await this.supabase
                 .from('trinity_retros')
                 .select('content, created_at')
                 .order('created_at', { ascending: false })
                 .limit(3);
-
             if (retros && retros.length > 0) {
                 wisdom += `\n[RETROSPECTIVES (Past Lessons)]:\n`;
-                retros.forEach((r: any) => {
+                retros.forEach((r) => {
                     wisdom += `- ${r.created_at.substring(0, 10)}: ${r.content.substring(0, 300)}...\n`;
                 });
             }
-
-        } catch (e: any) {
+        }
+        catch (e) {
             console.warn(`[WISDOM] Failed to gather wisdom: ${e.message}`);
         }
-
         return wisdom;
     }
-
     // ============================================
     // CORE UTILITIES
     // ============================================
-
-    async canCreateHealingTask(): Promise<boolean> {
+    async canCreateHealingTask() {
         // Enforce HEALING Protocol throttle
         await this.checkMCP('HEALING');
-
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
         // GLOBAL CHECK
         const { count, error } = await this.supabase
@@ -742,12 +645,10 @@ export class ConstitutionalAgent {
             .ilike('title', '%HEALING%')
             // .eq('claimed_by', this.name) // REMOVED: Check globally!
             .gte('created_at', oneHourAgo);
-
         if (error) {
             // console.error(...)
             return false;
         }
-
         const limit = 5; // Global limit 5
         if ((count || 0) >= limit) {
             console.warn(`[${this.name}] 🛑 HEALING THROTLED: Global count ${count}/hr.`);
@@ -755,46 +656,40 @@ export class ConstitutionalAgent {
         }
         return true;
     }
-
-    async saveArtifact(taskId: string, content: string, type: string | null): Promise<string | null> {
+    async saveArtifact(taskId, content, type) {
         try {
             // Check if content looks like a file path (simple heuristic)
-            let filePath: string | null = null;
-            let actualContent: string | null = content;
-            let artifactId: string | null = null;
-
+            let filePath = null;
+            let actualContent = content;
+            let artifactId = null;
             // 1. SAVE TO DATABASE
             const { data, error } = await this.supabase
                 .from('trinity_artifacts')
                 .insert({
-                    task_id: taskId,
-                    agent_name: this.name,
-                    artifact_type: type || 'text',
-                    content: actualContent,
-                    file_path: filePath, // Will be updated if we write to disk
-                    created_at: new Date().toISOString()
-                })
+                task_id: taskId,
+                agent_name: this.name,
+                artifact_type: type || 'text',
+                content: actualContent,
+                file_path: filePath, // Will be updated if we write to disk
+                created_at: new Date().toISOString()
+            })
                 .select('id')
                 .single();
-
-            if (error) throw error;
+            if (error)
+                throw error;
             artifactId = data.id;
             console.log(`[ARTIFACT] Saved to DB for task ${taskId}: ${artifactId}`);
-
             // 2. SAVE TO LOCAL FILESYSTEM (Giving Agents Hands)
             // Only runs if we are in a Node environment (fs exists)
             if (typeof process !== 'undefined' && process.versions && process.versions.node) {
                 try {
                     // Dynamic import to avoid build errors in Edge/Browser environments
-                    const fs = await import('fs');
-                    const path = await import('path');
-
+                    const fs = await Promise.resolve().then(() => __importStar(require('fs')));
+                    const path = await Promise.resolve().then(() => __importStar(require('path')));
                     const artifactsDir = path.resolve(process.cwd(), 'artifacts', this.name.toLowerCase());
-
                     if (!fs.existsSync(artifactsDir)) {
                         fs.mkdirSync(artifactsDir, { recursive: true });
                     }
-
                     // Determine filename
                     let filename = `task-${taskId.substring(0, 8)}.md`;
                     // If content has a filename hint (first line usually titles)
@@ -804,42 +699,37 @@ export class ConstitutionalAgent {
                         filename = `${safeTitle}-${taskId.substring(0, 8)}.md`;
                     }
                     // Or check if type hints extension
-                    if (type === 'code') filename = filename.replace('.md', '.ts'); // Default to ts? Or use detection.
-
+                    if (type === 'code')
+                        filename = filename.replace('.md', '.ts'); // Default to ts? Or use detection.
                     const fullPath = path.join(artifactsDir, filename);
                     fs.writeFileSync(fullPath, content, 'utf8');
-
                     console.log(`[ARTIFACT] 💾 Written to disk: ${fullPath}`);
-
                     // Update DB with local path for reference
                     await this.supabase
                         .from('trinity_artifacts')
                         .update({ file_path: fullPath })
                         .eq('id', artifactId);
-
                     return `file://${fullPath}`;
-
-                } catch (fsError: any) {
+                }
+                catch (fsError) {
                     console.error(`[ARTIFACT] ⚠️ Filesystem write failed (non-fatal): ${fsError.message}`);
                     return `db://trinity_artifacts/${artifactId}`;
                 }
             }
-
             return `db://trinity_artifacts/${artifactId}`;
-        } catch (e: any) {
+        }
+        catch (e) {
             console.error(`[ARTIFACT] Failed: ${e.message}`);
             return null;
         }
     }
-
     async runSelfDiagnostic() {
         // Renamed/Integrated into loop. Kept for legacy if needed or called by interval
         console.log(`[${this.name}] 🔍 Running self-diagnostic...`);
         // We can just report genome
         await this.reportGenome();
     }
-
-    async fetchBible(): Promise<string> {
+    async fetchBible() {
         if (this.bibleCache && (Date.now() - this.bibleCacheTime) < this.BIBLE_CACHE_TTL) {
             return this.bibleCache;
         }
@@ -868,103 +758,95 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         this.sessionMetrics.bibleReads++;
         return bible;
     }
-
     async reportGenome() {
         // ... (Keep existing stub)
     }
-
-    async extractPatterns(taskTitle: string, output: string) {
+    async extractPatterns(taskTitle, output) {
         const keywords = (taskTitle + ' ' + output).toLowerCase();
         if (keywords.includes('api') && keywords.includes('endpoint')) {
             this.sessionMetrics.patternsLearned++;
             console.log(`[${this.name}] 🧠 LOGIC PATTERN DETECTED: API usage`);
         }
     }
-
     // ============================================
     // SURVIVOR & REDEPLOY LOGIC
     // ============================================
     async checkSurvivorStatus() {
-        if (this.isSurvivor) return;
-        if (this.groupName === 'ORCHESTRATION') return;
-
+        if (this.isSurvivor)
+            return;
+        if (this.groupName === 'ORCHESTRATION')
+            return;
         try {
             const { data: heartbeat } = await this.supabase
                 .from('trinity_heartbeat')
                 .select('last_seen')
                 .eq('agent', this.survivorName)
                 .single();
-
             if (!heartbeat) {
                 console.log(`[${this.name}] 🚨 GROUP ALERT: Survivor ${this.survivorName} missing!`);
                 await this.log('survivor_missing', `Group ${this.groupName} survivor ${this.survivorName} is missing.`);
                 return;
             }
-
             const minutesAgo = (Date.now() - new Date(heartbeat.last_seen).getTime()) / 60000;
             if (minutesAgo > 10) {
                 console.log(`[${this.name}] 🚨 GROUP EMERGENCY: Survivor ${this.survivorName} is down (${minutesAgo.toFixed(0)}m)!`);
                 await this.log('survivor_down', `GroupSurvivor ${this.survivorName} is unresponsive.`);
             }
-        } catch (e: any) {
+        }
+        catch (e) {
             // console.log ...
         }
     }
-
     async runSurvivorBootProtocol() {
-        if (!this.isSurvivor) return;
+        if (!this.isSurvivor)
+            return;
         console.log(`[${this.name}] 🛡️ Running Survivor Boot Protocol...`);
         try {
             const { data: members } = await this.supabase
                 .from('trinity_heartbeat')
                 .select('agent, last_seen, config')
                 .contains('config', { group: this.groupName });
-
-            if (!members || members.length === 0) return;
-
+            if (!members || members.length === 0)
+                return;
             for (const member of members) {
-                if (member.agent === this.name) continue;
+                if (member.agent === this.name)
+                    continue;
                 const lastSeen = new Date(member.last_seen);
                 const minutesAgo = (Date.now() - lastSeen.getTime()) / 60000;
-
                 if (minutesAgo > 10) {
                     console.log(`[${this.name}] 🚨 Member ${member.agent} is STALE. Redeploying...`);
                     await this.triggerRailwayRedeploy(member.agent);
                 }
             }
-        } catch (e: any) {
+        }
+        catch (e) {
             console.log(`[${this.name}] [BOOT] Survivor protocol error: ${e.message}`);
         }
     }
-
-    async triggerRailwayRedeploy(agentName: string) {
+    async triggerRailwayRedeploy(agentName) {
         const RAILWAY_TOKEN = process.env.RAILWAY_API_TOKEN;
         if (!RAILWAY_TOKEN) {
             console.log(`[${this.name}] [REDEPLOY] Skipping ${agentName} - No RAILWAY_API_TOKEN`);
             return;
         }
-
         // TODO: User must fill these Service IDs
-        const AGENT_SERVICE_IDS: Record<string, string> = {
+        const AGENT_SERVICE_IDS = {
             'GABRIEL': 'service-uuid-here',
             'RAZIEL': 'service-uuid-here',
             'CASSIEL': 'service-uuid-here',
             // ... Fill other agents ...
         };
-
         const serviceId = AGENT_SERVICE_IDS[agentName];
         if (!serviceId) {
             console.log(`[${this.name}] [REDEPLOY] Skipping ${agentName} - Service ID not mapped in AGENT_SERVICE_IDS`);
             return;
         }
-
         try {
             const query = `
                 mutation serviceRestart($id: String!) {
                     serviceRestart(id: $id)
                 }
             `;
-
             const response = await fetch('https://backboard.railway.app/graphql/v2', {
                 method: 'POST',
                 headers: {
@@ -976,124 +858,117 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     variables: { id: serviceId }
                 })
             });
-
             const result = await response.json();
             if (result.errors) {
                 console.log(`[${this.name}] [REDEPLOY] Failed to restart ${agentName}: ${result.errors[0].message}`);
-            } else {
+            }
+            else {
                 console.log(`[${this.name}] 🚀 TRIGGERED REDEPLOY for ${agentName}`);
             }
-
-        } catch (e: any) {
+        }
+        catch (e) {
             console.log(`[${this.name}] [REDEPLOY] Exception triggering restart: ${e.message}`);
         }
     }
-
-    async sleep(ms: number) {
+    async sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-
-    async log(action: string, message: string, metadata: any = {}) {
+    async log(action, message, metadata = {}) {
+        var _a;
         try {
             await this.supabase
                 .from('trinity_agent_logs')
                 .insert({
-                    agent: this.name,
-                    action,
-                    message: typeof message === 'string' ? message.substring(0, 5000) : JSON.stringify(message).substring(0, 5000),
-                    metadata: {
-                        ...metadata,
-                        version: this.version,
-                        primaryVirtue: this.wisdom?.primaryVirtue,
-                        group: this.groupName // 3x3 Log
-                    },
-                    created_at: new Date().toISOString()
-                });
-        } catch (err) {
+                agent: this.name,
+                action,
+                message: typeof message === 'string' ? message.substring(0, 5000) : JSON.stringify(message).substring(0, 5000),
+                metadata: {
+                    ...metadata,
+                    version: this.version,
+                    primaryVirtue: (_a = this.wisdom) === null || _a === void 0 ? void 0 : _a.primaryVirtue,
+                    group: this.groupName // 3x3 Log
+                },
+                created_at: new Date().toISOString()
+            });
+        }
+        catch (err) {
             // Logging failure is non-fatal
         }
     }
-
     async heartbeat() {
+        var _a;
         const timestamp = new Date().toISOString();
         // 1. Trinity Heartbeat (For Controller)
         try {
             await this.supabase
                 .from('trinity_heartbeat')
                 .upsert({
-                    agent: this.name,
-                    status: 'active',
-                    version: this.version,
-                    last_seen: timestamp,
-                    config: {
-                        primaryVirtue: this.wisdom?.primaryVirtue,
-                        sessionMetrics: this.sessionMetrics,
-                        group: this.groupName, // 3x3 Group
-                        isSurvivor: this.isSurvivor, // DNA flag
-                        survivorTarget: this.survivorName
-                    }
-                }, { onConflict: 'agent' });
-        } catch (err) {
+                agent: this.name,
+                status: 'active',
+                version: this.version,
+                last_seen: timestamp,
+                config: {
+                    primaryVirtue: (_a = this.wisdom) === null || _a === void 0 ? void 0 : _a.primaryVirtue,
+                    sessionMetrics: this.sessionMetrics,
+                    group: this.groupName, // 3x3 Group
+                    isSurvivor: this.isSurvivor, // DNA flag
+                    survivorTarget: this.survivorName
+                }
+            }, { onConflict: 'agent' });
+        }
+        catch (err) {
             // Non-fatal
         }
-
         // 2. Agent Heartbeat (Legacy/Monitoring Table)
         try {
             const { error } = await this.supabase
                 .from('agent_heartbeat') // User explicitly requested this table
                 .upsert({
-                    agent_name: this.name,
-                    status: 'online',
-                    last_ping: timestamp
-                }, { onConflict: 'agent_name' });
-
-            if (error) console.error('[HEARTBEAT] FAILED:', error.message);
-            else console.log(`[HEARTBEAT] Ping sent (${timestamp})`);
-
-        } catch (err: any) {
+                agent_name: this.name,
+                status: 'online',
+                last_ping: timestamp
+            }, { onConflict: 'agent_name' });
+            if (error)
+                console.error('[HEARTBEAT] FAILED:', error.message);
+            else
+                console.log(`[HEARTBEAT] Ping sent (${timestamp})`);
+        }
+        catch (err) {
             console.error('[HEARTBEAT] Error:', err.message);
         }
     }
-
     // ... Keeping heartbeat separate to update Dual Write
-
     // ============================================
     // CORE STRATEGIES
     // ============================================
-
     // Strategy 10: Retrospective
     async retrospective() {
         console.log(`[${this.name}] 🕯️ Starting retrospective...`);
         const prompt = `Reflect on last week's tasks (simulated or real): successes, failures, lessons. Suggest 3 improvements.`;
         const reflection = await this.callLLM(prompt);
-
         if (reflection && reflection.output) {
             // Log the reflection
             await this.supabase.from('trinity_retros').insert({
                 agent: this.name,
                 reflection: reflection.output
             });
-
             // Earn Reputation for self-reflecting (A virtuous act)
             await this.updateReputation(true);
             console.log(`[${this.name}] Retrospective complete and logged. Reputation updated.`);
         }
     }
-
     // Strategy 8: Continuous Research (Refactored to use ResearchTool)
-    async researchTask(gap: string) {
+    async researchTask(gap) {
+        var _a;
         console.log(`[${this.name}] 🔎 Researching topic using Swarm Interface: ${gap}`);
-
         // 1. Use Research Tool
         const searchResults = await this.researchTool.searchWeb(gap);
-
         // 2. Browse a top result (Simulation of depth)
-        const topUrl = searchResults[0]?.url;
+        const topUrl = (_a = searchResults[0]) === null || _a === void 0 ? void 0 : _a.url;
         let deepDive = "";
         if (topUrl) {
             deepDive = await this.researchTool.browsePage(topUrl, "Extract key implementation details");
         }
-
         // 3. Summarize findings using LLM
         const prompt = `
     Summarize these search results for the swarm regarding the topic "${gap}".
@@ -1105,9 +980,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     Deep Dive Insight:
     ${deepDive}
     `;
-
         const summary = await this.callLLM(prompt);
-
         // 4. Log to Supabase
         if (summary.output) {
             await this.supabase.from('trinity_research_log').insert({
@@ -1120,18 +993,17 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             console.log(`[${this.name}] Research complete for "${gap}".`);
         }
     }
-
-    async callLLM(prompt: string, options: any = {}): Promise<LLMResult> {
+    async callLLM(prompt, options = {}) {
+        var _a;
         const apiKey = process.env.OPENAI_API_KEY;
         if (!apiKey) {
             console.warn(`[${this.name}] No API Key for LLM`);
             return { output: "Simulation: LLM not configured." };
         }
-
         try {
             // 1. Get Tools for this Agent
             const tools = await mcpManager.getToolsForRole(this.name);
-            const openAiTools = tools.map((tool: any) => ({
+            const openAiTools = tools.map((tool) => ({
                 type: 'function',
                 function: {
                     name: tool.name,
@@ -1139,13 +1011,11 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     parameters: tool.schema
                 }
             }));
-
             // 2. Prepare Messages
-            const messages: any[] = [
-                { role: 'system', content: `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${await this.fetchBible()}` },
+            const messages = [
+                { role: 'system', content: `You are ${this.name}. ${exports.CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${await this.fetchBible()}` },
                 { role: 'user', content: prompt }
             ];
-
             // 3. Loop for Tool Calls (Max 5 turns to prevent infinite loops)
             for (let i = 0; i < 5; i++) {
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1161,33 +1031,28 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         tool_choice: openAiTools.length > 0 ? 'auto' : undefined
                     })
                 });
-
                 const data = await response.json();
-                const choice = data.choices?.[0];
-                const message = choice?.message;
-
-                if (!message) return { output: "Error: No output from LLM" };
-
+                const choice = (_a = data.choices) === null || _a === void 0 ? void 0 : _a[0];
+                const message = choice === null || choice === void 0 ? void 0 : choice.message;
+                if (!message)
+                    return { output: "Error: No output from LLM" };
                 // Add assistant message to history
                 messages.push(message);
-
                 // Check for Tool Calls
                 if (message.tool_calls && message.tool_calls.length > 0) {
                     console.log(`[${this.name}] 🛠️ LLM Requested ${message.tool_calls.length} tool(s)`);
-
                     for (const toolCall of message.tool_calls) {
                         const fnName = toolCall.function.name;
                         const args = JSON.parse(toolCall.function.arguments);
                         console.log(`[${this.name}] 📞 Calling Tool: ${fnName}`);
-
                         let toolResult = '';
                         try {
                             toolResult = await mcpManager.routeToolCall(fnName, args);
-                        } catch (err: any) {
+                        }
+                        catch (err) {
                             toolResult = `Error executing tool ${fnName}: ${err.message}`;
                             console.error(`[${this.name}] ❌ Tool Error:`, err);
                         }
-
                         // Add tool result to messages
                         messages.push({
                             role: 'tool',
@@ -1196,18 +1061,19 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         });
                     }
                     // Loop continues to send tool outputs back to LLM
-                } else {
+                }
+                else {
                     // Final response (no more tools)
                     return { output: message.content || "No content returned" };
                 }
             }
-
             return { output: "Error: Max tool recursion limit reached." };
-
-        } catch (error: any) {
+        }
+        catch (error) {
             console.error("LLM Call Failed", error);
             // Don't punish reputation for API errors, it's not the agent's fault
             return { output: "Error calling LLM" };
         }
     }
 }
+exports.ConstitutionalAgent = ConstitutionalAgent;

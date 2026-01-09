@@ -76,6 +76,7 @@ export default function ConductorPage() {
                     <div className="flex gap-4 items-center">
                         <div className="flex gap-2 text-xs text-white/30 font-mono items-center">
                             <a href="/" className="hover:text-white transition-colors mr-4">Home</a>
+                            <a href="/pulse/wisdom" className="hover:text-blue-400 transition-colors mr-4 font-bold">WISDOM VIEW</a>
                             CONNECTED: CONTROLLER.AITRINITYSYMPHONY.COM
                         </div>
                         {/* CAPTAIN CONTROLS */}

@@ -1,0 +1,193 @@
+'use client';
+
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, CheckCircle2, Sparkles, Heart, ShieldCheck, Zap } from 'lucide-react';
+import Link from 'next/link';
+
+export default function ImpactPage() {
+    const [email, setEmail] = useState('');
+    const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const [message, setMessage] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setStatus('loading');
+
+        try {
+            const res = await fetch('/api/join', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                setStatus('success');
+                setMessage(data.message);
+                setEmail('');
+            } else {
+                setStatus('error');
+                setMessage(data.error || 'Something went wrong.');
+            }
+        } catch (err) {
+            setStatus('error');
+            setMessage('Failed to connect. Please try again.');
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-black text-white selection:bg-purple-500/30 font-sans overflow-x-hidden relative">
+
+            {/* Background Effects */}
+            <div className="fixed inset-0 z-0">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black opacity-80" />
+                <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150"></div>
+                {/* Simulated Particles (CSS Dots) */}
+                <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-purple-500 rounded-full blur-[2px] animate-pulse"></div>
+                <div className="absolute top-3/4 left-3/4 w-1 h-1 bg-blue-400 rounded-full blur-[1px] animate-pulse delay-75"></div>
+                <div className="absolute top-1/2 left-1/2 w-1.5 h-1.5 bg-yellow-400 rounded-full blur-[2px] animate-ping delay-1000"></div>
+            </div>
+
+            {/* Navigation */}
+            <nav className="relative z-10 p-6 flex justify-between items-center max-w-7xl mx-auto">
+                <Link href="/" className="text-xl font-bold tracking-tighter flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-purple-400" />
+                    Trinity Symphony
+                </Link>
+                <Link href="/pulse/wisdom" className="text-sm text-gray-400 hover:text-white transition-colors">
+                    View Live Pulse
+                </Link>
+            </nav>
+
+            {/* Hero Section */}
+            <main className="relative z-10 flex flex-col items-center justify-center min-h-[80vh] px-4 text-center max-w-4xl mx-auto">
+
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8 }}
+                    className="space-y-6"
+                >
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-purple-300 mb-4">
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                        </span>
+                        Identifying Co-Builders Now
+                    </div>
+
+                    <h1 className="text-5xl md:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-purple-200 pb-2">
+                        Join the AI Revolution <br /> <span className="text-white">for Good.</span>
+                    </h1>
+
+                    <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
+                        Help build a decentralized, ethical AI ecosystem that values <span className="text-blue-300">Truth</span> and empowers people to <span className="text-purple-300">help people</span>.
+                    </p>
+
+                    <p className="text-sm md:text-md text-gray-500 max-w-xl mx-auto">
+                        We’re creating agents that learn wisdom, fact-check for truth, and drive real inclusion in finance, education, and health — for the last, the lost, and the least.
+                    </p>
+                </motion.div>
+
+                {/* CTA Form */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4, duration: 0.5 }}
+                    className="mt-12 w-full max-w-md"
+                >
+                    <form onSubmit={handleSubmit} className="relative group">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+                        <div className="relative flex items-center bg-black/80 backdrop-blur-xl border border-white/10 rounded-lg p-2 pr-2 shadow-2xl">
+                            <input
+                                type="email"
+                                placeholder="name@example.com"
+                                required
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-500 px-4 py-3"
+                            />
+                            <button
+                                type="submit"
+                                disabled={status === 'loading' || status === 'success'}
+                                className="bg-white text-black font-semibold px-6 py-3 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {status === 'loading' ? 'Joining...' : 'Join the Spark'}
+                                {status !== 'loading' && <ArrowRight className="w-4 h-4" />}
+                            </button>
+                        </div>
+                    </form>
+                    <p className="mt-4 text-xs text-center text-gray-600">
+                        Zero spam. Only signal. Validating "Truth" in 3... 2... 1...
+                    </p>
+                </motion.div>
+
+                {/* Feature Grid (Trust Signals) */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.8 }}
+                    className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 text-left w-full max-w-5xl px-4"
+                >
+                    {[
+                        { icon: ShieldCheck, title: "Truth-First AI", desc: "Agents incentivized by accuracy, not engagement." },
+                        { icon: Heart, title: "Radical Empathy", desc: "Designed to uplift the marginalized and underserved." },
+                        { icon: Zap, title: "Agentic Action", desc: "Not just chat. Real work, real tasks, real impact." }
+                    ].map((feature, i) => (
+                        <div key={i} className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                            <feature.icon className="w-8 h-8 text-gray-400 mb-4" />
+                            <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
+                            <p className="text-sm text-gray-400">{feature.desc}</p>
+                        </div>
+                    ))}
+                </motion.div>
+            </main>
+
+            {/* Success Modal */}
+            <AnimatePresence>
+                {status === 'success' && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+
+                            <div className="flex flex-col items-center text-center space-y-4">
+                                <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mb-2">
+                                    <CheckCircle2 className="w-8 h-8 text-green-400" />
+                                </div>
+
+                                <h2 className="text-2xl font-bold text-white">Welcome to the Spark</h2>
+
+                                <p className="text-gray-300 leading-relaxed">
+                                    Thank you for your interest! We are really excited about building a Decentralized Ethical AI Ecosystem.
+                                </p>
+
+                                <div className="bg-white/5 p-4 rounded-lg border border-white/10 text-sm text-gray-400 w-full">
+                                    <span className="text-white font-semibold block mb-1">Next Step:</span>
+                                    Check your inbox — we just sent you a quick note to learn more about your superpowers. ⚡
+                                </div>
+
+                                <button
+                                    onClick={() => setStatus('idle')}
+                                    className="mt-6 w-full bg-white text-black px-4 py-3 rounded hover:bg-gray-200 font-semibold"
+                                >
+                                    Got it, thanks!
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+        </div>
+    );
+}

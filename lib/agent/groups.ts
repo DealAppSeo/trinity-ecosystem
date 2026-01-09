@@ -1,6 +1,6 @@
 
 import { WisdomProfile } from './types';
-import { AGENT_WISDOM } from './ConstitutionalAgent';
+import { AGENT_WISDOM } from './wisdom';
 
 export type GroupId = 'ALPHA' | 'BETA' | 'GAMMA' | 'ORCHESTRATION';
 

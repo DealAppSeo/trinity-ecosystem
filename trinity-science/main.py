@@ -14,6 +14,33 @@ app = FastAPI(
     version="0.1.0"
 )
 
+# --- CORS ---
+from fastapi.middleware.cors import CORSMiddleware
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://controller.aitrinitysymphony.com", # Production Vercel
+    "*" # Allow all for now to ensure smooth launch
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- PROMETHEUS METRICS ---
+from prometheus_client import make_asgi_app
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
+# --- ROUTERS ---
+from app.anfis_router import router as anfis_router
+app.include_router(anfis_router, prefix="/anfis/v2", tags=["ANFIS v2"])
+
 # --- Data Models (Mirroring openapi.json) ---
 
 class AnfisInput(BaseModel):
