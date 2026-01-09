@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Card from '@/components/ui/Card';
+import { Card } from '@/components/ui/Card';
 import { Activity, Shield, Cpu, RefreshCw, Layers, Zap, Database, Palette } from 'lucide-react';
 
 interface AgentState {

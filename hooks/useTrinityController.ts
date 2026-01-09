@@ -6,20 +6,19 @@ export function useTrinityController() {
     const [agents, setAgents] = useState<AgentRegistryRecord[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
-    // const supabase = createClient(); // REMOVED: Using imported singleton
+    const [logs, setLogs] = useState<any[]>([]);
+    const [heartbeats, setHeartbeats] = useState<any[]>([]);
 
     const fetchData = async () => {
         setLoading(true);
 
-        // Fetch Agents
+        // 1. Fetch Agents
         const { data: agentData } = await supabase
             .from('trinity_agent_registry')
             .select('*')
             .order('reputation_score', { ascending: false });
 
-        if (agentData) setAgents(agentData as AgentRegistryRecord[]);
-
-        // Fetch Recent Tasks
+        // 2. Fetch Recent Tasks
         const { data: taskData } = await supabase
             .from('trinity_tasks')
             .select('*')
@@ -28,33 +27,7 @@ export function useTrinityController() {
 
         if (taskData) setTasks(taskData as Task[]);
 
-        setLoading(false);
-    };
-
-    const [logs, setLogs] = useState<any[]>([]); // New: Consulting Logs
-    const [heartbeats, setHeartbeats] = useState<any[]>([]); // New: Real-time Heartbeats
-
-    // ... existing ...
-
-    const fetchData = async () => {
-        setLoading(true);
-
-        // Fetch Agents
-        const { data: agentData } = await supabase
-            .from('trinity_agent_registry')
-            .select('*')
-            .order('reputation_score', { ascending: false });
-        if (agentData) setAgents(agentData as AgentRegistryRecord[]);
-
-        // Fetch Recent Tasks
-        const { data: taskData } = await supabase
-            .from('trinity_tasks')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(20);
-        if (taskData) setTasks(taskData as Task[]);
-
-        // NEW: Fetch Consulting Logs
+        // 3. Fetch Consulting Logs
         const { data: logData } = await supabase
             .from('trinity_agent_logs')
             .select('*')
@@ -63,15 +36,14 @@ export function useTrinityController() {
             .limit(10);
         if (logData) setLogs(logData);
 
-        // NEW: Fetch Heartbeats
+        // 4. Fetch Heartbeats
         const { data: heartbeatData } = await supabase
             .from('trinity_heartbeat')
             .select('*')
             .gt('last_seen', new Date(Date.now() - 15 * 60 * 1000).toISOString()); // Last 15m
         if (heartbeatData) setHeartbeats(heartbeatData);
 
-        // 3. MAP TASKS TO AGENTS
-        // Create a map of AgentName -> CurrentTask
+        // 5. MAP TASKS TO AGENTS
         const activeTasks = (taskData || []).filter((t: any) => t.status === 'in_progress' && t.claimed_by);
         const taskMap = new Map(activeTasks.map((t: any) => [t.claimed_by, t]));
 
@@ -92,64 +64,65 @@ export function useTrinityController() {
         setLoading(false);
     };
 
-    // ... create, kill ...
-
-    return { agents, tasks, logs, heartbeats, loading, createTask, killRandomAgent, triggerChaosEvent, refresh: fetchData };
-}
-useEffect(() => {
-    fetchData();
-    // Subscriptions remain (could add logs subscription if crucial)
-    // ... existing subs ...
-
-    return () => {
-        // ... cleanup ...
+    const createTask = async (title: string, priority: string = 'medium') => {
+        await supabase.from('trinity_tasks').insert({
+            title,
+            priority,
+            status: 'pending',
+            created_at: new Date().toISOString()
+        });
+        fetchData(); // Optimistic refresh
     };
-}, []);
 
-// ... create, kill ...
+    const killRandomAgent = async () => {
+        // Find active agents
+        const activeAgents = agents.filter(a => a.status === 'active');
+        if (activeAgents.length === 0) {
+            console.warn('No active agents to kill');
+            return;
+        }
 
-return { agents, tasks, logs, heartbeats, loading, createTask, killRandomAgent, triggerChaosEvent, refresh: fetchData };
-}
+        // Select victim
+        const victim = activeAgents[Math.floor(Math.random() * activeAgents.length)];
 
-const createTask = async (title: string, priority: string = 'medium') => {
-    await supabase.from('trinity_tasks').insert({
-        title,
-        priority,
-        status: 'pending',
-        created_at: new Date().toISOString()
-    });
-    fetchData(); // Optimistic refresh
-};
+        // Execute kill
+        await supabase
+            .from('trinity_agent_registry')
+            .update({ status: 'offline' })
+            .eq('id', victim.id);
 
-const killRandomAgent = async () => {
-    // Find active agents
-    const activeAgents = agents.filter(a => a.status === 'active');
-    if (activeAgents.length === 0) {
-        console.warn('No active agents to kill');
-        return;
-    }
+        console.log(`💀 Agent Killed: ${victim.agent_name}`);
+        createTask(`⚠️ ALERT: Agent ${victim.agent_name} went offline unexpectedly`, 'high');
+        fetchData();
+    };
 
-    // Select victim
-    const victim = activeAgents[Math.floor(Math.random() * activeAgents.length)];
+    const triggerChaosEvent = async (eventType: string) => {
+        const title = `🔥 CHAOS SIMULATION: ${eventType}`;
+        await createTask(title, 'critical');
 
-    // Execute kill
-    await supabase
-        .from('trinity_agent_registry')
-        .update({ status: 'offline' })
-        .eq('id', victim.id);
+        // Log chaos event to console or separate audit log if needed
+        console.warn(`Chaos Event Triggered: ${eventType}`);
+    };
 
-    console.log(`💀 Agent Killed: ${victim.agent_name}`);
-    createTask(`⚠️ ALERT: Agent ${victim.agent_name} went offline unexpectedly`, 'high');
-    fetchData();
-};
+    useEffect(() => {
+        fetchData();
 
-const triggerChaosEvent = async (eventType: string) => {
-    const title = `🔥 CHAOS SIMULATION: ${eventType}`;
-    await createTask(title, 'critical');
+        // Optional: Real-time subscription could go here
 
-    // Log chaos event to console or separate audit log if needed
-    console.warn(`Chaos Event Triggered: ${eventType}`);
-};
+        return () => {
+            // cleanup
+        };
+    }, []);
 
-return { agents, tasks, loading, createTask, killRandomAgent, triggerChaosEvent, refresh: fetchData };
+    return {
+        agents,
+        tasks,
+        logs,
+        heartbeats,
+        loading,
+        createTask,
+        killRandomAgent,
+        triggerChaosEvent,
+        refresh: fetchData
+    };
 }
