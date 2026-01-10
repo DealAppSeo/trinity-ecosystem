@@ -16,10 +16,19 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
         }
 
-        // 1. Save to Supabase
+        // 1. Generate Referral Code
+        const referralCode = 'TR-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        // 2. Save to Supabase
         const { error } = await supabase
             .from('trinity_leads')
-            .insert({ email, status: 'new' });
+            .insert({
+                email,
+                status: 'new',
+                referral_code: referralCode,
+                // Check if there was a referral from query params/cookies (future proofing)
+                // for now we just prepare the column
+            });
 
         if (error) {
             // Handle duplicate emails gracefully
