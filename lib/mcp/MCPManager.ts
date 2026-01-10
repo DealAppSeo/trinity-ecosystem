@@ -1,7 +1,4 @@
-import { MCPServer, MCPTool, MCPRegistryRecord } from './types';
-import { FileSystemMCP } from './servers/FileSystemMCP';
-import { PuppeteerMCP } from './servers/PuppeteerMCP';
-import { FigmaMCP } from './servers/FigmaMCP';
+import { TavilyMCP } from './servers/TavilyMCP';
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -13,6 +10,7 @@ export class MCPManager {
         this.registerServer(new FileSystemMCP());
         this.registerServer(new PuppeteerMCP());
         this.registerServer(new FigmaMCP());
+        this.registerServer(new TavilyMCP());
     }
 
     registerServer(server: MCPServer) {
@@ -62,7 +60,7 @@ export class MCPManager {
 
         // ALPHA SQUAD (Marketing/Truth) - Grok
         if (roleUpper.includes('CMO') || roleUpper.includes('GROK') || roleUpper.includes('MARKETING') || roleUpper.includes('VERITAS') || roleUpper.includes('W3C')) {
-            allowedServers = accessMap['CMO_SQUAD'];
+            allowedServers = ['TavilySearch', ...accessMap['CMO_SQUAD']];
         }
         // BETA SQUAD (Design/Care) - Claude
         else if (roleUpper.includes('CDO') || roleUpper.includes('CLAUDE') || roleUpper.includes('DESIGN') || roleUpper.includes('MEL') || roleUpper.includes('LILY')) {

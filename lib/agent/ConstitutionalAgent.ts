@@ -40,11 +40,42 @@ export interface ResearchTool {
 
 export class WebResearchTool implements ResearchTool {
     async searchWeb(query: string): Promise<{ url: string; title: string; content: string }[]> {
-        console.log(`[ResearchTool] 🔎 Searching web for: "${query}"`);
-        return [{ url: "https://example.com", title: "Simulated Result", content: "Simulated content" }];
+        const apiKey = process.env.TAVILY_API_KEY;
+        if (!apiKey) {
+            console.warn('[ResearchTool] ⚠️ No TAVILY_API_KEY. Returning mock.');
+            return [{ url: "https://example.com", title: "Missing API Key", content: "Please set TAVILY_API_KEY." }];
+        }
+
+        try {
+            console.log(`[ResearchTool] 🔎 Searching web for: "${query}"`);
+            const response = await fetch('https://api.tavily.com/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    api_key: apiKey,
+                    query: query,
+                    search_depth: "basic",
+                    max_results: 3
+                })
+            });
+
+            const data = await response.json();
+            if (!data.results) return [];
+
+            return data.results.map((r: any) => ({
+                url: r.url,
+                title: r.title,
+                content: r.content
+            }));
+        } catch (e: any) {
+            console.error(`[ResearchTool] Error: ${e.message}`);
+            return [{ url: "error", title: "Search Failed", content: e.message }];
+        }
     }
+
     async browsePage(url: string, instructions: string): Promise<string> {
-        return `Simulated browse of ${url}`;
+        // Fallback to "extract" endpoint of Tavily if we want, or just search
+        return `Browsing logic is currently handled via search context for ${url}.`;
     }
 }
 
