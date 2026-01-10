@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Activity, Shield, Zap, Database, Cpu, Eye, Network } from 'lucide-react';
 
 interface AgentGridProps {
@@ -59,7 +60,11 @@ export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGr
                                 const isSurvivor = agent.is_survivor;
 
                                 return (
-                                    <div key={agent.agent_name} className="bg-black/40 border border-white/5 rounded-lg p-3 hover:border-white/10 transition-colors group relative">
+                                    <Link
+                                        href={`/pulse/conductor?agent=${agent.agent_name}`}
+                                        key={agent.agent_name}
+                                        className="block bg-black/40 border border-white/5 rounded-lg p-3 hover:border-accent-violet/50 hover:bg-accent-violet/5 transition-all group relative cursor-pointer"
+                                    >
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex items-center gap-2">
                                                 <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500/50'}`} />
@@ -106,13 +111,16 @@ export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGr
 
                                         {isConductor && (
                                             <button
-                                                onClick={() => onAssignTask && onAssignTask(agent.agent_name)}
+                                                onClick={(e) => {
+                                                    e.preventDefault(); // Prevent navigation when clicking assign
+                                                    onAssignTask && onAssignTask(agent.agent_name);
+                                                }}
                                                 className="mt-3 w-full py-1 text-[10px] font-medium bg-white/5 hover:bg-white/10 border border-white/5 rounded text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
                                             >
                                                 Assign Task
                                             </button>
                                         )}
-                                    </div>
+                                    </Link>
                                 );
                             })}
                         </div>
