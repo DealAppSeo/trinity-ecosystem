@@ -2,6 +2,7 @@ import { MCPServer, MCPTool } from '../types';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { supabase } from '../../supabase';
 
 export class FileSystemMCP implements MCPServer {
     name = 'FileSystem';
@@ -86,6 +87,23 @@ export class FileSystemMCP implements MCPServer {
         const signedContent = `${content}\n\n<!-- RepID: ${repId} | Signed by Trinity System -->`;
 
         fs.writeFileSync(safePath, signedContent);
+
+        // PERSISTENCE: Save to Database (Cloud) so user can see it in dashboard
+        try {
+            const { error } = await supabase.from('trinity_artifacts').insert({
+                file_path: relativePath,
+                content: content,
+                repid_hash: repId,
+                agent_name: 'Swarm_Agent', // Default, as tool call context is limited here
+                artifact_type: 'file',
+                metadata: { source: 'FileSystemMCP', signed: true }
+            });
+            if (error) console.error('[FileSystemMCP] DB Save Error:', error.message);
+            else console.log(`[FileSystemMCP] Saved ${relativePath} to Database.`);
+        } catch (err) {
+            console.error('[FileSystemMCP] DB Exception:', err);
+        }
+
         return `Successfully wrote to ${relativePath} (RepID: ${repId})`;
     }
 
