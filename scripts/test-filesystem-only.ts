@@ -6,7 +6,7 @@ async function main() {
     console.log('🧪 Testing FileSystemMCP independently...');
 
     const fsMcp = new FileSystemMCP();
-    await fsMcp.connect();
+    await fsMcp.initialize();
 
     console.log('📂 connected. Tools:', (await fsMcp.getTools()).map(t => t.name).join(', '));
 

@@ -33,9 +33,12 @@ app.add_middleware(
 )
 
 # --- PROMETHEUS METRICS ---
-from prometheus_client import make_asgi_app
-metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
+try:
+    from prometheus_client import make_asgi_app
+    metrics_app = make_asgi_app()
+    app.mount("/metrics", metrics_app)
+except ImportError:
+    logger.warning("prometheus_client not found. Metrics endpoint disabled.")
 
 # --- ROUTERS ---
 from app.anfis_router import router as anfis_router

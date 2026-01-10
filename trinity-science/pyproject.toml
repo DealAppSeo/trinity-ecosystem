@@ -16,6 +16,7 @@ dependencies = [
     # PyTorch (CPU for standard dev, CUDA if available in PROD)
     "torch>=2.2.0", 
     "torch_geometric>=2.5.0",
+    "prometheus_client>=0.20.0",
 ]
 
 [tool.uv]

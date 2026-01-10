@@ -16,6 +16,7 @@
     "populate-inbox": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/populate-inbox.ts",
     "simulate-chaos": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/simulate-chaos.ts",
     "train-agents": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/train-agents.ts",
+    "test-swarm": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/test-swarm.ts",
     "scheduler": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/scheduler.ts"
   },
   "dependencies": {

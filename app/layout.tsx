@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { MobileNav } from "@/components/MobileNav";
 
 export const metadata: Metadata = {
   title: "Trinity Pulse | AI Symphony Controller",
@@ -31,6 +32,7 @@ export default function RootLayout({
       </head>
       <body className="font-display antialiased">
         {children}
+        <MobileNav />
       </body>
     </html>
   );
