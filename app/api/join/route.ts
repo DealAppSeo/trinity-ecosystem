@@ -42,4 +42,43 @@ export async function POST(request: Request) {
         console.error('Lead Capture Error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
-}
+
+    export async function PUT(request: Request) {
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        try {
+            const body = await request.json();
+            const { email, preferred_ecosystem, linkedin_handle, github_handle, why_interested } = body;
+
+            if (!email) {
+                return NextResponse.json({ error: 'Email required to update record' }, { status: 400 });
+            }
+
+            // Update the record
+            const { error } = await supabase
+                .from('trinity_leads')
+                .update({
+                    preferred_ecosystem,
+                    linkedin_handle,
+                    github_handle,
+                    why_interested,
+                    vote_timestamp: new Date().toISOString()
+                })
+                .eq('email', email);
+
+            if (error) throw error;
+
+            return NextResponse.json({
+                success: true,
+                message: 'Preferences saved. Welcome to the family.'
+            });
+
+        } catch (error: any) {
+            console.error('Lead Update Error:', error);
+            return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        }
+    }
+

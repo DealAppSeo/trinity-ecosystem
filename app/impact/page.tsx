@@ -144,50 +144,161 @@ export default function ImpactPage() {
                 </motion.div>
             </main>
 
-            {/* Success Modal */}
+            {/* Success Modal / Poll Wizard */}
             <AnimatePresence>
                 {status === 'success' && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
                     >
-                        <motion.div
-                            initial={{ scale: 0.9, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl relative overflow-hidden"
-                        >
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-
-                            <div className="flex flex-col items-center text-center space-y-4">
-                                <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mb-2">
-                                    <CheckCircle2 className="w-8 h-8 text-green-400" />
-                                </div>
-
-                                <h2 className="text-2xl font-bold text-white">Welcome to the Spark</h2>
-
-                                <p className="text-gray-300 leading-relaxed">
-                                    Thank you for your interest! We are really excited about building a Decentralized Ethical AI Ecosystem.
-                                </p>
-
-                                <div className="bg-white/5 p-4 rounded-lg border border-white/10 text-sm text-gray-400 w-full">
-                                    <span className="text-white font-semibold block mb-1">Next Step:</span>
-                                    Check your inbox — we just sent you a quick note to learn more about your superpowers. ⚡
-                                </div>
-
-                                <button
-                                    onClick={() => setStatus('idle')}
-                                    className="mt-6 w-full bg-white text-black px-4 py-3 rounded hover:bg-gray-200 font-semibold"
-                                >
-                                    Got it, thanks!
-                                </button>
-                            </div>
-                        </motion.div>
+                        <PollWizard email={email} onClose={() => setStatus('idle')} />
                     </motion.div>
                 )}
             </AnimatePresence>
 
         </div>
+    );
+}
+
+function PollWizard({ email, onClose }: { email: string, onClose: () => void }) {
+    const [step, setStep] = useState(1);
+    const [vote, setVote] = useState('');
+    const [socials, setSocials] = useState({ linkedin: '', github: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleVote = (choice: string) => {
+        setVote(choice);
+        setStep(2);
+    };
+
+    const handleFinalSubmit = async () => {
+        setIsSubmitting(true);
+        await fetch('/api/join', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email,
+                preferred_ecosystem: vote,
+                linkedin_handle: socials.linkedin,
+                github_handle: socials.github
+            })
+        });
+        setStep(3); // Thank you screen
+        setIsSubmitting(false);
+    };
+
+    return (
+        <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            className="bg-[#0a0a0a] border border-white/10 rounded-2xl max-w-2xl w-full shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]"
+        >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+
+            <div className="p-8 overflow-y-auto">
+
+                {/* STEP 1: RESONANCE VOTE */}
+                {step === 1 && (
+                    <div className="space-y-6 text-center">
+                        <h2 className="text-2xl font-bold text-white">Which Mission Resonates Most?</h2>
+                        <p className="text-gray-400">Help our agents route your onboarding. Pick one.</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[
+                                { id: 'PurposeHub', name: 'PurposeHub.ai', desc: 'Connecting people to Impact Projects.', icon: '🌍' },
+                                { id: 'ImageBearer', name: 'ImageBearer.org', desc: 'Restoring identity & dignity.', icon: '🛡️' },
+                                { id: 'AISocialMirror', name: 'AISocialMirror.com', desc: 'Truth, Psychology & Self-Awareness.', icon: '🪞' },
+                                { id: 'AIDebate', name: 'AIDebate.io', desc: 'Logic, Reason & Ethical Discourse.', icon: '⚖️' }
+                            ].map((opt) => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => handleVote(opt.id)}
+                                    className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-purple-500/50 transition-all text-left group"
+                                >
+                                    <span className="text-2xl mb-2 block">{opt.icon}</span>
+                                    <h3 className="font-bold text-white group-hover:text-purple-300">{opt.name}</h3>
+                                    <p className="text-xs text-gray-500">{opt.desc}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* STEP 2: SHARE & CONNECT */}
+                {step === 2 && (
+                    <div className="space-y-6 text-center">
+                        <div className="w-16 h-16 bg-purple-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Sparkles className="w-8 h-8 text-purple-400" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white">Let's Build Together</h2>
+                        <p className="text-gray-400 max-w-md mx-auto">
+                            If you believe in <span className="text-white font-semibold">Democratized, Ethical AI</span>, connect with us.
+                            We are looking for co-pilots.
+                        </p>
+
+                        <div className="space-y-4 max-w-sm mx-auto">
+                            <input
+                                type="text"
+                                placeholder="LinkedIn Profile URL (Optional)"
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 outline-none"
+                                value={socials.linkedin}
+                                onChange={e => setSocials({ ...socials, linkedin: e.target.value })}
+                            />
+                            <input
+                                type="text"
+                                placeholder="GitHub Handle (Optional)"
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 outline-none"
+                                value={socials.github}
+                                onChange={e => setSocials({ ...socials, github: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="flex gap-3 justify-center pt-4">
+                            <button onClick={() => setStep(1)} className="text-gray-500 hover:text-white text-sm px-4">Back</button>
+                            <button
+                                onClick={handleFinalSubmit}
+                                disabled={isSubmitting}
+                                className="bg-white text-black px-8 py-2 rounded-full font-bold hover:bg-gray-200"
+                            >
+                                {isSubmitting ? 'Saving...' : 'Complete Impact Profile'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* STEP 3: THANK YOU */}
+                {step === 3 && (
+                    <div className="space-y-6 text-center py-8">
+                        <CheckCircle2 className="w-16 h-16 text-green-400 mx-auto" />
+                        <h2 className="text-3xl font-bold text-white">You're In.</h2>
+                        <p className="text-gray-400 max-w-md mx-auto">
+                            We have recorded your preference for <span className="text-purple-400 font-mono">{vote}</span>.
+                            <br />Our agents are analyzing your fit now.
+                        </p>
+
+                        <div className="bg-white/5 p-6 rounded-xl border border-white/10 mt-8">
+                            <p className="text-sm text-gray-300 italic mb-4">
+                                "The best way to predict the future is to create it."
+                            </p>
+                            <a
+                                href="https://twitter.com/intent/tweet?text=I%20just%20joined%20the%20Trinity%20Symphony.%20Building%20Safe%2C%20Ethical%20AI%20that%20uplifts%20humanity.%20%23AIForGood%20%23TrinityEcosystem"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block bg-[#1DA1F2] text-white px-6 py-2 rounded-full font-bold text-sm hover:opacity-90 transition-opacity"
+                            >
+                                Share the Vision on X
+                            </a>
+                        </div>
+
+                        <button onClick={onClose} className="mt-8 text-gray-500 hover:text-white text-sm">
+                            Close & Return to Earth
+                        </button>
+                    </div>
+                )}
+
+            </div>
+        </motion.div>
     );
 }
