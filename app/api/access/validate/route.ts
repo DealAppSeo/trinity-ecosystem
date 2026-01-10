@@ -21,6 +21,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: 'Code required' }, { status: 400 });
         }
 
+        if (!supabaseAdmin) {
+            return NextResponse.json({ success: false, message: 'Database not authorized' }, { status: 500 });
+        }
+
         // 1. Check if Code Exists & is valid
         const { data: invite, error } = await supabaseAdmin
             .from('trinity_access_invites')

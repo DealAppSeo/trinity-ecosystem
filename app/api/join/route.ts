@@ -3,10 +3,36 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
     // Initialize standard client (lighter weight than auth-helpers)
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url || !key) {
+        // Allow build to pass, but runtime will fail if called
+        return NextResponse.json({ error: 'Database config missing' }, { status: 500 });
+    }
+
+    const supabase = createClient(url, key);
+
+    try {
+        const body = await request.json();
+        // ...
+        // ... existing logic ...
+        // ...
+    } catch (error: any) {
+        console.error('Lead Capture Error:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+export async function PUT(request: Request) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url || !key) {
+        return NextResponse.json({ error: 'Database config missing' }, { status: 500 });
+    }
+
+    const supabase = createClient(url, key);
 
     try {
         const body = await request.json();
@@ -54,10 +80,14 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url || !key) {
+        return NextResponse.json({ error: 'Database config missing' }, { status: 500 });
+    }
+
+    const supabase = createClient(url, key);
 
     try {
         const body = await request.json();
