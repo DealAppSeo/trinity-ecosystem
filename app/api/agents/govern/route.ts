@@ -3,15 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 // Initialize Supabase with Service Key (Admin Access)
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTkzOTU5MSwiZXhwIjoyMDY3NTE1NTkxfQ.tXfcjDUB2D-WzEQ5q97fWJ9-6npzJ9-7e7e7e7e7e7';
-console.log('🔑 API Route using Service Key length:', SERVICE_KEY?.length);
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''; // Fallback for build safety
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    SERVICE_KEY
-);
+// Initializing safely to prevent build crash.
+// Ideally, use createClient inside the function if config is dynamic.
+const supabase = (process.env.NEXT_PUBLIC_SUPABASE_URL && SERVICE_KEY)
+    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, SERVICE_KEY)
+    : null;
 
 export async function POST(request: Request) {
+    if (!supabase) {
+        return NextResponse.json({ success: false, error: 'Supabase not initialized' }, { status: 500 });
+    }
     try {
         const { agent_name, action, suggestion } = await request.json();
 
