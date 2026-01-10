@@ -13,45 +13,33 @@ interface AgentState {
     updated_at: string;
 }
 
-export default function SandboxPage() {
-    const [agents, setAgents] = useState<AgentState[]>([]);
-    const [loading, setLoading] = useState(true);
+import { useTrinityController } from '@/hooks/useTrinityController';
 
-    const fetchAgents = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch('/api/sandbox/agents');
-            const data = await res.json();
-            if (data.agents) {
-                // De-duplicate by agent_id
-                const uniqueAgents = Object.values(
-                    data.agents.reduce((acc: any, curr: AgentState) => {
-                        if (!acc[curr.agent_id] || new Date(curr.updated_at) > new Date(acc[curr.agent_id].updated_at)) {
-                            acc[curr.agent_id] = curr;
-                        }
-                        return acc;
-                    }, {})
-                ) as AgentState[];
-                setAgents(uniqueAgents);
-            }
-        } catch (e) {
-            console.error("Failed", e);
-        } finally {
-            setLoading(false);
-        }
-    };
+export default function SandboxPage() {
+    // Use the central Realtime hook
+    const { agents: registryAgents, loading } = useTrinityController();
+    const [agents, setAgents] = useState<AgentState[]>([]);
 
     useEffect(() => {
-        fetchAgents();
-        const interval = setInterval(fetchAgents, 5000); // Poll slow 5s
-        return () => clearInterval(interval);
-    }, []);
+        // Map AgentRegistryRecord to AgentState
+        if (registryAgents) {
+            const mappedAgents: AgentState[] = registryAgents.map(a => ({
+                id: a.id || a.agent_name, // Fallback to name if id is missing
+                agent_id: a.agent_name,
+                status: a.status,
+                current_task: a.currentTask ? a.currentTask.title : null,
+                memory: {},
+                updated_at: a.lastHeartbeat || a.last_active || new Date().toISOString()
+            }));
+            setAgents(mappedAgents);
+        }
+    }, [registryAgents]);
 
     const getAgentsByRole = (role: string) => agents.filter(a => a.agent_id.includes(role));
-    const managers = agents.filter(a => a.agent_id.includes('MANAGER'));
-    const grokPod = agents.filter(a => a.agent_id.includes('GROK'));
-    const claudePod = agents.filter(a => a.agent_id.includes('CLAUDE'));
-    const geminiPod = agents.filter(a => a.agent_id.includes('GEMINI'));
+    const managers = agents.filter(a => a.agent_id.includes('MANAGER') || a.agent_id.includes('w3c') || a.agent_id.includes('shofet')); // Added mapping for known orchestrators
+    const grokPod = agents.filter(a => a.agent_id.includes('GROK') || a.agent_id.includes('gcm') || a.agent_id.includes('torch'));
+    const claudePod = agents.filter(a => a.agent_id.includes('CLAUDE') || a.agent_id.includes('mel') || a.agent_id.includes('artisan'));
+    const geminiPod = agents.filter(a => a.agent_id.includes('GEMINI') || a.agent_id.includes('nexus') || a.agent_id.includes('science'));
 
     return (
         <div className="min-h-screen bg-black text-white p-8 font-sans">
@@ -68,7 +56,7 @@ export default function SandboxPage() {
                     <span className="text-xs text-green-500 font-mono flex items-center gap-2">
                         <Shield size={12} /> ZKP REPUTATION ACTIVE
                     </span>
-                    <button onClick={fetchAgents} className="p-2 rounded-full hover:bg-gray-800 transition-colors">
+                    <button onClick={() => window.location.reload()} className="p-2 rounded-full hover:bg-gray-800 transition-colors">
                         <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
                     </button>
                 </div>

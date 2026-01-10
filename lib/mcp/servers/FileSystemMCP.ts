@@ -88,18 +88,47 @@ export class FileSystemMCP implements MCPServer {
 
         fs.writeFileSync(safePath, signedContent);
 
-        // PERSISTENCE: Save to Database (Cloud) so user can see it in dashboard
+        // PERSISTENCE & ORGANIZATION: Smart Metadata Extraction
+        // Path format expected: artifacts/ProjectName/Category/File.md
+        const pathParts = relativePath.split('/');
+        let project = 'Unassigned';
+        let category = 'General';
+
+        // Heuristic: If path starts with namespace, treat it as Project
+        // e.g. "NeuroSwarm/Research/report.md" -> Project: NeuroSwarm, Category: Research
+        if (pathParts.length > 2) {
+            project = pathParts[0];
+            category = pathParts[1];
+        } else if (pathParts.length === 2) {
+            project = pathParts[0];
+        }
+
+        // Keywords detection for "Smart Search"
+        const keywords = [];
+        const lowerContent = content.toLowerCase();
+        if (lowerContent.includes('patent')) keywords.push('patent');
+        if (lowerContent.includes('business plan')) keywords.push('business_plan');
+        if (lowerContent.includes('mockup') || lowerContent.includes('ui')) keywords.push('design');
+        if (lowerContent.includes('survey')) keywords.push('research');
+
         try {
             const { error } = await supabase.from('trinity_artifacts').insert({
                 file_path: relativePath,
                 content: content,
                 repid_hash: repId,
-                agent_name: 'Swarm_Agent', // Default, as tool call context is limited here
-                artifact_type: 'file',
-                metadata: { source: 'FileSystemMCP', signed: true }
+                agent_name: 'Swarm_Agent',
+                artifact_type: category.toLowerCase(), // Use folder as type
+                metadata: {
+                    source: 'FileSystemMCP',
+                    signed: true,
+                    project: project,
+                    category: category,
+                    tags: keywords,
+                    smart_folder: `${project}/${category}`
+                }
             });
             if (error) console.error('[FileSystemMCP] DB Save Error:', error.message);
-            else console.log(`[FileSystemMCP] Saved ${relativePath} to Database.`);
+            else console.log(`[FileSystemMCP] Saved ${relativePath} to Database (Project: ${project}).`);
         } catch (err) {
             console.error('[FileSystemMCP] DB Exception:', err);
         }

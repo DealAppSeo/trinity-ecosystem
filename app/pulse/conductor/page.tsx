@@ -10,7 +10,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { AddTaskModal } from '@/components/modals/AddTaskModal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import InviteManager from '@/components/InviteManager';
-import { Skull, Share2, AlertTriangle, ServerCrash } from 'lucide-react';
+import { Skull, Share2, AlertTriangle, ServerCrash, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { AGENT_GROUPS } from '@/lib/agent/groups';
@@ -18,22 +18,13 @@ import { RewardTuner } from '@/components/RewardTuner';
 
 export default function ConductorPage() {
     // consolidated logic via hook
-    const { agents, tasks, logs, heartbeats, loading, createTask, refresh, killRandomAgent, triggerChaosEvent } = useTrinityController();
-    const [stats, setStats] = useState({ online_agents: 0, tasks_completed_24h: 0, active_tasks: 0 });
+    const { agents, tasks, logs, heartbeats, stats, loading, createTask, refresh, killRandomAgent, triggerChaosEvent } = useTrinityController();
+
+    // Stats are now fetched via Realtime hook
     const [showAddTask, setShowAddTask] = useState(false);
 
-    // Initial Fetch + Interval for Hook Refresh & Stats
-    useEffect(() => {
-        refresh(); // initial load via hook
-
-        const interval = setInterval(() => {
-            refresh();
-            // Fetch stats separately as they aren't in the hook yet (could assume from agents/tasks but simpler to keep fetch)
-            fetch('/api/stats').then(r => { if (r.ok) r.json().then(setStats) });
-        }, 10000);
-
-        return () => clearInterval(interval);
-    }, [refresh]);
+    // Initial load happens in hook. Realtime subscriptions handle subsequent updates.
+    // No explicit refresh interval needed here.
 
     // Derived stats for UI if API fails or for instant updates
     const onlineCount = agents.filter(a => a.status === 'active').length;
@@ -110,7 +101,7 @@ export default function ConductorPage() {
                         {/* Stats Row (Offline) */}
                         <div className="grid grid-cols-3 gap-6 w-full max-w-2xl mb-12">
                             <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 text-center">
-                                <ActivityFeed className="w-6 h-6 mx-auto mb-2 text-zinc-500" /> {/* Icon reuse hack or use lucide */}
+                                <Activity className="w-6 h-6 mx-auto mb-2 text-zinc-500" />
                                 <div className="text-3xl font-bold text-white mb-1">0%</div>
                                 <div className="text-xs text-zinc-500 uppercase tracking-wider">Uptime</div>
                             </div>
@@ -225,7 +216,7 @@ export default function ConductorPage() {
                             <div className="h-48 shrink-0">
                                 {/* Passing logs to ActivityFeed if it supported it, or just relying on its internal fetch. 
                                     For now, assuming ActivityFeed fetches its own, but we could upgrade it later. */}
-                                <ActivityFeed />
+                                <ActivityFeed logs={logs} />
                             </div>
                         </div>
 

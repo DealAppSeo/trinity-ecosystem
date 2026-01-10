@@ -20,14 +20,25 @@ const MOCK_ACTIVITY: ActivityItem[] = [
 
 interface ActivityFeedProps {
     className?: string;
+    logs?: any[];
 }
 
-export function ActivityFeed({ className }: ActivityFeedProps) {
+export function ActivityFeed({ className, logs = [] }: ActivityFeedProps) {
+    // Map real logs to Activity Items
+    const activityItems: ActivityItem[] = logs.length > 0
+        ? logs.map((log) => ({
+            id: log.id,
+            message: log.content || log.action || 'Unknown Action', // Adjust based on schema
+            timestamp: new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            type: (log.log_level === 'error' ? 'warning' : 'info') as any // Simple mapping
+        }))
+        : MOCK_ACTIVITY; // Fallback to mock if no logs yet (optional, or just empty)
+
     return (
         <Card className={`p-4 ${className || ''}`} elevated>
             <h3 className="font-bold text-text-primary mb-4 text-sm">System Logs</h3>
             <div className="space-y-4 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                {MOCK_ACTIVITY.map((item) => (
+                {activityItems.map((item) => (
                     <div key={item.id} className="flex gap-3 text-xs">
                         <span className="text-text-muted font-mono shrink-0">{item.timestamp}</span>
                         <span className={`${item.type === 'success' ? 'text-status-online' :
