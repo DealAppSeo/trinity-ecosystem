@@ -1,3 +1,7 @@
+import { MCPServer, MCPTool, MCPRegistryRecord } from './types';
+import { FileSystemMCP } from './servers/FileSystemMCP';
+import { PuppeteerMCP } from './servers/PuppeteerMCP';
+import { FigmaMCP } from './servers/FigmaMCP';
 import { TavilyMCP } from './servers/TavilyMCP';
 
 export class MCPManager {
