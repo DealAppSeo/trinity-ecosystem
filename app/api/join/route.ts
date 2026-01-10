@@ -2,29 +2,6 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse, NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
-    // Initialize standard client (lighter weight than auth-helpers)
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!url || !key) {
-        // Allow build to pass, but runtime will fail if called
-        return NextResponse.json({ error: 'Database config missing' }, { status: 500 });
-    }
-
-    const supabase = createClient(url, key);
-
-    try {
-        const body = await request.json();
-        // ...
-        // ... existing logic ...
-        // ...
-    } catch (error: any) {
-        console.error('Lead Capture Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
-}
-
-export async function PUT(request: Request) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -52,8 +29,6 @@ export async function PUT(request: Request) {
                 email,
                 status: 'new',
                 referral_code: referralCode,
-                // Check if there was a referral from query params/cookies (future proofing)
-                // for now we just prepare the column
             });
 
         if (error) {
@@ -65,7 +40,6 @@ export async function PUT(request: Request) {
         }
 
         // 2. Trigger "Welcome" Email (Mock / Placeholder)
-        // In production, this would call Resend/Mailchimp API
         console.log(`[EMAIL-SERVICE] Sending 'Welcome to the Spark' to ${email}`);
 
         return NextResponse.json({
@@ -121,4 +95,3 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
-
