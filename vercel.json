@@ -1,12 +1,8 @@
 {
     "crons": [
         {
-            "path": "/api/cron/retro",
-            "schedule": "0 */4 * * *"
-        },
-        {
             "path": "/api/cron/genesis",
-            "schedule": "0 * * * *"
+            "schedule": "0 12 * * *"
         }
     ]
 }
