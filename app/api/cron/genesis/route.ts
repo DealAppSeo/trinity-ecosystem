@@ -7,22 +7,42 @@ const GENESIS_CURRICULUM = [
     {
         phase: 'Ideation',
         tasks: [
-            { title: "[Auto-Genesis] Brainstorm: Edge AI + Web3", description: "List 5 concepts for running AI on edge devices with crypto payments.", type: "reasoning", role: "trinity-cdo", priority: 80 },
-            { title: "[Auto-Genesis] Pitch: Decentralized Data Marketplace", description: "Draft a 1-paragraph pitch for a NeuroSwarm Data DAO.", type: "content", role: "trinity-cdo", priority: 80 }
+            {
+                title: "[Auto-Genesis] Ideation: Brainstorm Concepts",
+                description: `OBJECTIVE: Brainstorm 10 product ideas for 'NeuroSwarm'.
+INSTRUCTIONS:
+1. USE 'tavily_search' to find 'AI Swarm use cases'.
+2. USE 'write_file' to save to 'artifacts/NeuroSwarm/AutoIdeation/concepts.md'.`,
+                type: "reasoning",
+                role: "trinity-cdo",
+                priority: 80
+            },
+            {
+                title: "[Auto-Genesis] Pitch Drafting",
+                description: `OBJECTIVE: Draft pitches for top ideas.
+INSTRUCTIONS:
+1. SELECT top 3 concepts.
+2. WRITE elevator pitches.
+3. SAVE to 'artifacts/NeuroSwarm/AutoIdeation/pitches.md'.`,
+                type: "content",
+                role: "trinity-cdo",
+                priority: 80
+            }
         ]
     },
     {
         phase: 'Research',
         tasks: [
-            { title: "[Auto-Genesis] Research: Zero-Knowledge ML", description: "Search for 'ZKML' use cases in 2025. Summarize 3 key benefits for NeuroSwarm.", type: "research", role: "trinity-veritas", priority: 75 },
-            { title: "[Auto-Genesis] Competitor Recon", description: "Find 3 new AI agents on ProductHunt. Analyze their 'swarming' capabilities.", type: "research", role: "trinity-science", priority: 75 }
-        ]
-    },
-    {
-        phase: 'Coding',
-        tasks: [
-            { title: "[Auto-Genesis] Code: React Force Graph", description: "Create a React component using 'react-force-graph' to visualize agent nodes.", type: "code", role: "trinity-cdo", priority: 70 },
-            { title: "[Auto-Genesis] Code: Smart Contract Interface", description: "Write a Solidity interface for an Agent Registry contract.", type: "code", role: "trinity-veritas", priority: 70 }
+            {
+                title: "[Auto-Genesis] Research: ZKML & Privacy",
+                description: `OBJECTIVE: Research Zero-Knowledge Machine Learning.
+INSTRUCTIONS:
+1. SEARCH for 'ZKML state of the art 2025'.
+2. SAVE report to 'artifacts/NeuroSwarm/AutoResearch/zkml_report.md'.`,
+                type: "research",
+                role: "trinity-veritas",
+                priority: 75
+            }
         ]
     }
 ];
