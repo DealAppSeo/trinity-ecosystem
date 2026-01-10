@@ -14,6 +14,10 @@ const supabase = (supabaseUrl && supabaseKey)
 
 export async function GET() {
     try {
+        if (!supabase) {
+            throw new Error('Supabase client not initialized. Missing environment variables.');
+        }
+
         const { data, error } = await supabase
             .from('sandbox_agent_state')
             .select('*')
