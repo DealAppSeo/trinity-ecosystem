@@ -27,8 +27,8 @@ export default async function LandingPage() {
         <div className="mb-8 text-6xl animate-fade-in">🎼</div>
 
         <h1 className="text-4xl md:text-6xl font-bold text-text-primary mb-6 tracking-tight max-w-4xl leading-tight">
-          Building an Ecosystem Around <br />
-          <span className="text-accent-violet">Safe & Ethical AI</span>
+          Welcome to the <br />
+          <span className="text-accent-violet">Founders App</span>
         </h1>
 
         <p className="text-xl text-text-secondary mb-12 max-w-2xl leading-relaxed">

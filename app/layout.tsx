@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { MobileNav } from "@/components/MobileNav";
+import { NavBar } from "@/components/NavBar";
 
 export const metadata: Metadata = {
-  title: "Trinity Pulse | AI Symphony Controller",
-  description: "The safest, most affordable AI coordination system",
+  title: "Founders App | AI Symphony",
+  description: "The autonomous operating system for your startup.",
   manifest: "/manifest.json",
 };
 
@@ -30,7 +31,8 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="font-display antialiased">
+      <body className="font-display antialiased pt-16 pb-16 md:pb-0">
+        <NavBar />
         {children}
         <MobileNav />
       </body>
