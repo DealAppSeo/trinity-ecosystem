@@ -82,6 +82,13 @@ export default function JoinPage() {
                             </Button>
 
                             <Button
+                                className="w-full bg-[#333] hover:bg-[#24292e] text-white"
+                                onClick={() => setStep('details')} // Simulating GitHub auth flow
+                            >
+                                Continue with GitHub
+                            </Button>
+
+                            <Button
                                 variant="secondary"
                                 className="w-full"
                                 onClick={() => setStep('details')} // Simulating Email auth flow
