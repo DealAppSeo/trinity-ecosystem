@@ -59,6 +59,20 @@ export default function JoinPage() {
         }
     };
 
+    const handleGithubLogin = async () => {
+        setLoading(true);
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'github',
+            options: {
+                redirectTo: `${window.location.origin}/pulse/conductor`
+            }
+        });
+        if (error) {
+            alert('GitHub Login Failed: ' + error.message);
+            setLoading(false);
+        }
+    };
+
     // Step 1: Frictionless Auth Choices
     if (step === 'auth') {
         return (
@@ -76,16 +90,16 @@ export default function JoinPage() {
                             {/* Frictionless Flow Options */}
                             <Button
                                 className="w-full bg-[#0077b5] hover:bg-[#006396] text-white"
-                                onClick={() => setStep('details')} // Simulating OAuth callback
+                                onClick={() => setStep('details')} // Simulating LinkedIn auth flow
                             >
                                 Continue with LinkedIn
                             </Button>
 
                             <Button
                                 className="w-full bg-[#333] hover:bg-[#24292e] text-white"
-                                onClick={() => setStep('details')} // Simulating GitHub auth flow
+                                onClick={handleGithubLogin}
                             >
-                                Continue with GitHub
+                                {loading ? 'Connecting...' : 'Continue with GitHub'}
                             </Button>
 
                             <Button
