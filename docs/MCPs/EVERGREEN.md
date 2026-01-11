@@ -1,17 +1,25 @@
-# EVERGREEN Protocol - Recurring Task Looping
+---
+description: Semi-Autonomous Task Regeneration
+---
 
-For tasks marked is_evergreen = true.
+# EVERGREEN PROTOCOL
 
-1. On successful completion:
-   - Increment loop_count in trinity_agent_logs
-2. Respawn logic:
-   - If loop_count < max_loops (default 24/day, configurable)
-   - INSERT new trinity_tasks row with updated parameters
-   - Use prior result to refine next iteration
-3. Enforce evolution:
-   - Next loop must improve or expand on previous
-   - If no progress detected, fail and notify HITL
-4. Minimum loop duration: 10 minutes
-5. Log each loop (status = 'looping')
+**Trigger**: When a task is marked as `evergreen` (meaning it should never truly end).
 
-Goal: True continuous improvement over days, not minutes.
+## Core Logic
+Instead of "Closing" the task, the agent must "Respawn" it.
+
+## Process
+1.  **Execute**: Perform the task logic (e.g. check system health, audit logs).
+2.  **Evaluate**: Did anything change? (e.g. found errors, found no errors).
+3.  **Respawn**:
+    -   Create a NEW task with the same title but incremented Loop Count (e.g. `[LOOP 42] System Health`).
+    -   Set `created_at` to `now()`.
+    -   Status: `pending`.
+4.  **Complete**: Mark the *current* task as completed.
+
+## Recursive Innovation (The Upgrade)
+If the task is a `[GENERATOR]` or `[ITERATE]` type:
+-   **Do NOT just respawn same task.**
+-   **Analyze Output**: Based on what you found (e.g. "Grant X found"), spawn a *child* task (`[APPLY] Grant X`).
+-   **Then Respawn Self**: To keep looking for more.

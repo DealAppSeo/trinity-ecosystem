@@ -74,6 +74,7 @@ export function useTrinityController() {
 
                 return {
                     ...agent,
+                    status: heartbeat ? 'active' : 'offline', // Derived status since column is missing
                     currentTask: currentTask || null,
                     lastHeartbeat: heartbeat ? heartbeat.last_seen : null
                 };

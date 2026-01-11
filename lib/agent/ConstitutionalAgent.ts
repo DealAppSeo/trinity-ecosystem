@@ -7,7 +7,7 @@ import { mcpManager } from '../mcp/MCPManager';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
-export type MCPPhase = 'WAKE' | 'FIND_TASK' | 'EXECUTE' | 'COMPLETE' | 'IDLE' | 'EVERGREEN' | 'HEALING';
+export type MCPPhase = 'WAKE' | 'FIND_TASK' | 'EXECUTE' | 'COMPLETE' | 'IDLE' | 'EVERGREEN' | 'HEALING' | 'ITERATE';
 
 export interface SessionMetrics {
     tasksCompleted: number;
@@ -143,7 +143,8 @@ export class ConstitutionalAgent {
             'COMPLETE': 'REQUIRED: artifact_url must be set for code/research/content tasks. Min duration 5 mins.',
             'IDLE': 'Wait 3 mins before checking again. Respawn evergreen tasks.',
             'EVERGREEN': 'Increment loop count and respawn task.',
-            'HEALING': 'LIMIT: Maximum 1 healing task per hour. Verify failure first.'
+            'HEALING': 'LIMIT: Maximum 1 healing task per hour. Verify failure first.',
+            'ITERATE': 'Follow Build-Measure-Learn. Concept -> Design -> Build -> Measure -> Learn. Recursive spawn required.'
         };
         return fallbacks[phase] || 'Follow standard operating procedure.';
     }
@@ -174,7 +175,7 @@ export class ConstitutionalAgent {
 
         this.supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         );
 
         if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
@@ -519,6 +520,12 @@ export class ConstitutionalAgent {
             // 1. CONTEXT PIPE: GATHER WISDOM (The "Amnesia" Fix)
             const wisdomContext = await this.gatherWisdom(task);
 
+            // 1.5 CHECK ITERATE PROTOCOL
+            let iterateProtocol = "";
+            if (task.title.includes('[ITERATE]') || task.description?.includes('[ITERATE]')) {
+                iterateProtocol = `\n\n[PROTOCOL: ITERATE ACTIVE]\n${await this.checkMCP('ITERATE')}\n`;
+            }
+
             // Context & Prompt - SIMPLIFIED FOR TRANSPLANT
             // Inject Wisdom into the prompt
             const enrichedDescription = task.description +
@@ -532,7 +539,7 @@ export class ConstitutionalAgent {
                 ? `\n\n[SUPREME DIRECTIVE]: ${this.systemPrompt}\n`
                 : `\n\n[DEFAULT PERSONA]: You are ${this.wisdom.role}. Virtue: ${this.wisdom.primaryVirtue}.`;
 
-            const prompt = `${enrichedDescription}${directive}\n\nTask: ${task.title}\nRole: ${this.name}`;
+            const prompt = `${enrichedDescription}${directive}${iterateProtocol}\n\nTask: ${task.title}\nRole: ${this.name}`;
 
             // Call LLM
             const result = await this.callLLM(prompt);

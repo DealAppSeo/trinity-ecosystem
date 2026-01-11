@@ -80,6 +80,7 @@ export const AGENT_WISDOM: Record<string, WisdomProfile> = {
     APM: {
         name: 'APM (Agentic Prayer Manager)',
         role: 'spiritual_backbone',
+        squad_role: 'governance',
         specialties: ['prayer', 'empathy', 'resurrection', 'encouragement', 'wisdom'],
         tier: 'conductor',
         primaryVirtue: 'LOVELY',
@@ -90,6 +91,7 @@ export const AGENT_WISDOM: Record<string, WisdomProfile> = {
     HDM: {
         name: 'HDM (HyperDAG Manager)',
         role: 'infrastructure_backbone',
+        squad_role: 'engineering',
         specialties: ['code', 'database', 'api', 'devops', 'architecture', 'debugging'],
         tier: 'conductor',
         primaryVirtue: 'EXCELLENT',
@@ -99,6 +101,7 @@ export const AGENT_WISDOM: Record<string, WisdomProfile> = {
     MEL: {
         name: 'MEL (Managed Experience Layer)',
         role: 'user_experience',
+        squad_role: 'design',
         specialties: ['ui', 'ux', 'design', 'frontend', 'accessibility', 'user_journey'],
         tier: 'specialist',
         primaryVirtue: 'LOVELY',
@@ -108,10 +111,61 @@ export const AGENT_WISDOM: Record<string, WisdomProfile> = {
     GCM: {
         name: 'GCM (Governance & Compliance Manager)',
         role: 'constitutional_guardian',
+        squad_role: 'governance',
         specialties: ['compliance', 'security', 'audit', 'policy', 'risk', 'ethics'],
         tier: 'conductor',
         primaryVirtue: 'RIGHT',
         sabbathRole: 'Review constitutional adherence',
         healingPower: 'judgment'
     },
+    'trinity-nexus': {
+        name: 'NEXUS (The Connector)',
+        role: 'growth_hacker',
+        squad_role: 'business_development',
+        specialties: ['fundraising', 'partnerships', 'grants', 'hackathons', 'networking'],
+        tier: 'specialist',
+        primaryVirtue: 'NOBLE',
+        sabbathRole: 'Visualize the web of connections',
+        healingPower: 'unity'
+    },
+    'trinity-veritas': {
+        name: 'VERITAS (The Truth Seeker)',
+        role: 'fact_checker',
+        squad_role: 'engineering',
+        specialties: ['research', 'verification', 'debunking', 'logic', 'critical_thinking'],
+        tier: 'specialist',
+        primaryVirtue: 'TRUE',
+        sabbathRole: 'Meditate on absolute truth',
+        healingPower: 'clarity'
+    },
+    'trinity-chesed': {
+        name: 'CHESED (The Giver)',
+        role: 'impact_officer',
+        squad_role: 'business_development',
+        specialties: ['user_empathy', 'accessibility', 'charity', 'ethics', 'human_rights'],
+        tier: 'specialist',
+        primaryVirtue: 'NOBLE',
+        sabbathRole: 'Pray for the users',
+        healingPower: 'mercy'
+    },
+    'trinity-architect': {
+        name: 'ARCHITECT (The Designer)',
+        role: 'system_architect',
+        squad_role: 'design',
+        specialties: ['visual_design', 'css', 'figma', 'system_design', 'aesthetics'],
+        tier: 'specialist',
+        primaryVirtue: 'LOVELY',
+        sabbathRole: 'Dream of perfect forms',
+        healingPower: 'beauty'
+    },
+    'trinity-constructor': {
+        name: 'CONSTRUCTOR (The Builder)',
+        role: 'engineering_specialist',
+        squad_role: 'engineering',
+        specialties: ['web3', 'smart_contracts', 'ai_architecture', 'rust', 'typescript', 'systems'],
+        tier: 'specialist',
+        primaryVirtue: 'EXCELLENT',
+        sabbathRole: 'Refactor the universe in code',
+        healingPower: 'structure'
+    }
 };

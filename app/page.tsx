@@ -1,10 +1,9 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { EcosystemGrid } from '@/components/EcosystemGrid';
 import { AgentGrid } from '@/components/AgentGrid';
 import { Button } from '@/components/ui/Button';
-
-// Force dynamic to fetch fresh data
 export const dynamic = 'force-dynamic';
 
 export default async function LandingPage() {
@@ -24,12 +23,23 @@ export default async function LandingPage() {
         {/* Background Gradients */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-accent-violet/10 rounded-full blur-[120px] -z-10" />
 
-        <div className="mb-8 text-6xl animate-fade-in">🎼</div>
-
-        <h1 className="text-4xl md:text-6xl font-bold text-text-primary mb-6 tracking-tight max-w-4xl leading-tight">
+        <h1 className="text-4xl md:text-6xl font-bold text-text-primary mb-2 tracking-tight max-w-4xl leading-tight">
           Welcome to the <br />
           <span className="text-accent-violet">Founders App</span>
         </h1>
+
+        <div className="flex flex-col items-center mb-10 animate-fade-in">
+          <span className="text-sm font-mono text-text-muted uppercase tracking-widest mb-4">Powered By</span>
+          <div className="relative w-[300px] h-[100px] md:w-[500px] md:h-[160px]">
+            <Image
+              src="/trinity-symphony.png"
+              alt="AI Trinity Symphony"
+              fill
+              className="object-contain drop-shadow-[0_0_15px_rgba(124,58,237,0.3)]"
+              priority
+            />
+          </div>
+        </div>
 
         <p className="text-xl text-text-secondary mb-12 max-w-2xl leading-relaxed">
           The Trinity Symphony orchestrates autonomous agents to solve complex problems at

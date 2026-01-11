@@ -2,9 +2,12 @@ export interface AgentConfig {
     name: string;
 }
 
+export type SquadRole = 'design' | 'engineering' | 'business_development' | 'governance';
+
 export interface WisdomProfile {
     name: string;
     role: string;
+    squad_role?: SquadRole; // The Trinity Triad Role
     specialties: string[];
     tier: 'conductor' | 'specialist';
     primaryVirtue: string;

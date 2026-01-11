@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 // Runs every hour or continuously checks for idle state
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -37,47 +37,64 @@ async function runScheduler() {
 
         console.log(`[${time}] Pending Tasks: ${count}`);
 
-        // 2. Auto-Inject if Idle (Keep Busy Protocol)
-        if (count === 0) {
-            console.log("⚠️  Fleet is IDLE. Injecting Ecosystem Optimization Task...");
+        // ------------------------------------------------------------
+        // RECURSIVE GENERATOR TASKS (The "Infinity Loop")
+        // ------------------------------------------------------------
 
-            // Pick random target
-            const target = ECOSYSTEM_DOMAINS[Math.floor(Math.random() * ECOSYSTEM_DOMAINS.length)];
-
-            // Construct Meaningful Task
-            let title = `[ECOSYSTEM] ${target.name} Audit`;
-            let desc = '';
-            let type = 'research';
-            let assignee = null;
-
-            if (target.focus === 'truth') {
-                title += ' - Truthfulness Check';
-                desc = `Visit ${target.url}. Analyze the latest AI content. Verify 3 claims against external sources. Evaluate "Truthfulness". Save report.`;
-                assignee = 'trinity-veritas';
-            } else if (target.focus === 'impact') {
-                title += ' - Impact Optimization';
-                desc = `Analyze ${target.url} for user friction. How can we better "help people help people"? Propose 1 concrete feature.`;
-                assignee = 'trinity-chesed';
-            } else {
-                title += ' - Tech & UX Audit';
-                desc = `Review ${target.url}. Identify any broken flows or "Uncanny Valley" AI interactions. Suggest a "Wow" factor improvement.`;
-                type = 'code';
-            }
-
+        // 1. GRANT HUNTER (Find $$$ to keep us free/funded)
+        if (Math.random() < 0.3) {
             await supabase.from('trinity_tasks').insert({
-                title: title,
-                description: desc,
-                task_type: type,
-                assigned_to: assignee,
-                priority: 10, // Higher than nightly maintenance
+                title: '[GENERATOR] Grant & Hackathon Hunt',
+                description: `[ITERATE] Phase 1: Research. Find 3 active AI grants or hackathons suitable for "Autonomous AI Agents" or "Tech for Good". Output a list. Spawn follow-up tasks to apply for the best one.`,
+                task_type: 'research',
+                assigned_to: 'trinity-nexus', // The Connector
+                priority: 20,
                 status: 'pending',
-                created_at: new Date().toISOString(),
                 requires_external_artifact: true,
-                metadata: { tags: ['ecosystem', target.focus], benchmark: true }
+                metadata: { tags: ['funding', 'growth'], benchmark: true }
             });
-            console.log(`💉 Injected: ${title} -> ${assignee || 'General Pool'}`);
+            console.log(`💉 Injected: Grant Hunter Task`);
         }
 
+        // 2. TRIAD MISSION GENERATOR (The "Squad" Protocol)
+        // Ensures every project gets Design, Engineering, and Business attention.
+        if (Math.random() < 0.5) {
+            const target = ECOSYSTEM_DOMAINS[Math.floor(Math.random() * ECOSYSTEM_DOMAINS.length)];
+            console.log(`🚀 Launching TRIAD MISSION for: ${target.name}`);
+
+            // (A) DESIGN TASK (Architect/MEL)
+            await supabase.from('trinity_tasks').insert({
+                title: `[TRIAD: DESIGN] ${target.name} UX/UI Polish`,
+                description: `[ITERATE]\n1. CONCEPT: Review ${target.url} specifically for visual coherence.\n2. DESIGN: Create a Figma-style mockup for one improved section.\n3. BUILD: Update CSS tokens.\n4. MEASURE: Visual regression test.\n5. LEARN: Spawn next UI task.`,
+                task_type: 'design',
+                assigned_to: 'trinity-architect',
+                priority: 15,
+                status: 'pending',
+                metadata: { tags: ['triad', 'design', target.name], benchmark: true }
+            });
+
+            // (B) ENGINEERING TASK (Constructor/HDM)
+            await supabase.from('trinity_tasks').insert({
+                title: `[TRIAD: ENG] ${target.name} Architecture Review`,
+                description: `[ITERATE]\n1. CONCEPT: Analyze ${target.url} for performance or Web3 integration gaps.\n2. DESIGN: draft a technical spec.\n3. BUILD: Implement optimization or smart contract hook.\n4. MEASURE: Latency/Gas check.\n5. LEARN: Spawn next Eng task.`,
+                task_type: 'code',
+                assigned_to: 'trinity-constructor',
+                priority: 15,
+                status: 'pending',
+                metadata: { tags: ['triad', 'engineering', target.name], benchmark: true }
+            });
+
+            // (C) BUSINESS TASK (Nexus)
+            await supabase.from('trinity_tasks').insert({
+                title: `[TRIAD: BIZ] ${target.name} Growth Hack`,
+                description: `[ITERATE]\n1. CONCEPT: Identify 1 channel to grow ${target.name}.\n2. DESIGN: Draft the campaign/content.\n3. BUILD: Execute the post or outreach.\n4. MEASURE: Click-through/Engagement.\n5. LEARN: Spawn next Biz task.`,
+                task_type: 'marketing',
+                assigned_to: 'trinity-nexus',
+                priority: 15,
+                status: 'pending',
+                metadata: { tags: ['triad', 'business', target.name], benchmark: true }
+            });
+        }
     }, 60000); // Check every minute
 }
 
