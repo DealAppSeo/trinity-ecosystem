@@ -43,7 +43,7 @@ export default function WatchPage() {
 
     // Realtime
     useSupabaseSubscription('trinity_agent_registry', () => {
-        supabase.from('trinity_agent_registry').select('*').order('agent_name').then(({ data }) => {
+        supabase.from('trinity_agent_registry').select('*').order('agent_name').then(({ data }: { data: any }) => {
             if (data) setAgents(data as AgentRegistryRecord[]);
         });
     });
