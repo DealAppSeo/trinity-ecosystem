@@ -87,13 +87,6 @@ export default function ConductorPage() {
                                 className="bg-zinc-900 border border-zinc-700 text-xs px-3 py-1.5 rounded w-64 text-zinc-300 focus:border-accent-violet focus:outline-none transition-colors"
                             />
 
-                            {/* Share Button */}
-                            <button
-                                onClick={() => setShowShareModal(true)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-accent-violet hover:bg-accent-violet/80 text-white text-xs font-bold rounded shadow-glow-violet transition-all"
-                            >
-                                <Share2 className="w-3.5 h-3.5" /> Share
-                            </button>
                         </div>
                     </div>
                 }
