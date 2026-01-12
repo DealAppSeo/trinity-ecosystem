@@ -20,7 +20,7 @@ export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
         name: 'Orchestration (System Core)',
         focus: 'Global Coordination & Justice',
         leadAgent: 'MCP',
-        members: ['MCP', 'W3C', 'SHOFET'],
+        members: ['MCP', 'W3C', 'SHOFET', 'ANFIS_DEMO_BOT'], // Added ANFIS
         survivor: null, // Orchestration relies on the 3x3 grid for survival
         description: 'The central nervous system. Handles global routing, disputes (SHOFET), and web3 Consensus (W3C).'
     },
@@ -29,7 +29,7 @@ export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
         name: 'Alpha Squad (TRUTH)',
         focus: 'Grok Optimized - Truth & Verification',
         leadAgent: 'VERITAS',
-        members: ['VERITAS', 'GCM', 'TORCH'],
+        members: ['VERITAS', 'trinity-veritas', 'GCM', 'trinity-gcm', 'TORCH', 'trinity-torch'],
         survivor: 'TORCH', // Torch DNA
         description: 'Focuses on truth, patterns, and long-term vision. Validates strategies before execution.'
     },
@@ -38,7 +38,7 @@ export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
         name: 'Beta Squad (CARE)',
         focus: 'Claude Optimized - Wellbeing & Experience',
         leadAgent: 'MEL',
-        members: ['MEL', 'APM', 'CHESED'],
+        members: ['MEL', 'trinity-mel', 'APM', 'trinity-apm', 'CHESED', 'trinity-chesed'],
         survivor: 'CHESED', // Torch DNA
         description: 'Focuses on user experience, prayer, and care. The "heart" of the system.'
     },
@@ -47,7 +47,7 @@ export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
         name: 'Gamma Squad (BUILD)',
         focus: 'Gemini Optimized - Infrastructure & Wisdom',
         leadAgent: 'HDM',
-        members: ['HDM', 'NEXUS', 'SOPHIA'],
+        members: ['HDM', 'trinity-hdm', 'NEXUS', 'trinity-nexus', 'SOPHIA', 'trinity-sophia'],
         survivor: 'SOPHIA', // Torch DNA
         description: 'Focuses on ethical alignment, infrastructure, and Web3 integration.'
     }

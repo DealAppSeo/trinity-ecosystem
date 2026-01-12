@@ -11,8 +11,8 @@ export function NavBar() {
 
     const navItems = [
         { name: 'Dashboard', href: '/pulse/conductor' },
-        { name: 'Agents', href: '/pulse/conductor?view=agents' },
         { name: 'Governance', href: '/pulse/wisdom' },
+        { name: 'Public View', href: '/pulse/watch' },
     ];
 
     return (
