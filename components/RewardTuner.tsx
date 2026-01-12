@@ -15,12 +15,17 @@ export function RewardTuner() {
 
     const handleUpdate = async () => {
         setLoading(true);
-        // Use the env var or default to the internal Railway address if running in prod context
-        const scienceUrl = process.env.NEXT_PUBLIC_SCIENCE_URL || 'http://localhost:8000';
-        const client = new ScienceClient(scienceUrl);
 
         try {
-            await client.updateRewardConfig({ weights });
+            // Call our own API route proxy instead of external URL directly
+            const response = await fetch('/api/anfis/weights', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ weights })
+            });
+
+            if (!response.ok) throw new Error('Update failed');
+
             // Visual feedback could be better (toast), but alert is safe for MVP
             // alert("Reward Weights Updated!");
         } catch (e) {
