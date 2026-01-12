@@ -51,6 +51,8 @@ export interface Task {
     context?: string;
 }
 
+export type TaskRecord = Task;
+
 export type AutonomyTier = 'Assist' | 'Approve' | 'Act' | 'Learn';
 
 export interface AgentRegistryRecord {
