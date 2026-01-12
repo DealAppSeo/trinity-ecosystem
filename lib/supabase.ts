@@ -10,40 +10,54 @@ if (!supabaseUrl || !supabaseKey) {
 
     // Anti-Fragile Mock Client: Return a chainable object that resolves to empty data
     // This supports .select().eq().order() and .channel().on().on().subscribe() chains
-    const createMockBuilder = (data: any = []) => {
-        const builder: any = {
-            select: () => builder,
-            insert: () => builder,
-            update: () => builder,
-            delete: () => builder,
-            upsert: () => builder,
-            eq: () => builder,
-            order: () => builder,
-            limit: () => builder,
-            single: () => {
-                // Return a builder that resolves to a single object (or null) instead of array
-                const singleBuilder = { ...builder };
-                singleBuilder.then = (resolve: any) => resolve({ data: {}, error: null });
-                return singleBuilder;
-            },
-            ilike: () => builder,
-            // Promise compatibility - delegate to real Promise for correct async timing
-            then: (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
-                return Promise.resolve({ data: data, error: null }).then(onfulfilled, onrejected);
-            },
-        };
-        return builder;
+    // Anti-Fragile Mock Client (Proxy Method):
+    // Universally handles any chain (e.g., .from().select().eq().order().limit().maybeSingle().csv())
+    // without needing manual definitions. Prevents "is not a function" crashes.
+    const createProxyMock = (resolvedData: any = []) => {
+        return new Proxy({}, {
+            get: (target, prop) => {
+                // Determine if we should resolve (Promise-like behavior)
+                if (prop === 'then') {
+                    return (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
+                        return Promise.resolve({ data: resolvedData, error: null }).then(onfulfilled, onrejected);
+                    };
+                }
+
+                // Specific overrides for known terminal methods/props
+                if (prop === 'on') {
+                    // Subscription chaining
+                    return () => createProxyMock([]);
+                }
+                if (prop === 'subscribe') {
+                    return (cb?: any) => {
+                        if (cb && typeof cb === 'function') setTimeout(() => cb('SUBSCRIBED'), 0);
+                        return createProxyMock([]);
+                    };
+                }
+                if (prop === 'unsubscribe') {
+                    return () => { };
+                }
+                if (prop === 'url') return 'http://mock-supabase.local';
+                if (prop === 'headers') return {};
+
+                // Default: Return a function that returns the Proxy (infinite chaining)
+                return () => createProxyMock(resolvedData);
+            }
+        });
     };
 
-    const mockChannel = {
-        on: () => mockChannel,
-        subscribe: (cb?: any) => {
-            // If callback provided, simulate SUBSCRIBED
-            if (cb && typeof cb === 'function') cb('SUBSCRIBED');
-            return mockChannel
+    client = {
+        from: (table: string) => createProxyMock([]),
+        channel: () => createProxyMock([]),
+        removeChannel: () => { },
+        auth: {
+            getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+            onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
         },
-        unsubscribe: () => { },
-    };
+        storage: {
+            from: () => createProxyMock([])
+        }
+    } as any;
 
     client = {
         from: (table: string) => createMockBuilder([]),
