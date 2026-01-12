@@ -17,7 +17,7 @@ export function useSupabaseSubscription(
             .on(
                 'postgres_changes',
                 { event: event as any, schema: 'public', table: table },
-                (payload) => {
+                (payload: any) => {
                     callback(payload);
                     router.refresh();
                 }
