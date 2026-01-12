@@ -1,6 +1,8 @@
 "use client";
 
-import { createClient } from '@supabase/supabase-js';
+export const dynamic = 'force-dynamic';
+
+import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import {
@@ -14,11 +16,7 @@ import {
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
-// Create a single supabase client for interacting with your database
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Client reused from lib/supabase (mock-safe)
 
 interface AgentRecord {
     id: string;
