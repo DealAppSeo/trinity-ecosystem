@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Activity, Shield, Zap, Database, Cpu, Eye, Network } from 'lucide-react';
+import { SymphonyCard } from './SymphonyCard';
 
 interface AgentGridProps {
     agents: any[]; // Flexible to handle API response
@@ -48,81 +49,16 @@ export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGr
                 const style = GROUP_CONFIG[groupName] || { color: 'text-zinc-400', border: 'border-zinc-800', bg: 'bg-zinc-900', label: groupName };
 
                 return (
-                    <div key={groupName} className={`rounded-xl border ${style.border} ${style.bg} p-4`}>
-                        <div className="flex items-center gap-2 mb-3">
-                            <Network className={`w-4 h-4 ${style.color}`} />
-                            <h3 className={`text-sm font-bold uppercase tracking-wider ${style.color}`}>{style.label}</h3>
+                    <div key={groupName} className={`rounded-2xl border ${style.border} ${style.bg} p-6 mb-8`}>
+                        <div className="flex items-center gap-3 mb-6">
+                            <Network className={`w-5 h-5 ${style.color}`} />
+                            <h3 className={`text-sm font-bold uppercase tracking-widest ${style.color}`}>{style.label}</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {groupAgents.map((agent: any) => {
-                                const isOnline = agent.status === 'active';
-                                const isSurvivor = agent.is_survivor;
-
-                                return (
-                                    <Link
-                                        href={`/pulse/conductor?agent=${agent.agent_name}`}
-                                        key={agent.agent_name}
-                                        className="block bg-black/40 border border-white/5 rounded-lg p-3 hover:border-accent-violet/50 hover:bg-accent-violet/5 transition-all group relative cursor-pointer"
-                                    >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500/50'}`} />
-                                                <span className="font-mono font-bold text-zinc-200">{agent.agent_name}</span>
-                                            </div>
-                                            {isSurvivor && (
-                                                <span className="text-[10px] bg-red-900/40 text-red-200 px-1.5 py-0.5 rounded border border-red-800/50 flex items-center gap-1">
-                                                    🔥 SURVIVOR
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            {/* CURRENT TASK DISPLAY */}
-                                            <div className="min-h-[40px] mb-2">
-                                                {agent.currentTask ? (
-                                                    <div className="text-[10px] text-zinc-300 bg-zinc-800/50 p-1.5 rounded border-l-2 border-accent-violet">
-                                                        <div className="flex items-center gap-1 text-accent-violet font-bold mb-0.5">
-                                                            <Activity className="w-3 h-3 animate-pulse" />
-                                                            WORKING
-                                                        </div>
-                                                        <span className="line-clamp-2 leading-tight">{agent.currentTask.title}</span>
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-[10px] text-zinc-600 italic py-1">
-                                                        Standing by for orders...
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="flex justify-between text-xs pt-2 border-t border-white/5">
-                                                <span className="text-zinc-500">Last Signal:</span>
-                                                <span className="text-zinc-400 font-mono">
-                                                    {agent.lastHeartbeat ? (
-                                                        <span className="text-green-400">
-                                                            {Math.floor((Date.now() - new Date(agent.lastHeartbeat).getTime()) / 1000)}s ago
-                                                        </span>
-                                                    ) : (
-                                                        'Offline'
-                                                    )}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {isConductor && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault(); // Prevent navigation when clicking assign
-                                                    onAssignTask && onAssignTask(agent.agent_name);
-                                                }}
-                                                className="mt-3 w-full py-1 text-[10px] font-medium bg-white/5 hover:bg-white/10 border border-white/5 rounded text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
-                                            >
-                                                Assign Task
-                                            </button>
-                                        )}
-                                    </Link>
-                                );
-                            })}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {groupAgents.map((agent: any) => (
+                                <SymphonyCard key={agent.agent_name} agent={agent} />
+                            ))}
                         </div>
                     </div>
                 );
