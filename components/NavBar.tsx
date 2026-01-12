@@ -12,6 +12,9 @@ export function NavBar() {
     const pathname = usePathname();
     const [isShareOpen, setIsShareOpen] = useState(false);
 
+    // Hide NavBar in Pulse (App) mode - Sidebar takes over
+    if (pathname?.startsWith('/pulse')) return null;
+
     const navItems = [
         { name: 'Dashboard', href: '/pulse/conductor' },
         { name: 'Governance', href: '/pulse/wisdom' },

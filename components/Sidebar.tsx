@@ -9,7 +9,9 @@ import {
     CheckSquare,
     Package,
     PlusCircle,
-    Cpu
+    Cpu,
+    Layers,
+    Activity
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,6 +27,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         { path: '/pulse/agents', icon: Users, label: 'Agents' },
         { path: '/pulse/tasks', icon: CheckSquare, label: 'Tasks' },
         { path: '/pulse/artifacts', icon: Package, label: 'Artifacts' },
+        { path: '/pulse/wisdom', icon: Layers, label: 'Governance' },
+        { path: '/pulse/watch', icon: Activity, label: 'Public View' },
         { path: '/pulse/mission', icon: PlusCircle, label: 'New Mission' },
     ];
 
