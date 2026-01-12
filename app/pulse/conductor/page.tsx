@@ -65,32 +65,17 @@ export default function ConductorPage() {
 
     return (
         <div className="min-h-screen bg-obsidian-base flex flex-col pb-24 md:pb-0">
-            <Header
-                title="TRINITY V2 CONTROLLER"
-                showLive
-                viewerCount={onlineCount}
-                rightContent={
-                    <div className="flex gap-4 items-center">
-                        <div className="hidden md:flex gap-2 text-xs text-white/30 font-mono items-center">
-                            <a href="/" className="hover:text-white transition-colors mr-4">Home</a>
-                            <a href="/pulse/wisdom" className="hover:text-blue-400 transition-colors mr-4 font-bold">WISDOM VIEW</a>
-                            CONNECTED: TRINITY-ECOSYSTEM.VERCEL.APP
-                        </div>
-                        {/* CAPTAIN CONTROLS - Desktop Only */}
-                        <div className="hidden md:flex gap-2 items-center">
-                            <input
-                                type="text"
-                                value={northStar}
-                                onChange={(e) => setNorthStar(e.target.value)}
-                                onBlur={updateNorthStar}
-                                placeholder="Set North Star Directive..."
-                                className="bg-zinc-900 border border-zinc-700 text-xs px-3 py-1.5 rounded w-64 text-zinc-300 focus:border-accent-violet focus:outline-none transition-colors"
-                            />
-
-                        </div>
-                    </div>
-                }
-            />
+            {/* North Star Directive Input (Relocated) */}
+            <div className="container mx-auto px-4 py-2 mb-4">
+                <input
+                    type="text"
+                    value={northStar}
+                    onChange={(e) => setNorthStar(e.target.value)}
+                    onBlur={updateNorthStar}
+                    placeholder="Set North Star Directive..."
+                    className="w-full bg-zinc-900/50 border border-white/10 text-sm px-4 py-3 rounded-lg text-zinc-300 focus:border-accent-violet focus:ring-1 focus:ring-accent-violet focus:outline-none transition-all placeholder:text-zinc-600"
+                />
+            </div>
 
             <main className="flex-1 container mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
 
