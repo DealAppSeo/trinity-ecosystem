@@ -42,58 +42,55 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
     return (
         <Link
             href={`/pulse/conductor?agent=${agent.agent_name}`}
-            className="group relative flex flex-col justify-between h-[180px] bg-[#0F0F13] border border-white/5 rounded-2xl p-5 hover:border-white/10 hover:shadow-2xl hover:bg-[#141419] transition-all duration-300 overflow-hidden"
+            className="group relative flex flex-col justify-between h-[160px] bg-[#0B0B0F] border border-white/5 rounded-2xl p-6 hover:border-white/10 hover:shadow-2xl hover:bg-[#121218] transition-all duration-300 overflow-hidden"
         >
-            {/* Top Row: Name & Status */}
-            <div className="flex justify-between items-start z-10">
-                <div>
-                    <h3 className="text-lg font-bold text-white tracking-tight group-hover:text-white/90 transition-colors">
+            <div className="flex justify-between items-start z-10 w-full">
+                {/* Left: Identity */}
+                <div className="flex flex-col">
+                    <h3 className="text-xl font-bold text-white tracking-tight group-hover:text-white/90 transition-colors">
                         {agent.agent_name}
                     </h3>
-                    <p className={cn("text-xs font-medium uppercase tracking-wider mt-0.5", roleColor)}>
+                    <p className="text-xs font-semibold text-zinc-500 mt-1">
                         {role}
                     </p>
-                </div>
-                <div className={cn(
-                    "w-2.5 h-2.5 rounded-full shadow-[0_0_8px_currentColor] transition-all duration-500",
-                    isOnline ? "bg-green-500 text-green-500 animate-pulse" : "bg-zinc-700 text-zinc-700"
-                )} />
-            </div>
 
-            {/* Metrics Grid */}
-            <div className="grid grid-cols-1 gap-1 my-4 z-10">
-                <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 text-xs font-medium flex items-center gap-1.5">
-                        <Award className="w-3 h-3" /> Reputation
-                    </span>
-                    <span className="text-sm font-bold text-zinc-200">{agent.reputation_score || 0}</span>
+                    {/* Status Dot (Moved here or kept top right? Figma has it top right, keeping separate) */}
                 </div>
-                <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 text-xs font-medium flex items-center gap-1.5">
-                        <Layers className="w-3 h-3" /> Tasks
-                    </span>
-                    <span className="text-sm font-bold text-zinc-200">{agent.tasks_completed || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 text-xs font-medium flex items-center gap-1.5">
-                        <Clock className="w-3 h-3" /> Uptime
-                    </span>
-                    <span className="text-sm font-bold text-zinc-200">{isOnline ? 'Active' : 'Offline'}</span>
+
+                {/* Right: Metrics Stack (Right Aligned) */}
+                <div className="flex flex-col items-end space-y-1">
+                    <div className={cn(
+                        "w-2.5 h-2.5 rounded-full mb-3 shadow-[0_0_8px_currentColor] transition-all duration-500",
+                        isOnline ? "bg-green-500 text-green-500" : "bg-zinc-800 text-zinc-800"
+                    )} />
+
+                    <div className="flex items-center gap-3 text-right">
+                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Rep</span>
+                        <span className={cn("text-lg font-bold leading-none", roleColor)}>{agent.reputation_score || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-right">
+                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Tasks</span>
+                        <span className="text-sm font-bold text-zinc-400 leading-none">{agent.tasks_completed || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-right">
+                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Uptime</span>
+                        <span className="text-sm font-bold text-zinc-400 leading-none">{uptimeDisplay}</span>
+                    </div>
                 </div>
             </div>
 
-            {/* Bottom Progress Bar */}
-            <div className="relative h-1.5 w-full bg-zinc-800/50 rounded-full overflow-hidden mt-auto">
+            {/* Bottom Progress Bar (Slim, Figma Style) */}
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900/50">
                 <div
-                    className={cn("absolute left-0 top-0 bottom-0 transition-all duration-1000 ease-out", barColor)}
+                    className={cn("h-full transition-all duration-1000 ease-out shadow-[0_0_10px_currentColor]", barColor)}
                     style={{ width: `${Math.min((agent.reputation_score || 0), 100)}%` }}
                 />
             </div>
 
-            {/* Background Glow (Figma Style) */}
+            {/* Subtle Gradient Glow */}
             <div className={cn(
-                "absolute -right-10 -bottom-10 w-32 h-32 rounded-full blur-[60px] opacity-0 group-hover:opacity-20 transition-opacity duration-500 pointer-events-none",
-                barColor.replace('bg-', 'bg-') // Reuse color
+                "absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-[50px] opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none",
+                barColor
             )} />
         </Link>
     );

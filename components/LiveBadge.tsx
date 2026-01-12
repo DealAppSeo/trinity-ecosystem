@@ -1,3 +1,5 @@
+import { cn } from '@/lib/utils';
+
 interface LiveBadgeProps {
     viewerCount?: number;
 }
@@ -5,10 +7,16 @@ interface LiveBadgeProps {
 export function LiveBadge({ viewerCount }: LiveBadgeProps) {
     return (
         <div className="flex items-center gap-3">
-            {/* Live Indicator */}
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 rounded">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse-slow" />
-                <span className="text-xs font-medium text-red-400">LIVE</span>
+            {/* Live Indicator - Green if viewerCount > 0 (Active Connection) */}
+            <div className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded transition-colors",
+                (viewerCount && viewerCount > 0) ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+            )}>
+                <span className={cn(
+                    "w-2 h-2 rounded-full animate-pulse-slow",
+                    (viewerCount && viewerCount > 0) ? "bg-green-500" : "bg-red-500"
+                )} />
+                <span className="text-xs font-medium">LIVE</span>
             </div>
 
             {/* Viewer Count */}

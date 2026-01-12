@@ -14,6 +14,7 @@ import { Skull, Share2, AlertTriangle, ServerCrash, Activity } from 'lucide-reac
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { AGENT_GROUPS } from '@/lib/agent/groups';
+import { ShareModal } from '@/components/modals/ShareModal';
 import { RewardTuner } from '@/components/RewardTuner';
 
 export default function ConductorPage() {
@@ -57,6 +58,9 @@ export default function ConductorPage() {
         alert('SIGNAL SENT: SYSTEM_WAKE');
     };
 
+    // --- SHARE FEATURE ---
+    const [showShareModal, setShowShareModal] = useState(false);
+
     return (
         <div className="min-h-screen bg-obsidian-base flex flex-col pb-24 md:pb-0">
             <Header
@@ -71,7 +75,7 @@ export default function ConductorPage() {
                             CONNECTED: TRINITY-ECOSYSTEM.VERCEL.APP
                         </div>
                         {/* CAPTAIN CONTROLS - Desktop Only */}
-                        <div className="hidden md:flex gap-2">
+                        <div className="hidden md:flex gap-2 items-center">
                             <input
                                 type="text"
                                 value={northStar}
@@ -80,6 +84,14 @@ export default function ConductorPage() {
                                 placeholder="Set North Star Directive..."
                                 className="bg-zinc-900 border border-zinc-700 text-xs px-3 py-1.5 rounded w-64 text-zinc-300 focus:border-accent-violet focus:outline-none transition-colors"
                             />
+
+                            {/* Share Button */}
+                            <button
+                                onClick={() => setShowShareModal(true)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-accent-violet hover:bg-accent-violet/80 text-white text-xs font-bold rounded shadow-glow-violet transition-all"
+                            >
+                                <Share2 className="w-3.5 h-3.5" /> Share
+                            </button>
                         </div>
                     </div>
                 }
@@ -214,8 +226,6 @@ export default function ConductorPage() {
 
                             {/* Activity Feed (Bottom) */}
                             <div className="h-48 shrink-0">
-                                {/* Passing logs to ActivityFeed if it supported it, or just relying on its internal fetch. 
-                                    For now, assuming ActivityFeed fetches its own, but we could upgrade it later. */}
                                 <ActivityFeed logs={logs} />
                             </div>
                         </div>
@@ -232,7 +242,7 @@ export default function ConductorPage() {
                             <div className="flex-1 flex flex-col min-h-0">
                                 <TaskQueue
                                     tasks={tasks as any}
-                                    onAddTask={() => setShowAddTask(true)}
+                                    onAddTask={() => setShowShareModal(true)}
                                 />
                             </div>
 
@@ -257,6 +267,11 @@ export default function ConductorPage() {
                     refresh(); // Refresh after add
                 }}
                 availableAgents={agents}
+            />
+
+            <ShareModal
+                isOpen={showShareModal}
+                onClose={() => setShowShareModal(false)}
             />
         </div >
     );
