@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { Plus, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -240,8 +242,8 @@ export default function TasksPage() {
 
                                             <div className="flex items-center justify-between pt-2 border-t border-white/5">
                                                 <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${task.priority === 'high' ? 'text-red-400 bg-red-400/10' :
-                                                        task.priority === 'low' ? 'text-blue-400 bg-blue-400/10' :
-                                                            'text-yellow-400 bg-yellow-400/10'
+                                                    task.priority === 'low' ? 'text-blue-400 bg-blue-400/10' :
+                                                        'text-yellow-400 bg-yellow-400/10'
                                                     }`}>
                                                     {task.priority || 'MEDIUM'}
                                                 </span>

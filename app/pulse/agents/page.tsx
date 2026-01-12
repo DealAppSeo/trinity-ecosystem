@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { AgentGrid } from '@/components/AgentGrid';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { Skeleton } from '@/components/ui/Skeleton';

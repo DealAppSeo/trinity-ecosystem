@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Rocket, Target, Users, DollarSign, AlertTriangle } from 'lucide-react';
@@ -161,12 +163,12 @@ export default function NewMissionPage() {
                                         type="button"
                                         onClick={() => setFormData({ ...formData, priority })}
                                         className={`px-4 py-2 rounded-lg capitalize transition-all duration-200 font-medium ${formData.priority === priority
-                                                ? priority === 'high'
-                                                    ? 'bg-red-500/20 border border-red-500/50 text-red-300 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-                                                    : priority === 'medium'
-                                                        ? 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-300 shadow-[0_0_10px_rgba(234,179,8,0.2)]'
-                                                        : 'bg-blue-500/20 border border-blue-500/50 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.2)]'
-                                                : 'glass-light border border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-200'
+                                            ? priority === 'high'
+                                                ? 'bg-red-500/20 border border-red-500/50 text-red-300 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                                                : priority === 'medium'
+                                                    ? 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-300 shadow-[0_0_10px_rgba(234,179,8,0.2)]'
+                                                    : 'bg-blue-500/20 border border-blue-500/50 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.2)]'
+                                            : 'glass-light border border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-200'
                                             }`}
                                     >
                                         {priority}
@@ -215,10 +217,10 @@ export default function NewMissionPage() {
                         <div className="flex justify-between border-b border-white/5 pb-2">
                             <span className="text-gray-400">Priority:</span>
                             <span className={`font-medium capitalize ${formData.priority === 'high'
-                                    ? 'text-red-400'
-                                    : formData.priority === 'medium'
-                                        ? 'text-yellow-400'
-                                        : 'text-blue-400'
+                                ? 'text-red-400'
+                                : formData.priority === 'medium'
+                                    ? 'text-yellow-400'
+                                    : 'text-blue-400'
                                 }`}>
                                 {formData.priority}
                             </span>

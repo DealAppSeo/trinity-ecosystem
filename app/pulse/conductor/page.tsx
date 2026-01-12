@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { Header } from '@/components/Header';
 import { AgentGrid } from '@/components/AgentGrid';
 import { CostTicker } from '@/components/CostTicker';
