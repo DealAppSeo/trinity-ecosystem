@@ -23,23 +23,20 @@ export default function PulseLayout({ children }: { children: React.ReactNode })
 
     return (
         <div className="min-h-screen bg-obsidian-base relative">
-            <Sidebar />
+            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
             {/* Main Content Area */}
             <div className="lg:ml-64 min-h-screen flex flex-col">
                 {/* Top Bar */}
                 <header className="sticky top-0 z-30 bg-obsidian-base/80 backdrop-blur-md border-b border-white/10">
                     <div className="flex items-center justify-between px-4 lg:px-8 py-4">
-                        {/* Mobile Menu Button - We'd need to pass setSidebarOpen context down if we want this to work perfectly, 
-                            but for now sidebar has its own state. 
-                            Ideally Sidebar lifts state up or we use a context. 
-                            For MVP, hiding mobile trigger here since Sidebar handles its own mobile overlay check. 
-                            Actually, Sidebar is fixed. We need a way to open it on mobile.
-                            Refactor Sidebar to accept isOpen prop later or rely on desktop-first for this generic layout.
-                        */}
-                        <div className="lg:hidden">
-                            {/* Placeholder for mobile trigger if we lift state */}
-                        </div>
+                        {/* Mobile Menu Button  */}
+                        <button
+                            className="lg:hidden p-2 text-zinc-400 hover:text-white transition-colors"
+                            onClick={() => setSidebarOpen(true)}
+                        >
+                            <Menu className="w-6 h-6" />
+                        </button>
 
                         {/* Page Title */}
                         <div className="hidden lg:block">

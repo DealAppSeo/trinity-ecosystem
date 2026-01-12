@@ -12,8 +12,12 @@ import {
     Cpu
 } from 'lucide-react';
 
-export function Sidebar() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+interface SidebarProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
 
     const navItems = [
@@ -27,10 +31,10 @@ export function Sidebar() {
     return (
         <>
             {/* Mobile Overlay */}
-            {sidebarOpen && (
+            {isOpen && (
                 <div
                     className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-                    onClick={() => setSidebarOpen(false)}
+                    onClick={onClose}
                 />
             )}
 
@@ -40,7 +44,7 @@ export function Sidebar() {
           fixed top-0 left-0 h-full w-64 z-50 
           bg-obsidian-base border-r border-white/10
           transform transition-transform duration-300 ease-in-out
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0
         `}
             >
@@ -68,7 +72,7 @@ export function Sidebar() {
                                 <Link
                                     key={item.path}
                                     href={item.path}
-                                    onClick={() => setSidebarOpen(false)}
+                                    onClick={onClose}
                                     className={`
                     flex items-center gap-3 px-4 py-3 rounded-lg
                     transition-all duration-200
