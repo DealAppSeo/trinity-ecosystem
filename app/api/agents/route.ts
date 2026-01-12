@@ -44,7 +44,7 @@ export async function GET() {
             .map(name => baseList.find((a: any) => a.agent_name === name));
 
         const agents = uniqueAgents.map((agent: any) => {
-            const hb = heartbeatMap.get(agent.agent_name);
+            const hb: any = heartbeatMap.get(agent.agent_name);
             const lastPing = hb?.last_seen || hb?.last_ping;
 
             // Online if seen in last 5 mins
