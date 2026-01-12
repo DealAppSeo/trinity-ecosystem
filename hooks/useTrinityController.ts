@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { RealtimeChannelSubscribeStatus } from '@supabase/supabase-js';
 import { AgentRegistryRecord, TaskRecord } from '@/lib/agent/types';
 import { getGroupForAgent } from '@/lib/agent/groups';
 
@@ -122,7 +123,7 @@ export const useTrinityController = () => {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'trinity_agent_registry' }, debouncedRefresh)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'trinity_tasks' }, debouncedRefresh)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'trinity_agent_logs' }, debouncedRefresh)
-            .subscribe((status) => {
+            .subscribe((status: RealtimeChannelSubscribeStatus) => {
                 if (status === 'SUBSCRIBED') {
                     // Connected
                 }
