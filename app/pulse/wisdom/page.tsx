@@ -71,7 +71,7 @@ export default function WisdomPage() {
 
         const channel = supabase
             .channel('public:trinity_agent_registry')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'trinity_agent_registry' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'trinity_agent_registry' }, (payload: any) => {
                 console.log('Real-time Wisdom Update:', payload);
                 fetchAgents();
             })
@@ -111,7 +111,7 @@ export default function WisdomPage() {
         // Listen for task changes to update benchmarks
         const taskChannel = supabase
             .channel('public:trinity_tasks_benchmarks')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'trinity_tasks' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'trinity_tasks' }, (payload: any) => {
                 console.log('Real-time Benchmark Update:', payload);
                 fetchBenchmarks();
             })
