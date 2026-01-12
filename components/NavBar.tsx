@@ -1,13 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Mic, Activity, Layers, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
+import { ShareModal } from '@/components/ShareModal';
 
 export function NavBar() {
     const pathname = usePathname();
+    const [isShareOpen, setIsShareOpen] = useState(false);
 
     const navItems = [
         { name: 'Dashboard', href: '/pulse/conductor' },
@@ -51,13 +54,17 @@ export function NavBar() {
                         <Mic className="w-5 h-5" />
                     </button>
 
-                    <Link href="/join">
-                        <Button size="sm" variant="outline" className="hidden sm:flex border-accent-violet/50 text-accent-violet hover:bg-accent-violet/10">
-                            Connect
-                        </Button>
-                    </Link>
+                    <Button
+                        size="sm"
+                        onClick={() => setIsShareOpen(true)}
+                        className="hidden sm:flex bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-glow-violet"
+                    >
+                        Share & Earn
+                    </Button>
                 </div>
             </div>
+
+            <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
         </header>
     );
 }
