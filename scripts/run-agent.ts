@@ -21,16 +21,36 @@ if (!agentName) {
     process.exit(1);
 }
 
+// Name Normalization (Map Short -> Full)
+const AGENT_MAP: Record<string, string> = {
+    'APM': 'trinity-apm',
+    'GCM': 'trinity-gcm',
+    'HDM': 'trinity-hdm',
+    'MEL': 'trinity-mel',
+    'NEXUS': 'trinity-nexus',
+    'TORCH': 'trinity-torch',
+    'VERITAS': 'trinity-veritas',
+    'CHESED': 'trinity-chesed',
+    'SOPHIA': 'trinity-sophia',
+    'W3C': 'trinity-w3c'
+};
+
+// Use mapped name or fallback to arg (handle case where user already provided full name)
+const normalizedName = AGENT_MAP[agentName.toUpperCase()] || (agentName.startsWith('trinity-') ? agentName : `trinity-${agentName.toLowerCase()}`);
+
+console.log(`[INIT] Name Normalized: ${agentName} -> ${normalizedName}`);
+const finalAgentName = normalizedName;
+
 async function startAgent() {
     // DYNAMIC IMPORT TO ENSURE ENV VARS ARE LOADED FIRST
     const { ConstitutionalAgent } = await import('../lib/agent/ConstitutionalAgent');
 
-    console.log(`🤖 Starting Agent: ${agentName}...`);
+    console.log(`🤖 Starting Agent: ${finalAgentName}...`);
 
-    const agent = new ConstitutionalAgent({ name: agentName });
+    const agent = new ConstitutionalAgent({ name: finalAgentName });
     await agent.syncState();
 
-    console.log(`✅ ${agentName} is ONLINE (Tier: ${agent.autonomyTier}, Rep: ${agent.reputationScore})`);
+    console.log(`✅ ${finalAgentName} is ONLINE (Tier: ${agent.autonomyTier}, Rep: ${agent.reputationScore})`);
 
     // START HTTP SERVER FOR RAILWAY/UPTIME ROBOT
     // Railway requires the app to listen on PORT (usually 3000)
@@ -41,7 +61,7 @@ async function startAgent() {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 status: 'online',
-                agent: agentName,
+                agent: finalAgentName,
                 time: new Date().toISOString()
             }));
         } else {
@@ -51,15 +71,15 @@ async function startAgent() {
     });
 
     server.listen(port, () => {
-        console.log(`[${agentName}] 🌍 Health Server listening on port ${port}`);
+        console.log(`[${finalAgentName}] 🌍 Health Server listening on port ${port}`);
     });
 
     // START MAIN AGENT LOOP
-    console.log(`[${agentName}] 🚀 Starting Trinity Healing Loop...`);
+    console.log(`[${finalAgentName}] 🚀 Starting Trinity Healing Loop...`);
     await agent.startTrinityHealingLoop();
 }
 
 startAgent().catch(err => {
-    console.error(`💥 FATAL: Agent ${agentName} crashed:`, err);
+    console.error(`💥 FATAL: Agent ${finalAgentName} crashed:`, err);
     process.exit(1);
 });

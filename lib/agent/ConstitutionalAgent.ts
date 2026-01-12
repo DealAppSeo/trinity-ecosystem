@@ -381,11 +381,11 @@ export class ConstitutionalAgent {
         console.log('[HEARTBEAT] Writing initial heartbeat...');
         await this.heartbeat();
 
-        // PERIODIC HEARTBEAT INTERVAL (2 mins)
+        // PERIODIC HEARTBEAT INTERVAL (15s to satisfy 30s UI threshold)
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = setInterval(async () => {
             await this.heartbeat();
-        }, 2 * 60 * 1000);
+        }, 15 * 1000);
 
         // 3x3: Check Survivor Status on startup
         await this.checkSurvivorStatus();
