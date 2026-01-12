@@ -8,7 +8,7 @@ import { useTrinityController } from '@/hooks/useTrinityController'; // Reusing 
 interface Artifact {
     id: string;
     title: string;
-    type: 'code' | 'document' | 'design' | 'report';
+    type: 'code' | 'document' | 'design' | 'report' | 'md';
     content: string;
     agentId?: string;
     createdAt: string;
