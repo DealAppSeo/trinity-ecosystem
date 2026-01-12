@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { getCookie } from 'cookies-next'; // We might need to install this or use document.cookie
+
 
 export function Gatekeeper() {
     const router = useRouter();
