@@ -27,8 +27,10 @@ if (!supabaseUrl || !supabaseKey) {
                 return singleBuilder;
             },
             ilike: () => builder,
-            // Promise compatibility
-            then: (resolve: any) => resolve({ data: data, error: null }),
+            // Promise compatibility - delegate to real Promise for correct async timing
+            then: (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
+                return Promise.resolve({ data: data, error: null }).then(onfulfilled, onrejected);
+            },
         };
         return builder;
     };
