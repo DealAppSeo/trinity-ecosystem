@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { MobileNav } from "@/components/MobileNav";
 import { NavBar } from "@/components/NavBar";
+import { MockBanner } from "@/components/MockBanner";
+import { Gatekeeper } from "@/components/Gatekeeper";
 
 export const metadata: Metadata = {
   title: "Founders App | AI Symphony",
@@ -32,6 +34,8 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="font-display antialiased pt-16 pb-16 md:pb-0">
+        <Gatekeeper />
+        <MockBanner />
         <NavBar />
         {children}
         <MobileNav />

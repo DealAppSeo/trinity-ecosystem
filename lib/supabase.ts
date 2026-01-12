@@ -1,35 +1,96 @@
-import { createClient } from '@supabase/supabase-js';
 
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+// Environment Variable Check
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
-let client;
+let client: SupabaseClient;
+
+// ------------------------------------------------------------------
+// LOGGING UTILITY (Swarm Wisdom)
+// Used by Mock to feed data to the Healer
+// ------------------------------------------------------------------
+async function logMockCall(method: string, args: any[]) {
+    // Only log if we have a service key (Backdoor Channel)
+    if (serviceKey && supabaseUrl) {
+        try {
+            // Lazy / Stateless fetch to avoid circular deps or client overlap
+            await fetch(`${supabaseUrl}/rest/v1/trinity_mock_calls`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${serviceKey}`,
+                    'apikey': serviceKey
+                },
+                body: JSON.stringify({
+                    method,
+                    args: JSON.stringify(args), // Sanitize?
+                    timestamp: new Date().toISOString(),
+                    status: 'pending' // Ready for Healer
+                })
+            });
+        } catch (e) {
+            // Silent fail - don't crash the mock
+            // console.warn('Mock log failed');
+        }
+    }
+    // Always console for debugging
+    if (process.env.NODE_ENV === 'development') {
+        console.groupCollapsed(`[Mock] 👻 .${method}()`);
+        console.log(args);
+        console.groupEnd();
+    }
+}
+
+// ------------------------------------------------------------------
+// CLIENT INITIALIZATION
+// ------------------------------------------------------------------
 
 if (!supabaseUrl || !supabaseKey) {
-    console.warn('⚠️ Supabase environment variables missing! Using mock client for build safety.');
+    console.warn('⚠️ Supabase environment variables missing! Using Anti-Fragile Mock Client.');
 
-    // Anti-Fragile Mock Client (Hybrid Universal Proxy)
-    // 1. Logs calls for agent learning (console-only during mock mode)
-    // 2. Handles specific Supabase methods (single, maybeSingle) with realistic empty returns
+    // Anti-Fragile Mock Client (Global Universal Proxy)
+    // 1. Logs calls for agent learning (trinity_mock_calls)
+    // 2. Handles specific Supabase methods (single, maybeSingle, on, subscribe)
     // 3. Universally handles all other chains via Proxy
-    const createUniversalMock = (resolvedData: any = []) => {
+    // 4. Returns safe empties to prevent crashes
+
+    const createUniversalMock = (resolvedData: any = []): any => {
         return new Proxy({}, {
             get: (target, prop: string) => {
-                // Promise Resolution (End of Chain)
+                // A. Promise Resolution (End of Chain)
                 if (prop === 'then') {
                     return (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
+                        logMockCall('then', ['metrics_logged']);
                         return Promise.resolve({ data: resolvedData, error: null }).then(onfulfilled, onrejected);
                     };
                 }
 
-                // Specific Handlers for Terminal Methods
+                // B. Specific Handlers for Terminal Methods
                 if (prop === 'single' || prop === 'maybeSingle') {
                     return () => ({
                         then: (cb: any) => cb({ data: null, error: null })
                     });
                 }
 
-                // Realtime Handlers
+                if (prop === 'select') {
+                    return (...args: any[]) => {
+                        logMockCall('select', args);
+                        return createUniversalMock([]); // Return chain
+                    }
+                }
+
+                if (prop === 'insert' || prop === 'update' || prop === 'upsert' || prop === 'delete') {
+                    return (...args: any[]) => {
+                        logMockCall(prop, args);
+                        // Return mock that resolves to success
+                        return createUniversalMock([{ status: 201, statusText: 'Mock Success' }]);
+                    }
+                }
+
+                // C. Realtime Handlers (Websockets)
                 if (prop === 'on') return () => createUniversalMock([]);
                 if (prop === 'subscribe') {
                     return (cb?: any) => {
@@ -41,16 +102,17 @@ if (!supabaseUrl || !supabaseKey) {
                 if (prop === 'url') return 'http://mock-supabase.local';
                 if (prop === 'headers') return {};
 
-                // Default: Log & Continue Chain
+                // D. Default: Log & Continue Chain
                 return (...args: any[]) => {
-                    // In a real scenario, we'd log this to a file or endpoint for agents to learn
-                    // console.debug(`[MOCK_CALL] ${prop}`, args); 
+                    logMockCall(prop, args);
                     return createUniversalMock(resolvedData);
                 };
             }
         });
     };
 
+    // Cast as "unknown" first to bypass strict type checks, then as SupabaseClient
+    // This empowers the mock to "pretend" to be the rigorous typed client
     client = {
         from: (table: string) => createUniversalMock([]),
         channel: () => createUniversalMock([]),
@@ -58,24 +120,23 @@ if (!supabaseUrl || !supabaseKey) {
         auth: {
             getSession: () => Promise.resolve({ data: { session: null }, error: null }),
             onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
+            signInWithOAuth: () => Promise.resolve({ data: null, error: null }),
+            signOut: () => Promise.resolve({ error: null }),
         },
         storage: {
             from: () => createUniversalMock([])
+        },
+        functions: {
+            invoke: () => Promise.resolve({ data: null, error: null })
         }
-    } as any;
+    } as unknown as SupabaseClient<any, "public", any>;
 
-    // Attempt to log error (fire and forget)
+    // Log environmental error for the Swarm to see
     if (typeof window === 'undefined') {
         const missing = [];
         if (!supabaseUrl) missing.push('NEXT_PUBLIC_SUPABASE_URL');
         if (!supabaseKey) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-
-        console.error(JSON.stringify({
-            event: 'TRINITY_ENV_ERROR',
-            missing_vars: missing,
-            service: 'trinity-ecosystem',
-            timestamp: new Date().toISOString()
-        }));
+        console.error(`[Anti-Fragile] Active. Missing: ${missing.join(', ')}`);
     }
 
 } else {
