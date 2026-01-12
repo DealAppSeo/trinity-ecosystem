@@ -45,8 +45,14 @@ export const useTrinityController = () => {
                 }
 
                 // Determine Status: If heartbeat is recent (< 30s), active. Else offline.
-                // Or use the status column if reliable. For now, let's trust the heartbeat for "live" status.
-                const isLive = heartbeat && (new Date().getTime() - new Date(heartbeat.last_seen).getTime() < 30000);
+                // Or use the status column if reliable.                const shortName = agent.agent_name.replace('trinity-', '').toUpperCase();
+                const matchedHeartbeat = heartbeatData?.find(h =>
+                    h.agent === agent.agent_name ||
+                    h.agent === shortName ||
+                    h.agent === `trinity-${shortName.toLowerCase()}`
+                );
+
+                const isLive = matchedHeartbeat && (new Date().getTime() - new Date(matchedHeartbeat.last_seen).getTime() < 120000); // Increased tolerance to 2 mins for safety
 
                 return {
                     ...agent,
