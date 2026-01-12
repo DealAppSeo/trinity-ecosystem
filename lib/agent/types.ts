@@ -41,7 +41,7 @@ export interface Task {
     description?: string;
     status: string;
     assigned_to?: string;
-    priority: number;
+    priority: number | string;
     created_at: string;
     metadata?: string;
     github_issue_number?: number;
