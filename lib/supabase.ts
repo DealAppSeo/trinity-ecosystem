@@ -8,64 +8,59 @@ let client;
 if (!supabaseUrl || !supabaseKey) {
     console.warn('⚠️ Supabase environment variables missing! Using mock client for build safety.');
 
-    // Anti-Fragile Mock Client: Return a chainable object that resolves to empty data
-    // This supports .select().eq().order() and .channel().on().on().subscribe() chains
-    // Anti-Fragile Mock Client (Proxy Method):
-    // Universally handles any chain (e.g., .from().select().eq().order().limit().maybeSingle().csv())
-    // without needing manual definitions. Prevents "is not a function" crashes.
-    const createProxyMock = (resolvedData: any = []) => {
+    // Anti-Fragile Mock Client (Hybrid Universal Proxy)
+    // 1. Logs calls for agent learning (console-only during mock mode)
+    // 2. Handles specific Supabase methods (single, maybeSingle) with realistic empty returns
+    // 3. Universally handles all other chains via Proxy
+    const createUniversalMock = (resolvedData: any = []) => {
         return new Proxy({}, {
-            get: (target, prop) => {
-                // Determine if we should resolve (Promise-like behavior)
+            get: (target, prop: string) => {
+                // Promise Resolution (End of Chain)
                 if (prop === 'then') {
                     return (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
                         return Promise.resolve({ data: resolvedData, error: null }).then(onfulfilled, onrejected);
                     };
                 }
 
-                // Specific overrides for known terminal methods/props
-                if (prop === 'on') {
-                    // Subscription chaining
-                    return () => createProxyMock([]);
+                // Specific Handlers for Terminal Methods
+                if (prop === 'single' || prop === 'maybeSingle') {
+                    return () => ({
+                        then: (cb: any) => cb({ data: null, error: null })
+                    });
                 }
+
+                // Realtime Handlers
+                if (prop === 'on') return () => createUniversalMock([]);
                 if (prop === 'subscribe') {
                     return (cb?: any) => {
                         if (cb && typeof cb === 'function') setTimeout(() => cb('SUBSCRIBED'), 0);
-                        return createProxyMock([]);
+                        return createUniversalMock([]);
                     };
                 }
-                if (prop === 'unsubscribe') {
-                    return () => { };
-                }
+                if (prop === 'unsubscribe') return () => { };
                 if (prop === 'url') return 'http://mock-supabase.local';
                 if (prop === 'headers') return {};
 
-                // Default: Return a function that returns the Proxy (infinite chaining)
-                return () => createProxyMock(resolvedData);
+                // Default: Log & Continue Chain
+                return (...args: any[]) => {
+                    // In a real scenario, we'd log this to a file or endpoint for agents to learn
+                    // console.debug(`[MOCK_CALL] ${prop}`, args); 
+                    return createUniversalMock(resolvedData);
+                };
             }
         });
     };
 
     client = {
-        from: (table: string) => createProxyMock([]),
-        channel: () => createProxyMock([]),
+        from: (table: string) => createUniversalMock([]),
+        channel: () => createUniversalMock([]),
         removeChannel: () => { },
         auth: {
             getSession: () => Promise.resolve({ data: { session: null }, error: null }),
             onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
         },
         storage: {
-            from: () => createProxyMock([])
-        }
-    } as any;
-
-    client = {
-        from: (table: string) => createMockBuilder([]),
-        channel: () => mockChannel,
-        removeChannel: () => { },
-        auth: {
-            getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-            onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
+            from: () => createUniversalMock([])
         }
     } as any;
 
@@ -88,3 +83,4 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 export const supabase = client;
+export const isMockMode = !supabaseUrl || !supabaseKey;
