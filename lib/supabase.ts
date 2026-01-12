@@ -114,7 +114,26 @@ if (!supabaseUrl || !supabaseKey) {
     // Cast as "unknown" first to bypass strict type checks, then as SupabaseClient
     // This empowers the mock to "pretend" to be the rigorous typed client
     client = {
-        from: (table: string) => createUniversalMock([]),
+        from: (table: string) => {
+            if (table === 'trinity_agent_registry') {
+                const shadowSwarm = [
+                    { id: 'mock-01', agent_name: 'Trinity Orchestrator', status: 'active', tier: 1 },
+                    { id: 'mock-02', agent_name: 'Workflow Monitor', status: 'active', tier: 2 },
+                    { id: 'mock-03', agent_name: 'Data Ingest 1', status: 'active', tier: 3 },
+                    { id: 'mock-04', agent_name: 'Data Ingest 2', status: 'active', tier: 3 },
+                    { id: 'mock-05', agent_name: 'Data Ingest 3', status: 'active', tier: 3 },
+                    { id: 'mock-06', agent_name: 'Visual Output', status: 'active', tier: 3 },
+                    { id: 'mock-07', agent_name: 'Analytics Engine 1', status: 'active', tier: 2 },
+                    { id: 'mock-08', agent_name: 'Analytics Engine 2', status: 'active', tier: 2 },
+                    { id: 'mock-09', agent_name: 'Security Sentinel', status: 'active', tier: 1 },
+                    { id: 'mock-10', agent_name: 'Quality Assurance', status: 'active', tier: 2 },
+                    { id: 'mock-11', agent_name: 'Deployment Manager', status: 'active', tier: 1 },
+                    { id: 'mock-12', agent_name: 'Feedback Loop', status: 'active', tier: 2 }
+                ];
+                return createUniversalMock(shadowSwarm);
+            }
+            return createUniversalMock([]);
+        },
         channel: () => createUniversalMock([]),
         removeChannel: () => { },
         auth: {
