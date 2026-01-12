@@ -28,7 +28,16 @@ export async function GET() {
 
         // 3. Merge Data - robustness update
         // If groups table is empty, use heartbeats to discover agents
-        const heartbeatMap = new Map((heartbeats || []).map((h: any) => [h.agent, h]));
+
+        type Heartbeat = {
+            agent: string;
+            last_seen?: string;
+            last_ping?: string;
+            config?: any;
+            status?: string;
+        };
+
+        const heartbeatMap = new Map<string, Heartbeat>((heartbeats || []).map((h: any) => [h.agent, h]));
 
         // Use groups if available, otherwise derive from heartbeats
         const baseList = (groups && groups.length > 0)
@@ -44,7 +53,7 @@ export async function GET() {
             .map(name => baseList.find((a: any) => a.agent_name === name));
 
         const agents = uniqueAgents.map((agent: any) => {
-            const hb: any = heartbeatMap.get(agent.agent_name);
+            const hb = heartbeatMap.get(agent.agent_name);
             const lastPing = hb?.last_seen || hb?.last_ping;
 
             // Online if seen in last 5 mins
