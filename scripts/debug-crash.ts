@@ -35,7 +35,7 @@ async function checkCrash() {
         .select('*');
 
     console.log('\n--- Heartbeats ---');
-    heartbeats?.forEach(h => {
+    heartbeats?.forEach((h: any) => {
         const minAgo = (Date.now() - new Date(h.last_seen).getTime()) / 60000;
         console.log(`${h.agent}: Seen ${minAgo.toFixed(1)} mins ago (${h.status})`);
     });
