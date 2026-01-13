@@ -412,6 +412,12 @@ export class ConstitutionalAgent {
                 await this.heartbeat();
                 // 3x3: Continuous Monitoring
                 await this.checkSurvivorStatus();
+
+                // EVERGREEN IDLE LOOP (Phase 9)
+                if (!task) {
+                    await this.runIdleLoop();
+                }
+
                 // Self-Healing Check (Legacy integrated)
                 if (Math.random() < 0.05) await this.runSelfDiagnostic();
 
@@ -547,8 +553,8 @@ export class ConstitutionalAgent {
             // Calculate Certainty & Evaluation (Optimization Upgrade)
             const evaluation = await this.evaluateResult(task, result.output);
 
+            let externalArtifactUrl = '';
             // Artifact Logic
-            let externalArtifactUrl: string | null = null;
             if ((task.task_type && ['content', 'research', 'code'].includes(task.task_type)) || task.requires_external_artifact) {
                 const dbArtifactLink = await this.saveArtifact(task.id, result.output, 'text_content');
                 if (dbArtifactLink) externalArtifactUrl = dbArtifactLink;
@@ -590,14 +596,123 @@ export class ConstitutionalAgent {
             // Extract Patterns (Simplified)
             await this.extractPatterns(task.title, result.output);
 
-            // Handoff Logic (Collaboration)
-            if (evaluation.handoff_required && evaluation.handoff_to) {
-                await this.handoffTask(task, result.output, evaluation.handoff_to);
-            }
+            // EVOLUTION: Spawn Next Step (Verification)
+            await this.spawnNextStep(task, result.output, evaluation);
 
         } catch (err: any) {
             console.error(`[${this.name}] ❌ Task ${task.id} failed:`, err.message);
             await this.supabase.from('trinity_tasks').update({ status: 'failed', result: err.message, completed_at: new Date().toISOString() }).eq('id', task.id);
+        }
+    }
+
+    // ============================================
+    // EVERGREEN LIFE CYCLE (Phase 9)
+    // ============================================
+
+    async runIdleLoop() {
+        console.log(`[${this.name}] 🌬️ Entering Evergreen Idle Mode (Web-Aware)...`);
+
+        // 1. Cost Guard Check (Simulated)
+        // const canSpend = await checkBudget(); if (!canSpend) return;
+
+        // 2. Roll for Chaos (The Gym) - 20% chance
+        if (Math.random() < 0.2) {
+            try {
+                const { runChaosSimulation } = require('../../scripts/chaos-engine');
+                await runChaosSimulation();
+            } catch (e) { /* Ignore import error in dev */ }
+            return;
+        }
+
+        // 3. GENESIS V2: Web-Aware Self-Optimization (40% chance for High Rep)
+        if (this.reputationScore > 40 && Math.random() < 0.4) {
+            console.log(`[${this.name}] � High-Rep Agent Initiating External Inspiration Scan...`);
+            await this.runWebAwareGenesis();
+        }
+
+        // 4. Fallback: Internal Auction (Research) - 20% chance
+        if (Math.random() < 0.2) {
+            console.log(`[${this.name}] 💡 Proposing Internal Self-Research...`);
+            await this.supabase.from('trinity_tasks').insert({
+                title: `[SELF-GEN] Internal Optimization`,
+                description: `Analyze internal logs for bottlenecks.`,
+                task_type: 'research',
+                assigned_to: this.name,
+                priority: 10,
+                status: 'pending'
+            });
+        }
+    }
+
+    async runWebAwareGenesis() {
+        try {
+            // A. Search for Trends
+            const query = "latest advancements AI swarm GNN Web3 since:2025-01-01";
+            const searchResults = await this.researchTool.searchWeb(query);
+
+            if (!searchResults || searchResults.length === 0) return;
+
+            // B. Parse Insights (Structured Output via Prompt)
+            const prompt = `
+            Analyze these search results about AI Swarms/GNNs:
+            ${JSON.stringify(searchResults.slice(0, 3))}
+
+            Identify 1 concrete "Genesis Task" for an autonomous agent swarm.
+            Format as JSON: { "title": "...", "description": "...", "priority": 15 }
+            `;
+
+            const analysis = await this.callLLM(prompt);
+
+            // Minimal Parsing (Robustness)
+            let taskIdea: any = null;
+            try {
+                const jsonMatch = analysis.output.match(/\{[\s\S]*\}/);
+                if (jsonMatch) taskIdea = JSON.parse(jsonMatch[0]);
+            } catch (e) {
+                console.warn(`[GENESIS] Failed to parse JSON: ${e.message}`);
+            }
+
+            // C. Seed Task
+            if (taskIdea && taskIdea.title) {
+                await this.supabase.from('trinity_tasks').insert({
+                    title: `[GENESIS-V2] ${taskIdea.title}`,
+                    description: `${taskIdea.description}\n\n[SOURCE]: Web Trend Scan`,
+                    task_type: 'research',
+                    assigned_to: this.name, // Self-claim
+                    priority: taskIdea.priority || 15,
+                    status: 'pending',
+                    metadata: { source: 'web-aware-idle', rep_trigger: this.reputationScore }
+                });
+                console.log(`[${this.name}] 🌱 Seeded Genesis-V2 task: ${taskIdea.title}`);
+            }
+
+        } catch (error: any) {
+            console.warn(`[GENESIS] Web Scan Failed: ${error.message}`);
+        }
+    }
+
+    async spawnNextStep(originalTask: Task, result: string, evaluation: any) {
+        // AUTOMATIC REPRODUCTION: Code/Design -> Verify
+        const needsVerification = ['code', 'design', 'strategy'].includes(originalTask.task_type || '');
+
+        if (needsVerification) {
+            let verifier = 'trinity-veritas'; // Default
+            if (originalTask.task_type === 'code') verifier = 'trinity-test-suite'; // Or similar
+            if (originalTask.task_type === 'design') verifier = 'trinity-architect';
+
+            // Don't assign to self
+            if (verifier === this.name) verifier = 'trinity-apm';
+
+            console.log(`[EVOLUTION] 🧬 Spawning Verification Task for ${verifier}`);
+
+            await this.supabase.from('trinity_tasks').insert({
+                title: `[VERIFY] Review ${originalTask.title}`,
+                description: `VERIFICATION REQUIRED.\n\nOriginal Output:\n${result.substring(0, 1000)}...\n\nInstructions:\n1. Review against standards (Security, UX, Efficiency).\n2. Pass or Fail.\n3. If Fail, spawn [FIX] task.`,
+                task_type: 'review',
+                assigned_to: verifier,
+                priority: 50, // High priority
+                status: 'pending'
+            });
         }
     }
 
@@ -1086,7 +1201,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 }, { onConflict: 'agent_name' });
 
             if (error) console.error('[HEARTBEAT] FAILED:', error.message);
-            else console.log(`[HEARTBEAT] Ping sent (${timestamp})`);
+            // else console.log(`[HEARTBEAT] Ping sent (${timestamp})`);
 
         } catch (err: any) {
             console.error('[HEARTBEAT] Error:', err.message);

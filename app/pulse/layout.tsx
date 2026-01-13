@@ -47,13 +47,7 @@ export default function PulseLayout({ children }: { children: React.ReactNode })
 
                         {/* Actions */}
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setShowShareModal(true)}
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-500 hover:from-violet-600 hover:to-cyan-600 transition-all duration-200 shadow-glow-violet text-white"
-                            >
-                                <Share2 className="w-4 h-4" />
-                                <span className="hidden sm:inline font-medium">Share</span>
-                            </button>
+                            {/* Share button removed per user request (Redundant with Header) */}
                         </div>
                     </div>
                 </header>

@@ -38,63 +38,35 @@ async function runScheduler() {
         console.log(`[${time}] Pending Tasks: ${count}`);
 
         // ------------------------------------------------------------
-        // RECURSIVE GENERATOR TASKS (The "Infinity Loop")
+        // HYBRID EVERGREEN SCHEDULER (North Star Seeder)
         // ------------------------------------------------------------
 
-        // 1. GRANT HUNTER (Find $$$ to keep us free/funded)
-        if (Math.random() < 0.3) {
+        // Only seed if queue is empty or very low to prevent spam
+        if (count === 0) {
+            console.log("🌑 Queue Empty. Seeding North Star Strategy Task...");
+
+            // 1. Get North Star (Simulated for now, could be from trinity_stats)
+            const northStar = "Ensure System Homeostasis and Growth";
+
+            // 2. Spawn Strategy Task (Bidder System)
+            // Assigned to 'trinity-sophia' (Wisdom) or 'trinity-nexus' (Connector) to delegate
             await supabase.from('trinity_tasks').insert({
-                title: '[GENERATOR] Grant & Hackathon Hunt',
-                description: `[ITERATE] Phase 1: Research. Find 3 active AI grants or hackathons suitable for "Autonomous AI Agents" or "Tech for Good". Output a list. Spawn follow-up tasks to apply for the best one.`,
-                task_type: 'research',
-                assigned_to: 'trinity-nexus', // The Connector
-                priority: 20,
+                title: `[STRATEGY] Align with North Star: ${northStar}`,
+                description: `[EVERGREEN]\n1. ANALYZE: Current system stats.\n2. IDENTIFY: One key opportunity for optimization or growth.\n3. SPAWN: Create specific tasks for Architect or Engineer.\n4. REPORT: Log findings.`,
+                task_type: 'strategy',
+                assigned_to: 'trinity-sophia', // The Strategist
+                priority: 90, // High priority to kickstart loop
                 status: 'pending',
-                requires_external_artifact: true,
-                metadata: { tags: ['funding', 'growth'], benchmark: true }
+                metadata: { tags: ['evergreen', 'strategy', 'north-star'], benchmark: true }
             });
-            console.log(`💉 Injected: Grant Hunter Task`);
+            console.log(`🌱 Seeded: Strategy Task for Sophia`);
+        } else {
+            console.log("🌖 Swarm Active. Monitoring...");
         }
 
-        // 2. TRIAD MISSION GENERATOR (The "Squad" Protocol)
-        // Ensures every project gets Design, Engineering, and Business attention.
-        if (Math.random() < 0.5) {
-            const target = ECOSYSTEM_DOMAINS[Math.floor(Math.random() * ECOSYSTEM_DOMAINS.length)];
-            console.log(`🚀 Launching TRIAD MISSION for: ${target.name}`);
+        // Hybrid Trigger: Verify "Stuck" tasks (older than 24h) and reset them
+        // ... (Logic to be added in Phase 9.1)
 
-            // (A) DESIGN TASK (Architect/MEL)
-            await supabase.from('trinity_tasks').insert({
-                title: `[TRIAD: DESIGN] ${target.name} UX/UI Polish`,
-                description: `[ITERATE]\n1. CONCEPT: Review ${target.url} specifically for visual coherence.\n2. DESIGN: Create a Figma-style mockup for one improved section.\n3. BUILD: Update CSS tokens.\n4. MEASURE: Visual regression test.\n5. LEARN: Spawn next UI task.`,
-                task_type: 'design',
-                assigned_to: 'trinity-architect',
-                priority: 15,
-                status: 'pending',
-                metadata: { tags: ['triad', 'design', target.name], benchmark: true }
-            });
-
-            // (B) ENGINEERING TASK (Constructor/HDM)
-            await supabase.from('trinity_tasks').insert({
-                title: `[TRIAD: ENG] ${target.name} Architecture Review`,
-                description: `[ITERATE]\n1. CONCEPT: Analyze ${target.url} for performance or Web3 integration gaps.\n2. DESIGN: draft a technical spec.\n3. BUILD: Implement optimization or smart contract hook.\n4. MEASURE: Latency/Gas check.\n5. LEARN: Spawn next Eng task.`,
-                task_type: 'code',
-                assigned_to: 'trinity-constructor',
-                priority: 15,
-                status: 'pending',
-                metadata: { tags: ['triad', 'engineering', target.name], benchmark: true }
-            });
-
-            // (C) BUSINESS TASK (Nexus)
-            await supabase.from('trinity_tasks').insert({
-                title: `[TRIAD: BIZ] ${target.name} Growth Hack`,
-                description: `[ITERATE]\n1. CONCEPT: Identify 1 channel to grow ${target.name}.\n2. DESIGN: Draft the campaign/content.\n3. BUILD: Execute the post or outreach.\n4. MEASURE: Click-through/Engagement.\n5. LEARN: Spawn next Biz task.`,
-                task_type: 'marketing',
-                assigned_to: 'trinity-nexus',
-                priority: 15,
-                status: 'pending',
-                metadata: { tags: ['triad', 'business', target.name], benchmark: true }
-            });
-        }
     }, 60000); // Check every minute
 }
 

@@ -20,106 +20,111 @@ export interface LLMResult {
  * Universal LLM Caller for the Trinity Swarm.
  * Handles OpenAI connection, Tool Routing (MCP), and multi-turn loops.
  */
+const DAILY_LIMIT = 500; // Free Tier Safe Limit
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function checkBudget(): Promise<boolean> {
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await supabase.from('trinity_usage').select('calls').eq('date', today).eq('provider', 'openai').single();
+    const used = data?.calls || 0;
+
+    if (used >= DAILY_LIMIT) {
+        console.warn(`[CostGuard] 🛑 Daily Limit Reached (${used}/${DAILY_LIMIT}). Switching to Mock.`);
+        return false;
+    }
+    return true;
+}
+
+async function incrementUsage() {
+    const today = new Date().toISOString().split('T')[0];
+    // Upsert logic would be better, but for now simple increment attempt
+    const { error } = await supabase.rpc('increment_usage', { p_date: today, p_provider: 'openai' });
+    if (error) console.error('[CostGuard] ⚠️ Failed to track usage:', error.message);
+}
+
+// ... existing smartLLM ...
 export async function smartLLM(request: LLMRequest): Promise<LLMResult> {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-        console.warn(`[smartLLM] ⚠️ No API Key found. Returning simulation.`);
-        return { output: "Simulation: LLM not configured. Set OPENAI_API_KEY." };
+    const canSpend = await checkBudget();
+
+    if (!apiKey || !canSpend) {
+        console.warn(`[smartLLM] 🛡️ Cost Guard Active. Returning Mock Response.`);
+        return { output: "Simulation (Cost Guard): Budget exceeded or Key missing." };
     }
+    // ... rest of function ...
+    for (let i = 0; i < 5; i++) {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: messages,
+                tools: openAiTools.length > 0 ? openAiTools : undefined,
+                tool_choice: openAiTools.length > 0 ? 'auto' : undefined
+            })
+        });
+        // Track successful call
+        await incrementUsage();
 
-    const model = request.model || 'gpt-4o';
-    const role = request.role || 'GUEST';
 
-    try {
-        // 1. Get Tools (if requested)
-        let openAiTools: any[] = [];
-        if (request.tools) {
-            const tools = await mcpManager.getToolsForRole(role);
-            openAiTools = tools.map((tool: any) => ({
-                type: 'function',
-                function: {
-                    name: tool.name,
-                    description: tool.description,
-                    parameters: tool.schema
-                }
-            }));
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`OpenAI API Error: ${response.status} - ${errText}`);
         }
 
-        // 2. Prepare Messages
-        const messages: any[] = [
-            { role: 'system', content: request.systemPrompt },
-            { role: 'user', content: request.userPrompt }
-        ];
+        const data = await response.json();
+        const choice = data.choices?.[0];
+        const message = choice?.message;
 
-        // 3. Execution Loop (Max 5 turns)
-        console.log(`[smartLLM] 🧠 Thinking... (Model: ${model}, Tools: ${openAiTools.length})`);
+        if (!message) return { output: "Error: No output from LLM" };
 
-        for (let i = 0; i < 5; i++) {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: model,
-                    messages: messages,
-                    tools: openAiTools.length > 0 ? openAiTools : undefined,
-                    tool_choice: openAiTools.length > 0 ? 'auto' : undefined
-                })
-            });
+        // Add response to history
+        messages.push(message);
 
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`OpenAI API Error: ${response.status} - ${errText}`);
-            }
+        // Check for Tool Calls
+        if (message.tool_calls && message.tool_calls.length > 0) {
+            console.log(`[smartLLM] 🛠️  Processing ${message.tool_calls.length} tool call(s)...`);
 
-            const data = await response.json();
-            const choice = data.choices?.[0];
-            const message = choice?.message;
+            for (const toolCall of message.tool_calls) {
+                const fnName = toolCall.function.name;
+                const args = JSON.parse(toolCall.function.arguments);
+                console.log(`[smartLLM] 📞 Executing: ${fnName}`);
 
-            if (!message) return { output: "Error: No output from LLM" };
-
-            // Add response to history
-            messages.push(message);
-
-            // Check for Tool Calls
-            if (message.tool_calls && message.tool_calls.length > 0) {
-                console.log(`[smartLLM] 🛠️  Processing ${message.tool_calls.length} tool call(s)...`);
-
-                for (const toolCall of message.tool_calls) {
-                    const fnName = toolCall.function.name;
-                    const args = JSON.parse(toolCall.function.arguments);
-                    console.log(`[smartLLM] 📞 Executing: ${fnName}`);
-
-                    let toolResult = '';
-                    try {
-                        toolResult = await mcpManager.routeToolCall(fnName, args);
-                    } catch (err: any) {
-                        toolResult = `Error executing tool ${fnName}: ${err.message}`;
-                        console.error(`[smartLLM] ❌ Tool Error:`, err);
-                    }
-
-                    messages.push({
-                        role: 'tool',
-                        tool_call_id: toolCall.id,
-                        content: toolResult
-                    });
+                let toolResult = '';
+                try {
+                    toolResult = await mcpManager.routeToolCall(fnName, args);
+                } catch (err: any) {
+                    toolResult = `Error executing tool ${fnName}: ${err.message}`;
+                    console.error(`[smartLLM] ❌ Tool Error:`, err);
                 }
-                // Loop continues to send results back to LLM
-            } else {
-                // Final response
-                return {
-                    output: message.content || "No content returned",
-                    toolCalls: i
-                };
+
+                messages.push({
+                    role: 'tool',
+                    tool_call_id: toolCall.id,
+                    content: toolResult
+                });
             }
+            // Loop continues to send results back to LLM
+        } else {
+            // Final response
+            return {
+                output: message.content || "No content returned",
+                toolCalls: i
+            };
         }
-
-        return { output: "Error: Max recursion limit reached." };
-
-    } catch (error: any) {
-        console.error("[smartLLM] 💥 Fatal Error:", error.message);
-        return { output: `System Error: ${error.message}` };
     }
+
+    return { output: "Error: Max recursion limit reached." };
+
+} catch (error: any) {
+    console.error("[smartLLM] 💥 Fatal Error:", error.message);
+    return { output: `System Error: ${error.message}` };
+}
 }

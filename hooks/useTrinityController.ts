@@ -52,6 +52,11 @@ export const useTrinityController = () => {
                     h.agent === `trinity-${shortName.toLowerCase()}`
                 );
 
+                /* DEBUG: Offline Investigation */
+                if (agent.agent_name === 'trinity-hdm') {
+                    console.log(`[DEBUG] Agent: ${agent.agent_name}`, { matchedHeartbeat, now: new Date().toISOString() });
+                }
+
                 const isLive = matchedHeartbeat && (new Date().getTime() - new Date(matchedHeartbeat.last_seen).getTime() < 120000); // Increased tolerance to 2 mins for safety
 
                 return {
