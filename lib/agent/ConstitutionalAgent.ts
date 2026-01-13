@@ -676,7 +676,7 @@ export class ConstitutionalAgent {
             try {
                 const jsonMatch = analysis.output.match(/\{[\s\S]*\}/);
                 if (jsonMatch) taskIdea = JSON.parse(jsonMatch[0]);
-            } catch (e) {
+            } catch (e: any) {
                 console.warn(`[GENESIS] Failed to parse JSON: ${e.message}`);
             }
 
