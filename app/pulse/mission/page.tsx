@@ -194,9 +194,9 @@ export default function NewMissionPage() {
                         <input
                             type="number"
                             min="0"
-                            step="100"
+                            step="1"
                             value={formData.budget}
-                            onChange={(e) => setFormData({ ...formData, budget: parseInt(e.target.value) })}
+                            onChange={(e) => setFormData({ ...formData, budget: parseInt(e.target.value) || 0 })}
                             className="flex-1 px-4 py-3 glass-light rounded-lg border border-white/10 focus:border-violet-500/50 outline-none transition-colors text-white bg-transparent font-mono text-lg"
                         />
                         <span className="text-gray-400 font-medium">USD</span>
