@@ -25,20 +25,24 @@ export default function NewMissionPage() {
         setLoading(true);
 
         try {
+            // Map priority string to integer
+            const priorityMap: Record<string, number> = { 'low': 2, 'medium': 5, 'high': 8 };
+            const priorityInt = priorityMap[formData.priority] || 5;
+
             // Create high-level task representing the mission
+            // Note: DB schema might not have 'metadata', so we append config to description
+            const configSummary = `\n\n[Mission Config]\nSwarm Size: ${formData.swarmSize}\nBudget: $${formData.budget}\nType: mission_deployment`;
+
             const { data, error } = await supabase
                 .from('trinity_tasks')
                 .insert([{
                     title: formData.name,
-                    description: formData.objective,
-                    priority: formData.priority,
+                    description: formData.objective + configSummary,
+                    priority: priorityInt,
                     status: 'pending',
-                    task_type: 'mission', // Custom field if schema allows, else stores in metadata
-                    metadata: JSON.stringify({
-                        swarm_size: formData.swarmSize,
-                        budget: formData.budget,
-                        type: 'mission_deployment'
-                    }),
+                    task_type: 'mission',
+                    // Remove metadata field to be safe against schema mismatch
+                    // metadata: JSON.stringify({...}), 
                     created_at: new Date().toISOString()
                 }])
                 .select()
