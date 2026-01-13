@@ -100,8 +100,17 @@ export default function TasksPage() {
     };
 
     const getPriorityColor = (priority: any) => {
-        // Default to medium if undefined
-        const p = (priority || 'medium').toLowerCase();
+        let p = 'medium';
+
+        // Handle Number Priority (Legacy/Agent Schema: 1-100)
+        if (typeof priority === 'number') {
+            if (priority >= 70) p = 'high';
+            else if (priority >= 30) p = 'medium';
+            else p = 'low';
+        } else if (typeof priority === 'string') {
+            p = (priority || 'medium').toLowerCase();
+        }
+
         switch (p) {
             case 'high':
             case 'critical':
