@@ -56,6 +56,15 @@ export async function smartLLM(request: LLMRequest): Promise<LLMResult> {
         return { output: "Simulation (Cost Guard): Budget exceeded or Key missing." };
     }
 
+    // Prepare request variables
+    const { model = 'gpt-4o', systemPrompt, userPrompt, tools = true } = request;
+    const messages: any[] = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+    ];
+    // Get tools if enabled, otherwise empty array - ensuring we await if it returns a promise (it usually does or is sync, treating as value for now based on usage)
+    const openAiTools = tools ? await mcpManager.getToolsForRole(request.role || 'default') : [];
+
     try {
         for (let i = 0; i < 5; i++) {
             const response = await fetch('https://api.openai.com/v1/chat/completions', {

@@ -381,10 +381,10 @@ export class ConstitutionalAgent {
         console.log('[HEARTBEAT] Writing initial heartbeat...');
         await this.heartbeat();
 
-        // PERIODIC HEARTBEAT INTERVAL (15s to satisfy 30s UI threshold)
-        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = setInterval(async () => {
-            await this.heartbeat();
+            try {
+                await this.heartbeat();
+            } catch (e) { console.error('[HEARTBEAT] Interval error', e) }
         }, 15 * 1000);
 
         // 3x3: Check Survivor Status on startup
@@ -626,7 +626,7 @@ export class ConstitutionalAgent {
 
         // 3. GENESIS V2: Web-Aware Self-Optimization (40% chance for High Rep)
         if (this.reputationScore > 40 && Math.random() < 0.4) {
-            console.log(`[${this.name}] � High-Rep Agent Initiating External Inspiration Scan...`);
+            console.log(`[${this.name}]  High-Rep Agent Initiating External Inspiration Scan...`);
             await this.runWebAwareGenesis();
         }
 
@@ -699,7 +699,7 @@ export class ConstitutionalAgent {
         }
     }
 
-    async spawnNextStep(originalTask: Task, result: string, evaluation: any) {
+    async spawnNextStep(originalTask: Task, result: string, evaluation: { score: number; handoff_required: boolean; handoff_to?: string }) {
         // AUTOMATIC REPRODUCTION: Code/Design -> Verify
         const needsVerification = ['code', 'design', 'strategy'].includes(originalTask.task_type || '');
 
@@ -833,36 +833,40 @@ export class ConstitutionalAgent {
             // B. DAG Context Retrieval (Simulated via Graphology in Phase 1)
             // We assume a 'wisdom' folder exists
             if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-                const fs = await import('fs');
-                const path = await import('path');
-                // Dynamic import graphology to avoid build issues if missing
-                let Graph: any;
                 try {
-                    const mod = await import('graphology');
-                    Graph = mod.default || mod;
-                } catch (e) {
-                    // console.warn("Graphology not found, skipping DAG build");
-                }
+                    const fs = await import('fs');
+                    const path = await import('path');
+                    // Dynamic import graphology to avoid build issues if missing
+                    let Graph: any;
+                    try {
+                        const mod = await import('graphology');
+                        Graph = mod.default || mod;
+                    } catch (e) {
+                        // console.warn("Graphology not found, skipping DAG build");
+                    }
 
-                const artifactsDir = path.resolve(process.cwd(), 'artifacts', 'wisdom');
+                    const artifactsDir = path.resolve(process.cwd(), 'artifacts', 'wisdom');
 
-                if (fs.existsSync(artifactsDir)) {
-                    const files = fs.readdirSync(artifactsDir);
-                    // Filter mainly by keyword matching for simple MVP
-                    const relevantFiles = files.filter(f => {
-                        // Very basic keyword check: Task title words in filename
-                        const taskKeywords = task.title.toLowerCase().split(' ').filter(w => w.length > 4);
-                        const filename = f.toLowerCase();
-                        return taskKeywords.some(kw => filename.includes(kw)) || filename.includes('manifest') || filename.includes('log');
-                    });
+                    if (fs.existsSync(artifactsDir)) {
+                        const files = fs.readdirSync(artifactsDir);
+                        // Filter mainly by keyword matching for simple MVP
+                        const relevantFiles = files.filter(f => {
+                            // Very basic keyword check: Task title words in filename
+                            const taskKeywords = task.title.toLowerCase().split(' ').filter(w => w.length > 4);
+                            const filename = f.toLowerCase();
+                            return taskKeywords.some(kw => filename.includes(kw)) || filename.includes('manifest') || filename.includes('log');
+                        });
 
-                    if (relevantFiles.length > 0) {
-                        wisdom += `\n[ARTIFACTS (Long-term Memory)]:\n`;
-                        for (const f of relevantFiles.slice(0, 3)) { // Limit to 3 files
-                            const content = fs.readFileSync(path.join(artifactsDir, f), 'utf-8');
-                            wisdom += `- File: ${f}\n  Excerpt: ${content.substring(0, 500).replace(/\n/g, ' ')}...\n`;
+                        if (relevantFiles.length > 0) {
+                            wisdom += `\n[ARTIFACTS (Long-term Memory)]:\n`;
+                            for (const f of relevantFiles.slice(0, 3)) { // Limit to 3 files
+                                const content = fs.readFileSync(path.join(artifactsDir, f), 'utf-8');
+                                wisdom += `- File: ${f}\n  Excerpt: ${content.substring(0, 500).replace(/\n/g, ' ')}...\n`;
+                            }
                         }
                     }
+                } catch (e) {
+                    console.warn('[WISDOM] FS Access failed:', e);
                 }
             }
 
