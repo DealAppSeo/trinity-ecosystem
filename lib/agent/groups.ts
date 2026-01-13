@@ -20,35 +20,35 @@ export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
         name: 'Orchestration (System Core)',
         focus: 'Global Coordination & Justice',
         leadAgent: 'MCP',
-        members: ['MCP', 'W3C', 'SHOFET', 'ANFIS_DEMO_BOT'], // Added ANFIS
-        survivor: null, // Orchestration relies on the 3x3 grid for survival
+        members: ['MCP', 'W3C', 'SHOFET', 'ANFIS_DEMO_BOT'],
+        survivor: null,
         description: 'The central nervous system. Handles global routing, disputes (SHOFET), and web3 Consensus (W3C).'
     },
     ALPHA: {
         id: 'ALPHA',
         name: 'Alpha Squad (TRUTH)',
         focus: 'Grok Optimized - Truth & Verification',
-        leadAgent: 'VERITAS',
-        members: ['VERITAS', 'trinity-veritas', 'GCM', 'trinity-gcm', 'TORCH', 'trinity-torch'],
-        survivor: 'TORCH', // Torch DNA
+        leadAgent: 'trinity-veritas',
+        members: ['trinity-veritas', 'trinity-gcm', 'trinity-torch'],
+        survivor: 'trinity-torch',
         description: 'Focuses on truth, patterns, and long-term vision. Validates strategies before execution.'
     },
     BETA: {
         id: 'BETA',
         name: 'Beta Squad (CARE)',
         focus: 'Claude Optimized - Wellbeing & Experience',
-        leadAgent: 'MEL',
-        members: ['MEL', 'trinity-mel', 'APM', 'trinity-apm', 'CHESED', 'trinity-chesed'],
-        survivor: 'CHESED', // Torch DNA
+        leadAgent: 'trinity-mel',
+        members: ['trinity-mel', 'trinity-apm', 'trinity-chesed'],
+        survivor: 'trinity-chesed',
         description: 'Focuses on user experience, prayer, and care. The "heart" of the system.'
     },
     GAMMA: {
         id: 'GAMMA',
         name: 'Gamma Squad (BUILD)',
         focus: 'Gemini Optimized - Infrastructure & Wisdom',
-        leadAgent: 'HDM',
-        members: ['HDM', 'trinity-hdm', 'NEXUS', 'trinity-nexus', 'SOPHIA', 'trinity-sophia'],
-        survivor: 'SOPHIA', // Torch DNA
+        leadAgent: 'trinity-hdm',
+        members: ['trinity-hdm', 'trinity-nexus', 'trinity-sophia'],
+        survivor: 'trinity-sophia',
         description: 'Focuses on ethical alignment, infrastructure, and Web3 integration.'
     }
 };

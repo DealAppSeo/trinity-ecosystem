@@ -31,16 +31,16 @@ export function TaskQueue({ tasks, onAddTask }: TaskQueueProps) {
                     </div>
                 ) : (
                     tasks.map(task => (
-                        <div key={task.id} className="p-3 rounded bg-obsidian-surface border border-obsidian-border hover:border-obsidian-border-focus transition-colors">
-                            <div className="flex justify-between items-start mb-1">
-                                <span className="font-medium text-sm text-text-primary line-clamp-1">{task.title}</span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${task.priority > 7 ? 'bg-red-500/10 text-red-400' : 'bg-obsidian-base text-text-muted'
+                        <div key={task.id} className="p-2 rounded bg-obsidian-surface border border-obsidian-border hover:border-obsidian-border-focus transition-colors">
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="font-medium text-xs text-text-primary line-clamp-1 flex-1 mr-2">{task.title}</span>
+                                <span className={`text-[9px] px-1 py-0.5 rounded font-mono ${task.priority > 7 ? 'bg-red-500/10 text-red-400' : 'bg-obsidian-base text-text-muted'
                                     }`}>
                                     P{task.priority}
                                 </span>
                             </div>
                             <div className="flex justify-between items-end">
-                                <span className="text-xs text-text-muted">{task.assigned_agent || 'Unassigned'}</span>
+                                <span className="text-[10px] text-text-muted">{task.assigned_agent || '-'}</span>
                                 <span className={`w-1.5 h-1.5 rounded-full ${task.status === 'in_progress' ? 'bg-status-working animate-pulse' : 'bg-obsidian-border'
                                     }`} />
                             </div>

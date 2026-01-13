@@ -121,6 +121,28 @@ export default function ConductorPage() {
 
                             {/* Chaos & Squad Panel */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
+                                {/* System Status Hero */}
+                                <div className="md:col-span-3 bg-gradient-to-r from-emerald-500/10 to-emerald-900/10 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                                            <Activity className="w-6 h-6 text-emerald-400" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                                System Online
+                                                <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">v1.0.2</span>
+                                            </h2>
+                                            <p className="text-sm text-zinc-400">Swarm is active and processing tasks. {onlineCount} agents deployed.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 pr-4">
+                                        <div className="text-right">
+                                            <div className="text-2xl font-bold text-emerald-400">{onlineCount}</div>
+                                            <div className="text-[10px] text-emerald-500/70 uppercase tracking-wider">Agents</div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Chaos Testing */}
                                 <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden group">
                                     <div className="absolute inset-0 bg-red-900/5 opacity-0 group-hover:opacity-100 transition-opacity" />
