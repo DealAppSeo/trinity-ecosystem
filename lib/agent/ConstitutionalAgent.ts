@@ -646,8 +646,16 @@ export class ConstitutionalAgent {
 
     async runWebAwareGenesis() {
         try {
-            // A. Search for Trends
-            const query = "latest advancements AI swarm GNN Web3 since:2025-01-01";
+            // A. Search for Trends (Rotating Topics from Phase 10)
+            const TOPICS = [
+                "LEGO equivariant GNN swarm control 2025",
+                "QMIX-GNN heterogeneous MARL 2025",
+                "relational GNN IoT swarm anomaly detection 2025",
+                "Web3 AI agent decentralized bidding optimization"
+            ];
+            const query = TOPICS[Math.floor(Math.random() * TOPICS.length)];
+
+            console.log(`[GENESIS] 🔍 Scanning: "${query}"...`);
             const searchResults = await this.researchTool.searchWeb(query);
 
             if (!searchResults || searchResults.length === 0) return;
