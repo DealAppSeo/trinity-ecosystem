@@ -76,10 +76,15 @@ export const useTrinityController = () => {
             if (logData) setLogs(logData);
             if (heartbeatData) setHeartbeats(heartbeatData);
 
-            // Set stats - fallback if table empty
-            setStats(statsData || {
-                active_agents: enrichedAgents.filter((a: any) => a.status === 'active').length,
-                tasks_completed_24h: enrichedAgents.reduce((acc: number, curr: any) => acc + (curr.tasks_completed || 0), 0)
+            // Set stats - PREFER DYNAMIC CALCULATION for Active Agents to match Grid
+            // Fallback to table for accumulated stats like tasks_completed_24h if meaningful
+            const calculatedActiveAgents = enrichedAgents.filter((a: any) => a.status === 'active').length;
+            const calculatedCompleted = enrichedAgents.reduce((acc: number, curr: any) => acc + (curr.tasks_completed || 0), 0);
+
+            setStats({
+                ...statsData, // Keep other stats if they exist
+                active_agents: calculatedActiveAgents,
+                tasks_completed_24h: calculatedCompleted // Sync Total Tasks too
             });
 
         } catch (error) {

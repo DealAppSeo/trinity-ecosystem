@@ -259,8 +259,13 @@ export default function TasksPage() {
 
                                                 <div className="flex items-center gap-2">
                                                     {task.assigned_to && (
-                                                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[10px] font-bold">
-                                                            {task.assigned_to[0].toUpperCase()}
+                                                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10" title={`Assigned to ${task.assigned_to}`}>
+                                                            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[8px] font-bold text-white shadow-sm">
+                                                                {task.assigned_to.replace('trinity-', '')[0].toUpperCase()}
+                                                            </div>
+                                                            <span className="text-[10px] font-mono text-gray-300">
+                                                                {task.assigned_to.replace('trinity-', '').toUpperCase()}
+                                                            </span>
                                                         </div>
                                                     )}
                                                     <button

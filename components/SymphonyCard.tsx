@@ -46,15 +46,28 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
         >
             <div className="flex justify-between items-start z-10 w-full">
                 {/* Left: Identity */}
-                <div className="flex flex-col">
-                    <h3 className="text-xl font-bold text-white tracking-tight group-hover:text-white/90 transition-colors">
+                <div className="flex flex-col flex-1 min-w-0 pr-4">
+                    <h3 className="text-xl font-bold text-white tracking-tight group-hover:text-white/90 transition-colors truncate">
                         {agent.agent_name}
                     </h3>
-                    <p className="text-xs font-semibold text-zinc-500 mt-1">
+                    <p className="text-xs font-semibold text-zinc-500 mt-1 mb-2">
                         {role}
                     </p>
 
-                    {/* Status Dot (Moved here or kept top right? Figma has it top right, keeping separate) */}
+                    {/* Current Activity Display */}
+                    {agent.currentTask ? (
+                        <div className="flex items-center gap-2 mt-auto animate-in fade-in slide-in-from-left-2 duration-500">
+                            <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+                            <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[140px]" title={agent.currentTask.title}>
+                                {agent.currentTask.title}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 mt-auto opacity-50">
+                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+                            <p className="text-[10px] text-zinc-600 font-mono">Idle</p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right: Metrics Stack (Right Aligned) */}

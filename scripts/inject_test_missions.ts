@@ -80,7 +80,6 @@ async function injectTestTasks() {
             ...task,
             status: 'pending',
             created_at: new Date().toISOString(),
-            created_by: 'TestScript',
             agent_assigned: task.agent_assigned || null
         });
 
