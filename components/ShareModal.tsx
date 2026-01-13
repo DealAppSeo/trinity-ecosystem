@@ -30,8 +30,11 @@ export function ShareModal({ isOpen, onClose, userEmail = 'Founder' }: ShareModa
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
-            <div className="relative bg-zinc-900 border border-zinc-800 rounded-xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
+            <div
+                className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95"
+                onClick={e => e.stopPropagation()}
+            >
 
                 {/* Close Button */}
                 <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-white">

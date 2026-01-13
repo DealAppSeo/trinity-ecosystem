@@ -51,7 +51,7 @@ export async function POST(req: Request) {
             priority: priority || 3, // Default normal priority
             status: 'pending',
             task_type: task_type || 'general',
-            claimed_by: agent_assigned || null, // Directly assign if selected
+            agent_assigned: agent_assigned || null, // Corrected column name
             created_at: new Date().toISOString(),
             created_by: 'admin' // HITL
         };

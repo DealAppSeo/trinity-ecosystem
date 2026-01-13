@@ -18,7 +18,14 @@ const GROUP_CONFIG: Record<string, any> = {
 };
 
 export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGridProps) {
-    if (agents.length === 0) {
+    // Filter out legacy/duplicate agent names (short names)
+    const BLACKLIST = ['APM', 'GCM', 'HDM', 'MEL', 'VERITAS', 'TORCH', 'CHESED', 'SOPHIA', 'NEXUS', 'ANFIS_DEMO_BOT', 'W3C', 'SHOFET', 'MCP'];
+    // Keep only trinity- prefixed agents OR agents not in blacklist
+    // Actually, user wants "trinity-apm" etc.
+    // Let's filter OUT exact matches of the short names if a corresponding trinity- exists, or just filter all short names if we are sure.
+    const filteredAgents = agents.filter(a => !BLACKLIST.includes(a.agent_name) && !BLACKLIST.includes(a.agent_name.toUpperCase()));
+
+    if (filteredAgents.length === 0) {
         return (
             <div className="col-span-full text-center py-12 px-4 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/30">
                 <Cpu className="w-8 h-8 text-zinc-600 mx-auto mb-3" />
@@ -29,7 +36,7 @@ export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGr
     }
 
     // Group agents by their group_name
-    const groupedAgents = agents.reduce((acc, agent) => {
+    const groupedAgents = filteredAgents.reduce((acc, agent) => {
         const group = agent.group_name || 'UNKNOWN';
         if (!acc[group]) acc[group] = [];
         acc[group].push(agent);
