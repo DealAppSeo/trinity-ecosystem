@@ -101,13 +101,52 @@ runHealer().catch(console.error);
 // ==========================================
 async function healDeployment() {
     console.log('🏗️  Deployment Healer Active...');
-    // In strict mode, we would query the Railway API here.
-    // Since we don't have the SDK yet, we simulate a check or look for DB signals.
 
-    // Future Implementation:
-    // const logs = await fetchRailwayLogs();
-    // if (logs.includes('.next')) await logDeploymentError(logs);
+    // 1. Check for Reports in DB (Pushed by Scout or Human)
+    const { data: errors } = await supabase
+        .from('trinity_deployment_errors')
+        .select('*')
+        .eq('status', 'pending');
 
-    console.log('   (Deployment Monitoring is currently manual via User Reports)');
+    if (!errors || errors.length === 0) {
+        // console.log('   (No pending deployment errors)'); // Quiet mode
+        return;
+    }
+
+    console.log(`🩹 Found ${errors.length} deployment failures. analyzing...`);
+
+    for (const err of errors) {
+        console.log(`\n🔍 Analyzing Build Error [${err.id}]: ${err.error_message?.substring(0, 50)}...`);
+
+        // 2. AI Analysis
+        const prompt = `
+        DEPLOYMENT FAILURE REPORT:
+        Message: ${err.error_message}
+        Context: ${err.component_stack || 'N/A'}
+        
+        TASK:
+        1. Identify the root cause (e.g. Missing Env Var, TS Error, Docker config).
+        2. Propose a precise fix (Shell command, Code diff, or Config change).
+        3. Rate confidence (0-100%).
+        `;
+
+        const llmResult = await smartLLM({
+            systemPrompt: "You are a DevOps Specialist for Next.js/Railway deployments.",
+            userPrompt: prompt
+        });
+
+        const fixProposal = llmResult.output;
+        console.log(`💡 AI Proposal: ${fixProposal.substring(0, 100)}...`);
+
+        // 3. Log Result
+        await supabase
+            .from('trinity_deployment_errors')
+            .update({
+                status: 'analyzed',
+                resolution_notes: `[AI_FIX]: ${fixProposal}`,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', err.id);
+    }
 }
 healDeployment().catch(console.error);
