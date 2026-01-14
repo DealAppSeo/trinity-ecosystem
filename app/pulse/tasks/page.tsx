@@ -128,10 +128,11 @@ export default function TasksPage() {
             if (priority >= 8) p = 'high';
             else if (priority >= 5) p = 'medium';
             else p = 'low';
-        } else if (typeof priority === 'string') {
+        } else {
+            // Fallback for string or unknown types - Force String conversion
             p = String(priority || 'medium').toLowerCase();
             // Handle legacy Agent priority (0-100)
-            if (priority === 'critical') p = 'high';
+            if (String(priority) === 'critical') p = 'high';
         }
 
         switch (p) {
