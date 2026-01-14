@@ -68,6 +68,6 @@ async function migrateToReal(task: Task, agent: AgentState) {
         description: task.description,
         assigned_to: agent.name,
         status: 'pending',
-        priority: (task.priority || 10) + 10 // Boost priority
+        priority: (typeof task.priority === 'number' ? task.priority : 10) + 10 // Boost priority
     });
 }

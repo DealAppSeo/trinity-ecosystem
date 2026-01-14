@@ -4,16 +4,12 @@ import { MCPTool } from '../types';
 
 export class SupabaseMCP extends BaseMCP {
     constructor() {
-        super(
-            'Supabase',
-            '1.0.0',
-            'Database Access for Auditing and Persistence'
-        );
+        super('Supabase');
     }
 
-    async initialize(): Promise<void> {
+    async connect(): Promise<void> {
         // Supabase client is global, just verify connection if possible
-        // No-op for now
+        // No-op for now as Supabase client is initialized on import
     }
 
     async getTools(): Promise<MCPTool[]> {
@@ -29,7 +25,8 @@ export class SupabaseMCP extends BaseMCP {
                         order_by: { type: 'string', default: 'created_at' }
                     },
                     required: ['table_name']
-                }
+                },
+                execute: async (args: any) => this.callTool('read_table', args)
             },
             {
                 name: 'write_record',
@@ -41,7 +38,8 @@ export class SupabaseMCP extends BaseMCP {
                         data: { type: 'object' }
                     },
                     required: ['table_name', 'data']
-                }
+                },
+                execute: async (args: any) => this.callTool('write_record', args)
             }
         ];
     }

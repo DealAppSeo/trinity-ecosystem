@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Rocket, Target, Users, DollarSign, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController'; // Trigger refresh on success
+import { useToast } from '@/components/ui/Toast';
 
 export default function NewMissionPage() {
     const router = useRouter();
