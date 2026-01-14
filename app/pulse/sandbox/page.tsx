@@ -35,11 +35,27 @@ export default function SandboxPage() {
         }
     }, [registryAgents]);
 
-    const getAgentsByRole = (role: string) => agents.filter(a => a.agent_id.includes(role));
-    const managers = agents.filter(a => a.agent_id.includes('MANAGER') || a.agent_id.includes('w3c') || a.agent_id.includes('shofet')); // Added mapping for known orchestrators
-    const grokPod = agents.filter(a => a.agent_id.includes('GROK') || a.agent_id.includes('gcm') || a.agent_id.includes('torch'));
-    const claudePod = agents.filter(a => a.agent_id.includes('CLAUDE') || a.agent_id.includes('mel') || a.agent_id.includes('artisan'));
-    const geminiPod = agents.filter(a => a.agent_id.includes('GEMINI') || a.agent_id.includes('nexus') || a.agent_id.includes('science'));
+    const normalize = (id: string) => id.toLowerCase();
+
+    const managers = agents.filter(a => {
+        const id = normalize(a.agent_id);
+        return id.includes('manager') || id.includes('w3c') || id.includes('shofet') || id.includes('mcp');
+    });
+
+    const grokPod = agents.filter(a => {
+        const id = normalize(a.agent_id);
+        return id.includes('grok') || id.includes('gcm') || id.includes('torch') || id.includes('veritas');
+    });
+
+    const claudePod = agents.filter(a => {
+        const id = normalize(a.agent_id);
+        return id.includes('claude') || id.includes('mel') || id.includes('chesed') || id.includes('apm') || id.includes('artisan');
+    });
+
+    const geminiPod = agents.filter(a => {
+        const id = normalize(a.agent_id);
+        return id.includes('gemini') || id.includes('nexus') || id.includes('sophia') || id.includes('hdm') || id.includes('science');
+    });
 
     return (
         <div className="min-h-screen bg-black text-white p-8 font-sans">
