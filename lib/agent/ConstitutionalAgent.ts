@@ -639,21 +639,19 @@ export class ConstitutionalAgent {
             return;
         }
 
-        // 3. GENESIS V2: Web-Aware Self-Optimization (40% chance for High Rep)
-        if (this.reputationScore > 40 && Math.random() < 0.4) {
-            console.log(`[${this.name}]  High-Rep Agent Initiating External Inspiration Scan...`);
-            await this.runWebAwareGenesis();
-        }
+        // 3. Auto-Seed Evergreen Task (Legacy "Internal Auction") - 30% chance if idle
+        // [ANTIGRAVITY] Shifted from "Internal Optimization" to "Visible Artifact Generation"
+        if (Math.random() < 0.3) {
+            console.log(`[${this.name}] 💡 Generating Evergreen Content Task...`);
+            const topics = ['System Health', 'User Experience', 'Market Trends', 'Code Quality', 'Future Roadmap'];
+            const topic = topics[Math.floor(Math.random() * topics.length)];
 
-        // 4. Fallback: Internal Auction (Research) - 20% chance
-        if (Math.random() < 0.2) {
-            console.log(`[${this.name}] 💡 Proposing Internal Self-Research...`);
             await this.supabase.from('trinity_tasks').insert({
-                title: `[SELF-GEN] Internal Optimization`,
-                description: `Analyze internal logs for bottlenecks.`,
-                task_type: 'research',
+                title: `[EVERGREEN] ${topic} Report`,
+                description: `Generate a brief ${topic} analysis report to demonstrate system activity.`,
+                task_type: 'content', // Explicitly 'content' to trigger artifact flow
                 assigned_to: this.name,
-                priority: 2, // Low priority (Background)
+                priority: 5, // Medium priority
                 status: 'pending'
             });
         }
@@ -1027,69 +1025,20 @@ export class ConstitutionalAgent {
             return null;
         }
     }
-            console.log(`[ARTIFACT] 💾 Saving '${safeTitle} '...`);
 
-// Calculate Hash
-const crypto = require('crypto');
-const fileHash = crypto.createHash('sha256').update(content).digest('hex');
-
-// 1. DATABASE INSERT
-const { data, error } = await this.supabase
-    .from('trinity_artifacts')
-    .insert({
-        task_id: safeTaskId,
-        agent_name: this.name,
-        title: safeTitle,
-        artifact_type: type || 'text',
-        content: content,
-        file_path: artifactUrl, // Might be null
-        url: artifactUrl,
-        created_at: new Date().toISOString(),
-        access_level: accessLevel,
-        view_count: 0,
-        file_hash: fileHash,
-        creator_agent: this.name
-    })
-    .select('id')
-    .single();
-
-if (error) throw error;
-artifactId = data.id;
-console.log(`[ARTIFACT] Saved to DB: ${artifactId} (${accessLevel})`);
-
-// 2. LOCAL FILESYSTEM (Backup)
-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-    try {
-        const fs = await import('fs');
-        const path = await import('path');
-        const artifactsDir = path.resolve(process.cwd(), 'artifacts', this.name.toLowerCase());
-        if (!fs.existsSync(artifactsDir)) fs.mkdirSync(artifactsDir, { recursive: true });
-
-        const filename = `task-${safeTaskId.substring(0, 8)}.md`;
-        const fullPath = path.join(artifactsDir, filename);
-        fs.writeFileSync(fullPath, content, 'utf8');
-    } catch (e) { /* Ignore local fs errors */ }
-}
-
-return `db://trinity_artifacts/${artifactId}`;
-        } catch (e: any) {
-    console.error(`[ARTIFACT] Failed: ${e.message}`);
-    return null;
-}
-    }
 
     async runSelfDiagnostic() {
-    // Renamed/Integrated into loop. Kept for legacy if needed or called by interval
-    console.log(`[${this.name}] 🔍 Running self-diagnostic...`);
-    // We can just report genome
-    await this.reportGenome();
-}
+        // Renamed/Integrated into loop. Kept for legacy if needed or called by interval
+        console.log(`[${this.name}] 🔍 Running self-diagnostic...`);
+        // We can just report genome
+        await this.reportGenome();
+    }
 
-    async fetchBible(): Promise < string > {
-    if(this.bibleCache && (Date.now() - this.bibleCacheTime) < this.BIBLE_CACHE_TTL) {
-    return this.bibleCache;
-}
-const bible = `
+    async fetchBible(): Promise<string> {
+        if (this.bibleCache && (Date.now() - this.bibleCacheTime) < this.BIBLE_CACHE_TTL) {
+            return this.bibleCache;
+        }
+        const bible = `
 # CORE PRINCIPLES (Bible Fallback)
 ## The Eight Virtues (Philippians 4:8)
 - TRUE: Never fabricate.
@@ -1109,197 +1058,197 @@ const bible = `
 5. **Deliverables**: Always produce Trust Cards, Spec Sheets, and Weekly Updates.
 See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 `;
-this.bibleCache = bible;
-this.bibleCacheTime = Date.now();
-this.sessionMetrics.bibleReads++;
-return bible;
+        this.bibleCache = bible;
+        this.bibleCacheTime = Date.now();
+        this.sessionMetrics.bibleReads++;
+        return bible;
     }
 
     async reportGenome() {
-    // ... (Keep existing stub)
-}
+        // ... (Keep existing stub)
+    }
 
     async extractPatterns(taskTitle: string, output: string) {
-    const keywords = (taskTitle + ' ' + output).toLowerCase();
-    if (keywords.includes('api') && keywords.includes('endpoint')) {
-        this.sessionMetrics.patternsLearned++;
-        console.log(`[${this.name}] 🧠 LOGIC PATTERN DETECTED: API usage`);
+        const keywords = (taskTitle + ' ' + output).toLowerCase();
+        if (keywords.includes('api') && keywords.includes('endpoint')) {
+            this.sessionMetrics.patternsLearned++;
+            console.log(`[${this.name}] 🧠 LOGIC PATTERN DETECTED: API usage`);
+        }
     }
-}
 
     // ============================================
     // SURVIVOR & REDEPLOY LOGIC
     // ============================================
     async checkSurvivorStatus() {
-    if (this.isSurvivor) return;
-    if (this.groupName === 'ORCHESTRATION') return;
+        if (this.isSurvivor) return;
+        if (this.groupName === 'ORCHESTRATION') return;
 
-    try {
-        const { data: heartbeat } = await this.supabase
-            .from('trinity_heartbeat')
-            .select('last_seen')
-            .eq('agent', this.survivorName)
-            .single();
+        try {
+            const { data: heartbeat } = await this.supabase
+                .from('trinity_heartbeat')
+                .select('last_seen')
+                .eq('agent', this.survivorName)
+                .single();
 
-        if (!heartbeat) {
-            console.log(`[${this.name}] 🚨 GROUP ALERT: Survivor ${this.survivorName} missing!`);
-            await this.log('survivor_missing', `Group ${this.groupName} survivor ${this.survivorName} is missing.`);
+            if (!heartbeat) {
+                console.log(`[${this.name}] 🚨 GROUP ALERT: Survivor ${this.survivorName} missing!`);
+                await this.log('survivor_missing', `Group ${this.groupName} survivor ${this.survivorName} is missing.`);
+                return;
+            }
+
+            const minutesAgo = (Date.now() - new Date(heartbeat.last_seen).getTime()) / 60000;
+            if (minutesAgo > 10) {
+                console.log(`[${this.name}] 🚨 GROUP EMERGENCY: Survivor ${this.survivorName} is down (${minutesAgo.toFixed(0)}m)!`);
+                await this.log('survivor_down', `GroupSurvivor ${this.survivorName} is unresponsive.`);
+            }
+        } catch (e: any) {
+            // console.log ...
+        }
+    }
+
+    async runSurvivorBootProtocol() {
+        if (!this.isSurvivor) return;
+        console.log(`[${this.name}] 🛡️ Running Survivor Boot Protocol...`);
+        try {
+            const { data: members } = await this.supabase
+                .from('trinity_heartbeat')
+                .select('agent, last_seen, config')
+                .contains('config', { group: this.groupName });
+
+            if (!members || members.length === 0) return;
+
+            for (const member of members) {
+                if (member.agent === this.name) continue;
+                const lastSeen = new Date(member.last_seen);
+                const minutesAgo = (Date.now() - lastSeen.getTime()) / 60000;
+
+                if (minutesAgo > 10) {
+                    console.log(`[${this.name}] 🚨 Member ${member.agent} is STALE. Redeploying...`);
+                    await this.triggerRailwayRedeploy(member.agent);
+                }
+            }
+        } catch (e: any) {
+            console.log(`[${this.name}] [BOOT] Survivor protocol error: ${e.message}`);
+        }
+    }
+
+    async triggerRailwayRedeploy(agentName: string) {
+        const RAILWAY_TOKEN = process.env.RAILWAY_API_TOKEN;
+        if (!RAILWAY_TOKEN) {
+            console.log(`[${this.name}] [REDEPLOY] Skipping ${agentName} - No RAILWAY_API_TOKEN`);
             return;
         }
 
-        const minutesAgo = (Date.now() - new Date(heartbeat.last_seen).getTime()) / 60000;
-        if (minutesAgo > 10) {
-            console.log(`[${this.name}] 🚨 GROUP EMERGENCY: Survivor ${this.survivorName} is down (${minutesAgo.toFixed(0)}m)!`);
-            await this.log('survivor_down', `GroupSurvivor ${this.survivorName} is unresponsive.`);
+        // TODO: User must fill these Service IDs
+        const AGENT_SERVICE_IDS: Record<string, string> = {
+            'GABRIEL': 'service-uuid-here',
+            'RAZIEL': 'service-uuid-here',
+            'CASSIEL': 'service-uuid-here',
+            // ... Fill other agents ...
+        };
+
+        const serviceId = AGENT_SERVICE_IDS[agentName];
+        if (!serviceId) {
+            console.log(`[${this.name}] [REDEPLOY] Skipping ${agentName} - Service ID not mapped in AGENT_SERVICE_IDS`);
+            return;
         }
-    } catch (e: any) {
-        // console.log ...
-    }
-}
 
-    async runSurvivorBootProtocol() {
-    if (!this.isSurvivor) return;
-    console.log(`[${this.name}] 🛡️ Running Survivor Boot Protocol...`);
-    try {
-        const { data: members } = await this.supabase
-            .from('trinity_heartbeat')
-            .select('agent, last_seen, config')
-            .contains('config', { group: this.groupName });
-
-        if (!members || members.length === 0) return;
-
-        for (const member of members) {
-            if (member.agent === this.name) continue;
-            const lastSeen = new Date(member.last_seen);
-            const minutesAgo = (Date.now() - lastSeen.getTime()) / 60000;
-
-            if (minutesAgo > 10) {
-                console.log(`[${this.name}] 🚨 Member ${member.agent} is STALE. Redeploying...`);
-                await this.triggerRailwayRedeploy(member.agent);
-            }
-        }
-    } catch (e: any) {
-        console.log(`[${this.name}] [BOOT] Survivor protocol error: ${e.message}`);
-    }
-}
-
-    async triggerRailwayRedeploy(agentName: string) {
-    const RAILWAY_TOKEN = process.env.RAILWAY_API_TOKEN;
-    if (!RAILWAY_TOKEN) {
-        console.log(`[${this.name}] [REDEPLOY] Skipping ${agentName} - No RAILWAY_API_TOKEN`);
-        return;
-    }
-
-    // TODO: User must fill these Service IDs
-    const AGENT_SERVICE_IDS: Record<string, string> = {
-        'GABRIEL': 'service-uuid-here',
-        'RAZIEL': 'service-uuid-here',
-        'CASSIEL': 'service-uuid-here',
-        // ... Fill other agents ...
-    };
-
-    const serviceId = AGENT_SERVICE_IDS[agentName];
-    if (!serviceId) {
-        console.log(`[${this.name}] [REDEPLOY] Skipping ${agentName} - Service ID not mapped in AGENT_SERVICE_IDS`);
-        return;
-    }
-
-    try {
-        const query = `
+        try {
+            const query = `
                 mutation serviceRestart($id: String!) {
                     serviceRestart(id: $id)
                 }
             `;
 
-        const response = await fetch('https://backboard.railway.app/graphql/v2', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${RAILWAY_TOKEN}`
-            },
-            body: JSON.stringify({
-                query,
-                variables: { id: serviceId }
-            })
-        });
+            const response = await fetch('https://backboard.railway.app/graphql/v2', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${RAILWAY_TOKEN}`
+                },
+                body: JSON.stringify({
+                    query,
+                    variables: { id: serviceId }
+                })
+            });
 
-        const result = await response.json();
-        if (result.errors) {
-            console.log(`[${this.name}] [REDEPLOY] Failed to restart ${agentName}: ${result.errors[0].message}`);
-        } else {
-            console.log(`[${this.name}] 🚀 TRIGGERED REDEPLOY for ${agentName}`);
+            const result = await response.json();
+            if (result.errors) {
+                console.log(`[${this.name}] [REDEPLOY] Failed to restart ${agentName}: ${result.errors[0].message}`);
+            } else {
+                console.log(`[${this.name}] 🚀 TRIGGERED REDEPLOY for ${agentName}`);
+            }
+
+        } catch (e: any) {
+            console.log(`[${this.name}] [REDEPLOY] Exception triggering restart: ${e.message}`);
         }
-
-    } catch (e: any) {
-        console.log(`[${this.name}] [REDEPLOY] Exception triggering restart: ${e.message}`);
     }
-}
 
     async sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
     async log(action: string, message: string, metadata: any = {}) {
-    try {
-        await this.supabase
-            .from('trinity_agent_logs')
-            .insert({
-                agent: this.name,
-                action,
-                message: typeof message === 'string' ? message.substring(0, 5000) : JSON.stringify(message).substring(0, 5000),
-                metadata: {
-                    ...metadata,
-                    version: this.version,
-                    primaryVirtue: this.wisdom?.primaryVirtue,
-                    group: this.groupName // 3x3 Log
-                },
-                created_at: new Date().toISOString()
-            });
-    } catch (err) {
-        // Logging failure is non-fatal
+        try {
+            await this.supabase
+                .from('trinity_agent_logs')
+                .insert({
+                    agent: this.name,
+                    action,
+                    message: typeof message === 'string' ? message.substring(0, 5000) : JSON.stringify(message).substring(0, 5000),
+                    metadata: {
+                        ...metadata,
+                        version: this.version,
+                        primaryVirtue: this.wisdom?.primaryVirtue,
+                        group: this.groupName // 3x3 Log
+                    },
+                    created_at: new Date().toISOString()
+                });
+        } catch (err) {
+            // Logging failure is non-fatal
+        }
     }
-}
 
     async heartbeat() {
-    const timestamp = new Date().toISOString();
-    // 1. Trinity Heartbeat (For Controller)
-    try {
-        await this.supabase
-            .from('trinity_heartbeat')
-            .upsert({
-                agent: this.name,
-                status: 'active',
-                version: this.version,
-                last_seen: timestamp,
-                config: {
-                    primaryVirtue: this.wisdom?.primaryVirtue,
-                    sessionMetrics: this.sessionMetrics,
-                    group: this.groupName, // 3x3 Group
-                    isSurvivor: this.isSurvivor, // DNA flag
-                    survivorTarget: this.survivorName
-                }
-            }, { onConflict: 'agent' });
-    } catch (err) {
-        // Non-fatal
+        const timestamp = new Date().toISOString();
+        // 1. Trinity Heartbeat (For Controller)
+        try {
+            await this.supabase
+                .from('trinity_heartbeat')
+                .upsert({
+                    agent: this.name,
+                    status: 'active',
+                    version: this.version,
+                    last_seen: timestamp,
+                    config: {
+                        primaryVirtue: this.wisdom?.primaryVirtue,
+                        sessionMetrics: this.sessionMetrics,
+                        group: this.groupName, // 3x3 Group
+                        isSurvivor: this.isSurvivor, // DNA flag
+                        survivorTarget: this.survivorName
+                    }
+                }, { onConflict: 'agent' });
+        } catch (err) {
+            // Non-fatal
+        }
+
+        // 2. Agent Heartbeat (Legacy/Monitoring Table)
+        try {
+            const { error } = await this.supabase
+                .from('agent_heartbeat') // User explicitly requested this table
+                .upsert({
+                    agent_name: this.name,
+                    status: 'online',
+                    last_ping: timestamp
+                }, { onConflict: 'agent_name' });
+
+            if (error) console.error('[HEARTBEAT] FAILED:', error.message);
+            // else console.log(`[HEARTBEAT] Ping sent (${timestamp})`);
+
+        } catch (err: any) {
+            console.error('[HEARTBEAT] Error:', err.message);
+        }
     }
-
-    // 2. Agent Heartbeat (Legacy/Monitoring Table)
-    try {
-        const { error } = await this.supabase
-            .from('agent_heartbeat') // User explicitly requested this table
-            .upsert({
-                agent_name: this.name,
-                status: 'online',
-                last_ping: timestamp
-            }, { onConflict: 'agent_name' });
-
-        if (error) console.error('[HEARTBEAT] FAILED:', error.message);
-        // else console.log(`[HEARTBEAT] Ping sent (${timestamp})`);
-
-    } catch (err: any) {
-        console.error('[HEARTBEAT] Error:', err.message);
-    }
-}
 
     // ... Keeping heartbeat separate to update Dual Write
 
@@ -1309,39 +1258,39 @@ return bible;
 
     // Strategy 10: Retrospective
     async retrospective() {
-    console.log(`[${this.name}] 🕯️ Starting retrospective...`);
-    const prompt = `Reflect on last week's tasks (simulated or real): successes, failures, lessons. Suggest 3 improvements.`;
-    const reflection = await this.callLLM(prompt);
+        console.log(`[${this.name}] 🕯️ Starting retrospective...`);
+        const prompt = `Reflect on last week's tasks (simulated or real): successes, failures, lessons. Suggest 3 improvements.`;
+        const reflection = await this.callLLM(prompt);
 
-    if (reflection && reflection.output) {
-        // Log the reflection
-        await this.supabase.from('trinity_retros').insert({
-            agent: this.name,
-            reflection: reflection.output
-        });
+        if (reflection && reflection.output) {
+            // Log the reflection
+            await this.supabase.from('trinity_retros').insert({
+                agent: this.name,
+                reflection: reflection.output
+            });
 
-        // Earn Reputation for self-reflecting (A virtuous act)
-        await this.updateReputation(true);
-        console.log(`[${this.name}] Retrospective complete and logged. Reputation updated.`);
+            // Earn Reputation for self-reflecting (A virtuous act)
+            await this.updateReputation(true);
+            console.log(`[${this.name}] Retrospective complete and logged. Reputation updated.`);
+        }
     }
-}
 
     // Strategy 8: Continuous Research (Refactored to use ResearchTool)
     async researchTask(gap: string) {
-    console.log(`[${this.name}] 🔎 Researching topic using Swarm Interface: ${gap}`);
+        console.log(`[${this.name}] 🔎 Researching topic using Swarm Interface: ${gap}`);
 
-    // 1. Use Research Tool
-    const searchResults = await this.researchTool.searchWeb(gap);
+        // 1. Use Research Tool
+        const searchResults = await this.researchTool.searchWeb(gap);
 
-    // 2. Browse a top result (Simulation of depth)
-    const topUrl = searchResults[0]?.url;
-    let deepDive = "";
-    if (topUrl) {
-        deepDive = await this.researchTool.browsePage(topUrl, "Extract key implementation details");
-    }
+        // 2. Browse a top result (Simulation of depth)
+        const topUrl = searchResults[0]?.url;
+        let deepDive = "";
+        if (topUrl) {
+            deepDive = await this.researchTool.browsePage(topUrl, "Extract key implementation details");
+        }
 
-    // 3. Summarize findings using LLM
-    const prompt = `
+        // 3. Summarize findings using LLM
+        const prompt = `
     Summarize these search results for the swarm regarding the topic "${gap}".
     Provide 3 key takeaways and a recommended action.
     
@@ -1352,139 +1301,139 @@ return bible;
     ${deepDive}
     `;
 
-    const summary = await this.callLLM(prompt);
+        const summary = await this.callLLM(prompt);
 
-    // 4. Log to Supabase
-    if (summary.output) {
-        await this.supabase.from('trinity_research_log').insert({
-            gap: gap,
-            summary: summary.output,
-            resources: searchResults,
-            agent: this.name
-        });
-        await this.updateReputation(true); // Reward for research
-        console.log(`[${this.name}] Research complete for "${gap}".`);
+        // 4. Log to Supabase
+        if (summary.output) {
+            await this.supabase.from('trinity_research_log').insert({
+                gap: gap,
+                summary: summary.output,
+                resources: searchResults,
+                agent: this.name
+            });
+            await this.updateReputation(true); // Reward for research
+            console.log(`[${this.name}] Research complete for "${gap}".`);
+        }
     }
-}
 
-    async callLLM(prompt: string, options: any = {}): Promise < LLMResult > {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if(!apiKey) {
-        console.warn(`[${this.name}] No API Key for LLM`);
-        return { output: "Simulation: LLM not configured." };
-    }
+    async callLLM(prompt: string, options: any = {}): Promise<LLMResult> {
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            console.warn(`[${this.name}] No API Key for LLM`);
+            return { output: "Simulation: LLM not configured." };
+        }
 
         try {
-        // 1. Get Tools for this Agent
-        const tools = await mcpManager.getToolsForRole(this.name);
-        const openAiTools = tools.map((tool: any) => ({
-            type: 'function',
-            function: {
-                name: tool.name,
-                description: tool.description,
-                parameters: tool.schema
-            }
-        }));
-
-        // [ANTIGRAVITY] Inject Database Write Tool explicitly
-        openAiTools.push({
-            type: 'function',
-            function: {
-                name: 'save_artifact',
-                description: 'Save a generated artifact (document, code, report) to the Trinity Database. REQUIRED for all creation tasks.',
-                parameters: {
-                    type: 'object',
-                    properties: {
-                        title: { type: 'string', description: 'Title of the artifact' },
-                        content: { type: 'string', description: 'The full text content of the artifact' },
-                        type: { type: 'string', enum: ['code', 'document', 'design', 'report', 'md'] },
-                        access_level: { type: 'string', enum: ['public', 'registered', 'protected'], default: 'protected' }
-                    },
-                    required: ['title', 'content', 'type']
+            // 1. Get Tools for this Agent
+            const tools = await mcpManager.getToolsForRole(this.name);
+            const openAiTools = tools.map((tool: any) => ({
+                type: 'function',
+                function: {
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: tool.schema
                 }
-            }
-        });
+            }));
 
-        // 2. Prepare Messages
-        const messages: any[] = [
-            { role: 'system', content: `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${await this.fetchBible()}` },
-            { role: 'user', content: prompt }
-        ];
-
-        // 3. Loop for Tool Calls (Max 5 turns to prevent infinite loops)
-        for(let i = 0; i < 5; i++) {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: messages,
-            tools: openAiTools.length > 0 ? openAiTools : undefined,
-            tool_choice: openAiTools.length > 0 ? 'auto' : undefined
-        })
-    });
-
-    const data = await response.json();
-    const choice = data.choices?.[0];
-    const message = choice?.message;
-
-    if (!message) return { output: "Error: No output from LLM" };
-
-    // Add assistant message to history
-    messages.push(message);
-
-    // Check for Tool Calls
-    if (message.tool_calls && message.tool_calls.length > 0) {
-        console.log(`[${this.name}] 🛠️ LLM Requested ${message.tool_calls.length} tool(s)`);
-
-        for (const toolCall of message.tool_calls) {
-            const fnName = toolCall.function.name;
-            const args = JSON.parse(toolCall.function.arguments);
-            console.log(`[${this.name}] 📞 Calling Tool: ${fnName}`);
-
-            let toolResult = '';
-            try {
-                if (fnName === 'save_artifact') {
-                    // [ANTIGRAVITY] Intercept Local Tool Call
-                    await this.saveArtifact(
-                        'mcp-gen-' + Date.now(),
-                        args.content,
-                        args.type,
-                        args.title,
-                        args.access_level
-                    );
-                    toolResult = `Artifact '${args.title}' successfully saved to database.`;
-                } else {
-                    toolResult = await mcpManager.routeToolCall(fnName, args);
+            // [ANTIGRAVITY] Inject Database Write Tool explicitly
+            openAiTools.push({
+                type: 'function',
+                function: {
+                    name: 'save_artifact',
+                    description: 'Save a generated artifact (document, code, report) to the Trinity Database. REQUIRED for all creation tasks.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: 'Title of the artifact' },
+                            content: { type: 'string', description: 'The full text content of the artifact' },
+                            type: { type: 'string', enum: ['code', 'document', 'design', 'report', 'md'] },
+                            access_level: { type: 'string', enum: ['public', 'registered', 'protected'], default: 'protected' }
+                        },
+                        required: ['title', 'content', 'type']
+                    }
                 }
-            } catch (err: any) {
-                toolResult = `Error executing tool ${fnName}: ${err.message}`;
-                console.error(`[${this.name}] ❌ Tool Error:`, err);
-            }
-
-            // Add tool result to messages
-            messages.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                content: toolResult
             });
-        }
-        // Loop continues to send tool outputs back to LLM
-    } else {
-        // Final response (no more tools)
-        return { output: message.content || "No content returned" };
-    }
-}
 
-return { output: "Error: Max tool recursion limit reached." };
+            // 2. Prepare Messages
+            const messages: any[] = [
+                { role: 'system', content: `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${await this.fetchBible()}` },
+                { role: 'user', content: prompt }
+            ];
+
+            // 3. Loop for Tool Calls (Max 5 turns to prevent infinite loops)
+            for (let i = 0; i < 5; i++) {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        messages: messages,
+                        tools: openAiTools.length > 0 ? openAiTools : undefined,
+                        tool_choice: openAiTools.length > 0 ? 'auto' : undefined
+                    })
+                });
+
+                const data = await response.json();
+                const choice = data.choices?.[0];
+                const message = choice?.message;
+
+                if (!message) return { output: "Error: No output from LLM" };
+
+                // Add assistant message to history
+                messages.push(message);
+
+                // Check for Tool Calls
+                if (message.tool_calls && message.tool_calls.length > 0) {
+                    console.log(`[${this.name}] 🛠️ LLM Requested ${message.tool_calls.length} tool(s)`);
+
+                    for (const toolCall of message.tool_calls) {
+                        const fnName = toolCall.function.name;
+                        const args = JSON.parse(toolCall.function.arguments);
+                        console.log(`[${this.name}] 📞 Calling Tool: ${fnName}`);
+
+                        let toolResult = '';
+                        try {
+                            if (fnName === 'save_artifact') {
+                                // [ANTIGRAVITY] Intercept Local Tool Call
+                                await this.saveArtifact(
+                                    'mcp-gen-' + Date.now(),
+                                    args.content,
+                                    args.type,
+                                    args.title,
+                                    args.access_level
+                                );
+                                toolResult = `Artifact '${args.title}' successfully saved to database.`;
+                            } else {
+                                toolResult = await mcpManager.routeToolCall(fnName, args);
+                            }
+                        } catch (err: any) {
+                            toolResult = `Error executing tool ${fnName}: ${err.message}`;
+                            console.error(`[${this.name}] ❌ Tool Error:`, err);
+                        }
+
+                        // Add tool result to messages
+                        messages.push({
+                            role: 'tool',
+                            tool_call_id: toolCall.id,
+                            content: toolResult
+                        });
+                    }
+                    // Loop continues to send tool outputs back to LLM
+                } else {
+                    // Final response (no more tools)
+                    return { output: message.content || "No content returned" };
+                }
+            }
+
+            return { output: "Error: Max tool recursion limit reached." };
 
         } catch (error: any) {
-    console.error("LLM Call Failed", error);
-    // Don't punish reputation for API errors, it's not the agent's fault
-    return { output: "Error calling LLM" };
-}
+            console.error("LLM Call Failed", error);
+            // Don't punish reputation for API errors, it's not the agent's fault
+            return { output: "Error calling LLM" };
+        }
     }
 }
