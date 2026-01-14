@@ -129,7 +129,7 @@ export default function TasksPage() {
             else if (priority >= 5) p = 'medium';
             else p = 'low';
         } else if (typeof priority === 'string') {
-            p = (priority || 'medium').toLowerCase();
+            p = String(priority || 'medium').toLowerCase();
             // Handle legacy Agent priority (0-100)
             if (priority === 'critical') p = 'high';
         }
@@ -271,8 +271,8 @@ export default function TasksPage() {
 
                                             <div className="flex items-center justify-between pt-2 border-t border-white/5">
                                                 <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${(typeof task.priority === 'number' && task.priority >= 8) || task.priority === 'high' ? 'text-red-400 bg-red-400/10' :
-                                                        (typeof task.priority === 'number' && task.priority <= 3) || task.priority === 'low' ? 'text-blue-400 bg-blue-400/10' :
-                                                            'text-yellow-400 bg-yellow-400/10'
+                                                    (typeof task.priority === 'number' && task.priority <= 3) || task.priority === 'low' ? 'text-blue-400 bg-blue-400/10' :
+                                                        'text-yellow-400 bg-yellow-400/10'
                                                     }`}>
                                                     {typeof task.priority === 'number'
                                                         ? (task.priority >= 8 ? 'HIGH' : task.priority >= 5 ? 'MEDIUM' : 'LOW')

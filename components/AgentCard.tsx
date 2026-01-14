@@ -41,7 +41,12 @@ export function AgentCard({ agent, isConductor = false, onAssignTask }: AgentCar
 
                 {/* Status Row */}
                 <div className="flex items-center gap-3 mb-2">
-                    <StatusDot status={agent.status} />
+                    {/* Unified Heartbeat Logic: 2 Minutes */}
+                    <StatusDot status={
+                        agent.lastHeartbeat && (Date.now() - new Date(agent.lastHeartbeat).getTime() < 120000)
+                            ? 'active'
+                            : 'offline'
+                    } />
                     <RepIdBadge score={agent.repid_score} />
                 </div>
 

@@ -71,6 +71,13 @@ export const useTrinityController = () => {
                 };
             });
 
+            // Sort: Active first, then by name
+            enrichedAgents.sort((a: any, b: any) => {
+                if (a.status === 'active' && b.status !== 'active') return -1;
+                if (a.status !== 'active' && b.status === 'active') return 1;
+                return a.agent_name.localeCompare(b.agent_name);
+            });
+
             if (enrichedAgents.length > 0) setAgents(enrichedAgents as AgentRegistryRecord[]);
             if (taskData) setTasks(taskData as unknown as TaskRecord[]);
             if (logData) setLogs(logData);

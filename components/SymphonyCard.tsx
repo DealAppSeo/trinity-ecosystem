@@ -12,7 +12,9 @@ interface SymphonyCardProps {
 }
 
 export function SymphonyCard({ agent }: SymphonyCardProps) {
-    const isOnline = agent.status === 'active';
+    const lastHeartbeat = agent.lastHeartbeat ? new Date(agent.lastHeartbeat) : null;
+    // Unified Heartbeat Logic: 2 Minutes (120000ms)
+    const isOnline = lastHeartbeat && (Date.now() - lastHeartbeat.getTime() < 120000);
     const group = getGroupForAgent(agent.agent_name);
 
     // Derive visual role from Group

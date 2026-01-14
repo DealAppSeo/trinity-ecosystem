@@ -564,9 +564,8 @@ export class ConstitutionalAgent {
 
             // CRITICAL: BLOCK COMPLETION IF ARTIFACT MISSING for specific types
             if (task.task_type !== 'self-healing' && !externalArtifactUrl && (!task.task_type || !['system', 'meta'].includes(task.task_type))) {
-                console.log(`[BLOCK] Task ${task.id} needs artifact`);
-                // For now, log but don't crash loop. In strict mode, throw.
-                // throw new Error('Artifact required'); 
+                console.warn(`[BLOCK] Task ${task.id} MISSING ARTIFACT. Rejecting completion.`);
+                throw new Error(`[STRICT] Artifact required for task type '${task.task_type || 'general'}'. No artifact URL returned.`);
             }
 
             // Mark Completed
@@ -920,25 +919,65 @@ export class ConstitutionalAgent {
             console.warn(`[${this.name}] 🛑 HEALING THROTLED: Global count ${count}/hr.`);
             return false;
         }
+
         return true;
     }
 
-    async saveArtifact(taskId: string, content: string, type: string | null): Promise<string | null> {
+    async saveArtifact(taskId: string | number, content: string, type: string | null): Promise<string | null> {
         try {
-            // Check if content looks like a file path (simple heuristic)
-            let filePath: string | null = null;
-            let actualContent: string | null = content;
+            // Ensure taskId is a string
+            const safeTaskId = String(taskId);
+
+            let artifactUrl = null;
             let artifactId: string | null = null;
 
-            // 1. SAVE TO DATABASE
+            // 1. UPLOAD TO SUPABASE STORAGE
+            try {
+                // Determine extension
+                let ext = 'md';
+                if (type === 'code' || content.includes('```ts') || content.includes('```js')) ext = 'ts';
+                if (type === 'design' || type === 'image') ext = 'png';
+
+                const timestamp = Date.now();
+                const cleanName = this.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                const storagePath = `${cleanName}/${timestamp}_${safeTaskId.substring(0, 8)}.${ext}`;
+
+                // Upload
+                const { error: uploadError } = await this.supabase
+                    .storage
+                    .from('trinity-artifacts')
+                    .upload(storagePath, content, {
+                        contentType: type === 'image' ? 'image/png' : 'text/plain;charset=UTF-8',
+                        upsert: true
+                    });
+
+                if (uploadError) {
+                    console.warn(`[ARTIFACT] ⚠️ Storage Upload Failed: ${uploadError.message}`);
+                } else {
+                    // Get Public URL
+                    const { data: publicUrlData } = this.supabase
+                        .storage
+                        .from('trinity-artifacts')
+                        .getPublicUrl(storagePath);
+
+                    artifactUrl = publicUrlData.publicUrl;
+                    console.log(`[ARTIFACT] ☁️ Uploaded to Storage: ${artifactUrl}`);
+                }
+
+            } catch (storageEx) {
+                console.warn(`[ARTIFACT] Storage exception:`, storageEx);
+            }
+
+            // 2. SAVE TO DATABASE
             const { data, error } = await this.supabase
                 .from('trinity_artifacts')
                 .insert({
-                    task_id: taskId,
+                    task_id: safeTaskId,
                     agent_name: this.name,
                     artifact_type: type || 'text',
-                    content: actualContent,
-                    file_path: filePath, // Will be updated if we write to disk
+                    content: content,
+                    file_path: artifactUrl,
+                    url: artifactUrl,
                     created_at: new Date().toISOString()
                 })
                 .select('id')
@@ -946,53 +985,23 @@ export class ConstitutionalAgent {
 
             if (error) throw error;
             artifactId = data.id;
-            console.log(`[ARTIFACT] Saved to DB for task ${taskId}: ${artifactId}`);
+            console.log(`[ARTIFACT] Saved to DB for task ${safeTaskId}: ${artifactId}`);
 
-            // 2. SAVE TO LOCAL FILESYSTEM (Giving Agents Hands)
-            // Only runs if we are in a Node environment (fs exists)
+            // 3. LOCAL FILESYSTEM
             if (typeof process !== 'undefined' && process.versions && process.versions.node) {
                 try {
-                    // Dynamic import to avoid build errors in Edge/Browser environments
                     const fs = await import('fs');
                     const path = await import('path');
-
                     const artifactsDir = path.resolve(process.cwd(), 'artifacts', this.name.toLowerCase());
+                    if (!fs.existsSync(artifactsDir)) fs.mkdirSync(artifactsDir, { recursive: true });
 
-                    if (!fs.existsSync(artifactsDir)) {
-                        fs.mkdirSync(artifactsDir, { recursive: true });
-                    }
-
-                    // Determine filename
-                    let filename = `task-${taskId.substring(0, 8)}.md`;
-                    // If content has a filename hint (first line usually titles)
-                    const titleMatch = content.match(/^#\s+(.+)$/m);
-                    if (titleMatch) {
-                        const safeTitle = titleMatch[1].replace(/[^a-z0-9]/gi, '-').toLowerCase().substring(0, 50);
-                        filename = `${safeTitle}-${taskId.substring(0, 8)}.md`;
-                    }
-                    // Or check if type hints extension
-                    if (type === 'code') filename = filename.replace('.md', '.ts'); // Default to ts? Or use detection.
-
+                    const filename = `task-${safeTaskId.substring(0, 8)}.md`;
                     const fullPath = path.join(artifactsDir, filename);
                     fs.writeFileSync(fullPath, content, 'utf8');
-
-                    console.log(`[ARTIFACT] 💾 Written to disk: ${fullPath}`);
-
-                    // Update DB with local path for reference
-                    await this.supabase
-                        .from('trinity_artifacts')
-                        .update({ file_path: fullPath })
-                        .eq('id', artifactId);
-
-                    return `file://${fullPath}`;
-
-                } catch (fsError: any) {
-                    console.error(`[ARTIFACT] ⚠️ Filesystem write failed (non-fatal): ${fsError.message}`);
-                    return `db://trinity_artifacts/${artifactId}`;
-                }
+                } catch (e) { /* Ignore local fs errors */ }
             }
 
-            return `db://trinity_artifacts/${artifactId}`;
+            return artifactUrl || `db://trinity_artifacts/${artifactId}`;
         } catch (e: any) {
             console.error(`[ARTIFACT] Failed: ${e.message}`);
             return null;
