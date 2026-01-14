@@ -20,6 +20,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+import { ToastProvider } from "@/components/ui/Toast";
+
 export default function RootLayout({
   children,
 }: {
@@ -34,11 +36,13 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="font-display antialiased pt-16 pb-16 md:pb-0">
-        <Gatekeeper />
-        <MockBanner />
-        <NavBar />
-        {children}
-        <MobileNav />
+        <ToastProvider>
+          <Gatekeeper />
+          <MockBanner />
+          <NavBar />
+          {children}
+          <MobileNav />
+        </ToastProvider>
       </body>
     </html>
   );

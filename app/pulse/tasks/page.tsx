@@ -7,14 +7,15 @@ import { Plus, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { TaskRecord } from '@/lib/agent/types';
+import { useToast } from '@/components/ui/Toast';
 
 export default function TasksPage() {
     const { tasks: initialTasks, refresh } = useTrinityController();
+    const { showToast } = useToast();
     const [tasks, setTasks] = useState<TaskRecord[]>([]);
     const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' });
     const [showNewTaskForm, setShowNewTaskForm] = useState(false);
 
-    // Sync with controller data initially, but allow local optimization updates
     useEffect(() => {
         if (initialTasks) setTasks(initialTasks);
     }, [initialTasks]);
@@ -22,14 +23,21 @@ export default function TasksPage() {
     const createTask = async () => {
         if (!newTask.title.trim()) return;
 
+        // Haptic
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+
         try {
+            // Map Priority to Int
+            const pMap: Record<string, number> = { 'low': 2, 'medium': 5, 'high': 8 };
+
             const { data, error } = await supabase
                 .from('trinity_tasks')
                 .insert([{
                     title: newTask.title,
                     description: newTask.description,
-                    priority: newTask.priority,
-                    status: 'pending', // map 'todo' to 'pending' if schema differs, assuming 'pending' in our DB
+                    priority: pMap[newTask.priority] || 5, // Store as Int
+                    status: 'pending',
+                    task_type: 'manual',
                     created_at: new Date().toISOString()
                 }])
                 .select()
@@ -41,22 +49,23 @@ export default function TasksPage() {
                 setTasks([data as unknown as TaskRecord, ...tasks]);
                 setNewTask({ title: '', description: '', priority: 'medium' });
                 setShowNewTaskForm(false);
-                refresh(); // Sync global state
+                refresh();
+                showToast('Task Created', 'success');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating task:', error);
+            showToast('Failed to create task', 'error');
         }
     };
 
     const updateTaskStatus = async (taskId: string, newStatus: string) => {
-        // status mapping: kanban cols (todo, in-progress, done, failed) -> db status
-        // assume db uses: pending, in_progress, completed, failed
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(5);
+
         let dbStatus = newStatus;
         if (newStatus === 'todo') dbStatus = 'pending';
         if (newStatus === 'done') dbStatus = 'completed';
         if (newStatus === 'in-progress') dbStatus = 'in_progress';
 
-        // Optimistic Update
         setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status: dbStatus } : t)));
 
         try {
@@ -68,53 +77,66 @@ export default function TasksPage() {
             if (error) throw error;
             refresh();
         } catch (error) {
-            console.error('Error updating task:', error);
-            refresh(); // Revert on error
+            refresh();
+            showToast('Failed to update status', 'error');
         }
     };
 
     const deleteTask = async (taskId: string) => {
         if (!confirm('Are you sure you want to delete this task?')) return;
 
-        // Optimistic Delete
+        // Haptic on Delete
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([20, 50]);
+
         setTasks(tasks.filter((t) => t.id !== taskId));
 
         try {
             const { error } = await supabase.from('trinity_tasks').delete().eq('id', taskId);
             if (error) throw error;
             refresh();
+            showToast('Task Deleted', 'info');
         } catch (error) {
             console.error('Error deleting task:', error);
             refresh();
+            showToast('Failed to delete task', 'error');
         }
     };
 
     const getTasksByStatus = (status: string) => {
-        // Map UI status to DB status
         let dbStatus = [status];
         if (status === 'todo') dbStatus = ['pending'];
         if (status === 'in-progress') dbStatus = ['in_progress', 'running'];
         if (status === 'done') dbStatus = ['completed', 'success'];
 
-        return tasks.filter((task) => dbStatus.includes(task.status));
+        return tasks
+            .filter((task) => dbStatus.includes(task.status))
+            .sort((a, b) => {
+                // Sort by Priority Descending (High > Low)
+                const pA = typeof a.priority === 'number' ? a.priority : 5;
+                const pB = typeof b.priority === 'number' ? b.priority : 5;
+                if (pB !== pA) return pB - pA;
+
+                // Then by Date Descending (Newer first)
+                return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+            });
     };
 
     const getPriorityColor = (priority: any) => {
         let p = 'medium';
-
-        // Handle Number Priority (Legacy/Agent Schema: 1-100)
+        // Handle Number or String priority from DB
         if (typeof priority === 'number') {
-            if (priority >= 70) p = 'high';
-            else if (priority >= 30) p = 'medium';
+            if (priority >= 8) p = 'high';
+            else if (priority >= 5) p = 'medium';
             else p = 'low';
         } else if (typeof priority === 'string') {
             p = (priority || 'medium').toLowerCase();
+            // Handle legacy Agent priority (0-100)
+            if (priority === 'critical') p = 'high';
         }
 
         switch (p) {
             case 'high':
-            case 'critical':
-                return 'border-red-500/50 bg-red-500/10';
+                return 'border-red-500/50 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.1)]'; // Added Priority Shadow
             case 'medium':
                 return 'border-yellow-500/50 bg-yellow-500/10';
             case 'low':
@@ -126,7 +148,7 @@ export default function TasksPage() {
 
     const columns = [
         { id: 'todo', title: 'To Do', icon: Clock, color: 'violet' },
-        { id: 'in-progress', title: 'Running', icon: AlertCircle, color: 'cyan' }, // Changed title to Running to match agent context
+        { id: 'in-progress', title: 'Running', icon: AlertCircle, color: 'cyan' },
         { id: 'done', title: 'Done', icon: CheckCircle, color: 'green' },
         { id: 'failed', title: 'Failed', icon: XCircle, color: 'red' },
     ];
@@ -148,7 +170,7 @@ export default function TasksPage() {
                 </button>
             </div>
 
-            {/* New Task Form - Design Port */}
+            {/* New Task Form */}
             {showNewTaskForm && (
                 <div className="glass rounded-xl p-6 border border-violet-500/30 glow-violet">
                     <h3 className="text-lg font-bold mb-4">Create New Task</h3>
@@ -178,7 +200,7 @@ export default function TasksPage() {
                             <select
                                 value={newTask.priority}
                                 onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                                className="px-4 py-2 glass-light rounded-lg border border-white/10 focus:border-violet-500/50 outline-none transition-colors text-gray-200 bg-[#0B0B0F]" // Added bg color for dropdown visibility
+                                className="px-4 py-2 glass-light rounded-lg border border-white/10 focus:border-violet-500/50 outline-none transition-colors text-gray-200 bg-[#0B0B0F]"
                             >
                                 <option value="low">Low</option>
                                 <option value="medium">Medium</option>
@@ -212,8 +234,6 @@ export default function TasksPage() {
                     return (
                         <div key={column.id} className="glass rounded-xl p-4 border border-white/10 min-w-[280px]">
                             <div className="flex items-center gap-2 mb-4">
-                                {/* Lucide icons don't support dynamic color classes like text-${color}-400 in JIT if not safe-listed, using style or explicit classes */}
-                                {/* Mapping colors explicitly */}
                                 <div className={`p-2 rounded-lg bg-${column.color}-500/10`}>
                                     <Icon className={`w-5 h-5 text-${column.color}-400`} style={{ color: column.id === 'todo' ? '#a78bfa' : column.id === 'in-progress' ? '#22d3ee' : column.id === 'done' ? '#4ade80' : '#f87171' }} />
                                 </div>
@@ -250,11 +270,13 @@ export default function TasksPage() {
                                             </div>
 
                                             <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${task.priority === 'high' ? 'text-red-400 bg-red-400/10' :
-                                                    task.priority === 'low' ? 'text-blue-400 bg-blue-400/10' :
-                                                        'text-yellow-400 bg-yellow-400/10'
+                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${(typeof task.priority === 'number' && task.priority >= 8) || task.priority === 'high' ? 'text-red-400 bg-red-400/10' :
+                                                        (typeof task.priority === 'number' && task.priority <= 3) || task.priority === 'low' ? 'text-blue-400 bg-blue-400/10' :
+                                                            'text-yellow-400 bg-yellow-400/10'
                                                     }`}>
-                                                    {task.priority || 'MEDIUM'}
+                                                    {typeof task.priority === 'number'
+                                                        ? (task.priority >= 8 ? 'HIGH' : task.priority >= 5 ? 'MEDIUM' : 'LOW')
+                                                        : (task.priority || 'MEDIUM')}
                                                 </span>
 
                                                 <div className="flex items-center gap-2">
@@ -270,9 +292,9 @@ export default function TasksPage() {
                                                     )}
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                                                        className="text-gray-600 hover:text-red-400 transition-colors p-1"
+                                                        className="text-gray-600 hover:text-white hover:bg-red-500/20 transition-all p-1.5 rounded-md"
                                                     >
-                                                        <XCircle className="w-3.5 h-3.5" />
+                                                        <XCircle className="w-4 h-4" />
                                                     </button>
                                                 </div>
                                             </div>

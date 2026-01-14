@@ -545,7 +545,9 @@ export class ConstitutionalAgent {
                 ? `\n\n[SUPREME DIRECTIVE]: ${this.systemPrompt}\n`
                 : `\n\n[DEFAULT PERSONA]: You are ${this.wisdom.role}. Virtue: ${this.wisdom.primaryVirtue}.`;
 
-            const prompt = `${enrichedDescription}${directive}${iterateProtocol}\n\nTask: ${task.title}\nRole: ${this.name}`;
+            const actionDirective = `\n\n[ACTION REQUIRED]: DO NOT just plan. EXECUTE the task. Use your tools (write_file, research) to create tangible artifacts. Output must include [Artifact: filename] if created.`;
+
+            const prompt = `${enrichedDescription}${directive}${actionDirective}${iterateProtocol}\n\nTask: ${task.title}\nRole: ${this.name}`;
 
             // Call LLM
             const result = await this.callLLM(prompt);

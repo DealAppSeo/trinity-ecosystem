@@ -3,6 +3,7 @@ import { FileSystemMCP } from './servers/FileSystemMCP';
 import { PuppeteerMCP } from './servers/PuppeteerMCP';
 import { FigmaMCP } from './servers/FigmaMCP';
 import { TavilyMCP } from './servers/TavilyMCP';
+import { SupabaseMCP } from './servers/SupabaseMCP';
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -15,6 +16,7 @@ export class MCPManager {
         this.registerServer(new PuppeteerMCP());
         this.registerServer(new FigmaMCP());
         this.registerServer(new TavilyMCP());
+        this.registerServer(new SupabaseMCP());
     }
 
     registerServer(server: MCPServer) {
@@ -53,7 +55,7 @@ export class MCPManager {
 
         // Define Role-to-Server Mappings
         const accessMap: Record<string, string[]> = {
-            'CMO_SQUAD': ['AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Puppeteer'],
+            'CMO_SQUAD': ['AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Puppeteer', 'Supabase'],
             'CDO_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Puppeteer'],
             'CTO_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem'],
             'ORCHESTRATOR': ['ALL']

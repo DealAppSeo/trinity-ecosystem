@@ -11,7 +11,9 @@ import {
     PlusCircle,
     Cpu,
     Layers,
-    Activity
+    Activity,
+    Lightbulb,
+    LayoutGrid
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,8 +26,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     const navItems = [
         { path: '/pulse/dashboard', icon: Home, label: 'Dashboard' },
-        { path: '/pulse/agents', icon: Users, label: 'Agents' },
         { path: '/pulse/tasks', icon: CheckSquare, label: 'Tasks' },
+        { path: '/pulse/directives', icon: Lightbulb, label: 'Ideas' }, // New
+        { path: '/pulse/agents', icon: Users, label: 'Agents' },
+        { path: '/pulse/sandbox', icon: LayoutGrid, label: 'Apps' }, // New
         { path: '/pulse/artifacts', icon: Package, label: 'Artifacts' },
         { path: '/pulse/wisdom', icon: Layers, label: 'Governance' },
         { path: '/pulse/watch', icon: Activity, label: 'Public View' },

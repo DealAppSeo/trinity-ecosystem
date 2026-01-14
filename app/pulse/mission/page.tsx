@@ -11,6 +11,8 @@ import { useTrinityController } from '@/hooks/useTrinityController'; // Trigger 
 export default function NewMissionPage() {
     const router = useRouter();
     const { refresh } = useTrinityController();
+    const { showToast } = useToast(); // Global Feedback Hook
+
     const [formData, setFormData] = useState({
         name: '',
         objective: '',
@@ -24,13 +26,15 @@ export default function NewMissionPage() {
         e.preventDefault();
         setLoading(true);
 
+        // Haptic Feedback (Start)
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+
         try {
             // Map priority string to integer
             const priorityMap: Record<string, number> = { 'low': 2, 'medium': 5, 'high': 8 };
             const priorityInt = priorityMap[formData.priority] || 5;
 
             // Create high-level task representing the mission
-            // Note: DB schema might not have 'metadata', so we append config to description
             const configSummary = `\n\n[Mission Config]\nSwarm Size: ${formData.swarmSize}\nBudget: $${formData.budget}\nType: mission_deployment`;
 
             const { data, error } = await supabase
@@ -41,8 +45,6 @@ export default function NewMissionPage() {
                     priority: priorityInt,
                     status: 'pending',
                     task_type: 'mission',
-                    // Remove metadata field to be safe against schema mismatch
-                    // metadata: JSON.stringify({...}), 
                     created_at: new Date().toISOString()
                 }])
                 .select()
@@ -58,13 +60,20 @@ export default function NewMissionPage() {
                 created_at: new Date().toISOString()
             }]);
 
-            refresh(); // Update global state
-            // alert('Mission deployed successfully!'); // Modern apps skip alerts
-            router.push('/pulse/tasks');
+            refresh();
 
-        } catch (error) {
+            // UX Enhancement: Toast + Delay + Redirect
+            showToast('Mission Deployed Successfully! Swarm Activating...', 'success');
+
+            setTimeout(() => {
+                router.push('/pulse/tasks');
+            }, 1500);
+
+        } catch (error: any) {
             console.error('Error deploying mission:', error);
-            alert('Failed to deploy mission');
+            showToast(`Failed to deploy: ${error.message || 'Unknown Error'}`, 'error');
+            // Haptic Error
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([50, 50, 50]);
         } finally {
             setLoading(false);
         }

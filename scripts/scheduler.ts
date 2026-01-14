@@ -43,7 +43,7 @@ async function runScheduler() {
 
         // Only seed if queue is empty or very low to prevent spam
         if (count === 0) {
-            console.log("🌑 Queue Empty. Seeding North Star Strategy Task...");
+            console.log("🌑 Queue Empty. Running Opportunity Auctions (Bidder System)...");
 
             // 1. Get North Star (Simulated for now, could be from trinity_stats)
             const northStar = "Ensure System Homeostasis and Growth";
@@ -61,7 +61,31 @@ async function runScheduler() {
             });
             console.log(`🌱 Seeded: Strategy Task for Sophia`);
         } else {
-            console.log("🌖 Swarm Active. Monitoring...");
+            console.log("🌖 Swarm Active. Checking for Auction Opportunities...");
+
+            // HYBRID BIDDER LOGIC
+            // Find tasks pending for > 10m (stuck) OR unassigned
+            // In a real swarm, we'd check created_at. Here we just grab 1 unassigned to demonstrate.
+
+            const { data: auctionableTasks } = await supabase
+                .from('trinity_tasks')
+                .select('*')
+                .eq('status', 'pending')
+                .is('assigned_to', null) // Only unassigned tasks need auction
+                .limit(1);
+
+            if (auctionableTasks && auctionableTasks.length > 0) {
+                const task = auctionableTasks[0];
+                console.log(`[SCHEDULER] 🔨 Triggering Auction for Task: ${task.title}`);
+
+                try {
+                    // Dynamic Import for Bidder to avoid build-time issues in scripts
+                    const { runArbitrageAuction } = await import('../lib/bidder');
+                    await runArbitrageAuction(task, 'execute');
+                } catch (e: any) {
+                    console.error(`[SCHEDULER] Auction Failed: ${e.message}`);
+                }
+            }
         }
 
         // Hybrid Trigger: Verify "Stuck" tasks (older than 24h) and reset them
