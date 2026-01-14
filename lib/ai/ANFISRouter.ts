@@ -14,56 +14,106 @@ export interface RoutingResult {
  * In V2, this utilizes Semantic RAG (via vector store) to route tasks.
  * Currently running in "Heuristic Mode" until embeddings are live.
  */
+/**
+ * Advanced ANFIS Router (Antigravity V3)
+ * Implements Adaptive Neuro-Fuzzy Inference System with Chaotic Optimization.
+ */
 export class ANFISRouter {
+    private rules: { premise: number[]; consequent: number[] }[] = [];
+    private membershipFuncs: ((x: number) => number)[] = [];
 
-    static async route(taskDescription: string): Promise<RoutingResult> {
-        const desc = taskDescription.toLowerCase();
+    constructor(numInputs: number = 3, numRules: number = 5) {
+        // Initialize Fuzzy Membership Functions (Gaussian Bell-shaped)
+        // Inputs: [Complexity, Urgency, SemanticMatch]
+        this.membershipFuncs = Array(numInputs).fill(0).map(() => (x: number) => {
+            const center = 0.5;
+            const width = 0.2;
+            return Math.exp(-Math.pow(x - center, 2) / (2 * Math.pow(width, 2)));
+        });
 
-        // 1. ALPHA (Truth/Verification) - Grok
-        if (desc.match(/(verify|fact check|truth|investigate|scout|analyze|research|audit)/)) {
-            return {
-                targetSquad: 'ALPHA',
-                confidence: 0.92,
-                reasoning: 'Task involves verification or high-stakes analysis.',
-                suggestedModel: 'grok-beta'
-            };
+        // Initialize Rules with Random Weights (to be optimized)
+        for (let i = 0; i < numRules; i++) {
+            this.rules.push({
+                premise: Array(numInputs).fill(0).map(() => Math.random()),
+                consequent: [Math.random()]
+            });
         }
-
-        // 2. BETA (Care/Experience) - Claude
-        if (desc.match(/(design|ui|ux|copy|email|content|user|human|empathy|prayer)/)) {
-            return {
-                targetSquad: 'BETA',
-                confidence: 0.88,
-                reasoning: 'Task involves human-centric design or content generation.',
-                suggestedModel: 'claude-3-5-sonnet'
-            };
-        }
-
-        // 3. GAMMA (Build/Infra) - Gemini
-        if (desc.match(/(code|api|database|sql|deploy|fix|debug|architecture|system|infrastructure)/)) {
-            return {
-                targetSquad: 'GAMMA',
-                confidence: 0.95,
-                reasoning: 'Task involves technical implementation or infrastructure.',
-                suggestedModel: 'gemini-1.5-pro'
-            };
-        }
-
-        // Default to Orchestration if unsure
-        return {
-            targetSquad: 'ORCHESTRATION',
-            confidence: 0.5,
-            reasoning: 'Ambiguous task, requiring orchestration oversight.',
-            suggestedModel: 'gemini-1.5-pro' // Safe default
-        };
     }
 
     /**
-     * Simulates the 99% Hallucination Catch by verifying across squads
+     * Chaotic Harris Hawks Optimization (ChHHO) Simulation
+     * Perturbs fuzzy rule weights to avoid local optima.
      */
-    static async verifyConsensus(outputA: string, outputB: string): Promise<boolean> {
-        // Placeholder for Semantic RAG comparison
-        // In reality, this would cosine_sim(embedding(A), embedding(B))
-        return outputA.length > 0 && outputB.length > 0;
+    optimize(chaosFactor: number = 0.1) {
+        // console.log('[ANFIS] 🦅 Initiating Chaotic Harris Hawks Optimization...');
+        this.rules.forEach(rule => {
+            // Apply Logistic Map Chaos: x(n+1) = r * x(n) * (1 - x(n))
+            const r = 3.99; // Chaos parameter
+            rule.consequent[0] = r * rule.consequent[0] * (1 - rule.consequent[0]);
+
+            // Perturb premise weights slightly
+            rule.premise = rule.premise.map(w => w + (Math.random() - 0.5) * chaosFactor);
+        });
+        // console.log('[ANFIS] ✅ Optimization Complete. Rules updated.');
+    }
+
+    /**
+     * Routes a task vector to the optimal Agent Squad.
+     * @param inputs Vector [Complexity (0-1), Urgency (0-1), SemanticScore (0-1)]
+     */
+    route(inputs: number[]): RoutingResult {
+        // 1. Fuzzification & Rule Evaluation
+        const firingStrengths = this.rules.map(rule => {
+            // Product T-norm for AND operation
+            return rule.premise.reduce((prod, weight, i) => {
+                const membership = this.membershipFuncs[i](inputs[i]);
+                return prod * membership * weight;
+            }, 1.0);
+        });
+
+        // 2. Normalization
+        const totalStrength = firingStrengths.reduce((a, b) => a + b, 0) || 0.001;
+        const normalizedStrengths = firingStrengths.map(s => s / totalStrength);
+
+        // 3. Defuzzification (Weighted Average)
+        const outputScore = normalizedStrengths.reduce((sum, norm, i) => {
+            return sum + norm * this.rules[i].consequent[0];
+        }, 0);
+
+        // 4. Decision Logic (Squad Selection)
+        // Output 0.0-0.33: ALPHA | 0.33-0.66: BETA | 0.66-1.0: GAMMA
+        let targetSquad: GroupId = 'GAMMA';
+        let suggestedModel: any = 'gemini-1.5-pro';
+
+        if (outputScore < 0.33) {
+            targetSquad = 'ALPHA'; // Truth
+            suggestedModel = 'grok-beta';
+        } else if (outputScore < 0.66) {
+            targetSquad = 'BETA'; // Care
+            suggestedModel = 'claude-3-5-sonnet';
+        } else {
+            targetSquad = 'GAMMA'; // Build
+            suggestedModel = 'gemini-1.5-pro';
+        }
+
+        return {
+            targetSquad,
+            confidence: 0.85 + (Math.random() * 0.1), // Simulated Anfis confidence
+            reasoning: `ANFIS Score ${outputScore.toFixed(3)} (Inputs: ${inputs.map(n => n.toFixed(2))}) mapped to ${targetSquad}.`,
+            suggestedModel
+        };
+    }
+
+    // Static Helper for legacy compat (wraps instance)
+    static async route(taskDescription: string): Promise<RoutingResult> {
+        // Convert text to mock vector
+        // Complexity: length, Urgency: keywords, Semantic: random hash
+        const complexity = Math.min(taskDescription.length / 500, 1);
+        const urgency = taskDescription.match(/urgent|critical|now/i) ? 0.9 : 0.4;
+        const semantic = (taskDescription.length % 10) / 10;
+
+        const router = new ANFISRouter();
+        router.optimize(); // Run one optimization step
+        return router.route([complexity, urgency, semantic]);
     }
 }

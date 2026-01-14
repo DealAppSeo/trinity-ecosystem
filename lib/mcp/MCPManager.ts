@@ -136,6 +136,26 @@ export class MCPManager {
         }
         return status;
     }
+    // ==========================================
+    // ANTHROPIC MCP PROTOCOL COMPATIBILITY LAYER
+    // ==========================================
+
+    async discover(): Promise<string[]> {
+        const tools = await this.listTools();
+        return tools.map(t => t.name);
+    }
+
+    async startSession(): Promise<{ id: string, startTime: string }> {
+        return {
+            id: `sess-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            startTime: new Date().toISOString()
+        };
+    }
+
+    async invoke(request: { tool: string; params?: any; sessionId?: string }): Promise<any> {
+        console.log(`[MCP] Invoking ${request.tool} (Session: ${request.sessionId || 'none'})...`);
+        return this.routeToolCall(request.tool, request.params || {});
+    }
 }
 
 // Singleton Instance

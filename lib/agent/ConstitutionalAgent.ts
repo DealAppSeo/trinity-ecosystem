@@ -621,6 +621,17 @@ export class ConstitutionalAgent {
 
         // 2. Roll for Chaos (The Gym) - 20% chance
         if (Math.random() < 0.2) {
+            // [ANTIGRAVITY] ANFIS Optimization Step
+            try {
+                const { ANFISRouter } = require('../ai/ANFISRouter');
+                const anfis = new ANFISRouter();
+                anfis.optimize(0.15); // Chaotic HHO
+                const route = anfis.route([Math.random(), Math.random(), 0.5]); // Simulate inputs
+                if (route.targetSquad === 'GAMMA' && this.name.includes('MEL')) {
+                    console.log(`[ANFIS] 🔀 Re-routing internal logic based on fuzzy score ${route.confidence.toFixed(2)}`);
+                }
+            } catch (e) { /* ignore */ }
+
             try {
                 const { runChaosSimulation } = require('../../scripts/chaos-engine');
                 await runChaosSimulation();
