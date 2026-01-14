@@ -21,7 +21,6 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
     const role = group?.focus.split(' - ')[0] || 'Autonomous Agent';
 
     // Calculate simple uptime string (mock logic for now, or relative time)
-    const lastHeartbeat = agent.lastHeartbeat ? new Date(agent.lastHeartbeat) : null;
     let uptimeDisplay = '0h';
     if (lastHeartbeat) {
         const diffMs = Date.now() - lastHeartbeat.getTime();
