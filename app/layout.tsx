@@ -37,11 +37,13 @@ export default function RootLayout({
       </head>
       <body className="font-display antialiased pt-16 pb-16 md:pb-0">
         <ToastProvider>
-          <Gatekeeper />
-          <MockBanner />
-          <NavBar />
-          {children}
-          <MobileNav />
+          <GlobalErrorBoundary>
+            <Gatekeeper />
+            <MockBanner />
+            <NavBar />
+            {children}
+            <MobileNav />
+          </GlobalErrorBoundary>
         </ToastProvider>
       </body>
     </html>
