@@ -18,35 +18,35 @@ const EVERGREEN_TASKS = [
         title: "Artifact Generator: Cycle A",
         description: "Scan pending missions and create 1 document or report artifact. You MUST use the saveArtifact tool to write to the DB. Output format: Markdown.",
         status: "pending",
-        priority: "critical",
+        priority: 9, // Critical
         task_type: "EVERGREEN"
     },
     {
         title: "Code Optimizer: Core Logic",
         description: "Review internal logs and produce an optimized code artifact (e.g. 'ConstitutionalAgent_Optimized.ts'). Post to DB using saveArtifact.",
         status: "pending",
-        priority: "high",
+        priority: 8, // High
         task_type: "EVERGREEN"
     },
     {
         title: "Design Auditor: Swarm Structure",
         description: "Generate a design artifact (Mermaid diagram or text description) auditing the current swarm structure. Store in DB via saveArtifact.",
         status: "pending",
-        priority: "high",
+        priority: 8, // High
         task_type: "EVERGREEN"
     },
     {
         title: "Web3 Integrator: HyperDAG Log",
         description: "Create a report on HyperDAG interactions. Hash the content and post to DB as an artifact.",
         status: "pending",
-        priority: "medium",
+        priority: 5, // Medium
         task_type: "EVERGREEN"
     },
     {
         title: "Permission Auditor: Governance Report",
         description: "Review current DB permissions (mock) and generate a 'Governance Report' artifact. Save to DB.",
         status: "pending",
-        priority: "medium",
+        priority: 5, // Medium
         task_type: "EVERGREEN"
     }
 ];
