@@ -93,4 +93,21 @@ async function runHealer() {
 }
 
 // Run immediately
+// Run immediately
 runHealer().catch(console.error);
+
+// ==========================================
+// V2.2 UPGRADE: DEPLOYMENT HEALER (BETA)
+// ==========================================
+async function healDeployment() {
+    console.log('🏗️  Deployment Healer Active...');
+    // In strict mode, we would query the Railway API here.
+    // Since we don't have the SDK yet, we simulate a check or look for DB signals.
+
+    // Future Implementation:
+    // const logs = await fetchRailwayLogs();
+    // if (logs.includes('.next')) await logDeploymentError(logs);
+
+    console.log('   (Deployment Monitoring is currently manual via User Reports)');
+}
+healDeployment().catch(console.error);
