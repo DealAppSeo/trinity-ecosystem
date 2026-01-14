@@ -238,7 +238,7 @@ export default function WisdomPage() {
                             <Activity className="w-6 h-6" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold">{agents.length}</div>
+                            <div className="text-2xl font-bold">{agents.filter(a => a.status === 'active').length}</div>
                             <div className="text-xs text-blue-200">Active Agents</div>
                         </div>
                     </div>

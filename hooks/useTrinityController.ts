@@ -20,10 +20,19 @@ export const useTrinityController = () => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
 
-            const res = await fetch(`${baseUrl}/`, { signal: controller.signal }).catch(() => null);
+            const res = await fetch(`${baseUrl}/`, { signal: controller.signal }).catch((err) => {
+                console.warn(`[PyBrain] Connection Failed to ${baseUrl}:`, err);
+                return null;
+            });
             clearTimeout(timeoutId);
 
-            setBrainStatus(res?.ok ? 'online' : 'offline');
+            if (res?.ok) {
+                // console.log('[PyBrain] Online');
+                setBrainStatus('online');
+            } else {
+                // console.warn('[PyBrain] Offline (Status or Net)', res?.status);
+                setBrainStatus('offline');
+            }
         } catch (e) {
             setBrainStatus('offline');
         }
@@ -66,11 +75,17 @@ export const useTrinityController = () => {
                 // Determine Status: If heartbeat is recent (< 30s), active. Else offline.
                 // Or use the status column if reliable.
                 const shortName = agent.agent_name.replace('trinity-', '').toUpperCase();
-                const matchedHeartbeat = heartbeatData?.find(h =>
+
+                // FIND BEST HEARTBEAT (Handle Aliases & Prevent Stale Shadowing)
+                const candidateHeartbeats = (heartbeatData || []).filter((h: any) =>
                     h.agent === agent.agent_name ||
                     h.agent === shortName ||
                     h.agent === `trinity-${shortName.toLowerCase()}`
                 );
+
+                // Sort by recency (newest first)
+                candidateHeartbeats.sort((a: any, b: any) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
+                const matchedHeartbeat = candidateHeartbeats[0];
 
                 /* DEBUG: Offline Investigation */
                 if (agent.agent_name === 'trinity-hdm') {
