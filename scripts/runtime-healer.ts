@@ -1,152 +1,99 @@
-
 import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-import { smartLLM } from '../lib/llm';
-import { computeAnfisScore } from '../lib/anfis';
+import dotenv from 'dotenv';
+import path from 'path';
 
-// Trusted Service Client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-async function runHealer() {
-    console.log('🩺 Trinity Healer (v2.1 - AI Enhanced) Starting...');
+async function runtimeHealer() {
+    console.log('🚑 Trinity Runtime Healer Activating...');
 
-    // 1. Fetch Status of Memory
+    // 1. Fetch Pending Errors
     const { data: errors, error } = await supabase
         .from('trinity_runtime_errors')
         .select('*')
         .eq('status', 'pending')
-        .limit(5);
+        .limit(10);
 
     if (error) {
-        console.error('❌ Failed to fetch errors:', error.message);
+        console.error('❌ Failed to fetch errors:', error);
         return;
     }
 
     if (!errors || errors.length === 0) {
-        console.log('✅ No pending wounds found. Cluster healthy.');
+        console.log('✅ No pending runtime errors. System healthy.');
         return;
     }
 
-    console.log(`🩹 Found ${errors.length} injuries. Beginning Triage...`);
+    console.log(`⚠️ Found ${errors.length} pending errors. Analyzing...`);
 
-    for (const err of errors) {
-        console.log(`\n🔍 Analyzing Error [${err.id}]: ${err.error_message?.substring(0, 50)}...`);
+    // 2. Group & Analyze
+    const groupedErrors: Record<string, typeof errors> = {};
+    errors.forEach(err => {
+        const key = err.error_message || 'Unknown Error';
+        if (!groupedErrors[key]) groupedErrors[key] = [];
+        groupedErrors[key].push(err);
+    });
 
-        // 2. ANFIS SCORING (Triage)
-        // Hardcoded frequency for now (v2.2 will query history)
-        const mockFrequency = Math.random() < 0.2 ? 0.8 : 0.1;
-        // Estimate severity from keywords
-        let severity = 0.3;
-        const msg = (err.error_message || '').toLowerCase();
-        if (msg.includes('fatal') || msg.includes('crash') || msg.includes('connection')) severity = 0.9;
-        if (msg.includes('undefined') || msg.includes('null')) severity = 0.6;
+    for (const [msg, group] of Object.entries(groupedErrors)) {
+        console.log(`\n🔍 Analyzing Cluster: "${msg}" (${group.length} occurrences)`);
 
-        const anfisResult = computeAnfisScore({ severity, frequency: mockFrequency, complexity: 0.5 });
-        console.log(`🧠 ANFIS Score: ${anfisResult.priorityScore.toFixed(1)} -> Action: ${anfisResult.action} (${anfisResult.explanation})`);
+        // Context
+        const sample = group[0];
+        const stack = sample.stack_trace ? sample.stack_trace.substring(0, 500) : 'No stack';
 
-        if (anfisResult.action === 'IGNORE') {
-            console.log('⏩ Skipping minor issue.');
-            await supabase.from('trinity_runtime_errors').update({ status: 'ignored', resolution_notes: anfisResult.explanation }).eq('id', err.id);
-            continue;
+        // Diagnosis Logic (Simulated AI for now, can be hooked to LLM)
+        let diagnosis = 'Unknown cause.';
+        let prescription = 'Investigate manually.';
+        let severity = 'low';
+
+        if (msg.includes('toLowerCase')) {
+            diagnosis = 'Type Error: Attempting to call string method on non-string value.';
+            prescription = 'Wrap variable in String() or check for null/undefined before calling .toLowerCase().';
+            severity = 'high';
+        } else if (msg.includes('fetch') || msg.includes('network')) {
+            diagnosis = 'Network Error: API or Resource unreachable.';
+            prescription = 'Check network connectivity, CORS settings, or API endpoint status.';
+            severity = 'medium';
         }
 
-        // 3. LLM DIAGNOSIS (The Brain)
-        console.log('💊 Requesting AI Diagnosis...');
-        const prompt = `
-        APPLICATION ERROR REPORT:
-        Message: ${err.error_message}
-        Stack Trace: ${err.component_stack}
-        URL: ${err.url}
+        console.log(`   🔸 Diagnosis: ${diagnosis}`);
+        console.log(`   🔸 Prescription: ${prescription}`);
 
-        TASK:
-        1. Analyze the root cause.
-        2. Propose a specific code fix.
-        3. Rate confidence (0-100%).
-        
-        Keep it concise.
-        `;
+        // 3. Take Action (Create Task for Gamma Squad)
+        if (severity === 'high' || group.length > 2) {
+            const { data: taskData, error: taskError } = await supabase
+                .from('trinity_tasks')
+                .insert([{
+                    title: `[AUTO-HEAL] Fix Runtime Error: ${msg.substring(0, 50)}...`,
+                    description: `**Runtime Healer Analysis**\n\n**Error**: ${msg}\n**Occurrences**: ${group.length}\n**Diagnosis**: ${diagnosis}\n**Prescription**: ${prescription}\n**Stack Trace**: \`\`\`\n${stack}\n\`\`\``,
+                    priority: 9, // Critical
+                    status: 'pending',
+                    task_type: 'self-healing',
+                    assigned_to: 'trinity-hdm' // Assign to Healer/Builder
+                }])
+                .select()
+                .single();
 
-        const llmResult = await smartLLM({
-            systemPrompt: "You are Trinity Healer, an expert TypeScript engineer specialized in Next.js and Supabase.",
-            userPrompt: prompt
-        });
+            if (taskError) {
+                console.error('   ❌ Failed to create healing task:', taskError.message);
+            } else {
+                console.log(`   ✅ Healing Task Created: ${taskData.title} (ID: ${taskData.id})`);
 
-        const fixProposal = llmResult.output;
-        console.log(`💡 AI Proposal: ${fixProposal.substring(0, 100)}...`);
-
-        // 4. Update Memory
-        await supabase
-            .from('trinity_runtime_errors')
-            .update({
-                status: 'analyzed',
-                resolution_notes: `[ANFIS:${anfisResult.action}] [AI_FIX]: ${fixProposal}`,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', err.id);
-
-        console.log('✅ Diagnosis logged to Memory.');
+                // 4. Mark Errors as 'processing'
+                const ids = group.map(e => e.id);
+                await supabase
+                    .from('trinity_runtime_errors')
+                    .update({ status: 'processing' })
+                    .in('id', ids);
+            }
+        }
     }
 }
 
-// Run immediately
-// Run immediately
-runHealer().catch(console.error);
-
-// ==========================================
-// V2.2 UPGRADE: DEPLOYMENT HEALER (BETA)
-// ==========================================
-async function healDeployment() {
-    console.log('🏗️  Deployment Healer Active...');
-
-    // 1. Check for Reports in DB (Pushed by Scout or Human)
-    const { data: errors } = await supabase
-        .from('trinity_deployment_errors')
-        .select('*')
-        .eq('status', 'pending');
-
-    if (!errors || errors.length === 0) {
-        // console.log('   (No pending deployment errors)'); // Quiet mode
-        return;
-    }
-
-    console.log(`🩹 Found ${errors.length} deployment failures. analyzing...`);
-
-    for (const err of errors) {
-        console.log(`\n🔍 Analyzing Build Error [${err.id}]: ${err.error_message?.substring(0, 50)}...`);
-
-        // 2. AI Analysis
-        const prompt = `
-        DEPLOYMENT FAILURE REPORT:
-        Message: ${err.error_message}
-        Context: ${err.component_stack || 'N/A'}
-        
-        TASK:
-        1. Identify the root cause (e.g. Missing Env Var, TS Error, Docker config).
-        2. Propose a precise fix (Shell command, Code diff, or Config change).
-        3. Rate confidence (0-100%).
-        `;
-
-        const llmResult = await smartLLM({
-            systemPrompt: "You are a DevOps Specialist for Next.js/Railway deployments.",
-            userPrompt: prompt
-        });
-
-        const fixProposal = llmResult.output;
-        console.log(`💡 AI Proposal: ${fixProposal.substring(0, 100)}...`);
-
-        // 3. Log Result
-        await supabase
-            .from('trinity_deployment_errors')
-            .update({
-                status: 'analyzed',
-                resolution_notes: `[AI_FIX]: ${fixProposal}`,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', err.id);
-    }
-}
-healDeployment().catch(console.error);
+// Run immediately for now, can be loop
+runtimeHealer();
