@@ -639,7 +639,7 @@ export class ConstitutionalAgent {
                 description: `Analyze internal logs for bottlenecks.`,
                 task_type: 'research',
                 assigned_to: this.name,
-                priority: 10,
+                priority: 2, // Low priority (Background)
                 status: 'pending'
             });
         }
