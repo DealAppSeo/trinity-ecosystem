@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
+import { useTrinityController } from '@/hooks/useTrinityController'; // Added hook
 import { Card } from '@/components/ui/Card';
 import {
     BrainCircuit,
@@ -18,6 +19,7 @@ import { Toaster, toast } from 'sonner';
 
 // Client reused from lib/supabase (mock-safe)
 
+// Interface mostly covered by hook, but keeping local extends if needed or just use hook type
 interface AgentRecord {
     id: string;
     agent_name: string;
@@ -30,15 +32,22 @@ interface AgentRecord {
     suggested_prompt?: string;
     suggestion_confidence?: number;
     suggestion_accepted?: boolean;
-    updated_at?: string; // Added for liveness check
+    updated_at?: string;
     status?: string;
 }
 
 export default function WisdomPage() {
-    const [agents, setAgents] = useState<AgentRecord[]>([]);
-    const [loading, setLoading] = useState(true);
+    // UNIFIED CONTROLLER HOOK
+    const { agents: rawAgents, loading, systemStatus, refresh } = useTrinityController();
+
+    // Cast to local type if needed, or better yet, just use the hook's returned agents.
+    // The hook returns 'Active' status correctly calculated via heartbeat.
+    const agents = rawAgents as unknown as AgentRecord[];
+
     const [processingId, setProcessingId] = useState<string | null>(null);
-    const [brainStatus, setBrainStatus] = useState<'online' | 'offline'>('offline');
+
+    // Brain status now comes from hook
+    const brainStatus = systemStatus?.pyBrain ? 'online' : 'offline';
 
     // Agent Grouping Logic
     const getGroup = (name: string) => {
@@ -49,56 +58,13 @@ export default function WisdomPage() {
         return 'Operatives';
     };
 
-    // Check Brain Status
-    useEffect(() => {
-        const checkBrain = async () => {
-            try {
-                const baseUrl = process.env.NEXT_PUBLIC_TRINITY_SCIENCE_URL || 'http://localhost:8000';
-                const res = await fetch(`${baseUrl}/`);
-                if (res.ok) setBrainStatus('online');
-            } catch (e) {
-                setBrainStatus('offline');
-            }
-        };
-        checkBrain();
-        const interval = setInterval(checkBrain, 30000); // Check every 30s
-        return () => clearInterval(interval);
-    }, []);
-
-    // Real-time Sync
-    useEffect(() => {
-        fetchAgents();
-
-        const channel = supabase
-            .channel('public:trinity_agent_registry')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'trinity_agent_registry' }, (payload: any) => {
-                console.log('Real-time Wisdom Update:', payload);
-                fetchAgents();
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, []);
-
-    const fetchAgents = async () => {
-        const { data } = await supabase
-            .from('trinity_agent_registry')
-            .select('*')
-            .order('reputation_score', { ascending: false });
-
-        if (data) setAgents(data as any);
-        setLoading(false);
-    };
-
     // Benchmark Data
     const [benchmarks, setBenchmarks] = useState<any[]>([]);
     const fetchBenchmarks = async () => {
         const { data } = await supabase
             .from('trinity_tasks')
             .select('*')
-            //.eq('metadata->benchmark', 'true') // syntax depends on supabase js version/setup, using client filter for safety or specific ilike
+            //.eq('metadata->benchmark', 'true') // syntax depends on supabase js version/setup
             .ilike('title', '%[BENCHMARK-%')
             .order('created_at', { ascending: false })
             .limit(5);
@@ -143,17 +109,7 @@ export default function WisdomPage() {
         toast.promise(promise, {
             loading: 'Integrating Wisdom into Neural Network...',
             success: (data) => {
-                // Optimistic update
-                setAgents(current => current.map(a =>
-                    a.agent_name === agent.agent_name
-                        ? {
-                            ...a,
-                            system_prompt: agent.suggested_prompt || null,
-                            directive_source: 'human' as const,
-                            suggested_prompt: undefined
-                        }
-                        : a
-                ));
+                refresh(); // Refresh global state
                 setProcessingId(null);
                 return `Wisdom Integrated: ${agent.agent_name} Updated!`;
             },
@@ -184,11 +140,7 @@ export default function WisdomPage() {
         toast.promise(promise, {
             loading: 'Discarding Suggestion...',
             success: () => {
-                setAgents(current => current.map(a =>
-                    a.agent_name === agent.agent_name
-                        ? { ...a, suggested_prompt: undefined, suggestion_accepted: false }
-                        : a
-                ));
+                refresh(); // Refresh global state
                 setProcessingId(null);
                 return 'Suggestion Rejected';
             },

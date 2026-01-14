@@ -21,6 +21,7 @@ export const viewport: Viewport = {
 };
 
 import { ToastProvider } from "@/components/ui/Toast";
+import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 
 export default function RootLayout({
   children,

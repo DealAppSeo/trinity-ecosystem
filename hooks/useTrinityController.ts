@@ -11,10 +11,29 @@ export const useTrinityController = () => {
     const [heartbeats, setHeartbeats] = useState<any[]>([]);
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [brainStatus, setBrainStatus] = useState<'online' | 'offline'>('offline');
     const channelRef = useRef<any>(null);
+
+    const checkBrain = useCallback(async () => {
+        try {
+            const baseUrl = process.env.NEXT_PUBLIC_TRINITY_SCIENCE_URL || 'http://localhost:8000';
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+
+            const res = await fetch(`${baseUrl}/`, { signal: controller.signal }).catch(() => null);
+            clearTimeout(timeoutId);
+
+            setBrainStatus(res?.ok ? 'online' : 'offline');
+        } catch (e) {
+            setBrainStatus('offline');
+        }
+    }, []);
 
     const fetchData = useCallback(async () => {
         try {
+            // Check Brain concurrently
+            checkBrain();
+
             // Parallel Fetching for Speed
             const [
                 { data: agentData },
@@ -99,7 +118,7 @@ export const useTrinityController = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [checkBrain]);
 
     const createTask = async (title: string, priority: string = 'medium') => {
         await supabase.from('trinity_tasks').insert({
@@ -173,6 +192,9 @@ export const useTrinityController = () => {
         createTask,
         killRandomAgent,
         triggerChaosEvent,
-        refresh: fetchData
+        refresh: fetchData,
+        systemStatus: {
+            pyBrain: brainStatus === 'online'
+        }
     };
 };
