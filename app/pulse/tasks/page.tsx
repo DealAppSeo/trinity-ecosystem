@@ -121,29 +121,28 @@ export default function TasksPage() {
             });
     };
 
-    const getPriorityColor = (priority: any) => {
-        let p = 'medium';
-        // Handle Number or String priority from DB
-        if (typeof priority === 'number') {
-            if (priority >= 8) p = 'high';
-            else if (priority >= 5) p = 'medium';
-            else p = 'low';
-        } else {
-            // Fallback for string or unknown types - Force String conversion
-            p = String(priority || 'medium').toLowerCase();
-            // Handle legacy Agent priority (0-100)
-            if (String(priority) === 'critical') p = 'high';
-        }
+    const getPriorityColor = (rawPriority: any) => {
+        try {
+            // V3 NUCLEAR SAFETY FIX
+            if (rawPriority === null || rawPriority === undefined) return 'border-yellow-500/50 bg-yellow-500/10';
 
-        switch (p) {
-            case 'high':
-                return 'border-red-500/50 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.1)]'; // Added Priority Shadow
-            case 'medium':
+            // Handle Numbers directly first
+            if (typeof rawPriority === 'number') {
+                if (rawPriority >= 8) return 'border-red-500/50 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.1)]';
+                if (rawPriority <= 3) return 'border-blue-500/50 bg-blue-500/10';
                 return 'border-yellow-500/50 bg-yellow-500/10';
-            case 'low':
-                return 'border-blue-500/50 bg-blue-500/10';
-            default:
-                return 'border-gray-500/50 bg-gray-500/10';
+            }
+
+            // Force safe string conversion
+            const pStr = String(rawPriority);
+            const pLower = (pStr && typeof pStr.toLowerCase === 'function') ? pStr.toLowerCase() : 'medium';
+
+            if (pLower === 'high' || pLower === 'critical') return 'border-red-500/50 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.1)]';
+            if (pLower === 'low') return 'border-blue-500/50 bg-blue-500/10';
+
+            return 'border-yellow-500/50 bg-yellow-500/10';
+        } catch (e) {
+            return 'border-gray-500/50 bg-gray-500/10';
         }
     };
 
@@ -160,7 +159,7 @@ export default function TasksPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold mb-2">Mission Tasks</h2>
-                    <p className="text-gray-400 text-sm">Manage and track your swarm's objectives</p>
+                    <p className="text-gray-400 text-sm">Manage and track your swarm's objectives <span className="text-xs text-gray-600">(v3.1)</span></p>
                 </div>
                 <button
                     onClick={() => setShowNewTaskForm(!showNewTaskForm)}
