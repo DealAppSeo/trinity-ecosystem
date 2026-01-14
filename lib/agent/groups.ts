@@ -12,15 +12,17 @@ export interface AgentGroup {
     members: string[];
     survivor: string | null; // The designated survivor/DNA agent for this group
     description: string;
+    color?: string; // Added color property
 }
 
 export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
     ORCHESTRATION: {
         id: 'ORCHESTRATION',
         name: 'Orchestration (System Core)',
-        focus: 'Global Coordination & Justice',
-        leadAgent: 'MCP',
-        members: ['MCP', 'W3C', 'SHOFET', 'ANFIS_DEMO_BOT'],
+        leadAgent: 'TRINITY_ORCH',
+        members: ['TRINITY_ORCH', 'W3C', 'SHOFET', 'ANFIS_DEMO_BOT'],
+        focus: 'Orchestration - System Governance & Protocol Enforcement',
+        color: 'bg-violet-500',
         survivor: null,
         description: 'The central nervous system. Handles global routing, disputes (SHOFET), and web3 Consensus (W3C).'
     },
@@ -62,7 +64,7 @@ export function getGroupForAgent(agentName: string): AgentGroup | null {
     return null;
 }
 
-export const ORCHESTRATION_AGENTS = ['MCP', 'W3C', 'SHOFET'];
+export const ORCHESTRATION_AGENTS = ['TRINITY_ORCH', 'W3C', 'SHOFET'];
 
 export const SURVIVOR_AGENTS = ['TORCH', 'CHESED', 'SOPHIA'];
 
