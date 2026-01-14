@@ -986,7 +986,7 @@ export class ConstitutionalAgent {
                 .from('trinity_artifacts')
                 .insert({
                     task_id: safeTaskId,
-                    agent_name: this.name,
+                    // agent_name: this.name, // REMOVED: Column does not exist
                     title: safeTitle,
                     artifact_type: type || 'text',
                     content: content,
