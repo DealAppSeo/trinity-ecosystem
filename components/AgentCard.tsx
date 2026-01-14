@@ -43,7 +43,7 @@ export function AgentCard({ agent, isConductor = false, onAssignTask }: AgentCar
                 <div className="flex items-center gap-3 mb-2">
                     {/* Unified Heartbeat Logic: 2 Minutes */}
                     <StatusDot status={
-                        agent.lastHeartbeat && (Date.now() - new Date(agent.lastHeartbeat).getTime() < 120000)
+                        agent.last_heartbeat && (Date.now() - new Date(agent.last_heartbeat).getTime() < 120000)
                             ? 'online'
                             : 'offline'
                     } />
