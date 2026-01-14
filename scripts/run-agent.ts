@@ -56,22 +56,19 @@ async function startAgent() {
     // Railway requires the app to listen on PORT (usually 3000)
     const port = process.env.PORT || 3000;
 
-    const server = http.createServer((req: IncomingMessage, res: ServerResponse) => {
-        if (req.url === '/health' || req.url === '/') {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                status: 'online',
-                agent: finalAgentName,
-                time: new Date().toISOString()
-            }));
+    // Start Heal Server (Dynamic Port)
+    const PORT = 3000 + Math.floor(Math.random() * 1000);
+    const server = http.createServer((req, res) => {
+        if (req.url === '/health') {
+            res.writeHead(200);
+            res.end('OK');
         } else {
             res.writeHead(404);
             res.end();
         }
     });
-
-    server.listen(port, () => {
-        console.log(`[${finalAgentName}] 🌍 Health Server listening on port ${port}`);
+    server.listen(PORT, () => {
+        console.log(`[${finalAgentName}] 🌍 Health Server listening on port ${PORT}`);
     });
 
     // START MAIN AGENT LOOP
