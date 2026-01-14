@@ -121,12 +121,12 @@ export default function TasksPage() {
             });
     };
 
-    const getPriorityColor = (rawPriority: any) => {
+    const getTaskPriorityColorV2 = (rawPriority: any) => {
+        // V3.2 CACHE BUSTER & SAFETY FIX
         try {
-            // V3 NUCLEAR SAFETY FIX
             if (rawPriority === null || rawPriority === undefined) return 'border-yellow-500/50 bg-yellow-500/10';
 
-            // Handle Numbers directly first
+            // Handle Numbers
             if (typeof rawPriority === 'number') {
                 if (rawPriority >= 8) return 'border-red-500/50 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.1)]';
                 if (rawPriority <= 3) return 'border-blue-500/50 bg-blue-500/10';
@@ -135,13 +135,17 @@ export default function TasksPage() {
 
             // Force safe string conversion
             const pStr = String(rawPriority);
-            const pLower = (pStr && typeof pStr.toLowerCase === 'function') ? pStr.toLowerCase() : 'medium';
+            // Explicit type check before calling method
+            if (typeof pStr.toLowerCase !== 'function') return 'border-yellow-500/50 bg-yellow-500/10';
+
+            const pLower = pStr.toLowerCase();
 
             if (pLower === 'high' || pLower === 'critical') return 'border-red-500/50 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.1)]';
             if (pLower === 'low') return 'border-blue-500/50 bg-blue-500/10';
 
             return 'border-yellow-500/50 bg-yellow-500/10';
         } catch (e) {
+            console.error("Priority Color Error:", e);
             return 'border-gray-500/50 bg-gray-500/10';
         }
     };
@@ -159,7 +163,7 @@ export default function TasksPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold mb-2">Mission Tasks</h2>
-                    <p className="text-gray-400 text-sm">Manage and track your swarm's objectives <span className="text-xs text-gray-600">(v3.1)</span></p>
+                    <p className="text-gray-400 text-sm">Manage and track your swarm's objectives <span className="text-xs text-gray-600">(v3.2)</span></p>
                 </div>
                 <button
                     onClick={() => setShowNewTaskForm(!showNewTaskForm)}
@@ -258,7 +262,7 @@ export default function TasksPage() {
                                     columnTasks.map((task) => (
                                         <div
                                             key={task.id}
-                                            className={`glass-light rounded-lg p-4 border ${getPriorityColor(task.priority)} hover:scale-[1.02] transition-all duration-200 cursor-grab active:cursor-grabbing shadow-lg`}
+                                            className={`glass-light rounded-lg p-4 border ${getTaskPriorityColorV2(task.priority)} hover:scale-[1.02] transition-all duration-200 cursor-grab active:cursor-grabbing shadow-lg`}
                                             draggable
                                             onDragStart={(e) => e.dataTransfer.setData('taskId', task.id)}
                                         >
