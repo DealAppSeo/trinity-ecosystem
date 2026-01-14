@@ -44,7 +44,7 @@ export function AgentCard({ agent, isConductor = false, onAssignTask }: AgentCar
                     {/* Unified Heartbeat Logic: 2 Minutes */}
                     <StatusDot status={
                         agent.lastHeartbeat && (Date.now() - new Date(agent.lastHeartbeat).getTime() < 120000)
-                            ? 'active'
+                            ? 'online'
                             : 'offline'
                     } />
                     <RepIdBadge score={agent.repid_score} />
