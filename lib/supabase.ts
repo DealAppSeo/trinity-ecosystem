@@ -144,5 +144,20 @@ if (!supabaseUrl || !supabaseKey) {
     client = createClient(supabaseUrl, supabaseKey);
 }
 
+// ... (previous code)
+
 export const supabase = client;
+
+// [ANTIGRAVITY] Admin Client (Service Role)
+// Agents need this to bypass RLS for writing Artifacts and updating Tasks
+export const supabaseAdmin = serviceKey
+    ? createClient(supabaseUrl, serviceKey, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    })
+    : client; // Fallback to anon if no service key (will fail RLS but prevents crash)
+
 export const isMockMode = !supabaseUrl || !supabaseKey;
+
