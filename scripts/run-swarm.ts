@@ -11,20 +11,25 @@ const supabase = createClient(
 );
 
 const AGENTS = [
+    // ORCHESTRATION (SYSTEM CORE)
+    'trinity-orch',
+    'trinity-w3c',
+    'trinity-shofet',
+
     // ALPHA SQUAD (TRUTH)
-    'trinity-gcm',
     'trinity-torch',
     'trinity-veritas',
+    'trinity-gcm',
 
     // BETA SQUAD (CARE)
-    'trinity-apm',
     'trinity-chesed',
     'trinity-mel',
+    'trinity-apm',
 
     // GAMMA SQUAD (BUILD)
-    'trinity-hdm',
+    'trinity-sophia',
     'trinity-nexus',
-    'trinity-sophia'
+    'trinity-hdm'
 ];
 
 async function startSwarm() {

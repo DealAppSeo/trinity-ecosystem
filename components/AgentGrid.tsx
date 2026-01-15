@@ -19,11 +19,19 @@ const GROUP_CONFIG: Record<string, any> = {
 
 export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGridProps) {
     // Filter out legacy/duplicate agent names (short names)
-    const BLACKLIST = ['APM', 'GCM', 'HDM', 'MEL', 'VERITAS', 'TORCH', 'CHESED', 'SOPHIA', 'NEXUS', 'ANFIS_DEMO_BOT', 'W3C', 'SHOFET', 'MCP'];
-    // Keep only trinity- prefixed agents OR agents not in blacklist
-    // Actually, user wants "trinity-apm" etc.
-    // Let's filter OUT exact matches of the short names if a corresponding trinity- exists, or just filter all short names if we are sure.
-    const filteredAgents = agents.filter(a => !BLACKLIST.includes(a.agent_name) && !BLACKLIST.includes(a.agent_name.toUpperCase()));
+    // Filter out legacy/duplicate agent names (short names)
+    // We only want 'trinity-' prefixes now
+    const BLACKLIST = ['MCP', 'MCP_SERVER', 'ANFIS_DEMO_BOT'];
+
+    // Normalize to handle case sensitivity
+    const filteredAgents = agents.filter(a => {
+        const name = a.agent_name.toLowerCase();
+        // Allow 'trinity-orch' etc.
+        if (BLACKLIST.includes(a.agent_name)) return false;
+        // Hide "short names" if they are just duplicates of full names (legacy check)
+        // But for now, we just want to ensure we show the 12 specific agents
+        return true;
+    });
 
     if (filteredAgents.length === 0) {
         return (

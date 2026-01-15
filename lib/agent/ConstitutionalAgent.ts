@@ -982,38 +982,70 @@ export class ConstitutionalAgent {
             }
 
             // 2. DATABASE INSERT (Using Admin Client to bypass RLS)
-            // Import dynamically or assume it's available via 'this.supabaseAdmin' if we refactor,
-            // but for now let's import the specific export if possible, or assume 'this.supabase' is upgraded?
-            // Actually, best to import it at top of file. 
-            // Since we can't easily change top imports in this tool step effectively without breaking lines,
-            // let's use a workaround or assume I will fix imports in next step.
 
-            // For now, let's try to use 'this.supabase' but knowing we need to change it.
-            // Wait, I can use require inside the method for safety in this "patch" style.
-            const { supabaseAdmin } = require('../../lib/supabase');
+            // [ANTIGRAVITY] Schema Refresh Retry Logic
+            // Sometimes the supersbase client caches the schema and thinks 'content' col is missing.
+            // We force a retry with a fresh client if that happens.
+            let attempt = 0;
+            let success = false;
+            let lastError;
 
-            const { data, error } = await supabaseAdmin
-                .from('trinity_artifacts')
-                .insert({
-                    task_id: safeTaskId,
-                    // agent_name: this.name, // REMOVED
-                    title: safeTitle,
-                    artifact_type: type || 'text',
-                    content: content,
-                    file_path: artifactUrl,
-                    url: artifactUrl,
-                    created_at: new Date().toISOString(),
-                    access_level: accessLevel,
-                    view_count: 0,
-                    file_hash: fileHash,
-                    creator_agent: this.name
-                })
-                .select('id')
-                .single();
+            while (attempt < 2 && !success) {
+                try {
+                    // Start with the standard export
+                    let clientToUse;
+                    if (attempt === 0) {
+                        const { supabaseAdmin } = require('../../lib/supabase');
+                        clientToUse = supabaseAdmin;
+                    } else {
+                        // FORCE FRESH CLIENT
+                        console.log("[ARTIFACT] ⚠️ Retrying with FRESH Supabase Client due to schema error...");
+                        const { createClient } = require('@supabase/supabase-js');
+                        // Re-read env vars directly to be safe
+                        const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
+                        const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+                        clientToUse = createClient(url, key, { auth: { persistSession: false } });
+                    }
 
-            if (error) throw error;
-            artifactId = data.id;
-            console.log(`[ARTIFACT] Saved to DB: ${artifactId} (${accessLevel})`);
+                    const { data, error } = await clientToUse
+                        .from('trinity_artifacts')
+                        .insert({
+                            task_id: safeTaskId,
+                            title: safeTitle,
+                            artifact_type: type || 'text',
+                            content: content,
+                            file_path: artifactUrl,
+                            url: artifactUrl,
+                            created_at: new Date().toISOString(),
+                            access_level: accessLevel,
+                            view_count: 0,
+                            file_hash: fileHash,
+                            creator_agent: this.name
+                        })
+                        .select('id')
+                        .single();
+
+                    if (error) {
+                        // Check for the specific "column not found" error or general schema issues
+                        if (error.message.includes("column") || error.code === '42703') {
+                            throw new Error(`Schema mismatch: ${error.message}`);
+                        }
+                        throw error;
+                    }
+
+                    artifactId = data.id;
+                    console.log(`[ARTIFACT] Saved to DB: ${artifactId} (${accessLevel})`);
+                    success = true;
+
+                } catch (e: any) {
+                    lastError = e;
+                    console.warn(`[ARTIFACT] Attempt ${attempt + 1} failed: ${e.message}`);
+                    attempt++;
+                    if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+                }
+            }
+
+            if (!success) throw lastError;
 
             // 3. LOCAL FILESYSTEM (Backup)
             if (typeof process !== 'undefined' && process.versions && process.versions.node) {
@@ -1031,7 +1063,7 @@ export class ConstitutionalAgent {
 
             return `db://trinity_artifacts/${artifactId}`;
         } catch (e: any) {
-            console.error(`[ARTIFACT] Failed: ${e.message}`);
+            console.error(`[ARTIFACT] Final Save Failure: ${e.message}`);
             return null;
         }
     }

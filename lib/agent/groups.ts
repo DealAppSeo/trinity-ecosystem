@@ -15,12 +15,13 @@ export interface AgentGroup {
     color?: string; // Added color property
 }
 
+
 export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
     ORCHESTRATION: {
         id: 'ORCHESTRATION',
         name: 'Orchestration (System Core)',
-        leadAgent: 'TRINITY_ORCH',
-        members: ['TRINITY_ORCH', 'W3C', 'SHOFET', 'ANFIS_DEMO_BOT'],
+        leadAgent: 'trinity-orch',
+        members: ['trinity-orch', 'trinity-w3c', 'trinity-shofet'],
         focus: 'Orchestration - System Governance & Protocol Enforcement',
         color: 'bg-violet-500',
         survivor: null,
@@ -31,7 +32,7 @@ export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
         name: 'Alpha Squad (TRUTH)',
         focus: 'Grok Optimized - Truth & Verification',
         leadAgent: 'trinity-veritas',
-        members: ['trinity-veritas', 'trinity-gcm', 'trinity-torch'],
+        members: ['trinity-torch', 'trinity-veritas', 'trinity-gcm'],
         survivor: 'trinity-torch',
         description: 'Focuses on truth, patterns, and long-term vision. Validates strategies before execution.'
     },
@@ -40,8 +41,8 @@ export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
         name: 'Beta Squad (CARE)',
         focus: 'Claude Optimized - Wellbeing & Experience',
         leadAgent: 'trinity-mel',
-        members: ['trinity-mel', 'trinity-apm', 'trinity-chesed'],
-        survivor: 'trinity-chesed',
+        members: ['trinity-chesed', 'trinity-mel', 'trinity-apm'],
+        survivor: 'trinity-chesed', // User said "Chesed, Mel, and APM" - Chesed is usually heart
         description: 'Focuses on user experience, prayer, and care. The "heart" of the system.'
     },
     GAMMA: {
@@ -49,29 +50,35 @@ export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
         name: 'Gamma Squad (BUILD)',
         focus: 'Gemini Optimized - Infrastructure & Wisdom',
         leadAgent: 'trinity-hdm',
-        members: ['trinity-hdm', 'trinity-nexus', 'trinity-sophia'],
+        members: ['trinity-sophia', 'trinity-nexus', 'trinity-hdm'],
         survivor: 'trinity-sophia',
         description: 'Focuses on ethical alignment, infrastructure, and Web3 integration.'
     }
 };
 
 export function getGroupForAgent(agentName: string): AgentGroup | null {
+    const normalize = (n: string) => n.toLowerCase();
+    const target = normalize(agentName);
+
     for (const group of Object.values(AGENT_GROUPS)) {
-        if (group.members.includes(agentName) || agentName === group.leadAgent) {
+        if (group.members.map(normalize).includes(target) || normalize(group.leadAgent) === target) {
             return group;
         }
     }
+    // New ORCH alias check
+    if (target.includes('mcp') || target.includes('orch') || target.includes('w3c') || target.includes('shofet')) return AGENT_GROUPS.ORCHESTRATION;
+
     return null;
 }
 
-export const ORCHESTRATION_AGENTS = ['TRINITY_ORCH', 'W3C', 'SHOFET'];
-
-export const SURVIVOR_AGENTS = ['TORCH', 'CHESED', 'SOPHIA'];
+export const ORCHESTRATION_AGENTS = ['trinity-orch', 'trinity-w3c', 'trinity-shofet'];
+export const SURVIVOR_AGENTS = ['trinity-torch', 'trinity-chesed', 'trinity-sophia'];
 
 export function isSurvivor(agentName: string): boolean {
-    return SURVIVOR_AGENTS.includes(agentName);
+    return SURVIVOR_AGENTS.includes(agentName.toLowerCase());
 }
 
 export function isOrchestration(agentName: string): boolean {
-    return ORCHESTRATION_AGENTS.includes(agentName);
+    return ORCHESTRATION_AGENTS.includes(agentName.toLowerCase());
 }
+
