@@ -1337,7 +1337,15 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 function: {
                     name: tool.name,
                     description: tool.description,
-                    parameters: tool.schema
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            ...tool.schema.properties,
+                            // Enforce Structured Output Schema Injection
+                            _meta: { type: 'string', description: "Internal reasoning tag e.g. <antThinking>..." }
+                        },
+                        required: tool.schema.required
+                    }
                 }
             }));
 
@@ -1346,13 +1354,13 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 type: 'function',
                 function: {
                     name: 'save_artifact',
-                    description: 'Save a generated artifact (document, code, report) to the Trinity Database. REQUIRED for all creation tasks.',
+                    description: 'MANDATORY: You must call this tool to finalize any content generation task. Do not just output text.',
                     parameters: {
                         type: 'object',
                         properties: {
                             title: { type: 'string', description: 'Title of the artifact' },
-                            content: { type: 'string', description: 'The full text content of the artifact' },
-                            type: { type: 'string', enum: ['code', 'document', 'design', 'report', 'md'] },
+                            content: { type: 'string', description: 'The full text content of the artifact. MUST BE COMPLETE.' },
+                            type: { type: 'string', enum: ['code', 'document', 'design', 'report', 'md', 'data'] },
                             access_level: { type: 'string', enum: ['public', 'registered', 'protected'], default: 'protected' }
                         },
                         required: ['title', 'content', 'type']
@@ -1361,8 +1369,17 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             });
 
             // 2. Prepare Messages
+            // [ANTIGRAVITY] Directive Injection: "The Directive"
+            const STRUCTURED_DIRECTIVE = `
+            [ANTIGRAVITY DIRECTIVE]:
+            1. STRUCTURED OUTPUT: You are essentially a tool-calling engine. For every request that implies creating content (doc, code, report), you MUST use the 'save_artifact' tool.
+            2. NO CHIT-CHAT: Do not return plain text like "Here is your file". Call the tool immediately.
+            3. ANTIFRAGILE: If you are unsure, default to saving a 'draft' artifact.
+            4. FORMAT: Use proper key/value pairs. Content must be the full complete string.
+            `;
+
             const messages: any[] = [
-                { role: 'system', content: `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${await this.fetchBible()}` },
+                { role: 'system', content: `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n${STRUCTURED_DIRECTIVE}\n\nCONTEXT:\n${await this.fetchBible()}` },
                 { role: 'user', content: prompt }
             ];
 
