@@ -19,6 +19,10 @@ export function StatusDot({ status, size = 'md', className }: StatusDotProps) {
         stale: 'bg-status-working/70', // Amber but dimmer
         offline: 'bg-status-offline',
         error: 'bg-status-error shadow-[0_0_8px_rgba(239,68,68,0.5)]',
+        green: 'bg-status-online shadow-[0_0_10px_rgba(34,197,94,0.8)]',
+        blue: 'bg-accent-violet shadow-[0_0_10px_rgba(139,92,246,0.8)] animate-pulse-slow',
+        amber: 'bg-status-working shadow-[0_0_10px_rgba(245,158,11,0.8)]',
+        active: 'bg-status-online shadow-[0_0_8px_rgba(34,197,94,0.5)]',
     };
 
     return (

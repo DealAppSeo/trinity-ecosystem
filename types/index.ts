@@ -1,4 +1,4 @@
-export type AgentStatus = 'online' | 'offline' | 'working' | 'error' | 'stale';
+export type AgentStatus = 'online' | 'offline' | 'working' | 'error' | 'stale' | 'green' | 'blue' | 'amber' | 'active';
 
 export interface Agent {
     agent_name: string;

@@ -1,0 +1,89 @@
+// app/api/swarm-health/route.ts
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+export async function GET() {
+    try {
+        // 1. Active Agents (last_active < 5 min, status = 'active')
+        const { data: agents, error: agentsError } = await supabase
+            .from('trinity_agent_registry')
+            .select('agent_name, status, last_active, reputation_score, current_tier, squad')
+            .gte('last_active', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+            .eq('status', 'active');
+
+        if (agentsError) throw agentsError;
+
+        const activeCount = agents?.length || 0;
+
+        // 2. Verification Backlog (Done but not Verified)
+        const { count: backlogCount, error: backlogError } = await supabase
+            .from('trinity_tasks')
+            .select('*', { count: 'exact', head: true })
+            .in('status', ['done', 'completed'])
+            .is('verified_by', null);
+
+        if (backlogError) throw backlogError;
+
+        // 3. Recent Artifacts (last 24h)
+        const { data: recentArtifacts, error: artifactError } = await supabase
+            .from('trinity_artifacts')
+            .select('id, title, artifact_type, creator_agent, created_at, status')
+            .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+        if (artifactError) throw artifactError;
+
+        // 4. Squad Health Summary
+        const squadHealth = (agents || []).reduce((acc: any, agent: any) => {
+            acc[agent.squad || 'UNKNOWN'] = (acc[agent.squad || 'UNKNOWN'] || 0) + 1;
+            return acc;
+        }, {});
+
+        // 5. Basic Health Score
+        const currentBacklog = backlogCount || 0;
+        const healthScore = Math.min(100,
+            (activeCount / 12) * 50 +                  // % of expected agents active
+            (currentBacklog < 10 ? 40 : 10) +            // Low backlog = good
+            (recentArtifacts?.length > 0 ? 10 : 0)     // Recent activity = good
+        );
+
+        return NextResponse.json({
+            timestamp: new Date().toISOString(),
+            active_agents: activeCount,
+            total_registered: 12,
+            verification_backlog: backlogCount || 0,
+            recent_artifacts: recentArtifacts?.length || 0,
+            squad_health: squadHealth,
+            health_score: Math.round(healthScore),
+            status_summary: healthScore > 80 ? 'Healthy' : healthScore > 50 ? 'Warning' : 'Critical',
+            details: {
+                agents: agents?.map(a => ({
+                    name: a.agent_name,
+                    squad: a.squad,
+                    rep_id: a.reputation_score,
+                    tier: a.current_tier,
+                    last_active: a.last_active,
+                    is_live: new Date(a.last_active) > new Date(Date.now() - 5 * 60 * 1000)
+                })),
+                recent_artifacts_sample: recentArtifacts?.map(a => ({
+                    title: a.title,
+                    type: a.artifact_type,
+                    creator: a.creator_agent,
+                    created_at: a.created_at,
+                    status: a.status
+                }))
+            }
+        }, { status: 200 });
+    } catch (error: any) {
+        console.error('[SWARM-HEALTH] Error:', error.message);
+        return NextResponse.json(
+            { error: 'Failed to fetch swarm health', details: error.message },
+            { status: 500 }
+        );
+    }
+}

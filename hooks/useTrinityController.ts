@@ -59,56 +59,56 @@ export const useTrinityController = () => {
             ]);
 
             // Enrich Agent Data with Group and Status
-            const taskMap = new Map((taskData || []).map((t: any) => [t.assigned_to, t]));
+            const taskList = taskData || [];
+            const agentTaskList = new Map((taskList).map((t: any) => [t.claimed_by || t.assigned_to, t]));
 
             const enrichedAgents = (agentData || []).map((agent: any) => {
-                const currentTask = taskMap.get(agent.agent_name);
-                const heartbeat = (heartbeatData || []).find((h: any) => h.agent === agent.agent_name);
+                const currentTask = agentTaskList.get(agent.agent_name);
 
-                // Determine group if missing
-                let groupName = agent.group_name;
-                if (!groupName) {
-                    const group = getGroupForAgent(agent.agent_name);
-                    if (group) groupName = group.id;
+                // UNIFIED HEARTBEAT LOGIC (v4.0 - Tiered Status)
+                const lastSeen = agent.last_active;
+                const now = new Date().getTime();
+                const lastSeenTime = lastSeen ? new Date(lastSeen).getTime() : 0;
+                const minutesIdle = (now - lastSeenTime) / 60000;
+
+                // Thresholds
+                const isActive = minutesIdle < 5; // 5 mins active window
+                const isIdle = minutesIdle >= 10 && minutesIdle < 60; // Amber threshold
+
+                // Tiered Logic
+                // Green: Active + Has recent task activity
+                // Blue: Active + Awaiting Peer Review
+                // Amber: Active but Idle
+                // Offline: > 1 hour or no status
+
+                let tierStatus = 'offline';
+                if (isActive) {
+                    const hasDoneTask = taskList.some(t => t.claimed_by === agent.agent_name && t.status === 'done');
+                    const hasVerifiedTask = taskList.some(t => t.claimed_by === agent.agent_name && t.status === 'verified');
+
+                    if (hasDoneTask) tierStatus = 'blue';
+                    else if (hasVerifiedTask) tierStatus = 'green';
+                    else tierStatus = 'active'; // Default active (Greener/Live)
+                } else if (isIdle) {
+                    tierStatus = 'amber';
                 }
-
-                // Determine Status: If heartbeat is recent (< 30s), active. Else offline.
-                // Or use the status column if reliable.
-                const shortName = agent.agent_name.replace('trinity-', '').toUpperCase();
-
-                // FIND BEST HEARTBEAT (Handle Aliases & Prevent Stale Shadowing)
-                const candidateHeartbeats = (heartbeatData || []).filter((h: any) =>
-                    h.agent === agent.agent_name ||
-                    h.agent === shortName ||
-                    h.agent === `trinity-${shortName.toLowerCase()}`
-                );
-
-                // Sort by recency (newest first)
-                candidateHeartbeats.sort((a: any, b: any) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
-                const matchedHeartbeat = candidateHeartbeats[0];
-
-                /* DEBUG: Offline Investigation */
-                if (agent.agent_name === 'trinity-hdm') {
-                    console.log(`[DEBUG] Agent: ${agent.agent_name}`, { matchedHeartbeat, now: new Date().toISOString() });
-                }
-
-                const isLive = matchedHeartbeat && (new Date().getTime() - new Date(matchedHeartbeat.last_seen).getTime() < 120000); // Increased tolerance to 2 mins for safety
 
                 return {
                     ...agent,
-                    group_name: groupName,
-                    status: isLive ? 'active' : 'offline',
+                    group_name: agent.group_name || getGroupForAgent(agent.agent_name)?.id || 'UNKNOWN',
+                    status: tierStatus,
+                    is_live: isActive,
                     currentTask: currentTask || null,
-                    lastHeartbeat: heartbeat ? heartbeat.last_seen : null,
+                    lastHeartbeat: lastSeen,
                     reputation_score: agent.reputation_score || 0,
                     tasks_completed: agent.tasks_completed || 0
                 };
             });
 
-            // Sort: Active first, then by name
+            // Sort: Live first, then by name
             enrichedAgents.sort((a: any, b: any) => {
-                if (a.status === 'active' && b.status !== 'active') return -1;
-                if (a.status !== 'active' && b.status === 'active') return 1;
+                if (a.is_live && !b.is_live) return -1;
+                if (!a.is_live && b.is_live) return 1;
                 return a.agent_name.localeCompare(b.agent_name);
             });
 

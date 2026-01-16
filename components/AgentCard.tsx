@@ -5,10 +5,10 @@ import { Card } from '@/components/ui/Card';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { RepIdBadge } from '@/components/ui/RepIdBadge';
 import { cn } from '@/lib/utils';
-import { Agent } from '@/types';
+import { AgentRegistryRecord } from '@/lib/agent/types';
 
 interface AgentCardProps {
-    agent: Agent;
+    agent: AgentRegistryRecord;
     isConductor?: boolean;
     onAssignTask?: (agentName: string) => void;
 }
@@ -39,20 +39,15 @@ export function AgentCard({ agent, isConductor = false, onAssignTask }: AgentCar
                     )}
                 </div>
 
-                {/* Status Row */}
+                {/* Unified Status from Controller SSOT */}
                 <div className="flex items-center gap-3 mb-2">
-                    {/* Unified Heartbeat Logic: 2 Minutes */}
-                    <StatusDot status={
-                        agent.last_heartbeat && (Date.now() - new Date(agent.last_heartbeat).getTime() < 120000)
-                            ? 'online'
-                            : 'offline'
-                    } />
-                    <RepIdBadge score={agent.repid_score} />
+                    <StatusDot status={agent.status as any} />
+                    <RepIdBadge score={agent.reputation_score} />
                 </div>
 
                 {/* Task Preview */}
                 <p className="text-xs text-text-muted truncate">
-                    {agent.current_task || 'Awaiting assignment'}
+                    {agent.currentTask?.title || 'Awaiting assignment'}
                 </p>
             </div>
 
@@ -68,22 +63,20 @@ export function AgentCard({ agent, isConductor = false, onAssignTask }: AgentCar
                         Current Activity
                     </h4>
                     <p className="text-sm text-text-secondary mb-4">
-                        {agent.current_task || 'No active task'}
+                        {(agent as any).current_task_summary || agent.currentTask?.title || 'No active task'}
                     </p>
 
                     {/* Tags */}
                     <div className="flex flex-wrap gap-2 mb-4">
                         <span className="text-xs px-2 py-1 bg-obsidian-base rounded text-text-muted">
-                            {agent.platform}
+                            {agent.current_tier}
                         </span>
                         <span className="text-xs px-2 py-1 bg-obsidian-base rounded font-mono text-text-muted">
-                            RepID: {agent.repid_score}
+                            RepID: {agent.reputation_score}
                         </span>
-                        {agent.role && (
-                            <span className="text-xs px-2 py-1 bg-obsidian-base rounded text-text-muted">
-                                {agent.role}
-                            </span>
-                        )}
+                        <span className="text-xs px-2 py-1 bg-obsidian-base rounded text-text-muted">
+                            Registry SSOT
+                        </span>
                     </div>
 
                     {/* Conductor Actions */}
