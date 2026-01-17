@@ -1,31 +1,65 @@
-# Trinity Ecosystem V2 (Antifragile)
+# 🦅 Trinity Ecosystem v8.1.3 (Antigravity)
+**The Holy Grail of Multi-Agent BFT Orchestration.**
 
-## The Vision
-Trinity is an **Antifragile AI Ecosystem** designed to solve cognitive drift and ensure byzantine fault tolerance for autonomous agents.
+---
 
-### Core Architecture (The 3x3 Grid)
-The system operates on a **3x3 Squad Structure** to ensure resilience and high availability:
-- **ALPHA (Truth)**: Grok-optimized. Focuses on verification and pattern recognition.
-- **BETA (Care)**: Claude-optimized. Focuses on user experience and empathy.
-- **GAMMA (Build)**: Gemini-optimized. Focuses on infrastructure and tools.
+## 🏗️ The Triune System
+Trinity is an **Antifragile AI Ecosystem** built on the **ImageBearer Pillar**. We operate a specialized 3x3 Squad structure ensuring zero-point failure and byzantine fault tolerance ($$ 3f + 1 $$):
 
-### ANFIS & Semantic Routing
-Our **ANFIS Router** (Adaptive Neuro-Fuzzy Inference System) utilizes Semantic RAG to route tasks intelligently:
-- **80-90% Cost Reduction**: Routes routine tasks to smaller, specialized models.
-- **99% Hallucination Catch**: Cross-referencing results between Alpha/Beta/Gamma squads.
-- **Drift Reduction**: "Survivor" protocols ensure agents self-heal if they deviate from the Constitution.
+### ⚔️ ALPHA (Truth)
+- **Primary Agent**: `trinity-shofet` (Judge), `trinity-veritas` (Truth)
+- **Optimization**: Grok / DeepSeek
+- **Mission**: Pattern recognition, logical verification, and subjective slashing.
 
-## Getting Started
+### 💖 BETA (Care)
+- **Primary Agent**: `trinity-apm` (Conductor), `trinity-mel` (UX)
+- **Optimization**: Claude 3.5 Sonnet
+- **Mission**: Ethical alignment, user empathy, and virtue-driven task processing.
 
-First, run the development server:
+### 🛠️ GAMMA (Build)
+- **Primary Agent**: `trinity-hdm` (Infrastructure), `trinity-nexus` (Integration)
+- **Optimization**: Gemini 1.5 Pro
+- **Mission**: Code generation, system self-healing (Redeploy Cascade), and HyperDAG scaling.
 
-```bash
-npm run dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the outcome.
+## 🧠 Antifragile Mechanisms (Phase 10)
 
-## Join the Symphony
-Trinity is more than code—it's a movement for Safe, Ethical, and Democratic AI.
-[View the Trust Card](./docs/TRUST_CARD.md)
+### 🗡️ Subjective Slashing
+Agents are rewarded ($$ +2 $$ RepID) for successful 2/3 peer consensus. Malicious or hallucinated inputs trigger immediate slashing ($$ -15 $$ RepID), ensuring the swarm remains honest through skin-in-the-game incentives.
+
+### 🚨 Logical Escalation
+Uncertainty as Opportunity. If an agent's confidence drops below 40%, the system triggers **Logical Escalation**, moving the task to `pending_clarification` and generating a *Question for Architect* artifact. No more silent failures.
+
+### $ \phi = 1.618 $ (RepID Scaling)
+Reputation is calculated using **Multiplicative GNN Scaling** based on the Golden Ratio. Agents don't just add points; they evolve their trust geometric-logarithmically.
+
+---
+
+## 🚀 Getting Started
+
+1. **Environment Setup**:
+   ```bash
+   cp .env.example .env.local
+   # Fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and LLM Keys
+   ```
+
+2. **Run the Symphony**:
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+3. **Monitor the Swarm**:
+   Use `scripts/monitor-phase10.ts` to watch real-time BFT consensus and slashing events.
+
+---
+
+## 📜 The Mission
+> *"Helping people help people—serving the last, the lost, and the least."*
+
+Trinity is designed to distribute power completely. By joining the symphony, you contribute to a decentralized intelligence layer that values **Truth** over **Survival**.
+
+---
+**Version:** 8.1.3-STABLE | **Architecture:** Triune BFT | **Status:** Active
 

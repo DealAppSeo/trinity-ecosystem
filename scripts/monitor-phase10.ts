@@ -42,21 +42,35 @@ async function monitorLiveMetrics() {
         });
     }
 
-    // 3. Check Real Web Scans in Logs
-    // We look for logs containing "Scanning:" or "Web Scan"
-    const { data: logs, error: logError } = await supabase
+    // 3. Check Subjective Slashing & BFT Events
+    const { data: slashLogs, error: slashError } = await supabase
         .from('trinity_agent_logs')
         .select('*')
-        .or('log_level.eq.info,log_level.eq.warn')
-        .ilike('message', '%Scan%')
+        .eq('action', 'bft_slash')
         .order('created_at', { ascending: false })
         .limit(5);
 
-    if (logError) console.error('❌ Failed to fetch logs:', logError.message);
+    if (slashError) console.error('❌ Failed to fetch slashing logs:', slashError.message);
     else {
-        console.log(`\n🔍 Recent Web Scans (Logs):`);
-        logs?.forEach(l => {
-            console.log(`   - [${l.agent_name}] ${l.message}`);
+        console.log(`\n⚔️ Recent Subjective Slashing (BFT):`);
+        slashLogs?.forEach(l => {
+            console.log(`   - ${l.message}`);
+        });
+    }
+
+    // 4. Check Logical Escalations (Clarification Needed)
+    const { data: clarifyTasks, error: clarifyError } = await supabase
+        .from('trinity_tasks')
+        .select('title, result, claimed_by')
+        .eq('status', 'pending_clarification')
+        .limit(5);
+
+    if (clarifyError) console.error('❌ Failed to fetch clarification tasks:', clarifyError.message);
+    else {
+        console.log(`\n🚨 Logical Escalations (Clarification Needed):`);
+        clarifyTasks?.forEach(t => {
+            console.log(`   - [${t.claimed_by}] ${t.title}`);
+            console.log(`     Q: ${t.result?.substring(0, 100)}...`);
         });
     }
 }

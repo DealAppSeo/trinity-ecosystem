@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { Toaster, toast } from 'sonner';
-import { FileCode, FileText, Image, FileSpreadsheet, Share2, Download, Eye, Lock, ShieldAlert, RefreshCw } from 'lucide-react';
+import { FileCode, FileText, Image, FileSpreadsheet, Share2, Download, Eye, Lock, ShieldAlert, RefreshCw, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { RegistrationModal, UnlockModal } from '@/components/AccessModals';
@@ -19,6 +19,9 @@ interface Artifact {
     shareCount: number;
     url?: string;
     accessLevel: string;
+    creator_agent?: string;
+    verified_by?: string[];
+    task_status?: string;
 }
 
 export default function ArtifactsPage() {
@@ -73,7 +76,13 @@ export default function ArtifactsPage() {
             const currentPage = reset ? 0 : page;
             const { data, error } = await supabase
                 .from('trinity_artifacts')
-                .select('*')
+                .select(`
+                    *,
+                    trinity_tasks!left (
+                        verified_by,
+                        status
+                    )
+                `)
                 .order('created_at', { ascending: false })
                 .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
@@ -96,7 +105,10 @@ export default function ArtifactsPage() {
                     createdAt: item.created_at,
                     shareCount: 0,
                     url: item.url,
-                    accessLevel: item.access_level || 'protected'
+                    accessLevel: item.access_level || 'protected',
+                    creator_agent: item.creator_agent || item.agent,
+                    verified_by: item.trinity_tasks?.verified_by || [],
+                    task_status: item.trinity_tasks?.status || 'created'
                 };
             });
 
@@ -269,9 +281,34 @@ export default function ArtifactsPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <p className="text-xs text-gray-400 line-clamp-3 font-mono leading-relaxed bg-black/20 p-2 rounded">
-                                    {snippet}
-                                </p>
+                                <div className="mt-4 pt-3 border-t border-white/5 flex flex-wrap gap-2 items-center justify-between">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <div className="w-4 h-4 rounded-full bg-violet-500 flex items-center justify-center text-[8px] font-bold text-white">
+                                            {(artifact.creator_agent || 'A')[0].toUpperCase()}
+                                        </div>
+                                        <span className="text-[10px] text-zinc-500 font-mono truncate">
+                                            {artifact.creator_agent?.replace('trinity-', '').toUpperCase() || 'UNKNOWN'}
+                                        </span>
+                                    </div>
+
+                                    {artifact.verified_by && artifact.verified_by.length > 0 ? (
+                                        <div className="flex items-center gap-1">
+                                            <div className="flex -space-x-1.5">
+                                                {artifact.verified_by.map((v, i) => (
+                                                    <div key={v} className="w-4 h-4 rounded-full bg-emerald-500 border border-[#0B0B0F] flex items-center justify-center text-[7px] font-bold text-white shadow-sm" title={`Verified by ${v}`}>
+                                                        {v.replace('trinity-', '')[0].toUpperCase()}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <span className="text-[8px] text-emerald-500 font-bold uppercase tracking-tighter">Verified</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1 opacity-50">
+                                            <Clock className="w-3 h-3 text-zinc-600" />
+                                            <span className="text-[8px] text-zinc-600 font-bold uppercase tracking-tighter">Pending</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         );
                     })

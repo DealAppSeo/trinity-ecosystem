@@ -41,7 +41,9 @@ export function TaskQueue({ tasks, onAddTask }: TaskQueueProps) {
                             </div>
                             <div className="flex justify-between items-end">
                                 <span className="text-[10px] text-text-muted">{task.assigned_agent || '-'}</span>
-                                <span className={`w-1.5 h-1.5 rounded-full ${task.status === 'in_progress' ? 'bg-status-working animate-pulse' : 'bg-obsidian-border'
+                                <span className={`w-1.5 h-1.5 rounded-full ${task.status === 'in_progress' ? 'bg-status-working animate-pulse' :
+                                        task.status === 'pending_clarification' ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_#fbbf24]' :
+                                            'bg-obsidian-border'
                                     }`} />
                             </div>
                         </div>
@@ -49,9 +51,15 @@ export function TaskQueue({ tasks, onAddTask }: TaskQueueProps) {
                 )}
             </div>
 
-            <div className="mt-4 pt-3 border-t border-obsidian-border text-xs text-text-muted font-mono flex justify-between">
-                <span>Pending: {tasks.filter(t => t.status === 'pending').length}</span>
-                <span>Active: {tasks.filter(t => t.status === 'in_progress').length}</span>
+            <div className="mt-4 pt-3 border-t border-obsidian-border text-xs text-text-muted font-mono flex flex-col gap-1">
+                <div className="flex justify-between">
+                    <span>Pending: {tasks.filter(t => t.status === 'pending').length}</span>
+                    <span>Active: {tasks.filter(t => t.status === 'in_progress').length}</span>
+                </div>
+                <div className="flex justify-between text-amber-500 font-bold">
+                    <span>Clarify: {tasks.filter(t => t.status === 'pending_clarification').length}</span>
+                    <span>Done: {tasks.filter(t => t.status === 'done').length}</span>
+                </div>
             </div>
         </Card>
     );

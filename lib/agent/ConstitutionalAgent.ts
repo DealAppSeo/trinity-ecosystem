@@ -262,44 +262,54 @@ export class ConstitutionalAgent {
     /**
      * Updates reputation based on task outcome.
      * @param success Did the agent complete the task?
+     * @param targetAgent Optional: Agent name to update (defaults to self)
+     * @param overrideDelta Optional: Custom delta for slashing/reward
      */
-    async updateReputation(success: boolean) {
-        // ELITE ADAPTIVE REPID: Infuse Golden Ratio (φ=1.618) & Peer Weights
-        // Patent: Multiplicative GNN / RepID – Provisional Aug 17, 2025
-        // O(log n) convergence via multiplicative RepID agg
-        const phi = 1.61803398875;
-        const peerProduct = 1.25; // Simulated peer-product scaling weight
-        const delta = success ? 1 : -5;
-        let score = this.reputationScore + delta;
+    async updateReputation(success: boolean, targetAgent?: string, overrideDelta?: number) {
+        // [PHASE 10] TARGETED REPID UPDATE
+        const name = targetAgent || this.name;
 
-        if (success) {
-            // Adaptive geometric mean scaling (Patent: Multiplicative GNN)
-            score = Math.pow(score * peerProduct, 1 / phi) * phi;
+        // ELITE ADAPTIVE REPID: Infuse Golden Ratio (φ=1.618) & Peer Weights
+        const phi = 1.61803398875;
+        const peerProduct = 1.25;
+        const delta = overrideDelta !== undefined ? overrideDelta : (success ? 1 : -5);
+
+        // Fetch current score if not self
+        let currentScore = this.reputationScore;
+        let currentTasksCompleted = this.tasksCompleted;
+
+        if (targetAgent && targetAgent !== this.name) {
+            const { data } = await this.supabase
+                .from('trinity_agent_registry')
+                .select('reputation_score, tasks_completed')
+                .eq('agent_name', targetAgent)
+                .single();
+            if (data) {
+                currentScore = data.reputation_score;
+                currentTasksCompleted = data.tasks_completed;
+            }
         }
 
-        this.reputationScore = Math.max(0, Math.min(100, score));
-        if (success) this.tasksCompleted++;
+        let score = currentScore + delta;
 
-        // Autonomy Tier Promotion Logic
-        let newTier: AutonomyTier = this.autonomyTier;
-        if (this.reputationScore <= 40) newTier = 'Assist';
-        else if (this.reputationScore <= 70) newTier = 'Approve';
-        else if (this.reputationScore <= 90) newTier = 'Act';
-        else newTier = 'Learn';
+        if (success) {
+            score = Math.pow(Math.max(1, score) * peerProduct, 1 / phi) * phi;
+        }
 
-        if (newTier !== this.autonomyTier) {
-            console.log(`[${this.name}] 🚨 TIER PROMOTION DETECTED: ${this.autonomyTier} -> ${newTier}`);
-            this.autonomyTier = newTier;
+        const finalScore = Math.max(0, Math.min(100, score));
+
+        // Update local if self
+        if (!targetAgent || targetAgent === this.name) {
+            this.reputationScore = finalScore;
+            if (success) this.tasksCompleted++;
         }
 
         // Commit to Ledger
-        await this.supabase.from('trinity_agent_registry').upsert({
-            agent_name: this.name,
-            reputation_score: this.reputationScore,
-            current_tier: this.autonomyTier,
-            tasks_completed: this.tasksCompleted,
+        await this.supabase.from('trinity_agent_registry').update({
+            reputation_score: finalScore,
+            tasks_completed: success ? currentTasksCompleted + 1 : currentTasksCompleted,
             last_active: new Date().toISOString()
-        });
+        }).eq('agent_name', name);
 
         // 🧠 ANFIS FEEDBACK LOOP (Truth-Seeking)
         await this.callAnfisReward(success);
@@ -401,37 +411,44 @@ export class ConstitutionalAgent {
 
         while (true) {
             try {
-                // [ANTIGRAVITY] SSOT: PRIORITIZED PROBABILISTIC LOGIC (Grok's recommendation)
-                // 1. Check for Done but unverified jobs (Peer Review)
+                // [ANTIGRAVITY v8.0] SSOT: INTEGRATED BFT CYCLE
+                // Rule: Check "Done" for peer work before starting "To Do"
                 const verificationTask = await this.getVerificationTask();
+                let taskHandled = false;
 
                 if (verificationTask) {
-                    // Calculate Backlog for probabilistic weighting
+                    // 1. Calculate Backlog for probabilistic weighting
                     const { count: backlog } = await this.supabase
                         .from('trinity_tasks')
                         .select('*', { count: 'exact', head: true })
                         .in('status', ['done', 'completed'])
-                        .is('verified_by', null);
+                        .neq('claimed_by', this.name); // Peers only
 
-                    const verifyProb = Math.min(0.9, 0.3 + 0.1 * (backlog || 0));
-                    const finalProb = Math.max(0.1, verifyProb);
+                    // 2. Probabilistic Weights (v8.0 Rules)
+                    // - 70% if backlog > 5
+                    // - 80% if backlog <= 2
+                    // - Bias: +20% toward new work if RepID > 8 (Probabilistic skip)
+                    let verifyProb = (backlog || 0) > 5 ? 0.7 : 0.8;
+                    if ((this.reputationScore || 50) / 10 > 8) {
+                        verifyProb = Math.max(0.1, verifyProb - 0.2); // Biased toward starting new work
+                    }
 
-                    if (Math.random() < finalProb) {
-                        console.log(`[${this.name}] 🔍 PROBABILISTIC PEER VERIFICATION (Backlog: ${backlog}, Prob: ${finalProb.toFixed(2)}): ${verificationTask.title}`);
-                        await this.processTask(verificationTask);
-                        await this.heartbeat();
-                        await this.sleep(10000);
-                        continue;
+                    if (Math.random() < verifyProb) {
+                        console.log(`[ANTIGRAVITY] 🔍 BFT CYCLE: Verifying Peer Work (Backlog: ${backlog}, Prob: ${verifyProb.toFixed(2)}): ${verificationTask.title}`);
+                        await this.verifyPeerTask(verificationTask);
+                        taskHandled = true;
                     }
                 }
 
-                const task = await this.getNextTask();
-
-                if (task) {
-                    console.log(`[${this.name}] 📋 Processing New Task: ${task.title}`);
-                    await this.processTask(task);
-                } else {
-                    console.log(`[${this.name}] 💤 No new tasks available, waiting...`);
+                if (!taskHandled) {
+                    const newTask = await this.getNextTask();
+                    if (newTask) {
+                        console.log(`[ANTIGRAVITY] 📋 BFT CYCLE: Starting New Task: ${newTask.title}`);
+                        await this.processTask(newTask);
+                        taskHandled = true;
+                    } else {
+                        console.log(`[${this.name}] 💤 No tasks available (Done Backlog: ${verificationTask ? 'Waiting' : 'Empty'}), idling...`);
+                    }
                 }
 
                 await this.heartbeat();
@@ -463,9 +480,8 @@ export class ConstitutionalAgent {
             .from('trinity_tasks')
             .select('*')
             .in('status', ['done', 'completed'])
-            .is('verified_by', null)
             .neq('claimed_by', this.name) // MUST BE SOMEONE ELSE'S WORK
-            .not('metadata->>creator_agent', 'eq', this.name) // CANNOT BE SELF-CREATED
+            .not('verified_by', 'cs', `{${this.name}}`) // WE HAVENT VERIFIED IT YET
             .order('priority', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -475,21 +491,69 @@ export class ConstitutionalAgent {
             return null;
         }
 
-        if (task) {
-            // Transform the completed task into a verification mission
-            return {
-                ...task,
-                title: `[VERIFY] ${task.title}`,
-                description: `VERIFY PEER WORK: ${this.name} reviewing ${task.claimed_by}'s work.\n\n` +
-                    `1. Check artifact: ${task.artifact_url}\n` +
-                    `2. Confirm results match description.\n` +
-                    `3. Provide confirmation or challenge.\n\n` +
-                    `Context: ${task.result || 'No result provided'}`,
-                task_type: 'review',
-                priority: 95 // Ensure it stays top of priority when injected into processTask
-            };
-        }
+        if (task) return task;
         return null;
+    }
+
+    async verifyPeerTask(task: Task) {
+        console.log(`[BFT] ⚔️ Commencing Triad Consensus on: ${task.title}`);
+
+        // 1. GATHER EVIDENCE (Check artifacts)
+        const { data: artifacts } = await this.supabase
+            .from('trinity_artifacts')
+            .select('*')
+            .eq('task_id', task.id);
+
+        const artifactCount = artifacts?.length || 0;
+        console.log(`[BFT] Found ${artifactCount} artifacts for review.`);
+
+        // 2. VOTE (Weighted by RepID)
+        // High RepID agents (>8) have stronger "belief" influence
+        const myWeight = Math.max(1, (this.reputationScore || 50) / 10);
+
+        // Subjective Logic simulation (b+d+u=1)
+        let belief = artifactCount > 0 ? 0.8 : 0.2;
+        let disbelief = artifactCount === 0 ? 0.7 : 0.1;
+
+        // 3. APPLY CONSENSUS
+        const isVerified = belief > disbelief;
+        const newVerifyCount = (task.verify_count || 0) + 1;
+        const verifiers = [...(task.verified_by || []), this.name];
+
+        if (isVerified) {
+            console.log(`[BFT] ✅ Verified by ${this.name} (Count: ${newVerifyCount}/3)`);
+
+            await this.supabase.from('trinity_tasks').update({
+                verify_count: newVerifyCount,
+                verified_by: verifiers,
+                status: newVerifyCount >= 3 ? 'verified' : 'done',
+                verified_at: newVerifyCount >= 3 ? new Date().toISOString() : null,
+                verification_result: `Verified by ${this.name} (Weight: ${myWeight.toFixed(1)})`
+            }).eq('id', task.id);
+
+            // [PHASE 10] Reward original completer's RepID on 2/3 and 3/3
+            if (newVerifyCount >= 2) {
+                await this.updateReputation(true, task.claimed_by || undefined, 2);
+            }
+        } else {
+            console.log(`[BFT] ❌ CHALLENGE ISSUED by ${this.name}`);
+
+            // [PHASE 10] SUBJECTIVE SLASHING
+            const slashAmount = disbelief > 0.6 ? -15 : -5;
+
+            await this.supabase.from('trinity_tasks').update({
+                status: 'failed',
+                verification_result: `CHALLENGE: Failed by ${this.name} (Disbelief: ${disbelief.toFixed(2)})`,
+                verification_details: `RepID Slashed ${slashAmount} for ${task.claimed_by}. Re-org triggered.`
+            }).eq('id', task.id);
+
+            // SLASH REPID of task.claimed_by
+            await this.updateReputation(false, task.claimed_by || undefined, slashAmount);
+            await this.log('bft_slash', `Slashed ${task.claimed_by} (${slashAmount}) for failed verification on ${task.id}`);
+        }
+
+        this.sessionMetrics.tasksCompleted++; // Verification counts as work
+        await this.heartbeat();
     }
 
     async getNextTask() {
@@ -566,7 +630,7 @@ export class ConstitutionalAgent {
         await this.supabase
             .from('trinity_tasks')
             .update({
-                status: 'completed',
+                status: 'done', // v8.0: mark "done" to trigger BFT review
                 result: result,
                 claimed_by: this.name,
                 completed_at: new Date().toISOString()
@@ -584,9 +648,9 @@ export class ConstitutionalAgent {
         console.log(`[LLM] 🧠 Calling API for task ${task.id}(${task.task_type})`);
 
         try {
-            // Claim Task
+            // 2. CLAIM TASK (Status: Doing)
             await this.supabase.from('trinity_tasks').update({
-                status: 'in_progress',
+                status: 'doing',
                 claimed_by: this.name,
                 started_at: new Date().toISOString()
             }).eq('id', task.id);
@@ -631,8 +695,26 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
             // Call LLM
             const result = await this.callLLM(prompt);
             console.log(`[${this.name}] 🧠 Result length: ${result.output?.length || 0}`);
-            // Calculate Certainty & Evaluation (Optimization Upgrade)
+            // [PHASE 10] UNCERTAINTY AS OPPORTUNITY (Logical Escalation)
             const evaluation = await this.evaluateResult(task, result.output);
+            const lowBelief = evaluation.score < 40;
+            const explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
+
+            if (lowBelief || explicitEscalate) {
+                console.log(`[ANTIGRAVITY] 🚨 UNCERTAINTY DETECTED (Score: ${evaluation.score}). Escalating to Architect...`);
+
+                await this.supabase.from('trinity_tasks').update({
+                    status: 'pending_clarification',
+                    result: `[ESCALATED] Agent ${this.name} is seeking clarification. \n\nReason: ${lowBelief ? 'Low certainty score' : 'Explicit escalation request'}. \n\nQuery: ${result.output.substring(0, 500)}`,
+                    verification_result: `Searching high-dimension databases... seeking expert consensus.`
+                }).eq('id', task.id);
+
+                // Spawn "Question for Architect" artifact
+                const questionContent = `# Question for Architect \n\n**Agent**: ${this.name} \n**Task**: ${task.title} \n\n**The Right Question**: \n${result.output} \n\n---\n*The smartest person is not the one with all the answers, but the one asking the right questions.*`;
+                await this.saveArtifact(task.id, questionContent, 'report', `Q: ${task.title}`, 'public');
+
+                return { success: true, llm_used: true, escalated: true };
+            }
 
             let externalArtifactUrl = '';
             // Artifact Logic
@@ -674,8 +756,8 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
                     disbelief: evaluation.score < 50 ? (50 - evaluation.score) / 100 : 0,
                     uncertainty: evaluation.score > 90 ? 0.05 : 0.2,
                     metadata: JSON.stringify({
-                        provider: 'openai', // or result.provider
-                        certainty: 0.85,
+                        provider: 'openai',
+                        certainty: evaluation.score / 100,
                         evaluation: evaluation,
                         processedBy: this.name,
                         version: this.version

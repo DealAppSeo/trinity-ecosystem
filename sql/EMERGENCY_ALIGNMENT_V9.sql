@@ -15,7 +15,7 @@ BEGIN
         -- We'll keep 'completed' for compatibility but prioritize 'done' in code.
         ALTER TABLE trinity_tasks DROP CONSTRAINT IF EXISTS trinity_tasks_status_check;
         ALTER TABLE trinity_tasks ADD CONSTRAINT trinity_tasks_status_check 
-        CHECK (status IN ('pending', 'in_progress', 'completed', 'done', 'verified', 'failed', 'archived'));
+        CHECK (status IN ('pending', 'in_progress', 'completed', 'done', 'verified', 'failed', 'archived', 'to_do', 'doing', 'pending_clarification'));
     END IF;
 END $$;
 
@@ -42,9 +42,17 @@ BEGIN
         ALTER TABLE trinity_tasks ADD COLUMN verify_count INTEGER DEFAULT 0;
     END IF;
 
-    -- verified_by (Primary/First verifier)
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trinity_tasks' AND column_name = 'verified_by') THEN
-        ALTER TABLE trinity_tasks ADD COLUMN verified_by TEXT;
+    -- [ANTIGRAVITY] RESOLVE VIEW DEPENDENCY
+    -- The view v_ready_tasks depends on verified_by. We must drop it to alter the type.
+    DROP VIEW IF EXISTS v_ready_tasks;
+
+    -- verified_by (Array for multiple verifiers)
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trinity_tasks' AND column_name = 'verified_by') THEN
+        -- Check if it's already an array, if not we might need to cast
+        -- For simplicity in this script, we'll try to ensure it's TEXT[]
+        ALTER TABLE trinity_tasks ALTER COLUMN verified_by TYPE TEXT[] USING array[verified_by];
+    ELSE
+        ALTER TABLE trinity_tasks ADD COLUMN verified_by TEXT[] DEFAULT '{}';
     END IF;
     
     -- verification_result
@@ -82,6 +90,15 @@ BEGIN
 END $$;
 
 -- 5. LOG ALIGNMENT
-INSERT INTO trinity_artifacts (task_id, title, artifact_type, content, creator_agent, status)
-VALUES ('system-alignment-v9', 'EMERGENCY_ALIGNMENT_V9 Execution', 'report', 'Verified status added. BFT columns initialized. 3x3 Triad support active.', 'Antigravity', 'created')
+INSERT INTO trinity_artifacts (task_id, title, artifact_type, content, agent, creator_agent, storage_location, status)
+VALUES (
+    'system-alignment-v9', 
+    'EMERGENCY_ALIGNMENT_V9 Execution', 
+    'report', 
+    'Verified status added. BFT columns initialized. 3x3 Triad support active.', 
+    'Antigravity', 
+    'Antigravity', 
+    'database',
+    'created'
+)
 ON CONFLICT DO NOTHING;

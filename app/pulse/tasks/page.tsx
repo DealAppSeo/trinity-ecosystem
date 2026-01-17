@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { Plus, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Clock, AlertCircle, CheckCircle, XCircle, HelpCircle, MessageSquare } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { TaskRecord } from '@/lib/agent/types';
@@ -63,8 +63,10 @@ export default function TasksPage() {
 
         let dbStatus = newStatus;
         if (newStatus === 'todo') dbStatus = 'pending';
-        if (newStatus === 'done') dbStatus = 'completed';
-        if (newStatus === 'in-progress') dbStatus = 'in_progress';
+        if (newStatus === 'doing') dbStatus = 'doing';
+        if (newStatus === 'done') dbStatus = 'done';
+        if (newStatus === 'verified') dbStatus = 'verified';
+        if (newStatus === 'failed') dbStatus = 'failed';
 
         setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status: dbStatus } : t)));
 
@@ -105,8 +107,11 @@ export default function TasksPage() {
     const getTasksByStatus = (status: string) => {
         let dbStatus = [status];
         if (status === 'todo') dbStatus = ['pending'];
-        if (status === 'in-progress') dbStatus = ['in_progress', 'running'];
-        if (status === 'done') dbStatus = ['completed', 'success'];
+        if (status === 'doing') dbStatus = ['doing', 'in_progress', 'running'];
+        if (status === 'done') dbStatus = ['done', 'completed'];
+        if (status === 'verified') dbStatus = ['verified', 'success'];
+        if (status === 'pending_clarification') dbStatus = ['pending_clarification'];
+        if (status === 'failed') dbStatus = ['failed'];
 
         return tasks
             .filter((task) => dbStatus.includes(task.status))
@@ -152,8 +157,10 @@ export default function TasksPage() {
 
     const columns = [
         { id: 'todo', title: 'To Do', icon: Clock, color: 'violet' },
-        { id: 'in-progress', title: 'Running', icon: AlertCircle, color: 'cyan' },
-        { id: 'done', title: 'Done', icon: CheckCircle, color: 'green' },
+        { id: 'doing', title: 'Doing', icon: AlertCircle, color: 'cyan' },
+        { id: 'pending_clarification', title: 'Clarify', icon: HelpCircle, color: 'amber' },
+        { id: 'done', title: 'Done', icon: CheckCircle, color: 'orange' },
+        { id: 'verified', title: 'Verified', icon: CheckCircle, color: 'green' },
         { id: 'failed', title: 'Failed', icon: XCircle, color: 'red' },
     ];
 
@@ -230,7 +237,7 @@ export default function TasksPage() {
             )}
 
             {/* Kanban Board */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 overflow-x-auto pb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
                 {columns.map((column) => {
                     const Icon = column.icon;
                     const columnTasks = getTasksByStatus(column.id);
@@ -238,8 +245,14 @@ export default function TasksPage() {
                     return (
                         <div key={column.id} className="glass rounded-xl p-4 border border-white/10 min-w-[280px]">
                             <div className="flex items-center gap-2 mb-4">
-                                <div className={`p-2 rounded-lg bg-${column.color}-500/10`}>
-                                    <Icon className={`w-5 h-5 text-${column.color}-400`} style={{ color: column.id === 'todo' ? '#a78bfa' : column.id === 'in-progress' ? '#22d3ee' : column.id === 'done' ? '#4ade80' : '#f87171' }} />
+                                <div className={`p-2 rounded-lg bg-${column.color}-500/10 ${column.id === 'pending_clarification' ? 'animate-pulse' : ''}`}>
+                                    <Icon className={`w-5 h-5 text-${column.color}-400`} style={{
+                                        color: column.id === 'todo' ? '#a78bfa' :
+                                            column.id === 'doing' ? '#22d3ee' :
+                                                column.id === 'pending_clarification' ? '#fbbf24' :
+                                                    column.id === 'done' ? '#fb923c' :
+                                                        column.id === 'verified' ? '#4ade80' : '#f87171'
+                                    }} />
                                 </div>
                                 <h3 className="font-bold">{column.title}</h3>
                                 <span className="ml-auto text-xs font-mono bg-white/5 px-2 py-1 rounded-md text-gray-400">{columnTasks.length}</span>
@@ -278,6 +291,11 @@ export default function TasksPage() {
                                                     (typeof task.priority === 'number' && task.priority <= 3) || task.priority === 'low' ? 'text-blue-400 bg-blue-400/10' :
                                                         'text-yellow-400 bg-yellow-400/10'
                                                     }`}>
+                                                    {task.verify_count !== undefined && task.verify_count > 0 && (
+                                                        <span className="text-[10px] font-mono text-gray-500 mr-2">
+                                                            {task.verify_count}/3
+                                                        </span>
+                                                    )}
                                                     {typeof task.priority === 'number'
                                                         ? (task.priority >= 8 ? 'HIGH' : task.priority >= 5 ? 'MEDIUM' : 'LOW')
                                                         : (task.priority || 'MEDIUM')}
@@ -302,6 +320,26 @@ export default function TasksPage() {
                                                     </button>
                                                 </div>
                                             </div>
+
+                                            {/* [PHASE 10] ASK AGENT INTERACTION */}
+                                            {task.status === 'pending_clarification' && (
+                                                <div className="mt-3 pt-3 border-t border-amber-500/20">
+                                                    <button
+                                                        onClick={() => {
+                                                            const answer = prompt(`Agent Query: ${task.result?.substring(0, 200)}...\n\nYour Answer:`);
+                                                            if (answer) {
+                                                                supabase.from('trinity_tasks').update({
+                                                                    status: 'pending',
+                                                                    description: `${task.description}\n\n[USER CLARIFICATION]: ${answer}`
+                                                                }).eq('id', task.id).then(() => refresh());
+                                                            }
+                                                        }}
+                                                        className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30 text-amber-400 text-[10px] font-bold transition-all"
+                                                    >
+                                                        <MessageSquare className="w-3 h-3" /> ASK AGENT
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     ))
                                 )}
