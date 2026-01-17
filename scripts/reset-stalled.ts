@@ -1,28 +1,71 @@
-import { supabaseAdmin as supabase } from '../lib/supabase';
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
+import path from 'path';
 
-async function resetInProgress() {
-    console.log('--- RESETTING STALLED TASKS ---');
+// Load environment
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config();
 
-    // 1. Move in_progress tasks back to pending if they are from the last mission
-    const { data: updated, error } = await supabase
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function resetStalledTasks() {
+    console.log('🔄 Identifying stalled tasks...');
+
+    // 1. Move 'doing' and 'pending_clarification' back to 'pending'
+    // This clears the Busy Worker Lock and allows renamed agents to claim them.
+    const { data: stalled, error: fetchError } = await supabase
         .from('trinity_tasks')
-        .update({
-            status: 'pending',
-            claimed_by: null,
-            started_at: null,
-            metadata: {} // Clear stalling metadata if any
-        })
-        .eq('status', 'in_progress');
+        .select('id, title, claimed_by, status')
+        .in('status', ['doing', 'pending_clarification', 'in_progress']);
 
-    if (error) {
-        console.error('Failed to reset tasks:', error.message);
-    } else {
-        console.log(`Successfully reset tasks to pending.`);
+    if (fetchError) {
+        console.error('Error fetching stalled tasks:', fetchError);
+        return;
     }
 
-    console.log('--- RESET COMPLETE ---');
+    if (!stalled || stalled.length === 0) {
+        console.log('✅ No stalled tasks found.');
+    } else {
+        console.log(`Found ${stalled.length} stalled tasks. Resetting naming/state...`);
+
+        const { error: updateError } = await supabase
+            .from('trinity_tasks')
+            .update({
+                status: 'pending',
+                claimed_by: null,
+                claimed_at: null,
+                assigned_to: null, // Fully reset for fresh claiming
+                metadata: {} // Clear any transient state
+            })
+            .in('status', ['doing', 'pending_clarification', 'in_progress']);
+
+        if (updateError) {
+            console.error('Error resetting tasks:', updateError);
+        } else {
+            console.log('✅ Stalled tasks successfully returned to PENDING.');
+        }
+    }
+
+    // 2. Clear Registry Status (Force Offline to trigger fresh heartbeats)
+    console.log('📡 Resetting agent registry status for naming alignment...');
+    const { error: registryError } = await supabase
+        .from('trinity_agent_registry')
+        .update({
+            status: 'offline',
+            current_task_summary: 'System Reset'
+        })
+        .neq('agent_name', 'RESERVED'); // Avoid system wide locks
+
+    if (registryError) {
+        console.error('Error resetting registry:', registryError);
+    } else {
+        console.log('✅ All agents marked OFFLINE. Ready for fresh boot.');
+    }
+
+    console.log('\n🚀 RECOVERY COMPLETE. Please apply UNIVERSAL_NAMING_V10.sql now.');
 }
 
-resetInProgress();
+resetStalledTasks();
