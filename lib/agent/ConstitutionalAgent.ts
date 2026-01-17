@@ -365,8 +365,24 @@ export class ConstitutionalAgent {
     }
 
     private resolveLegacyName(name: string): string {
-        const MAP: Record<string, string> = { 'MCP': 'trinity-orch', 'orch': 'trinity-orch', 'MEL': 'trinity-mel', 'APM': 'trinity-apm' };
-        return MAP[name] || name;
+        const MAP: Record<string, string> = {
+            'MCP': 'trinity-orch',
+            'ORCH': 'trinity-orch',
+            'orch': 'trinity-orch',
+            'MEL': 'trinity-mel',
+            'APM': 'trinity-apm',
+            'GCM': 'trinity-gcm',
+            'HDM': 'trinity-hdm',
+            'TORCH': 'trinity-torch',
+            'VERITAS': 'trinity-veritas',
+            'SHOFET': 'trinity-shofet',
+            'SOPHIA': 'trinity-sophia',
+            'NEXUS': 'trinity-nexus',
+            'CHESED': 'trinity-chesed',
+            'W3C': 'trinity-w3c'
+        };
+        const upper = name ? name.toUpperCase() : '';
+        return MAP[upper] || MAP[name] || name;
     }
 
     // ============================================

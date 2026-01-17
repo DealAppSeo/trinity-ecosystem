@@ -13,7 +13,7 @@ interface SymphonyCardProps {
 
 export function SymphonyCard({ agent }: SymphonyCardProps) {
     // Unified Heartbeat Logic (v3.4 - SSOT Consolidation)
-    const isOnline = agent.status === 'active';
+    const isOnline = ['online', 'active', 'green', 'blue'].includes(agent.status);
     const group = getGroupForAgent(agent.agent_name);
     const lastHeartbeat = agent.last_active ? new Date(agent.last_active) : null;
 
@@ -49,7 +49,7 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
                 {/* Left: Identity */}
                 <div className="flex flex-col flex-1 min-w-0 pr-4">
                     <h3 className="text-xl font-bold text-white tracking-tight group-hover:text-white/90 transition-colors truncate">
-                        {agent.agent_name}
+                        {agent.agent_name.replace('trinity-', '').toUpperCase()}
                     </h3>
                     <p className="text-xs font-semibold text-zinc-500 mt-1 mb-2">
                         {role}

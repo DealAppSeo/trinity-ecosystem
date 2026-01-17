@@ -31,7 +31,7 @@ export default function ConductorPage() {
     // No explicit refresh interval needed here.
 
     // Derived stats for UI if API fails or for instant updates
-    const onlineCount = agents.filter(a => a.status === 'active').length;
+    const onlineCount = agents.filter(a => ['online', 'active', 'green', 'blue'].includes(a.status)).length;
 
     // --- CAPTAIN FEATURES ---
     const [northStar, setNorthStar] = useState('');
@@ -178,7 +178,7 @@ export default function ConductorPage() {
                                     <div className="grid grid-cols-4 gap-2"> {/* Orchestration + 3 Squads */}
                                         {Object.values(AGENT_GROUPS).map(group => {
                                             const groupAgents = agents.filter(a => group.members.includes(a.agent_name));
-                                            const onlineCount = groupAgents.filter(a => a.status === 'online' || a.status === 'active').length;
+                                            const onlineCount = groupAgents.filter(a => ['online', 'active', 'green', 'blue'].includes(a.status)).length;
                                             const busyCount = groupAgents.filter(a => (a as any).current_task_summary && (a as any).current_task_summary !== 'Idle').length;
                                             const total = group.members.length;
 
