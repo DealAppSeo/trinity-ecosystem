@@ -60,10 +60,9 @@ async function startAgent() {
 
     // START HTTP SERVER FOR RAILWAY/UPTIME ROBOT
     // Railway requires the app to listen on PORT (usually 3000)
-    const port = process.env.PORT || 3000;
+    // We favor process.env.PORT but allow a random fallback for local multi-agent boot.
+    const finalPort = process.env.PORT ? parseInt(process.env.PORT) : (3100 + Math.floor(Math.random() * 1000));
 
-    // Start Heal Server (Dynamic Port)
-    const PORT = 3000 + Math.floor(Math.random() * 1000);
     const server = http.createServer((req, res) => {
         if (req.url === '/health') {
             res.writeHead(200);
@@ -73,8 +72,9 @@ async function startAgent() {
             res.end();
         }
     });
-    server.listen(PORT, () => {
-        console.log(`[${finalAgentName}] 🌍 Health Server listening on port ${PORT}`);
+
+    server.listen(finalPort, '0.0.0.0', () => {
+        console.log(`[${finalAgentName}] 🌍 Health Server listening on port ${finalPort} (/health)`);
     });
 
     // START MAIN AGENT LOOP

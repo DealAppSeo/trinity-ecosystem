@@ -53,12 +53,22 @@ export default function ConductorPage() {
     };
 
     const wakeTrinity = async () => {
-        if (!confirm('⚠️ WAKE ALL AGENTS? This will signal the swarm to startup.')) return;
+        if (!confirm('☀️ WAKE ALL AGENTS? This will send keep-alive pings to the entire swarm.')) return;
         await fetch('/api/captain', {
             method: 'POST',
             body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_WAKE' })
         });
-        alert('SIGNAL SENT: SYSTEM_WAKE');
+        alert('SIGNAL DISPATCHED: SWARM WAKE');
+    };
+
+    const resetTrinity = async () => {
+        if (!confirm('🚨 KILL ALL ACTION AND REBOOT? This will clear all "Doing" tasks and mark the swarm offline. Use this for emergency recovery.')) return;
+        await fetch('/api/captain', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_RESET' })
+        });
+        alert('SYSTEM RESET: Board cleared and agents marked offline.');
+        refresh();
     };
 
     // --- SHARE FEATURE ---
@@ -108,12 +118,20 @@ export default function ConductorPage() {
                             </div>
                         </div>
 
-                        <button
-                            onClick={wakeTrinity}
-                            className="w-full max-w-md bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                        >
-                            <Share2 className="w-5 h-5" /> REBOOT SYSTEM
-                        </button>
+                        <div className="flex gap-4 w-full max-w-md">
+                            <button
+                                onClick={wakeTrinity}
+                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                <Activity className="w-5 h-5" /> WAKE SWARM
+                            </button>
+                            <button
+                                onClick={resetTrinity}
+                                className="flex-1 bg-zinc-800 hover:bg-red-900 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 border border-white/5"
+                            >
+                                <Skull className="w-5 h-5" /> REBOOT
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -157,12 +175,34 @@ export default function ConductorPage() {
                                         </div>
                                         <div className="flex gap-2">
                                             <button
-                                                onClick={() => confirm('Kill Random Agent?') && killRandomAgent()}
-                                                className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors flex items-center gap-1"
+                                                onClick={wakeTrinity}
+                                                className="px-3 py-1 bg-emerald-950/50 border border-emerald-900/30 text-emerald-300 text-xs rounded hover:bg-emerald-900/80 transition-colors flex items-center gap-1"
+                                                title="Send Keep-Alive Pings"
                                             >
-                                                <Skull className="w-3 h-3" /> Kill Random
+                                                <Activity className="w-3 h-3" /> Wake Swarm
+                                            </button>
+                                            <button
+                                                onClick={resetTrinity}
+                                                className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors flex items-center gap-1"
+                                                title="Emergency Board Reset"
+                                            >
+                                                <AlertTriangle className="w-3 h-3" /> Kill All
                                             </button>
                                         </div>
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-2 gap-2">
+                                        <button
+                                            onClick={() => confirm('Kill Random Agent?') && killRandomAgent()}
+                                            className="px-3 py-1 bg-zinc-900/50 border border-white/5 text-zinc-500 text-[10px] rounded hover:bg-red-950/30 hover:text-red-400 transition-all flex items-center justify-center gap-1"
+                                        >
+                                            <Skull className="w-3 h-3" /> Kill Random
+                                        </button>
+                                        <button
+                                            onClick={() => triggerChaosEvent('SIMULATED_FAILURE')}
+                                            className="px-3 py-1 bg-zinc-900/50 border border-white/5 text-zinc-500 text-[10px] rounded hover:bg-amber-950/30 hover:text-amber-400 transition-all flex items-center justify-center gap-1"
+                                        >
+                                            <ServerCrash className="w-3 h-3" /> Trip Circuit
+                                        </button>
                                     </div>
                                 </div>
 

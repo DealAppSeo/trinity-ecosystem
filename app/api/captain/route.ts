@@ -36,7 +36,59 @@ export async function POST(req: Request) {
         }
 
         if (action === 'SEND_SIGNAL') {
-            // e.g. signal = 'SYSTEM_WAKE'
+            const { signal } = body;
+
+            if (signal === 'SYSTEM_WAKE') {
+                // 1. Get all agents from registry
+                const { data: agents } = await supabase.from('trinity_agent_registry').select('agent_name');
+                const agentNames = agents?.map(a => a.agent_name) || [];
+
+                // 2. Insert Heartbeat/Wake tasks for each agent
+                if (agentNames.length > 0) {
+                    const pings = agentNames.map(name => ({
+                        title: `[HEARTBEAT] System Wake Signal`,
+                        description: 'Manual wake signal from Conductor Dashboard.',
+                        task_type: 'heartbeat',
+                        status: 'pending',
+                        assigned_to: name,
+                        priority: 1
+                    }));
+                    await supabase.from('trinity_tasks').insert(pings);
+
+                    // Update registry last_active to show immediate pulse
+                    await supabase.from('trinity_agent_registry')
+                        .update({ last_active: new Date().toISOString() })
+                        .in('agent_name', agentNames);
+                }
+
+                if (process.env.RAILWAY_DEPLOY_HOOK) {
+                    await fetch(process.env.RAILWAY_DEPLOY_HOOK, { method: 'POST' });
+                }
+
+                return NextResponse.json({ message: 'SYSTEM_WAKE signal dispatched to all agents.' });
+            }
+
+            if (signal === 'SYSTEM_RESET') {
+                // 1. Reset all tasks in progress
+                await supabase.from('trinity_tasks')
+                    .update({
+                        status: 'pending',
+                        claimed_by: null,
+                        claimed_at: null,
+                        assigned_to: null,
+                        metadata: { reset_reason: 'MANUAL_REBOOT' }
+                    })
+                    .in('status', ['doing', 'in_progress', 'pending_clarification']);
+
+                // 2. Mark all agents offline
+                await supabase.from('trinity_agent_registry')
+                    .update({ status: 'offline' })
+                    .neq('agent_name', 'RESERVED');
+
+                return NextResponse.json({ message: 'SYSTEM_RESET completed. Swarm state cleared.' });
+            }
+
+            // Fallback for other signals
             const { data, error } = await supabase
                 .from('trinity_signals')
                 .insert({
@@ -45,12 +97,6 @@ export async function POST(req: Request) {
                 })
                 .select()
                 .single();
-
-            // TODO: If we had a Railway Webhook, we would fire it here too.
-            if (signal === 'SYSTEM_WAKE' && process.env.RAILWAY_DEPLOY_HOOK) {
-                console.log('Firing Railway Deploy Hook...');
-                await fetch(process.env.RAILWAY_DEPLOY_HOOK, { method: 'POST' });
-            }
 
             if (error) throw error;
             return NextResponse.json(data);

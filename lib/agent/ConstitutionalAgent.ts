@@ -432,14 +432,28 @@ export class ConstitutionalAgent {
                 // [PHASE 11] BUSY WORKER LOCK: Check if we are already handling an escalated/in-progress task
                 const { data: busyCheck } = await this.supabase
                     .from('trinity_tasks')
-                    .select('id')
+                    .select('id, status')
                     .eq('claimed_by', this.name)
                     .in('status', ['doing', 'pending_clarification'])
                     .limit(1)
-                    .single();
+                    .maybeSingle();
 
                 if (busyCheck) {
-                    console.log(`[${this.name}] 🚧 Busy with task ${busyCheck.id}. Skipping fetch.`);
+                    if (busyCheck.status === 'doing') {
+                        console.log(`[${this.name}] 🚀 RESUMING orphaned task ${busyCheck.id}...`);
+                        const { data: fullTask } = await this.supabase
+                            .from('trinity_tasks')
+                            .select('*')
+                            .eq('id', busyCheck.id)
+                            .single();
+
+                        if (fullTask) {
+                            await this.processTask(fullTask as any);
+                            continue;
+                        }
+                    }
+
+                    console.log(`[${this.name}] 🚧 Awaiting clarification for ${busyCheck.id}. Skipping fetch.`);
                     await this.heartbeat();
                     await this.sleep(60000);
                     continue;
@@ -1765,39 +1779,54 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         ];
 
         for (let i = 0; i < 5; i++) {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                body: JSON.stringify({
-                    model: 'gpt-4o',
-                    messages,
-                    tools: tools.length > 0 ? tools : undefined,
-                    tool_choice: tools.length > 0 ? 'auto' : undefined
-                })
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout
 
-            if (!response.ok) throw new Error(await response.text());
-            const data = await response.json();
-            const message = data.choices[0].message;
-            messages.push(message);
+            try {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        messages,
+                        tools: tools.length > 0 ? tools : undefined,
+                        tool_choice: tools.length > 0 ? 'auto' : undefined
+                    })
+                });
 
-            if (message.tool_calls) {
-                for (const toolCall of message.tool_calls) {
-                    const fnName = toolCall.function.name;
-                    const args = JSON.parse(toolCall.function.arguments);
-                    let toolResult = '';
-                    if (fnName === 'save_artifact') {
-                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-                        await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
-                        toolResult = `Artifact '${args.title}' saved.`;
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error(await response.text());
+                const data = await response.json();
+                const message = data.choices[0].message;
+                messages.push(message);
+
+                if (message.tool_calls) {
+                    for (const toolCall of message.tool_calls) {
+                        const fnName = toolCall.function.name;
+                        const args = JSON.parse(toolCall.function.arguments);
+                        let toolResult = '';
+                        if (fnName === 'save_artifact') {
+                            const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+                            await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                            toolResult = `Artifact '${args.title}' saved.`;
+                        }
+                        else {
+                            toolResult = await mcpManager.routeToolCall(fnName, args);
+                        }
+                        messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
                     }
-                    else {
-                        toolResult = await mcpManager.routeToolCall(fnName, args);
-                    }
-                    messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
+                } else {
+                    return { output: message.content || "" };
                 }
-            } else {
-                return { output: message.content || "" };
+            } catch (err: any) {
+                clearTimeout(timeoutId);
+                if (err.name === 'AbortError') {
+                    console.error(`[${this.name}] ⏱️ OpenAI Timeout after 120s.`);
+                    throw new Error("LLM API Timeout");
+                }
+                throw err;
             }
         }
         throw new Error("Max tool recursion");

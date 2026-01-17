@@ -54,8 +54,7 @@ async function resetStalledTasks() {
     const { error: registryError } = await supabase
         .from('trinity_agent_registry')
         .update({
-            status: 'offline',
-            current_task_summary: 'System Reset'
+            status: 'offline'
         })
         .neq('agent_name', 'RESERVED'); // Avoid system wide locks
 
