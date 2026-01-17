@@ -1,6 +1,6 @@
 -- UNIVERSAL_NAMING_V10.sql
 -- Enforcing trinity- prefix schema for all core agents
--- FIXED: Robust handling for unique constraints and array columns.
+-- FIXED: Robust handling for unique constraints, array columns, and schema-correct logging.
 
 DO $$ 
 BEGIN
@@ -56,8 +56,8 @@ BEGIN
     ELSE
         -- Update the most recent one if multiple exist
         UPDATE agent_heartbeat SET agent_name = 'trinity-orch' 
-        WHERE id = (SELECT id FROM agent_heartbeat WHERE agent_name IN ('ORCH', 'orch', 'MCP') ORDER BY last_ping DESC LIMIT 1);
-        DELETE FROM agent_heartbeat WHERE agent_name IN ('ORCH', 'orch', 'MCP');
+        WHERE id = (SELECT id FROM (SELECT id, last_ping FROM agent_heartbeat WHERE agent_name IN ('ORCH', 'orch', 'MCP') ORDER BY last_ping DESC LIMIT 1) sub);
+        DELETE FROM agent_heartbeat WHERE agent_name IN ('ORCH', 'orch', 'MCP') AND agent_name != 'trinity-orch';
     END IF;
 
     -- 5. RECOVERY: Reset Stuck Tasks
@@ -65,7 +65,13 @@ BEGIN
     SET status = 'pending', claimed_by = NULL, claimed_at = NULL 
     WHERE status = 'doing' OR status = 'in_progress';
 
-    -- Log the alignment
-    INSERT INTO trinity_agent_logs (agent_name, message, level)
-    VALUES ('trinity-orch', '[SYSTEM] Universal Naming Schema V10 Applied. Integrity checks passed. Tasks reset.', 'info');
+    -- 6. Log the alignment (Using schema-correct columns: agent, action, message)
+    -- We use a dynamic check to handle cases where agent_name might still exist (unlikely given error)
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trinity_agent_logs' AND column_name = 'agent') THEN
+        INSERT INTO trinity_agent_logs (agent, action, message)
+        VALUES ('trinity-orch', 'migration', '[SYSTEM] Universal Naming Schema V10 Applied. Integrity checks passed. Tasks reset.');
+    ELSE
+        INSERT INTO trinity_agent_logs (agent_name, action, message)
+        VALUES ('trinity-orch', 'migration', '[SYSTEM] Universal Naming Schema V10 Applied. Integrity checks passed. Tasks reset.');
+    END IF;
 END $$;
