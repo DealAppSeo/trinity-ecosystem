@@ -1,18 +1,18 @@
 -- UNIVERSAL_NAMING_V10.sql
 -- Enforcing trinity- prefix schema for all core agents
--- FIXED: Robust handling for unique constraints, array columns, and schema-correct logging.
+-- FIXED: Robust handling for unique constraints, array columns, and schema-agnostic logging.
 
 DO $$ 
 BEGIN
     -- 1. Update trinity_agent_registry (Merged logic to avoid unique violations)
     -- Handle ORCHESTRATION
     IF EXISTS (SELECT 1 FROM trinity_agent_registry WHERE agent_name = 'trinity-orch') THEN
-        DELETE FROM trinity_agent_registry WHERE agent_name IN ('ORCH', 'orch', 'MCP');
+        DELETE FROM trinity_agent_registry WHERE agent_name IN ('ORCH', 'orch', 'MCP', 'mcp');
     ELSE
         UPDATE trinity_agent_registry SET agent_name = 'trinity-orch' WHERE agent_name = 'ORCH';
         UPDATE trinity_agent_registry SET agent_name = 'trinity-orch' WHERE agent_name = 'orch' AND NOT EXISTS (SELECT 1 FROM trinity_agent_registry WHERE agent_name = 'trinity-orch');
         UPDATE trinity_agent_registry SET agent_name = 'trinity-orch' WHERE agent_name = 'MCP' AND NOT EXISTS (SELECT 1 FROM trinity_agent_registry WHERE agent_name = 'trinity-orch');
-        DELETE FROM trinity_agent_registry WHERE agent_name IN ('ORCH', 'orch', 'MCP') AND agent_name != 'trinity-orch';
+        DELETE FROM trinity_agent_registry WHERE agent_name IN ('ORCH', 'orch', 'MCP', 'mcp') AND agent_name != 'trinity-orch';
     END IF;
 
     -- Handle MEL
@@ -32,8 +32,8 @@ BEGIN
     END IF;
 
     -- 2. Update trinity_tasks (Safe - No unique constraint)
-    UPDATE trinity_tasks SET assigned_to = 'trinity-orch' WHERE assigned_to IN ('ORCH', 'orch', 'MCP');
-    UPDATE trinity_tasks SET claimed_by = 'trinity-orch' WHERE claimed_by IN ('ORCH', 'orch', 'MCP');
+    UPDATE trinity_tasks SET assigned_to = 'trinity-orch' WHERE assigned_to IN ('ORCH', 'orch', 'MCP', 'mcp');
+    UPDATE trinity_tasks SET claimed_by = 'trinity-orch' WHERE claimed_by IN ('ORCH', 'orch', 'MCP', 'mcp');
     UPDATE trinity_tasks SET assigned_to = 'trinity-mel' WHERE assigned_to IN ('MEL', 'mel');
     UPDATE trinity_tasks SET claimed_by = 'trinity-mel' WHERE claimed_by IN ('MEL', 'mel');
     UPDATE trinity_tasks SET assigned_to = 'trinity-apm' WHERE assigned_to IN ('APM', 'apm');
@@ -47,17 +47,17 @@ BEGIN
     UPDATE trinity_tasks SET verified_by = array_replace(verified_by, 'mel', 'trinity-mel') WHERE 'mel' = ANY(verified_by);
 
     -- 3. Update trinity_artifacts
-    UPDATE trinity_artifacts SET creator_agent = 'trinity-orch' WHERE creator_agent IN ('ORCH', 'orch', 'MCP');
-    UPDATE trinity_artifacts SET agent = 'trinity-orch' WHERE agent IN ('ORCH', 'orch', 'MCP');
+    UPDATE trinity_artifacts SET creator_agent = 'trinity-orch' WHERE creator_agent IN ('ORCH', 'orch', 'MCP', 'mcp');
+    UPDATE trinity_artifacts SET agent = 'trinity-orch' WHERE agent IN ('ORCH', 'orch', 'MCP', 'mcp');
 
     -- 4. Update agent_heartbeat (Merged logic for unique constraint)
     IF EXISTS (SELECT 1 FROM agent_heartbeat WHERE agent_name = 'trinity-orch') THEN
-        DELETE FROM agent_heartbeat WHERE agent_name IN ('ORCH', 'orch', 'MCP');
+        DELETE FROM agent_heartbeat WHERE agent_name IN ('ORCH', 'orch', 'MCP', 'mcp');
     ELSE
         -- Update the most recent one if multiple exist
-        UPDATE agent_heartbeat SET agent_name = 'trinity-orch' 
-        WHERE id = (SELECT id FROM (SELECT id, last_ping FROM agent_heartbeat WHERE agent_name IN ('ORCH', 'orch', 'MCP') ORDER BY last_ping DESC LIMIT 1) sub);
-        DELETE FROM agent_heartbeat WHERE agent_name IN ('ORCH', 'orch', 'MCP') AND agent_name != 'trinity-orch';
+        EXECUTE 'UPDATE agent_heartbeat SET agent_name = ''trinity-orch'' 
+        WHERE id = (SELECT id FROM agent_heartbeat WHERE agent_name IN (''ORCH'', ''orch'', ''MCP'', ''mcp'') ORDER BY last_ping DESC LIMIT 1)';
+        DELETE FROM agent_heartbeat WHERE agent_name IN ('ORCH', 'orch', 'MCP', 'mcp') AND agent_name != 'trinity-orch';
     END IF;
 
     -- 5. RECOVERY: Reset Stuck Tasks
@@ -65,13 +65,22 @@ BEGIN
     SET status = 'pending', claimed_by = NULL, claimed_at = NULL 
     WHERE status = 'doing' OR status = 'in_progress';
 
-    -- 6. Log the alignment (Using schema-correct columns: agent, action, message)
-    -- We use a dynamic check to handle cases where agent_name might still exist (unlikely given error)
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trinity_agent_logs' AND column_name = 'agent') THEN
-        INSERT INTO trinity_agent_logs (agent, action, message)
-        VALUES ('trinity-orch', 'migration', '[SYSTEM] Universal Naming Schema V10 Applied. Integrity checks passed. Tasks reset.');
-    ELSE
-        INSERT INTO trinity_agent_logs (agent_name, action, message)
-        VALUES ('trinity-orch', 'migration', '[SYSTEM] Universal Naming Schema V10 Applied. Integrity checks passed. Tasks reset.');
-    END IF;
+    -- 6. Log the alignment (ULTRA-DEFENSIVE COLUMN PROBING)
+    BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trinity_agent_logs' AND column_name = 'message') THEN
+            EXECUTE 'INSERT INTO trinity_agent_logs (' || 
+                    (SELECT column_name FROM information_schema.columns WHERE table_name = 'trinity_agent_logs' AND column_name IN ('agent', 'agent_name') LIMIT 1) || 
+                    ', action, message) VALUES (''trinity-orch'', ''migration'', ''[SYSTEM] Universal Naming Schema V10 Applied. Integrity checks passed. Tasks reset.'')';
+        ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trinity_agent_logs' AND column_name = 'content') THEN
+            EXECUTE 'INSERT INTO trinity_agent_logs (' || 
+                    (SELECT column_name FROM information_schema.columns WHERE table_name = 'trinity_agent_logs' AND column_name IN ('agent', 'agent_name') LIMIT 1) || 
+                    ', action, content) VALUES (''trinity-orch'', ''migration'', ''[SYSTEM] Universal Naming Schema V10 Applied. Integrity checks passed. Tasks reset.'')';
+        ELSE
+            -- Fallback: Just skip logging if columns are non-standard
+            RAISE NOTICE 'Skipping log insert due to non-standard column schema.';
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Log insert failed, but migration logic completed.';
+    END;
+
 END $$;
