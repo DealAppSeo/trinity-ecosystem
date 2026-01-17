@@ -27,7 +27,7 @@ export default function SandboxPage() {
                 id: a.id || a.agent_name, // Fallback to name if id is missing
                 agent_id: a.agent_name,
                 status: a.status,
-                current_task: a.currentTask ? a.currentTask.title : null,
+                current_task: (a as any).current_task_summary || (a.currentTask ? a.currentTask.title : null),
                 memory: {},
                 updated_at: a.lastHeartbeat || a.last_active || new Date().toISOString()
             }));
@@ -39,7 +39,7 @@ export default function SandboxPage() {
 
     const managers = agents.filter(a => {
         const id = normalize(a.agent_id);
-        return id.includes('manager') || id.includes('w3c') || id.includes('shofet') || id.includes('mcp');
+        return id.includes('manager') || id.includes('w3c') || id.includes('shofet') || id.includes('mcp') || id.includes('orch');
     });
 
     const grokPod = agents.filter(a => {

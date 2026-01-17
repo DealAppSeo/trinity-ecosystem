@@ -465,6 +465,7 @@ export class ConstitutionalAgent {
             .in('status', ['done', 'completed'])
             .is('verified_by', null)
             .neq('claimed_by', this.name) // MUST BE SOMEONE ELSE'S WORK
+            .not('metadata->>creator_agent', 'eq', this.name) // CANNOT BE SELF-CREATED
             .order('priority', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -543,13 +544,15 @@ export class ConstitutionalAgent {
     }
 
     async handleLocal(task: Task) {
-        // Claim task first
+        // Claim Task
         await this.supabase.from('trinity_tasks').update({ status: 'in_progress', claimed_by: this.name }).eq('id', task.id);
 
-        let result = `[LOCAL] Processed by ${this.name} rule engine`;
+        // Persistent Activity Logging
+        await this.log('task_processing_local', `Processing local task: ${task.title}`, { taskId: task.id, type: task.task_type });
 
         // Special handling if needed
         if (task.task_type === 'heartbeat') await this.heartbeat();
+
         if (task.task_type === 'self-healing' || task.title.includes('[HEALING]')) {
             // Log the healing
             console.log(`[LOCAL] 🩺 Processed healing task ${task.id}`);
@@ -580,7 +583,14 @@ export class ConstitutionalAgent {
 
         try {
             // Claim Task
-            await this.supabase.from('trinity_tasks').update({ status: 'in_progress', claimed_by: this.name, started_at: new Date().toISOString() }).eq('id', task.id);
+            await this.supabase.from('trinity_tasks').update({
+                status: 'in_progress',
+                claimed_by: this.name,
+                started_at: new Date().toISOString()
+            }).eq('id', task.id);
+
+            // Persistent Activity Logging
+            await this.log('task_processing_llm', `Starting LLM task: ${task.title}`, { taskId: task.id, type: task.task_type });
 
             // 1. CONTEXT PIPE: GATHER WISDOM (The "Amnesia" Fix)
             const wisdomContext = await this.gatherWisdom(task);
@@ -803,8 +813,14 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
     }
 
     async spawnNextStep(originalTask: Task, result: string, evaluation: { score: number; handoff_required: boolean; handoff_to?: string }) {
-        // [ANTIGRAVITY] LOOP BREAKER: Do NOT spawn verification for a verification task.
-        if (originalTask.task_type === 'review' || originalTask.title.includes('[VERIFY]')) {
+        // [ANTIGRAVITY] ROBUST LOOP BREAKER: Do NOT spawn verification for a verification task.
+        const titleMatch = originalTask.title.includes('[VERIFY]') ||
+            originalTask.title.includes('[REVIEW]') ||
+            originalTask.title.includes('Verify');
+
+        const typeMatch = originalTask.task_type === 'review' || originalTask.task_type === 'meta';
+
+        if (titleMatch || typeMatch) {
             console.log(`[VERIFY] 🛑 Loop breaker triggered for Task ${originalTask.id}. Not spawning recursive review.`);
 
             // Mark the PARENT task as verified if this was a review
@@ -851,10 +867,13 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
         }
 
         // [CLAUDE: DECENTRALIZED VERITAS LOOP] - Automatic Verification for all critical tasks
-        const isCritical = ['code', 'design', 'strategy', 'research', 'report'].includes(originalTask.task_type || '') || (originalTask as any).priority > 50;
+        const isCritical = ['code', 'design', 'strategy', 'research', 'report', 'content'].includes(originalTask.task_type || '') || (originalTask as any).priority > 50;
 
         if (isCritical) {
             console.log(`[VERIFY] 🔎 Spawning mandatory cross-agent verification for task ${originalTask.id}`);
+
+            // [ANTIGRAVITY] PERSISTENT ACTIVITY LOGGING
+            await this.log('verification_spawned', `Spawned peer review for task: ${originalTask.title}`, { parentTaskId: originalTask.id });
 
             // Find a different peer to verify (Peer Review Protocol)
             // Strategy: Pick someone from the same squad but NOT self.

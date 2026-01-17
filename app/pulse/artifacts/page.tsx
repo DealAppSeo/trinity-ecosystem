@@ -54,7 +54,7 @@ export default function ArtifactsPage() {
             const mappedData = (data || []).map((item: any) => ({
                 id: item.id,
                 title: item.title || 'Untitled Artifact',
-                type: (item.type || 'document') as Artifact['type'],
+                type: (item.artifact_type || item.type || 'document') as Artifact['type'],
                 content: item.content || '',
                 createdAt: item.created_at,
                 shareCount: 0,

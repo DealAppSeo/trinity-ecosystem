@@ -1,44 +1,30 @@
-
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://qnnpjhlxljtqyigedwkb.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supabaseAdmin as supabase } from '../lib/supabase';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
 async function debug() {
-    console.log('🐞 Debugging Supabase Access...');
+    console.log('--- DB DEBUG ---');
+    console.log('URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
 
-    // 1. Try INSERT
-    console.log('Testing INSERT...');
-    const { data: insertData, error: insertError } = await supabase
-        .from('trinity_retros')
-        .insert({
-            agent: 'DEBUG_BOT',
-            reflection: 'This is a test reflection.'
-        })
-        .select();
+    const { data: tables, error: tableErr } = await supabase.rpc('exec_sql', {
+        query: "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+    });
 
-    if (insertError) {
-        console.error('❌ INSERT FAILED:', insertError);
+    if (tableErr) {
+        console.error('Table Error:', tableErr.message);
     } else {
-        console.log('✅ INSERT SUCCESS:', insertData);
+        console.log('Tables:', tables?.map((t: any) => t.tablename));
     }
 
-    // 2. Try SELECT
-    console.log('\nTesting SELECT...');
-    const { data: selectData, error: selectError } = await supabase
-        .from('trinity_retros')
-        .select('*');
+    const { count, error: countErr } = await supabase
+        .from('trinity_tasks')
+        .select('*', { count: 'exact', head: true });
 
-    if (selectError) {
-        console.error('❌ SELECT FAILED:', selectError);
+    if (countErr) {
+        console.error('Count Error:', countErr.message);
     } else {
-        console.log(`✅ SELECT SUCCESS: Found ${selectData?.length} rows.`);
-        if (selectData && selectData.length > 0) {
-            console.log('Sample Row:', selectData[0]);
-        }
+        console.log('Trinity Tasks Count:', count);
     }
 }
 
-debug().catch(console.error);
+debug();

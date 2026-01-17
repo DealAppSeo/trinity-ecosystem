@@ -35,8 +35,8 @@ export class ScienceClient {
     private baseUrl: string;
     private fallbackMode: boolean = false;
 
-    constructor(baseUrl: string = 'http://127.0.0.1:8000') {
-        this.baseUrl = baseUrl;
+    constructor(baseUrl: string | null = null) {
+        this.baseUrl = baseUrl || process.env.NEXT_PUBLIC_TRINITY_SCIENCE_URL || 'http://127.0.0.1:8000';
     }
 
     /**

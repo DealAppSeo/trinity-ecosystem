@@ -1,15 +1,19 @@
-import 'dotenv/config';
-import path from 'path';
-// Ensure .env.local is also loaded if the default config didn't pick it up (dotenv/config usually loads .env)
 import * as dotenv from 'dotenv';
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+import path from 'path';
 
-// FORCE CREDENTIALS if missing (Bypassing dotenv issues)
+// 1. LOAD ENVIRONMENT IMMEDIATELY
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config();
+
+// 2. FORCE CREDENTIALS if missing (Essential for preventing Mock Mode)
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     console.log("⚠️ Injecting Hardcoded Supabase Credentials...");
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://qnnpjhlxljtqyigedwkb.supabase.co';
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw';
-    process.env.SUPABASE_SERVICE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; // Fallback to Anon if Service not available
+}
+// Ensure Service Role Key is available to prevent RLS blocks
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 }
 
 import http, { IncomingMessage, ServerResponse } from 'http';
@@ -32,7 +36,9 @@ const AGENT_MAP: Record<string, string> = {
     'VERITAS': 'trinity-veritas',
     'CHESED': 'trinity-chesed',
     'SOPHIA': 'trinity-sophia',
-    'W3C': 'trinity-w3c'
+    'W3C': 'trinity-w3c',
+    'ORCH': 'trinity-orch',
+    'SHOFET': 'trinity-shofet'
 };
 
 // Use mapped name or fallback to arg (handle case where user already provided full name)
@@ -43,7 +49,7 @@ const finalAgentName = normalizedName;
 
 async function startAgent() {
     // DYNAMIC IMPORT TO ENSURE ENV VARS ARE LOADED FIRST
-    const { ConstitutionalAgent } = await import('../lib/agent/ConstitutionalAgent');
+    const { ConstitutionalAgent } = await import('@trinity/agent-core');
 
     console.log(`🤖 Starting Agent: ${finalAgentName}...`);
 

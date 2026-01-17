@@ -47,7 +47,7 @@ export function AgentCard({ agent, isConductor = false, onAssignTask }: AgentCar
 
                 {/* Task Preview */}
                 <p className="text-xs text-text-muted truncate">
-                    {agent.currentTask?.title || 'Awaiting assignment'}
+                    {(agent as any).current_task_summary || agent.currentTask?.title || 'Awaiting assignment'}
                 </p>
             </div>
 

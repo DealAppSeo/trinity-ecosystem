@@ -14,7 +14,7 @@ const command = process.platform === 'win32'
     : 'pkill -f "run-swarm.ts" || pkill -f "trinity-worker.js"';
 
 // For Windows specifically since we know OS is Windows:
-const winCommand = `wmic process where "CommandLine like '%run-swarm.ts%' or CommandLine like '%trinity-worker.js%'" call terminate`;
+const winCommand = `wmic process where "CommandLine like '%run-swarm%' or CommandLine like '%run-agent%' or CommandLine like '%trinity-worker%'" call terminate`;
 
 if (process.platform === 'win32') {
     exec(winCommand, (error, stdout, stderr) => {

@@ -12,10 +12,10 @@ interface SymphonyCardProps {
 }
 
 export function SymphonyCard({ agent }: SymphonyCardProps) {
-    const lastHeartbeat = agent.lastHeartbeat ? new Date(agent.lastHeartbeat) : null;
-    // Unified Heartbeat Logic: 2 Minutes (120000ms)
-    const isOnline = lastHeartbeat && (Date.now() - lastHeartbeat.getTime() < 120000);
+    // Unified Heartbeat Logic (v3.4 - SSOT Consolidation)
+    const isOnline = agent.status === 'active';
     const group = getGroupForAgent(agent.agent_name);
+    const lastHeartbeat = agent.last_active ? new Date(agent.last_active) : null;
 
     // Derive visual role from Group
     const role = group?.focus.split(' - ')[0] || 'Autonomous Agent';
@@ -56,11 +56,11 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
                     </p>
 
                     {/* Current Activity Display */}
-                    {agent.currentTask ? (
+                    {(agent as any).current_task_summary || agent.currentTask ? (
                         <div className="flex items-center gap-2 mt-auto animate-in fade-in slide-in-from-left-2 duration-500">
                             <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
-                            <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[140px]" title={agent.currentTask.title}>
-                                {agent.currentTask.title}
+                            <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[140px]" title={(agent as any).current_task_summary || agent.currentTask?.title}>
+                                {(agent as any).current_task_summary || agent.currentTask?.title}
                             </p>
                         </div>
                     ) : (

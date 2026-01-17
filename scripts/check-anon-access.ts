@@ -14,19 +14,28 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function checkAnonAccess() {
-    console.log('🕵️ Checking Public Access (Anon Key) to trinity_heartbeat...');
+    console.log('🕵️ Checking Public Access (Anon Key)...');
 
-    const { data, error } = await supabase
+    const { data: hbData, error: hbError } = await supabase
         .from('trinity_heartbeat')
         .select('*');
 
-    if (error) {
-        console.error('❌ ACCESS DENIED (RLS BLOCK):', error.message);
-        console.error('   Hint: You need to enable RLS policy for SELECT on trinity_heartbeat for public/anon role.');
+    if (hbError) {
+        console.error('❌ Heartbeat Access Denied:', hbError.message);
     } else {
-        console.log(`✅ ACCESS GRANTED. Rows visible: ${data?.length || 0}`);
-        if (data && data.length > 0) {
-            console.log('   (The UI -should- be able to see these)');
+        console.log(`✅ Heartbeat Access Granted. Rows: ${hbData?.length || 0}`);
+    }
+
+    const { data: regData, error: regError } = await supabase
+        .from('trinity_agent_registry')
+        .select('*');
+
+    if (regError) {
+        console.error('❌ Registry Access Denied:', regError.message);
+    } else {
+        console.log(`✅ Registry Access Granted. Rows: ${regData?.length || 0}`);
+        if (regData) {
+            console.log('Visible Agents:', regData.map(a => a.agent_name));
         }
     }
 }

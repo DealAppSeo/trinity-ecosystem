@@ -21,6 +21,7 @@
     "wake-monitor": "npx tsx scripts/wake-monitor.ts"
   },
   "dependencies": {
+    "@trinity/agent-core": "file:./packages/agent-core",
     "@octokit/rest": "^22.0.1",
     "@supabase/mcp-server-postgrest": "^0.1.0",
     "@supabase/supabase-js": "^2.45.0",
