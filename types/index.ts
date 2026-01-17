@@ -15,9 +15,12 @@ export interface TrinityTask {
     id: string;
     title: string;
     description: string;
-    status: 'pending' | 'in_progress' | 'completed' | 'done' | 'verified' | 'failed' | 'pending_clarification';
+    status: 'pending' | 'in_progress' | 'completed' | 'done' | 'verified' | 'failed' | 'pending_clarification' | 'doing' | 'to_do';
     assigned_agent: string | null;
+    claimed_by?: string | null;
     priority: number;
+    verify_count?: number;
+    signatures?: any[];
     created_at: string;
 }
 

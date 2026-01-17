@@ -89,13 +89,55 @@ BEGIN
     -- Assuming already TEXT from V8, but double checking.
 END $$;
 
--- 5. LOG ALIGNMENT
+-- 5. PHASE 12: UNIFIED HEARTBEATS & AUTO-ESCALATION
+-- Unified Heartbeats View (For Legacy Compatibility + SSOT Transition)
+CREATE OR REPLACE VIEW unified_heartbeats AS
+SELECT agent_name AS agent, status, last_active, reputation_score, current_tier
+FROM trinity_agent_registry  -- Primary SSOT
+UNION ALL
+SELECT agent, status, last_seen AS last_active, NULL AS reputation_score, NULL AS current_tier
+FROM trinity_heartbeat      -- Secondary
+UNION ALL
+SELECT agent_name AS agent, status, last_ping AS last_active, NULL AS reputation_score, NULL AS current_tier
+FROM agent_heartbeat;        -- Legacy Monitoring
+
+-- Add Signatures column for BFT auditing
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trinity_tasks' AND column_name = 'signatures') THEN
+        ALTER TABLE trinity_tasks ADD COLUMN signatures JSONB DEFAULT '[]';
+    END IF;
+END $$;
+
+-- Timeout Trigger for Done → Verified Escalation (Antifragile: Prevent Stalls)
+CREATE OR REPLACE FUNCTION escalate_unverified_done()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Logic: If task stays 'done' for > 10 mins without reaching 2 verifications, escalate.
+  IF OLD.status = 'done' AND NEW.status = 'done' AND 
+     (CURRENT_TIMESTAMP - OLD.updated_at) > INTERVAL '10 minutes' AND 
+     NEW.verify_count < 2 THEN
+    NEW.status = 'pending_escalation';
+    -- Log the event for the dashboard
+    INSERT INTO trinity_agent_logs (agent_name, action, message) 
+    VALUES ('Antigravity', 'escalation', 'Unverified Done timeout for task ' || OLD.id);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS timeout_unverified ON trinity_tasks;
+CREATE TRIGGER timeout_unverified
+BEFORE UPDATE ON trinity_tasks
+FOR EACH ROW EXECUTE PROCEDURE escalate_unverified_done();
+
+-- 6. LOG ALIGNMENT
 INSERT INTO trinity_artifacts (task_id, title, artifact_type, content, agent, creator_agent, storage_location, status)
 VALUES (
     'system-alignment-v9', 
     'EMERGENCY_ALIGNMENT_V9 Execution', 
     'report', 
-    'Verified status added. BFT columns initialized. 3x3 Triad support active.', 
+    'Verified status added. BFT columns initialized. Phase 12 Unified View & Escalation Trigger active.', 
     'Antigravity', 
     'Antigravity', 
     'database',

@@ -60,19 +60,21 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
                         <div className="flex items-center gap-2 mt-auto animate-in fade-in slide-in-from-left-2 duration-500">
                             <div className={cn(
                                 "w-1.5 h-1.5 rounded-full animate-pulse",
-                                ((agent as any).current_task_summary || agent.currentTask?.title)?.includes('Seeking Clarification')
+                                ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('clarification')
                                     ? "bg-amber-500 shadow-[0_0_8px_#fbbf24]"
-                                    : ((agent as any).current_task_summary || agent.currentTask?.title)?.includes('Verifying')
-                                        ? "bg-green-500 shadow-[0_0_8px_#22c55e]"
-                                        : "bg-violet-500"
+                                    : (((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('verifying') ||
+                                        ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('reviewing'))
+                                        ? "bg-cyan-500 shadow-[0_0_8px_#06b6d4]"
+                                        : "bg-green-500 shadow-[0_0_8px_#22c55e]"
                             )} />
                             <p className={cn(
                                 "text-[10px] font-mono truncate max-w-[140px]",
-                                ((agent as any).current_task_summary || agent.currentTask?.title)?.includes('Seeking Clarification')
+                                ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('clarification')
                                     ? "text-amber-400"
-                                    : ((agent as any).current_task_summary || agent.currentTask?.title)?.includes('Verifying')
-                                        ? "text-green-400"
-                                        : "text-zinc-400"
+                                    : (((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('verifying') ||
+                                        ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('reviewing'))
+                                        ? "text-cyan-400"
+                                        : "text-green-400"
                             )} title={(agent as any).current_task_summary || agent.currentTask?.title}>
                                 {(agent as any).current_task_summary || agent.currentTask?.title}
                             </p>

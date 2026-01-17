@@ -39,11 +39,28 @@ export function TaskQueue({ tasks, onAddTask }: TaskQueueProps) {
                                     P{task.priority}
                                 </span>
                             </div>
-                            <div className="flex justify-between items-end">
-                                <span className="text-[10px] text-text-muted">{task.assigned_agent || '-'}</span>
-                                <span className={`w-1.5 h-1.5 rounded-full ${task.status === 'in_progress' ? 'bg-status-working animate-pulse' :
-                                        task.status === 'pending_clarification' ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_#fbbf24]' :
-                                            'bg-obsidian-border'
+                            <div className="flex justify-between items-end mt-1">
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] text-text-muted flex items-center gap-1">
+                                        {task.claimed_by ? (
+                                            <>
+                                                <span className="text-accent-blue">●</span> {task.claimed_by}
+                                            </>
+                                        ) : (
+                                            <span className="italic">Unclaimed</span>
+                                        )}
+                                    </span>
+                                    {task.verify_count !== undefined && task.verify_count > 0 && (
+                                        <span className="text-[8px] text-accent-green font-mono">
+                                            ✓ {task.verify_count}/2 Consensus
+                                        </span>
+                                    )}
+                                </div>
+                                <span className={`w-1.5 h-1.5 rounded-full ${task.status === 'verified' ? 'bg-accent-green shadow-[0_0_8px_#22c55e]' :
+                                        task.status === 'in_progress' || task.status === 'doing' ? 'bg-status-working animate-pulse' :
+                                            task.status === 'pending_clarification' ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_#fbbf24]' :
+                                                task.status === 'done' || task.status === 'completed' ? 'bg-cyan-500 shadow-[0_0_8px_#06b6d4]' :
+                                                    'bg-obsidian-border'
                                     }`} />
                             </div>
                         </div>

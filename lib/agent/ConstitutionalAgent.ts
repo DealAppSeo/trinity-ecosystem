@@ -292,6 +292,7 @@ export class ConstitutionalAgent {
 
         let score = currentScore + delta;
 
+        // O(log n) convergence via multiplicative RepID agg – Provisional Aug 17, 2025
         if (success) {
             score = Math.pow(Math.max(1, score) * peerProduct, 1 / phi) * phi;
         }
@@ -930,28 +931,47 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                 const isApproved = evaluation.score > 0.5;
 
                 // 2/3 BFT Consensus Logic – Provisional Aug 17, 2025
-                // Triad BFT (2/3 consensus) fallback logic
                 const { data: parentTask, error } = await this.supabase
                     .from('trinity_tasks')
-                    .select('signatures, status, metadata, verify_count')
+                    .select('signatures, status, metadata, verify_count, claimed_by, completed_at')
                     .eq('id', parentId)
                     .single();
 
-                if (error) {
-                    console.error(`[VERIFY] Error fetching parent task ${parentId}:`, error.message);
-                    return;
-                }
-                if (!parentTask) {
-                    console.warn(`[VERIFY] Parent task ${parentId} not found.`);
+                if (error || !parentTask) {
+                    console.error(`[VERIFY] Error fetching parent task ${parentId}:`, error?.message);
                     return;
                 }
 
                 let newVerifyCount = (parentTask.verify_count || 0) + (isApproved ? 1 : 0);
                 let newStatus = parentTask.status || 'done';
+                let signatures = parentTask.signatures || [];
+
+                // Track multi-agent signatures for BFT audit trail
+                signatures.push({
+                    agent: this.name,
+                    reputation: this.reputationScore,
+                    approved: isApproved,
+                    timestamp: new Date().toISOString()
+                });
 
                 if (newVerifyCount >= 2 && isApproved) {
                     newStatus = 'verified';
                     console.log(`[VERIFY] 🏆 Task ${parentId} reached 2/3 BFT consensus. Status -> VERIFIED.`);
+                } else if (!isApproved) {
+                    // [BFT DISPUTE] Subjective Slashing Logic – Provisionally Protected
+                    console.log(`[VERIFY] ⚠️ CHALLENGE DETECTED for Task ${parentId}. Slashing original producer.`);
+                    await this.updateReputation(false, parentTask.claimed_by, -5); // Slash -5 for bad work
+                    newStatus = 'failed';
+
+                    // Trigger Reorg: Question-Driven Reorganization (Patent pending)
+                    await this.supabase.from('trinity_tasks').insert({
+                        title: `[REORG] Dispute Resolution for ${parentId}`,
+                        description: `Task ${parentId} failed peer verify. Dispute reason: ${result.substring(0, 200)}`,
+                        task_type: 'critique',
+                        priority: 90,
+                        status: 'pending',
+                        metadata: { disputed_task_id: parentId, disputed_agent: parentTask.claimed_by }
+                    });
                 }
 
                 await this.supabase.from('trinity_tasks').update({
@@ -959,6 +979,7 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                     repid_verified: true,
                     verification_result: isApproved ? 'VALID' : 'CHALLENGED',
                     verification_details: result.substring(0, 1000),
+                    signatures: signatures,
                     verify_count: newVerifyCount,
                     status: newStatus,
                     verified_at: newStatus === 'verified' ? new Date().toISOString() : null

@@ -165,25 +165,51 @@ export default function ConductorPage() {
                                     </div>
                                 </div>
 
-                                {/* Squad Status Summary (3x3 Grid) */}
-                                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Share2 className="w-4 h-4 text-blue-500" />
-                                        <h2 className="text-sm font-bold text-zinc-100">Squad Status ({Object.keys(AGENT_GROUPS).length})</h2>
+                                {/* Squad Status Summary (3x3 Grid - Antigravity Refinement) */}
+                                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Share2 className="w-4 h-4 text-accent-blue" />
+                                            <h2 className="text-sm font-bold text-zinc-100">Swarm Triad Pulse</h2>
+                                        </div>
+                                        <span className="text-[10px] text-zinc-600 font-mono uppercase tracking-tighter">BFT Ready</span>
                                     </div>
-                                    <div className="grid grid-cols-4 gap-2"> {/* 4 cols for Orchestration + 3 Squads */}
+                                    <div className="grid grid-cols-4 gap-2"> {/* Orchestration + 3 Squads */}
                                         {Object.values(AGENT_GROUPS).map(group => {
-                                            // Calculate online count for this group
                                             const groupAgents = agents.filter(a => group.members.includes(a.agent_name));
-                                            const onlineCount = groupAgents.filter(a => a.status === 'active').length;
+                                            const onlineCount = groupAgents.filter(a => a.status === 'online' || a.status === 'active').length;
+                                            const busyCount = groupAgents.filter(a => (a as any).current_task_summary && (a as any).current_task_summary !== 'Idle').length;
                                             const total = group.members.length;
 
+                                            // Heat Logic: Busy = Hot (Violet/Green), Idle = Cool (Zinc)
+                                            // Only if online
+                                            const isHot = busyCount > 0;
+
                                             return (
-                                                <div key={group.id} className="bg-black/40 py-1.5 px-2 rounded border border-zinc-800/50 text-center">
-                                                    <div className="text-[9px] text-zinc-500 uppercase tracking-wider mb-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{group.name.split(' ')[0]}</div>
-                                                    <div className={`text-[10px] font-mono font-bold ${onlineCount === total ? 'text-green-400' : 'text-yellow-400'}`}>
-                                                        {onlineCount}/{total}
+                                                <div key={group.id} className={cn(
+                                                    "relative bg-black/40 py-2 px-1 rounded border transition-all duration-500",
+                                                    isHot ? "border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "border-zinc-800/50"
+                                                )}>
+                                                    <div className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 truncate text-center">
+                                                        {group.name.split(' ')[0]}
                                                     </div>
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        <div className={cn(
+                                                            "w-1 h-1 rounded-full",
+                                                            onlineCount === total ? "bg-emerald-500" : onlineCount > 0 ? "bg-amber-500" : "bg-red-500"
+                                                        )} />
+                                                        <div className={cn(
+                                                            "text-[10px] font-mono font-bold",
+                                                            onlineCount === total ? 'text-zinc-200' : 'text-zinc-400'
+                                                        )}>
+                                                            {onlineCount}/{total}
+                                                        </div>
+                                                    </div>
+                                                    {isHot && (
+                                                        <div className="absolute top-0 right-0 p-1">
+                                                            <div className="w-1 h-1 bg-emerald-400 rounded-full animate-ping" />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
