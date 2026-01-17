@@ -18,6 +18,7 @@ import { useTrinityController } from '@/hooks/useTrinityController';
 import { AGENT_GROUPS } from '@/lib/agent/groups';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { RewardTuner } from '@/components/RewardTuner';
+import { cn } from '@/lib/utils';
 
 export default function ConductorPage() {
     // consolidated logic via hook
