@@ -394,8 +394,9 @@ export class ConstitutionalAgent {
         console.log('========================================');
         console.log(`[${this.name}] 🏃 Starting main task loop (Spawn Control v8.1.1)...`);
 
-        // IMMEDIATE HEARTBEAT ON BOOT
-        console.log('[HEARTBEAT] Writing initial heartbeat...');
+        // IMMEDIATE SYNC & HEARTBEAT ON BOOT
+        console.log('[HEARTBEAT] Writing initial heartbeat & Syncing state...');
+        await this.syncState();
         await this.heartbeat();
 
         this.heartbeatInterval = setInterval(async () => {
@@ -411,6 +412,22 @@ export class ConstitutionalAgent {
 
         while (true) {
             try {
+                // [PHASE 11] BUSY WORKER LOCK: Check if we are already handling an escalated/in-progress task
+                const { data: busyCheck } = await this.supabase
+                    .from('trinity_tasks')
+                    .select('id')
+                    .eq('claimed_by', this.name)
+                    .in('status', ['doing', 'pending_clarification'])
+                    .limit(1)
+                    .single();
+
+                if (busyCheck) {
+                    console.log(`[${this.name}] 🚧 Busy with task ${busyCheck.id}. Skipping fetch.`);
+                    await this.heartbeat();
+                    await this.sleep(60000);
+                    continue;
+                }
+
                 // [ANTIGRAVITY v8.0] SSOT: INTEGRATED BFT CYCLE
                 // Rule: Check "Done" for peer work before starting "To Do"
                 const verificationTask = await this.getVerificationTask();
@@ -456,7 +473,7 @@ export class ConstitutionalAgent {
                 await this.checkSurvivorStatus();
 
                 // EVERGREEN IDLE LOOP (Phase 9)
-                if (!task && !verificationTask) {
+                if (!taskHandled && !verificationTask) {
                     await this.runIdleLoop();
                 }
 
@@ -1474,7 +1491,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 .from('trinity_agent_registry')
                 .upsert({
                     agent_name: this.name,
-                    status: 'active',
+                    status: 'online', // SSOT: UI expects 'online' or 'active' for Green
                     last_active: timestamp,
                     current_tier: this.autonomyTier,
                     reputation_score: this.reputationScore,

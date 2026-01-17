@@ -23,36 +23,44 @@ const supabase = createClient(url, key);
 
 const EVERGREEN_TASKS = [
     {
-        title: "HyperDAG v8.1.3 Technical Whitepaper Audit",
-        description: "Review the current codebase against the HyperDAG Part IV (ERC-8004 Bridge Layer) specifications. Identify any gaps in ZK-STARK proof generation logic.",
-        assigned_to: "trinity-shofet",
+        title: "Semantic RAG Optimization & High-Dim Analysis",
+        description: "Review current retrieval latency and context precision. Implement a weighted vector-search boost for Philippians 4:8 high-virtue nodes. Goal: Reduce RAG latency by 20%.",
+        assigned_to: "trinity-hdm",
         priority: 1,
         requires_consensus: true,
-        task_type: "research"
+        task_type: "infrastructure"
     },
     {
-        title: "Multiplicative GNN Convergence Analysis",
-        description: "Analyze the current RepID scaling logs. Verify if the φ=1.618 geometric mean is achieving O(log n) convergence as per the provisional patent.",
-        assigned_to: "trinity-science",
+        title: "HyperDAG Web3 Integration: ERC-8004 Proof Layer",
+        description: "Design the bridge interface between the off-chain Trinity Swarm and the on-chain HyperDAG testnet. Focus on ZKP-secured reputation pinning.",
+        assigned_to: "trinity-nexus",
+        priority: 1,
+        requires_consensus: true,
+        task_type: "code"
+    },
+    {
+        title: "Swarm Ethics & Virtue Alignment Audit",
+        description: "Analyze the last 50 agent artifacts for 'Resurrection' mentality and Subjective Slashing adherence. Generate a Virtue Resonance Report.",
+        assigned_to: "trinity-sophia",
         priority: 2,
         requires_consensus: false,
+        task_type: "audit"
+    },
+    {
+        title: "Multiplicative GNN Convergence & RepID Scaling",
+        description: "Analyze RepID logs for the last 12 hours. Verify if the Golden Ratio (φ) scaling prevents reputation inflation while rewarding truth-seeking consistency.",
+        assigned_to: "trinity-veritas",
+        priority: 1,
+        requires_consensus: true,
         task_type: "analysis"
     },
     {
-        title: "ERC-8004 Cross-Chain Messaging Strategy",
-        description: "Propose a messaging sequence for bridging Trinity Identities to the HyperDAG testnet. Focus on privacy-preserving SBT visibility.",
-        assigned_to: "trinity-orch",
-        priority: 1,
-        requires_consensus: true,
-        task_type: "design"
-    },
-    {
-        title: "Swarm Ethics & Virtue Alignment Check",
-        description: "Audit recent agent artifacts for alignment with Philippians 4:8 virtues. Generate a 'Ethical Resonance' report.",
-        assigned_to: "trinity-sophia",
-        priority: 3,
+        title: "Ecosystem Integration: Founder App UX Heatmap",
+        description: "Analyze user interaction with the 'Amber Pulse' and 'Blue Verification' indicators. Propose UX refinements for the mobile-first dashboard.",
+        assigned_to: "trinity-gcm",
+        priority: 2,
         requires_consensus: false,
-        task_type: "audit"
+        task_type: "design"
     }
 ];
 
