@@ -39,22 +39,22 @@ export default function SandboxPage() {
 
     const managers = agents.filter(a => {
         const id = normalize(a.agent_id);
-        return id.includes('manager') || id.includes('w3c') || id.includes('shofet') || id.includes('mcp') || id.includes('orch');
+        return id === 'trinity-orch' || id === 'orch' || id.includes('w3c') || id.includes('shofet') || id.includes('mcp');
     });
 
     const grokPod = agents.filter(a => {
         const id = normalize(a.agent_id);
-        return id.includes('grok') || id.includes('gcm') || id.includes('torch') || id.includes('veritas');
+        return id === 'trinity-gcm' || id === 'gcm' || id === 'trinity-torch' || id === 'torch' || id === 'trinity-veritas' || id === 'veritas';
     });
 
     const claudePod = agents.filter(a => {
         const id = normalize(a.agent_id);
-        return id.includes('claude') || id.includes('mel') || id.includes('chesed') || id.includes('apm') || id.includes('artisan');
+        return id === 'trinity-mel' || id === 'mel' || id === 'trinity-chesed' || id === 'chesed' || id === 'trinity-apm' || id === 'apm';
     });
 
     const geminiPod = agents.filter(a => {
         const id = normalize(a.agent_id);
-        return id.includes('gemini') || id.includes('nexus') || id.includes('sophia') || id.includes('hdm') || id.includes('science');
+        return id === 'trinity-hdm' || id === 'hdm' || id === 'trinity-nexus' || id === 'nexus' || id === 'trinity-sophia' || id === 'sophia';
     });
 
     return (

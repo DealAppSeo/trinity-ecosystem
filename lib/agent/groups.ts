@@ -65,8 +65,8 @@ export function getGroupForAgent(agentName: string): AgentGroup | null {
             return group;
         }
     }
-    // New ORCH alias check
-    if (target.includes('mcp') || target.includes('orch') || target.includes('w3c') || target.includes('shofet')) return AGENT_GROUPS.ORCHESTRATION;
+    // New ORCH alias check (Exact match for orch to avoid torch collision)
+    if (target.includes('mcp') || target === 'trinity-orch' || target === 'orch' || target.includes('w3c') || target.includes('shofet')) return AGENT_GROUPS.ORCHESTRATION;
 
     return null;
 }

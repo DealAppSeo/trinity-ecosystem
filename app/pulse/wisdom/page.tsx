@@ -34,6 +34,7 @@ interface AgentRecord {
     suggestion_accepted?: boolean;
     updated_at?: string;
     status?: string;
+    group_name?: string;
 }
 
 export default function WisdomPage() {
@@ -49,14 +50,8 @@ export default function WisdomPage() {
     // Brain status now comes from hook
     const brainStatus = systemStatus?.pyBrain ? 'online' : 'offline';
 
-    // Agent Grouping Logic
-    const getGroup = (name: string) => {
-        if (name.includes('w3c') || name.includes('shofet') || name.includes('mcp')) return 'Orchestration';
-        if (name.includes('torch') || name.includes('veritas') || name.includes('gcm')) return 'Alpha';
-        if (name.includes('chesed') || name.includes('mel') || name.includes('apm')) return 'Beta';
-        if (name.includes('sophia') || name.includes('nexus') || name.includes('hdm')) return 'Gamma';
-        return 'Operatives';
-    };
+    // Agent Grouping Logic (Standardized via hook)
+    const groups = ['ORCHESTRATION', 'ALPHA', 'BETA', 'GAMMA', 'Operatives'];
 
     // Benchmark Data
     const [benchmarks, setBenchmarks] = useState<any[]>([]);
@@ -238,7 +233,7 @@ export default function WisdomPage() {
                             <Activity className="w-6 h-6" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold">{agents.filter(a => a.status === 'active').length}</div>
+                            <div className="text-2xl font-bold">{agents.filter(a => ['active', 'green', 'blue'].includes(a.status || '')).length}</div>
                             <div className="text-xs text-blue-200">Active Agents</div>
                         </div>
                     </div>
@@ -361,26 +356,26 @@ export default function WisdomPage() {
                     Fleet Wisdom State
                 </h2>
 
-                {['Orchestration', 'Alpha', 'Beta', 'Gamma', 'Operatives'].map(group => {
-                    const groupAgents = agents.filter(a => getGroup(a.agent_name) === group);
+                {groups.map(group => {
+                    const groupAgents = agents.filter(a => (a.group_name || 'Operatives') === group);
                     if (groupAgents.length === 0) return null;
 
                     return (
                         <div key={group} className="space-y-3">
                             <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 bg-white/5 p-2 rounded w-fit">
-                                <span className={`w-2 h-2 rounded-full ${group === 'Orchestration' ? 'bg-purple-400' : 'bg-blue-400'}`}></span>
-                                {group} Squad
+                                <span className={`w-2 h-2 rounded-full ${group === 'ORCHESTRATION' ? 'bg-purple-400' : 'bg-blue-400'}`}></span>
+                                {group}
                             </h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                                 {groupAgents.map(agent => (
                                     <div key={agent.agent_name} className="bg-white/5 p-3 rounded border border-white/5 hover:border-blue-400/50 transition-colors relative group">
                                         <div className="flex justify-between items-center mb-2">
                                             <div className="text-sm font-bold truncate flex items-center gap-2">
-                                                <div className={`w-2 h-2 rounded-full ${agent.reputation_score > 0 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-gray-600'}`}></div>
+                                                <div className={`w-2 h-2 rounded-full ${['active', 'green', 'blue'].includes(agent.status || '') ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-gray-600'}`}></div>
                                                 {agent.agent_name.replace('trinity-', '')}
                                             </div>
                                             <div className="text-[10px] text-gray-500">
-                                                {agent.status === 'working' ? 'WORKING' : 'ONLINE'}
+                                                {(agent.status || 'offline').toUpperCase()}
                                             </div>
                                         </div>
                                         <div className="flex items-end gap-2">
