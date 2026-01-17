@@ -550,6 +550,8 @@ export class ConstitutionalAgent {
         // Persistent Activity Logging
         await this.log('task_processing_local', `Processing local task: ${task.title}`, { taskId: task.id, type: task.task_type });
 
+        let result = `[LOCAL] Processed by ${this.name} rule engine`;
+
         // Special handling if needed
         if (task.task_type === 'heartbeat') await this.heartbeat();
 
@@ -557,7 +559,7 @@ export class ConstitutionalAgent {
             // Log the healing
             console.log(`[LOCAL] 🩺 Processed healing task ${task.id}`);
             result = `[HEALING] System repaired by ${this.name}`;
-            this.sessionMetrics.healingAttempts++;
+            this.sessionMetrics.tasksCompleted++; // Count it
         }
 
         // Complete it immediately
