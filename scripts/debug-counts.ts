@@ -1,23 +1,43 @@
 
-import { supabase } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
-async function check() {
-    console.log("🔍 Checking DB Counts (using lib/supabase)...");
+async function debugArtifacts() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { count: artifactCount, error: err1 } = await supabase.from('trinity_artifacts').select('*', { count: 'exact', head: true });
-    if (err1) console.error("Artifact Error:", err1);
-    else console.log(`✅ Total Artifacts: ${artifactCount}`);
+    console.log('--- Fetching all artifact types ---');
+    const { data: allTypes, error } = await supabase.from('trinity_artifacts').select('artifact_type');
 
-    const { count: taskCount, error: err2 } = await supabase.from('trinity_tasks').select('*', { count: 'exact', head: true });
-    if (err2) console.error("Task Error:", err2);
-    else console.log(`✅ Total Tasks: ${taskCount}`);
-
-    console.log("-------------------");
-    const { data: recent, error: err3 } = await supabase.from('trinity_artifacts').select('title, created_at, access_level').order('created_at', { ascending: false }).limit(3);
-    if (recent) {
-        console.log("Recent Artifacts:");
-        recent.forEach(r => console.log(` - [${r.access_level}] ${r.title} (${r.created_at})`));
+    if (error) {
+        console.error('Error:', error);
+        return;
     }
+
+    const counts: Record<string, number> = {};
+    allTypes?.forEach(a => {
+        const t = a.artifact_type || 'undefined';
+        counts[t] = (counts[t] || 0) + 1;
+    });
+
+    console.log('--- Artifact Type Distribution ---');
+    console.log(JSON.stringify(counts, null, 2));
+
+    console.log('\n--- Sample Artifacts (Title and Type) ---');
+    const { data: sample } = await supabase
+        .from('trinity_artifacts')
+        .select('title, artifact_type, access_level, content')
+        .limit(5);
+
+    // Snip content for display
+    const cleanedSample = sample?.map(s => ({
+        ...s,
+        content: s.content ? s.content.substring(0, 50) + '...' : null
+    }));
+
+    console.log(JSON.stringify(cleanedSample, null, 2));
 }
 
-check();
+debugArtifacts();

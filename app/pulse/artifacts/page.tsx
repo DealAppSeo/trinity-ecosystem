@@ -3,7 +3,8 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { FileCode, FileText, Image, FileSpreadsheet, Share2, Download, Eye, Lock, ShieldAlert } from 'lucide-react';
+import { Toaster, toast } from 'sonner';
+import { FileCode, FileText, Image, FileSpreadsheet, Share2, Download, Eye, Lock, ShieldAlert, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { RegistrationModal, UnlockModal } from '@/components/AccessModals';
@@ -24,6 +25,10 @@ export default function ArtifactsPage() {
     const [artifacts, setArtifacts] = useState<Artifact[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
+    const [counts, setCounts] = useState<Record<string, number>>({ code: 0, document: 0, design: 0, report: 0 });
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const PAGE_SIZE = 24;
 
     // ACCESS GATES
     const [hasRegistered, setHasRegistered] = useState(false);
@@ -36,35 +41,79 @@ export default function ArtifactsPage() {
 
     // Initial Fetch (Public Data Only - Counts)
     useEffect(() => {
-        fetchArtifacts();
+        fetchArtifacts(true);
+        fetchTotalCounts();
         if (localStorage.getItem('trinity_registration')) {
             setHasRegistered(true);
         }
     }, []);
 
-    const fetchArtifacts = async () => {
+    const fetchTotalCounts = async () => {
         try {
+            // We fetch all types just for the count - this is cheaper than the full content
+            const { data, error } = await supabase.from('trinity_artifacts').select('artifact_type');
+            if (error) throw error;
+
+            const newCounts = { code: 0, document: 0, design: 0, report: 0 };
+            data?.forEach((item: any) => {
+                const rawType = item.artifact_type || item.type || 'document';
+                if (rawType === 'report') newCounts.report++;
+                else if (rawType === 'code') newCounts.code++;
+                else if (rawType === 'design' || rawType === 'image') newCounts.design++;
+                else if (rawType === 'md' || rawType === 'markdown' || rawType === 'text_content' || rawType === 'document') newCounts.document++;
+            });
+            setCounts(newCounts);
+        } catch (e) {
+            console.error('Error fetching total counts:', e);
+        }
+    };
+
+    const fetchArtifacts = async (reset = false) => {
+        try {
+            const currentPage = reset ? 0 : page;
             const { data, error } = await supabase
                 .from('trinity_artifacts')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
             if (error) throw error;
 
-            const mappedData = (data || []).map((item: any) => ({
-                id: item.id,
-                title: item.title || 'Untitled Artifact',
-                type: (item.artifact_type || item.type || 'document') as Artifact['type'],
-                content: item.content || '',
-                createdAt: item.created_at,
-                shareCount: 0,
-                url: item.url,
-                accessLevel: item.access_level || 'protected'
-            }));
+            const mappedData = (data || []).map((item: any) => {
+                const rawType = item.artifact_type || item.type || 'document';
+                let mappedType: Artifact['type'] = 'document';
 
-            setArtifacts(mappedData);
+                if (rawType === 'report') mappedType = 'report';
+                else if (rawType === 'code') mappedType = 'code';
+                else if (rawType === 'design' || rawType === 'image') mappedType = 'design';
+                else if (rawType === 'md' || rawType === 'markdown' || rawType === 'text_content') mappedType = 'document';
+
+                return {
+                    id: item.id,
+                    title: item.title || 'Untitled Artifact',
+                    type: mappedType,
+                    content: item.content || '',
+                    createdAt: item.created_at,
+                    shareCount: 0,
+                    url: item.url,
+                    accessLevel: item.access_level || 'protected'
+                };
+            });
+
+            if (reset) {
+                setArtifacts(mappedData);
+                setPage(1);
+            } else {
+                setArtifacts((prev: Artifact[]) => [...prev, ...mappedData]);
+                setPage(prev => prev + 1);
+            }
+
+            if (mappedData.length < PAGE_SIZE) {
+                setHasMore(false);
+            }
         } catch (error) {
             console.error('Error fetching artifacts:', error);
+            toast.error('Failed to load artifacts');
         } finally {
             setLoading(false);
         }
@@ -79,6 +128,13 @@ export default function ArtifactsPage() {
 
     const handleArtifactClick = (artifact: Artifact) => {
         if (!hasRegistered) {
+            toast.error('Identity Verification Required', {
+                description: 'You must be a registered user to access full artifacts.',
+                action: {
+                    label: 'Register',
+                    onClick: () => setShowRegModal(true)
+                }
+            });
             setShowRegModal(true);
             return;
         }
@@ -155,7 +211,7 @@ export default function ArtifactsPage() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
                     {['code', 'document', 'design', 'report'].map((type) => {
-                        const count = artifacts.filter((a) => a.type === type || (type === 'document' && a.type === 'md')).length;
+                        const count = (counts as any)[type] || 0;
                         const Icon = getTypeIcon(type);
                         const color = getTypeColor(type);
 
@@ -182,8 +238,8 @@ export default function ArtifactsPage() {
             </div>
 
             {/* Artifact Grid */}
-            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-all duration-500 \${!hasRegistered ? 'blur-sm opacity-50 pointer-events-none select-none' : ''}`}>
-                {artifacts.length === 0 ? (
+            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-all duration-500`}>
+                {artifacts.length === 0 && !loading ? (
                     <div className="col-span-full flex flex-col items-center justify-center py-16 text-gray-500 glass rounded-xl border border-white/5">
                         <FileText className="w-12 h-12 mb-4 opacity-50" />
                         <p>No artifacts generated yet</p>
@@ -193,12 +249,13 @@ export default function ArtifactsPage() {
                         const Icon = getTypeIcon(artifact.type);
                         const color = getTypeColor(artifact.type);
                         const colorHex = color === 'violet' ? '#a78bfa' : color === 'cyan' ? '#22d3ee' : color === 'pink' ? '#f472b6' : color === 'green' ? '#4ade80' : '#9ca3af';
+                        const snippet = artifact.content ? artifact.content.replace(/#+ /g, '').substring(0, 120) + '...' : 'No description available';
 
                         return (
                             <div
                                 key={artifact.id}
                                 onClick={() => handleArtifactClick(artifact)}
-                                className="glass rounded-xl p-5 border border-white/10 hover:border-violet-500/50 transition-all duration-300 group hover:-translate-y-1 hover:shadow-2xl cursor-pointer"
+                                className={`glass rounded-xl p-5 border border-white/10 hover:border-violet-500/50 transition-all duration-300 group hover:-translate-y-1 hover:shadow-2xl cursor-pointer \${!hasRegistered ? 'opacity-60 grayscale-[0.5]' : ''}`}
                             >
                                 <div className="flex items-start gap-4 mb-4">
                                     <div className={`p-3 glass-light rounded-lg border border-\${color}-500/30 flex items-center justify-center`}>
@@ -208,35 +265,33 @@ export default function ArtifactsPage() {
                                         <h3 className="font-semibold mb-1 truncate text-gray-100">{artifact.title}</h3>
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs text-gray-500 capitalize">{artifact.type}</span>
-                                            <Lock size={10} className="text-red-400" />
+                                            {!hasRegistered && <Lock size={10} className="text-amber-500" />}
                                         </div>
                                     </div>
                                 </div>
-                                <p className="text-xs text-gray-500">Restricted Access. Password Required.</p>
+                                <p className="text-xs text-gray-400 line-clamp-3 font-mono leading-relaxed bg-black/20 p-2 rounded">
+                                    {snippet}
+                                </p>
                             </div>
                         );
                     })
                 )}
             </div>
 
-            {/* CTA Overlay */}
-            {!hasRegistered && artifacts.length > 0 && (
-                <div className="absolute inset-0 top-[200px] flex items-center justify-center z-10 pointer-events-none">
-                    <div className="bg-black/60 backdrop-blur-md p-8 rounded-2xl border border-violet-500/50 text-center pointer-events-auto shadow-2xl">
-                        <ShieldAlert className="mx-auto w-12 h-12 text-violet-400 mb-4" />
-                        <h3 className="text-2xl font-bold text-white mb-2">Restricted Access</h3>
-                        <p className="text-gray-400 mb-6 max-w-sm">
-                            Artifact details are protected. Please register to view the file list.
-                        </p>
-                        <button
-                            onClick={() => setShowRegModal(true)}
-                            className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-violet-900/50 transition-all hover:scale-105"
-                        >
-                            Register Access
-                        </button>
-                    </div>
+            {/* Pagination / Infinite Scroll Trigger */}
+            {hasMore && (
+                <div className="flex justify-center py-8">
+                    <button
+                        onClick={() => fetchArtifacts()}
+                        disabled={loading}
+                        className="glass-light hover:bg-white/10 text-gray-400 px-8 py-3 rounded-full border border-white/10 transition-all flex items-center gap-2 group"
+                    >
+                        {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4 group-hover:text-blue-400" />}
+                        {loading ? 'Sourcing More Intelligence...' : 'Load More Artifacts'}
+                    </button>
                 </div>
             )}
+
 
             {/* Artifact Viewer Modal */}
             {selectedArtifact && (
