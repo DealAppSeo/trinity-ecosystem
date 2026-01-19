@@ -52,8 +52,8 @@ export const useTrinityController = () => {
                 { data: statsData }
             ] = await Promise.all([
                 supabase.from('trinity_agent_registry').select('*').order('agent_name'),
-                supabase.from('trinity_tasks').select('*').order('created_at', { ascending: false }).limit(50),
-                supabase.from('trinity_agent_logs').select('*').order('created_at', { ascending: false }).limit(50),
+                supabase.from('trinity_tasks').select('*').order('created_at', { ascending: false }).limit(150),
+                supabase.from('trinity_agent_logs').select('*').order('created_at', { ascending: false }).limit(100),
                 supabase.from('trinity_heartbeat').select('*'),
                 supabase.from('trinity_stats').select('*').single() // Assuming a stats table or view exists
             ]);
