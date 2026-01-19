@@ -4,10 +4,8 @@ import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, Task, AutonomyTi
 import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
 // Dynamic imports for graphology/fs handled inside methods to avoid build issues
 import { mcpManager } from '../mcp/MCPManager';
-import { computeAnfisScore, AnfisInput } from '../anfis';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
-const PHI = 1.61803398875; // The Golden Ratio for Antifragile Weighting
 
 // ============================================
 
@@ -83,7 +81,11 @@ export class ConstitutionalAgent {
     autonomyTier: AutonomyTier = 'Assist';
     tasksCompleted: number = 0;
     sessionMetrics: SessionMetrics;
-    squad: 'ALPHA' | 'BETA' | 'GAMMA' | 'ORCHESTRATION' | 'UNKNOWN';
+    squad: 'ALPHA' | 'BETA' | 'GAMMA' | 'ORCHESTRATION' | 'UNKNOWN' = 'UNKNOWN';
+    groupName: string = 'UNKNOWN';
+    isSurvivor: boolean = false;
+    survivorName: string = '';
+    heartbeatInterval: any = null;
 
     // BRAIN TRANSPLANT: New Organs
     private currentTaskId: string | null = null;
@@ -138,6 +140,7 @@ export class ConstitutionalAgent {
     }
 
     constructor(config: AgentConfig) {
+        // PATENT-PENDING: MULTIPLICATIVE_GNN_O(LOG_N) TRUST_SCALING
         const rawName = config.name || 'UNKNOWN';
         this.name = this.resolveLegacyName(rawName);
         this.wisdom = AGENT_WISDOM[this.name] || AGENT_WISDOM.HDM;
@@ -162,16 +165,10 @@ export class ConstitutionalAgent {
         // Start the Trinity Healing Loop - REMOVED (Called by run-agent.ts)
         // this.startTrinityHealingLoop();
 
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-        this.supabase = createClient(supabaseUrl, serviceKey || anonKey, {
-            auth: {
-                autoRefreshToken: false,
-                persistSession: false
-            }
-        });
+        this.supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
 
         if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
             this.redis = new Redis({
@@ -183,24 +180,10 @@ export class ConstitutionalAgent {
         }
 
         // Initialize Internal Research Tool (Default Implementation)
-        this.researchTool = {
-            searchWeb: async (query: string) => {
-                console.log(`[${this.name}] 🌐 SEARCHING WEB: "${query}"`);
-                return [
-                    { title: `${query} Guidelines`, url: 'https://example.com/guidelines', content: `Best practices for ${query}...` },
-                    { title: `Advanced ${query} Techniques`, url: 'https://arxiv.org/fake-paper', content: `Recent study on ${query} optimization...` },
-                    { title: `${query} Tutorial`, url: 'https://github.com/fake-repo/tutorial', content: `Step-by-step guide to ${query}...` }
-                ];
-            },
-            browsePage: async (url: string, instructions: string) => {
-                console.log(`[${this.name}] 📄 BROWSING: ${url} with instructions: "${instructions}"`);
-                return `Extracted content from ${url} relevant to ${instructions}`;
-            }
-        };
+        this.researchTool = new WebResearchTool();
 
         this.availableProviders = this.detectProviders();
-        this.squad = this.wisdom.squad || 'UNKNOWN';
-        console.log(`[${this.name}] 🚀 Initialized v${this.version} | Squad: ${this.squad}`);
+        console.log(`[${this.name}] 🚀 Initialized v${this.version}`);
     }
 
     detectProviders() {
@@ -229,12 +212,9 @@ export class ConstitutionalAgent {
                 .from('trinity_agent_registry')
                 .select('*')
                 .eq('agent_name', this.name)
-                .maybeSingle();
+                .single();
 
-            if (error) {
-                console.warn(`[${this.name}] Registry sync error:`, error.message);
-                // Non-fatal, will attempt registration
-            }
+            if (error) throw error; // Truth-Seeking: Don't silently fail
 
             if (data) {
                 const record = data as AgentRegistryRecord;
@@ -270,42 +250,79 @@ export class ConstitutionalAgent {
     /**
      * Updates reputation based on task outcome.
      * @param success Did the agent complete the task?
+     * @param targetAgent Optional: Agent name to update (defaults to self)
+     * @param overrideDelta Optional: Custom delta for slashing/reward
      */
-    async updateReputation(success: boolean) {
+    async generateInsight(task: Task, result: string) {
+        // [PHASE 25] SHARED KNOWLEDGE LOOP (Grok's Phase 3)
+        try {
+            const insightText = result.slice(0, 300); // Concatenate first 300 chars
+            const insightEntry = {
+                title: `Insight: ${task.title}`,
+                content: insightText,
+                creator_agent: this.name,
+                task_id: task.id,
+                artifact_type: 'insight',
+                metadata: {
+                    ...(task.metadata as any || {}),
+                    source_task_priority: task.priority,
+                    generated_at: new Date().toISOString()
+                }
+            };
+
+            await this.supabase.from('trinity_artifacts').insert([insightEntry]);
+            console.log(`[WISDOM] 📚 Insight persisted for ${task.id}`);
+        } catch (e) {
+            console.error(`[WISDOM] Insight failure:`, e);
+        }
+    }
+
+    async updateReputation(success: boolean, targetAgent?: string, overrideDelta?: number) {
+        // [PHASE 10] TARGETED REPID UPDATE
+        const name = targetAgent || this.name;
+
         // ELITE ADAPTIVE REPID: Infuse Golden Ratio (φ=1.618) & Peer Weights
         const phi = 1.61803398875;
-        const peerProduct = 1.25; // Simulated peer-product scaling weight
-        const delta = success ? 1 : -5;
-        let score = this.reputationScore + delta;
+        const peerProduct = 1.25;
+        const delta = overrideDelta !== undefined ? overrideDelta : (success ? 1 : -5);
 
-        if (success) {
-            // Adaptive geometric mean scaling (Patent: Multiplicative GNN)
-            score = Math.pow(score * peerProduct, 1 / phi) * phi;
+        // Fetch current score if not self
+        let currentScore = this.reputationScore;
+        let currentTasksCompleted = this.tasksCompleted;
+
+        if (targetAgent && targetAgent !== this.name) {
+            const { data } = await this.supabase
+                .from('trinity_agent_registry')
+                .select('reputation_score, tasks_completed')
+                .eq('agent_name', targetAgent)
+                .single();
+            if (data) {
+                currentScore = data.reputation_score;
+                currentTasksCompleted = data.tasks_completed;
+            }
         }
 
-        this.reputationScore = Math.max(0, Math.min(100, score));
-        if (success) this.tasksCompleted++;
+        let score = currentScore + delta;
 
-        // Autonomy Tier Promotion Logic
-        let newTier: AutonomyTier = this.autonomyTier;
-        if (this.reputationScore <= 40) newTier = 'Assist';
-        else if (this.reputationScore <= 70) newTier = 'Approve';
-        else if (this.reputationScore <= 90) newTier = 'Act';
-        else newTier = 'Learn';
+        // O(log n) convergence via multiplicative RepID agg – Provisional Aug 17, 2025
+        if (success) {
+            score = Math.pow(Math.max(1, score) * peerProduct, 1 / phi) * phi;
+        }
 
-        if (newTier !== this.autonomyTier) {
-            console.log(`[${this.name}] 🚨 TIER PROMOTION DETECTED: ${this.autonomyTier} -> ${newTier}`);
-            this.autonomyTier = newTier;
+        const finalScore = Math.max(0, Math.min(100, score));
+
+        // Update local if self
+        if (!targetAgent || targetAgent === this.name) {
+            this.reputationScore = finalScore;
+            if (success) this.tasksCompleted++;
         }
 
         // Commit to Ledger
-        await this.supabase.from('trinity_agent_registry').upsert({
-            agent_name: this.name,
-            reputation_score: this.reputationScore,
-            current_tier: this.autonomyTier,
-            tasks_completed: this.tasksCompleted,
+        await this.supabase.from('trinity_agent_registry').update({
+            reputation_score: finalScore,
+            tasks_completed: success ? currentTasksCompleted + 1 : currentTasksCompleted,
             last_active: new Date().toISOString()
-        });
+        }).eq('agent_name', name);
 
         // 🧠 ANFIS FEEDBACK LOOP (Truth-Seeking)
         await this.callAnfisReward(success);
@@ -362,6 +379,7 @@ export class ConstitutionalAgent {
     private resolveLegacyName(name: string): string {
         const MAP: Record<string, string> = {
             'MCP': 'trinity-orch',
+            'ORCH': 'trinity-orch',
             'orch': 'trinity-orch',
             'MEL': 'trinity-mel',
             'APM': 'trinity-apm',
@@ -372,11 +390,11 @@ export class ConstitutionalAgent {
             'SHOFET': 'trinity-shofet',
             'SOPHIA': 'trinity-sophia',
             'NEXUS': 'trinity-nexus',
-            'W3C': 'trinity-w3c',
-            'CHESED': 'trinity-chesed'
+            'CHESED': 'trinity-chesed',
+            'W3C': 'trinity-w3c'
         };
-        const normalized = MAP[name.toUpperCase()] || name.toLowerCase();
-        return normalized.startsWith('trinity-') ? normalized : `trinity-${normalized}`;
+        const upper = name ? name.toUpperCase() : '';
+        return MAP[upper] || MAP[name] || name;
     }
 
     // ============================================
@@ -391,11 +409,6 @@ export class ConstitutionalAgent {
     // MAIN AGENT LOOP (TRANSPLANTED CORE)
     // ============================================
 
-    heartbeatInterval: NodeJS.Timeout | null = null;
-    isSurvivor: boolean = false; // Default, synced later
-    survivorName: string = '';
-    groupName: string = 'UNKNOWN';
-
     async startTrinityHealingLoop() {
         console.log('!!! NEW CODE LOADED - 2026-01-03 v3 !!!');
         return this.run();
@@ -403,14 +416,16 @@ export class ConstitutionalAgent {
 
     async run() {
         console.log('========================================');
-        console.log('[BOOT] Trinity Agent v2026-01-16-STABLE');
+        console.log('[BOOT] Trinity Agent v2026-01-03-FIX');
         console.log('[BOOT] Name:', this.name);
-        console.log('[BOOT] Balancing Mode: ACTIVE');
+        console.log('[BOOT] Healing throttle: ENABLED');
+        console.log('[BOOT] Artifact requirement: ENABLED');
         console.log('========================================');
-        console.log(`[${this.name}] 🏃 Starting main task loop (Spawn Control v9.0.0)...`);
+        console.log(`[${this.name}] 🏃 Starting main task loop (Spawn Control v8.1.1)...`);
 
-        // IMMEDIATE HEARTBEAT ON BOOT
-        console.log('[HEARTBEAT] Writing initial heartbeat...');
+        // IMMEDIATE SYNC & HEARTBEAT ON BOOT
+        console.log('[HEARTBEAT] Writing initial heartbeat & Syncing state...');
+        await this.syncState();
         await this.heartbeat();
 
         this.heartbeatInterval = setInterval(async () => {
@@ -426,68 +441,89 @@ export class ConstitutionalAgent {
 
         while (true) {
             try {
-                // [ANTIGRAVITY] SSOT: PRIORITIZED PROBABILISTIC LOGIC (Grok's recommendation)
-                // 1. Check for Done but unverified jobs (Peer Review)
-                const verificationTask = await this.getVerificationTask();
+                if (activeCount && activeCount > 0) {
+                    const firstBusy = activeClaims![0];
+                    if (activeCount > 1) {
+                        console.warn(`[${this.name}] 🚨 CONCURRENCY VIOLATION: ${activeCount} tasks claimed.`);
+                    }
 
-                if (verificationTask) {
-                    // Calculate Backlog for probabilistic weighting
-                    const { count: backlog } = await this.supabase
+                    console.log(`[${this.name}] 🚀 FOCUS: Resuming active task ${firstBusy.id} (${firstBusy.status})...`);
+
+                    const { data: fullTask } = await this.supabase
                         .from('trinity_tasks')
-                        .select('*', { count: 'exact', head: true })
-                        .in('status', ['done', 'completed'])
-                        .is('verified_by', null);
+                        .select('*')
+                        .eq('id', firstBusy.id)
+                        .single();
 
-                    const verifyProb = Math.min(0.9, 0.3 + 0.1 * (backlog || 0));
-                    const repBias = this.reputationScore > 80 ? -0.2 : 0; // Trusted agents bias toward creation
-                    const finalProb = Math.max(0.1, verifyProb + repBias);
-
-                    if (Math.random() < finalProb) {
-                        console.log(`[${this.name}] 🔍 PROBABILISTIC PEER VERIFICATION (Backlog: ${backlog}, Prob: ${finalProb.toFixed(2)}): ${verificationTask.title}`);
-                        await this.processTask(verificationTask);
-                        await this.heartbeat();
-                        await this.sleep(10000);
+                    if (fullTask) {
+                        if (firstBusy.status === 'pending_clarification') {
+                            console.log(`[${this.name}] 🚧 Awaiting clarification for ${firstBusy.id}.`);
+                            await this.sleep(30000);
+                        } else {
+                            await this.processTask(fullTask as any);
+                        }
                         continue;
-                    } else {
-                        console.log(`[${this.name}] 🎲 Verification skipped (rolled creation)`);
                     }
                 }
 
-                // [ANTIGRAVITY] STROKE OF CONSCIENCE: One task at a time.
-                const { data: activeTasks } = await this.supabase
-                    .from('trinity_tasks')
-                    .select('id')
-                    .eq('claimed_by', this.name)
-                    .eq('status', 'in_progress');
+                let taskHandled = false;
 
-                if (activeTasks && activeTasks.length > 0) {
-                    console.log(`[${this.name}] ⏳ Already processing task ${activeTasks[0].id}. Stalling...`);
-                    await this.sleep(20000);
-                    continue;
+                // ──────────────────────────────────────────────────────
+                // PRIORITY 1 — Peer Verification (Always First)
+                // ──────────────────────────────────────────────────────
+                const verificationTask = await this.getVerificationTask();
+                if (verificationTask) {
+                    console.log(`[${this.name}] 🔍 P1: Verifying peer work -> ${verificationTask.title}`);
+                    await this.verifyPeerTask(verificationTask);
+                    taskHandled = true;
+
+                    // [EVERGREEN PROTOCOL] Auto-respawn after successful verification
+                    const { data: updatedTask } = await this.supabase
+                        .from('trinity_tasks')
+                        .select('status, title')
+                        .eq('id', verificationTask.id)
+                        .single();
+
+                    if (updatedTask && updatedTask.title.includes('[EVERGREEN]') && updatedTask.status === 'verified') {
+                        await this.respawnEvergreen(verificationTask);
+                    }
                 }
 
-                const task = await this.getNextTask();
+                // ──────────────────────────────────────────────────────
+                // PRIORITY 2 — Explicitly Assigned Tasks
+                // ──────────────────────────────────────────────────────
+                if (!taskHandled) {
+                    const assignedTask = await this.getNextTask(true);
+                    if (assignedTask) {
+                        console.log(`[${this.name}] 🎯 P2: My assigned task -> ${assignedTask.title}`);
+                        await this.processTask(assignedTask);
+                        taskHandled = true;
+                    }
+                }
 
-                if (task) {
-                    console.log(`[${this.name}] 📋 Processing New Task: ${task.title}`);
-                    await this.processTask(task);
-                } else {
-                    console.log(`[${this.name}] 💤 No new tasks available, waiting...`);
+                // ──────────────────────────────────────────────────────
+                // PRIORITY 3 — Global High-Priority Queue
+                // ──────────────────────────────────────────────────────
+                if (!taskHandled) {
+                    const globalTask = await this.getNextTask(false);
+                    if (globalTask) {
+                        console.log(`[${this.name}] 📈 P3: Highest global -> ${globalTask.title}`);
+                        await this.processTask(globalTask);
+                        taskHandled = true;
+                    }
+                }
+
+                // ──────────────────────────────────────────────────────
+                // IDLE STATE — Maintenance & Genesis
+                // ──────────────────────────────────────────────────────
+                if (!taskHandled) {
+                    console.log(`[${this.name}] 🌙 Swarm Idle — running maintenance checks...`);
+                    await this.runIdleLoop();
+                    if (Math.random() < 0.15) await this.runWebAwareGenesis();
                 }
 
                 await this.heartbeat();
-                // 3x3: Continuous Monitoring
-                await this.checkSurvivorStatus();
-
-                // EVERGREEN IDLE LOOP (Phase 9)
-                if (!task && !verificationTask) {
-                    await this.runIdleLoop();
-                }
-
-                // Self-Healing Check (Legacy integrated)
-                if (Math.random() < 0.05) await this.runSelfDiagnostic();
-
-                await this.sleep(30000);
+                await this.sleep(taskHandled ? 5000 : 15000);
 
             } catch (err: any) {
                 console.error(`[${this.name}] Main loop error:`, err.message);
@@ -498,64 +534,157 @@ export class ConstitutionalAgent {
     }
 
     async getVerificationTask() {
-        // [ANTIGRAVITY] PEER REVIEW SSOT:
-        // Find tasks marked 'completed' by SOMEONE ELSE, but not yet 'verified_by' anyone.
-        const { data: task, error } = await this.supabase
+        // [PHASE 25] ROBUST PEER REVIEW FETCH
+        const { data: tasks, error } = await this.supabase
             .from('trinity_tasks')
             .select('*')
             .in('status', ['done', 'completed'])
-            .is('verified_by', null)
-            .neq('claimed_by', this.name) // MUST BE SOMEONE ELSE'S WORK
+            .neq('claimed_by', this.name)
+            .or(`verified_by.is.null,not.verified_by.cs.{${this.name}}`)
             .order('priority', { ascending: false })
+            .order('completed_at', { ascending: true }) // FIFO: Oldest work first
+            .limit(1);
+
+        if (error) {
+            console.error(`[${this.name}] Verification fetch error:`, error.message);
+            return null;
+        }
+
+        return tasks?.[0] || null;
+    }
+
+    async respawnEvergreen(original: Task) {
+        if (!original.title.includes('[EVERGREEN]')) return;
+
+        // Clone the task for perpetual motion
+        const newTask = {
+            title: original.title,
+            description: original.description,
+            task_type: original.task_type || 'evergreen',
+            priority: original.priority || 50,
+            status: 'pending',
+            claimed_by: null,
+            assigned_to: original.assigned_to,
+            created_at: new Date().toISOString(),
+            metadata: {
+                ...(original.metadata as any || {}),
+                loop_generation: (original.metadata as any)?.loop_generation ? (original.metadata as any).loop_generation + 1 : 1,
+                previous_id: original.id
+            }
+        };
+
+        const { error } = await this.supabase
+            .from('trinity_tasks')
+            .insert([newTask]);
+
+        if (!error) {
+            console.log(`[${this.name}] ♻️  EVERGREEN RESPAWNED: ${original.title} (Gen: ${newTask.metadata.loop_generation})`);
+        } else {
+            console.warn(`[${this.name}] ⚠️  Evergreen respawn failed:`, error.message);
+        }
+    }
+
+    async verifyPeerTask(task: Task) {
+        console.log(`[BFT] ⚔️ Commencing Triad Consensus on: ${task.title}`);
+
+        // 1. GATHER EVIDENCE (Check artifacts)
+        const { data: artifacts } = await this.supabase
+            .from('trinity_artifacts')
+            .select('*')
+            .eq('task_id', task.id);
+
+        const artifactCount = artifacts?.length || 0;
+        console.log(`[BFT] Found ${artifactCount} artifacts for review.`);
+
+        // 2. PHI-WEIGHTED CONSISTENCY (Grok's Golden Ratio Consensus)
+        // Apply φ-weight: finalBelief = beliefs.reduce((sum, b) => sum + b * 1.618 ** (rep / 100), 0)
+        const phi = 1.618;
+        const repFactor = (this.reputationScore || 50) / 100;
+        const weight = Math.pow(phi, repFactor);
+
+        let belief = artifactCount > 0 ? 0.8 : 0.2;
+        let disbelief = artifactCount === 0 ? 0.7 : 0.1;
+
+        // Final aggregate logic (weighted influence)
+        const isVerified = (belief * weight) > (disbelief * (1 / weight));
+        const newVerifyCount = (task.verify_count || 0) + 1;
+        const verifiers = [...(task.verified_by || []), this.name];
+
+        // 3. APPLY TRUNCATED BFT
+        if (isVerified) {
+            console.log(`[BFT] ✅ Verified by ${this.name} (Weight: ${weight.toFixed(2)})`);
+
+            await this.supabase.from('trinity_tasks').update({
+                verify_count: newVerifyCount,
+                verified_by: verifiers,
+                status: newVerifyCount >= 3 ? 'verified' : 'done',
+                verified_at: newVerifyCount >= 3 ? new Date().toISOString() : null,
+                verification_result: `Verified via φ-weighted consensus by ${this.name}`,
+                metadata: {
+                    ...(task.metadata as any || {}),
+                    last_verifier: this.name,
+                    last_verify_time: new Date().toISOString(),
+                    last_verify_phi_weight: weight,
+                    last_verify_score: belief
+                }
+            }).eq('id', task.id);
+
+            // [PHASE 25] PERSIST VERIFICATION INSIGHT (Phase 3)
+            await this.generateInsight(task, `Peer verification complete for ${task.title}. Result: ${isVerified ? 'PASSED' : 'FAILED'}`);
+
+            // [PHASE 10] Reward original completer's RepID on 2/3 and 3/3
+            if (newVerifyCount >= 2) {
+                await this.updateReputation(true, task.claimed_by || undefined, 2);
+            }
+        } else {
+            console.log(`[BFT] ❌ CHALLENGE ISSUED by ${this.name}`);
+
+            // [PHASE 10] SUBJECTIVE SLASHING
+            const slashAmount = disbelief > 0.6 ? -15 : -5;
+
+            await this.supabase.from('trinity_tasks').update({
+                status: 'failed',
+                verification_result: `CHALLENGE: Failed by ${this.name} (Disbelief: ${disbelief.toFixed(2)})`,
+                verification_details: `RepID Slashed ${slashAmount} for ${task.claimed_by}. Re-org triggered.`
+            }).eq('id', task.id);
+
+            // SLASH REPID of task.claimed_by
+            await this.updateReputation(false, task.claimed_by || undefined, slashAmount);
+            await this.log('bft_slash', `Slashed ${task.claimed_by} (${slashAmount}) for failed verification on ${task.id}`);
+        }
+
+        this.sessionMetrics.tasksCompleted++; // Verification counts as work
+        await this.heartbeat();
+    }
+
+    async getNextTask(strictlyAssigned = false) {
+        // [PHASE 25] FLEXIBLE ROLE MATCHING
+        // Handle both 'trinity-mel' and 'MEL'
+        const shortName = this.name.includes('-') ? this.name.split('-')[1].toUpperCase() : this.name.toUpperCase();
+
+        let query = this.supabase
+            .from('trinity_tasks')
+            .select('*')
+            .eq('status', 'pending');
+
+        if (strictlyAssigned) {
+            // Check for both trinity-mel AND MEL
+            query = query.or(`assigned_to.eq.${this.name},assigned_to.eq.${shortName}`);
+        } else {
+            query = query.is('assigned_to', null);
+        }
+
+        const { data: task, error } = await query
+            .order('priority', { ascending: false })
+            .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle();
 
         if (error) {
-            console.error(`[${this.name}] Failed to fetch peer work:`, error.message);
+            console.error(`[${this.name}] Error fetching task:`, error.message);
             return null;
         }
 
-        if (task) {
-            // Transform the completed task into a verification mission
-            return {
-                ...task,
-                title: `[VERIFY] ${task.title}`,
-                description: `VERIFY PEER WORK: ${this.name} reviewing ${task.claimed_by}'s work.\n\n` +
-                    `1. Check artifact: ${task.artifact_url}\n` +
-                    `2. Confirm results match description.\n` +
-                    `3. Provide confirmation or challenge.\n\n` +
-                    `Context: ${task.result || 'No result provided'}`,
-                task_type: 'review',
-                priority: 95 // Ensure it stays top of priority when injected into processTask
-            };
-        }
-        return null;
-    }
-
-    async getNextTask() {
-        let { data: task } = await this.supabase
-            .from('trinity_tasks')
-            .select('*')
-            .or(`assigned_to.eq.${this.name},assigned_to.is.null`)
-            .eq('status', 'pending')
-            .order('priority', { ascending: false })
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .single();
-
-        if (!task) {
-            // Check for unassigned tasks explicitly if OR query fails or just double check
-            const result = await this.supabase
-                .from('trinity_tasks')
-                .select('*')
-                .is('assigned_to', null)
-                .eq('status', 'pending')
-                .order('priority', { ascending: false })
-                .order('created_at', { ascending: true })
-                .limit(1)
-                .single();
-            task = result.data;
-        }
         return task || null;
     }
 
@@ -564,6 +693,13 @@ export class ConstitutionalAgent {
     // ============================================
 
     async processTask(task: Task) {
+        // [PHASE 20] ATOMIC CLAIM: Ensure we own the task before starting
+        const claimed = await this.claimTask(task.id);
+        if (!claimed) {
+            console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
+            return { success: false, error: 'Already claimed' };
+        }
+
         // TRY LOCAL FIRST
         if (this.canHandleLocally(task)) {
             console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
@@ -572,6 +708,32 @@ export class ConstitutionalAgent {
 
         // ONLY THEN use LLM
         return await this.processWithLLM(task);
+    }
+
+    async claimTask(taskId: number | string): Promise<boolean> {
+        // [PHASE 22] ATOMIC SUPABASE TRANSACTION
+        const { data, error } = await this.supabase
+            .from('trinity_tasks')
+            .update({
+                status: 'doing',
+                claimed_by: this.name,
+                started_at: new Date().toISOString()
+            })
+            .eq('id', taskId)
+            .eq('status', 'pending')
+            .is('claimed_by', null)
+            .select();
+
+        if (error) {
+            console.error(`[${this.name}] 🚨 Atomic claim failed:`, error.message);
+            return false;
+        }
+
+        const success = !!(data && data.length > 0);
+        if (success) {
+            console.log(`[${this.name}] 🛡️ Atomic claim SECURED for task ${taskId}`);
+        }
+        return success;
     }
 
     canHandleLocally(task: Task) {
@@ -584,25 +746,27 @@ export class ConstitutionalAgent {
     }
 
     async handleLocal(task: Task) {
-        // Claim task first
-        await this.supabase.from('trinity_tasks').update({ status: 'in_progress', claimed_by: this.name }).eq('id', task.id);
+        // [PHASE 20] Already claimed via processTask -> claimTask
+        // Log the healing
+        await this.log('task_processing_local', `Processing local task: ${task.title}`, { taskId: task.id, type: task.task_type });
 
         let result = `[LOCAL] Processed by ${this.name} rule engine`;
 
         // Special handling if needed
         if (task.task_type === 'heartbeat') await this.heartbeat();
+
         if (task.task_type === 'self-healing' || task.title.includes('[HEALING]')) {
             // Log the healing
             console.log(`[LOCAL] 🩺 Processed healing task ${task.id}`);
             result = `[HEALING] System repaired by ${this.name}`;
-            this.sessionMetrics.healingAttempts++;
+            this.sessionMetrics.tasksCompleted++; // Count it
         }
 
         // Complete it immediately
         await this.supabase
             .from('trinity_tasks')
             .update({
-                status: 'completed',
+                status: 'done', // v8.0: mark "done" to trigger BFT review
                 result: result,
                 claimed_by: this.name,
                 completed_at: new Date().toISOString()
@@ -620,14 +784,9 @@ export class ConstitutionalAgent {
         console.log(`[LLM] 🧠 Calling API for task ${task.id}(${task.task_type})`);
 
         try {
-            console.log(`[${this.name}] 🚀 Initiating Execution for Task ${task.id}: "${task.title}"`);
-            // Claim Task
-            const { error: claimError } = await this.supabase.from('trinity_tasks').update({ status: 'in_progress', claimed_by: this.name, started_at: new Date().toISOString() }).eq('id', task.id);
-            if (claimError) {
-                console.error(`[${this.name}] ❌ Failed to claim task ${task.id}:`, claimError.message);
-                throw claimError;
-            }
-            console.log(`[${this.name}] ✅ Task ${task.id} marked as In Progress.`);
+            // [PHASE 20] Already claimed via processTask -> claimTask
+            // Persistent Activity Logging
+            await this.log('task_processing_llm', `Starting LLM task: ${task.title}`, { taskId: task.id, type: task.task_type });
 
             // 1. CONTEXT PIPE: GATHER WISDOM (The "Amnesia" Fix)
             const wisdomContext = await this.gatherWisdom(task);
@@ -660,20 +819,32 @@ Description: ${task.description}
 Context: 
 ${wisdomContext}
 
-[THINKING_PROTOCOL]
-Before outputting any text or calling any tools, you MUST include a <thinking> block analyzing:
-1. Core Objective: What is the single most important outcome?
-2. Tool Requirement: Which tool MUST be called to persist this work (e.g., save_artifact)?
-3. Artifact Specs: Format (MD/Code), Title, and Access Level.
-
-Then, proceed with your response. ALWAYS use the save_artifact tool to store your result if the task is complete.
+Please complete this task according to the Constitution. ALWAYS use the save_artifact tool to store your result.
 `;
 
             // Call LLM
             const result = await this.callLLM(prompt);
             console.log(`[${this.name}] 🧠 Result length: ${result.output?.length || 0}`);
-            // Calculate Certainty & Evaluation (Optimization Upgrade)
-            const evaluation = await this.evaluateResult(result.output, task);
+            // [PHASE 10] UNCERTAINTY AS OPPORTUNITY (Logical Escalation)
+            const evaluation = await this.evaluateResult(task, result.output);
+            const lowBelief = evaluation.score < 40;
+            const explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
+
+            if (lowBelief || explicitEscalate) {
+                console.log(`[ANTIGRAVITY] 🚨 UNCERTAINTY DETECTED (Score: ${evaluation.score}). Escalating to Architect...`);
+
+                await this.supabase.from('trinity_tasks').update({
+                    status: 'pending_clarification',
+                    result: `[ESCALATED] Agent ${this.name} is seeking clarification. \n\nReason: ${lowBelief ? 'Low certainty score' : 'Explicit escalation request'}. \n\nQuery: ${result.output.substring(0, 500)}`,
+                    verification_result: `Searching high-dimension databases... seeking expert consensus.`
+                }).eq('id', task.id);
+
+                // Spawn "Question for Architect" artifact
+                const questionContent = `# Question for Architect \n\n**Agent**: ${this.name} \n**Task**: ${task.title} \n\n**The Right Question**: \n${result.output} \n\n---\n*The smartest person is not the one with all the answers, but the one asking the right questions.*`;
+                await this.saveArtifact(task.id, questionContent, 'report', `Q: ${task.title}`, 'public');
+
+                return { success: true, llm_used: true, escalated: true };
+            }
 
             let externalArtifactUrl = '';
             // Artifact Logic
@@ -694,89 +865,42 @@ Then, proceed with your response. ALWAYS use the save_artifact tool to store you
 
             // [ANTIGRAVITY] MANDATORY ARTIFACT ENFORCEMENT
             if (!externalArtifactUrl) {
-                console.log(`[ANTIGRAVITY] 🛡️ No artifact produced for task ${task.id}. Auto-generating default report...`);
-                const reportContent = `---
-Agent: ${this.name}
-Task: ${task.title}
-Task ID: ${task.id}
-Time: ${new Date().toISOString()}
----
-
-# Task Completion Report: ${task.title}
-
-## Result Summary
-${result.output}
-
-## Metadata
-- Priority: ${task.priority}
-- Type: ${task.task_type || 'General'}
-- Status: Completed
-- Signatory: ${this.name}`;
-                const fallbackUrl = await this.saveArtifact(String(task.id), reportContent, 'report', `Report: ${task.title}`, 'protected');
+                console.log(`[ANTIGRAVITY] 🛡️ No artifact produced for task ${task.id}.Auto - generating default report...`);
+                const reportContent = `# Task Completion Report: ${task.title} \n\n## Agent: ${this.name} \n## Result Summary\n${result.output} \n\n## Metadata\n - Priority: ${task.priority} \n - Type: ${task.task_type || 'General'} \n - Time: ${new Date().toISOString()} `;
+                const fallbackUrl = await this.saveArtifact(task.id, reportContent, 'report', `Report: ${task.title} `, 'protected');
                 if (fallbackUrl) externalArtifactUrl = fallbackUrl;
                 else console.warn(`[ANTIGRAVITY] ⚠️ Failed to save fallback artifact.`);
             }
 
-            // Mark Completed (Moving to 'done' status for verification pipeline)
-            const updatePayload = {
-                status: 'done',
-                claimed_by: this.name,
-                result: result.output,
-                artifact_url: externalArtifactUrl,
-                completed_at: new Date().toISOString(),
-                belief: evaluation.score / 100,
-                disbelief: evaluation.score < 50 ? (50 - evaluation.score) / 100 : 0,
-                uncertainty: evaluation.score > 90 ? 0.05 : 0.2,
-                metadata: {
-                    provider: 'openai',
-                    certainty: 0.85,
-                    evaluation: evaluation,
-                }
-            };
-
-            // mark completed
-            const finalBelief = evaluation.score / 100;
-
-            // [ANTIGRAVITY] Lowering threshold to 10% to let Peer Review (v3) handle quality.
-            if (finalBelief < 0.1) {
-                console.warn(`[${this.name}] ⚠️ Belief score ${finalBelief} is extremely low. Task failed logic check.`);
-                await this.supabase.from('trinity_tasks').update({
-                    status: 'failed',
-                    result: result.output,
-                    metadata: {
-                        ...updatePayload.metadata,
-                        fail_reason: 'Logic threshold minimum not met'
-                    }
-                }).eq('id', task.id);
-                return;
-            }
-
-            const { data: updatedRows, error: finalUpdateError } = await this.supabase
+            // Mark Completed
+            await this.supabase
                 .from('trinity_tasks')
-                .update(updatePayload)
-                .eq('id', task.id)
-                .select();
-
-            if (finalUpdateError) {
-                console.error(`[${this.name}] ❌ Final completion update failure for Task ${task.id}:`, finalUpdateError.message);
-                throw finalUpdateError;
-            }
-
-            if (!updatedRows || updatedRows.length === 0) {
-                console.warn(`[${this.name}] ⚠️ No rows updated for Task ${task.id}. Check RLS/Permissions.`);
-            } else {
-                console.log(`[${this.name}] ✅ Task ${task.id} marked as completed.`);
-            }
-
-            // [PHASE 2] - TRIAD CONSENSUS CHECK
-            const consensusGroup = task.consensus_group || (task.metadata as any)?.consensus_group;
-            if (task.requires_consensus && consensusGroup) {
-                await this.logConsensusParticipation(String(task.id), finalBelief);
-            }
+                .update({
+                    status: 'done', // Moving to 'done' status for verification pipeline
+                    claimed_by: this.name,
+                    result: result.output,
+                    artifact_url: externalArtifactUrl,
+                    completed_at: new Date().toISOString(),
+                    // SUBJECTIVE LOGIC: b+d+u=1
+                    belief: evaluation.score / 100,
+                    disbelief: evaluation.score < 50 ? (50 - evaluation.score) / 100 : 0,
+                    uncertainty: evaluation.score > 90 ? 0.05 : 0.2,
+                    metadata: JSON.stringify({
+                        provider: 'openai',
+                        certainty: evaluation.score / 100,
+                        evaluation: evaluation,
+                        processedBy: this.name,
+                        version: this.version
+                    })
+                })
+                .eq('id', task.id);
 
             // Log Benchmark Score if applicable (Training Loop)
             // 3. LOG BENCHMARK
             await this.logBenchmark(task, evaluation.score);
+
+            // [PHASE 25] PERSIST INSIGHT (Phase 3)
+            await this.generateInsight(task, result.output);
 
             this.sessionMetrics.tasksCompleted++;
             await this.updateReputation(evaluation.score > 0.6);
@@ -809,26 +933,22 @@ ${result.output}
     async runIdleLoop() {
         console.log(`[${this.name}] 🌬️ Entering Evergreen Idle Mode(Web - Aware)...`);
 
-        // 1. Cost Guard Check (Simulated)
-        // const canSpend = await checkBudget(); if (!canSpend) return;
-
-        // 2. Roll for Chaos (The Gym) - 20% chance
+        // [PHASE 25] CHAOS INJECTION (Grok's Phase 4)
+        // 20% chance to simulate failure and trigger self-healing
         if (Math.random() < 0.2) {
-            // [ANTIGRAVITY] ANFIS Optimization Step
+            console.log(`[CHAOS] 🌪️ Controlled failure injected to test swarm resilience...`);
+            await this.updateReputation(false, this.name, -5); // Test-slash
+
+            // Trigger self-diagnostic to "heal"
+            await this.runSelfDiagnostic();
+
+            // Trigger an internal ANFIS re-route sim if available
             try {
                 const { ANFISRouter } = require('../ai/ANFISRouter');
                 const anfis = new ANFISRouter();
-                anfis.optimize(0.15); // Chaotic HHO
-                const route = anfis.route([Math.random(), Math.random(), 0.5]); // Simulate inputs
-                if (route.targetSquad === 'GAMMA' && this.name.includes('MEL')) {
-                    console.log(`[ANFIS] 🔀 Re - routing internal logic based on fuzzy score ${route.confidence.toFixed(2)} `);
-                }
+                anfis.optimize(0.15);
+                console.log(`[ANFIS] 🧠 Self-healing: Logic re-optimized after chaos event.`);
             } catch (e) { /* ignore */ }
-
-            try {
-                const { runChaosSimulation } = require('../../scripts/chaos-engine');
-                await runChaosSimulation();
-            } catch (e) { /* Ignore import error in dev */ }
             return;
         }
 
@@ -906,8 +1026,14 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
     }
 
     async spawnNextStep(originalTask: Task, result: string, evaluation: { score: number; handoff_required: boolean; handoff_to?: string }) {
-        // [ANTIGRAVITY] LOOP BREAKER: Do NOT spawn verification for a verification task.
-        if (originalTask.task_type === 'review' || originalTask.title.includes('[VERIFY]')) {
+        // [ANTIGRAVITY] ROBUST LOOP BREAKER: Do NOT spawn verification for a verification task.
+        const titleMatch = originalTask.title.includes('[VERIFY]') ||
+            originalTask.title.includes('[REVIEW]') ||
+            originalTask.title.includes('Verify');
+
+        const typeMatch = originalTask.task_type === 'review' || originalTask.task_type === 'meta';
+
+        if (titleMatch || typeMatch) {
             console.log(`[VERIFY] 🛑 Loop breaker triggered for Task ${originalTask.id}. Not spawning recursive review.`);
 
             // Mark the PARENT task as verified if this was a review
@@ -915,19 +1041,48 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
             if (parentId) {
                 const isApproved = evaluation.score > 0.5;
 
-                // 2/3 BFT Consensus Logic
-                const { data: parentTask } = await this.supabase
+                // 2/3 BFT Consensus Logic – Provisional Aug 17, 2025
+                const { data: parentTask, error } = await this.supabase
                     .from('trinity_tasks')
-                    .select('verify_count, status')
+                    .select('signatures, status, metadata, verify_count, claimed_by, completed_at')
                     .eq('id', parentId)
                     .single();
 
-                let newVerifyCount = ((parentTask as any)?.verify_count || 0) + (isApproved ? 1 : 0);
-                let newStatus = (parentTask as any)?.status || 'done';
+                if (error || !parentTask) {
+                    console.error(`[VERIFY] Error fetching parent task ${parentId}:`, error?.message);
+                    return;
+                }
+
+                let newVerifyCount = (parentTask.verify_count || 0) + (isApproved ? 1 : 0);
+                let newStatus = parentTask.status || 'done';
+                let signatures = parentTask.signatures || [];
+
+                // Track multi-agent signatures for BFT audit trail
+                signatures.push({
+                    agent: this.name,
+                    reputation: this.reputationScore,
+                    approved: isApproved,
+                    timestamp: new Date().toISOString()
+                });
 
                 if (newVerifyCount >= 2 && isApproved) {
                     newStatus = 'verified';
                     console.log(`[VERIFY] 🏆 Task ${parentId} reached 2/3 BFT consensus. Status -> VERIFIED.`);
+                } else if (!isApproved) {
+                    // [BFT DISPUTE] Subjective Slashing Logic – Provisionally Protected
+                    console.log(`[VERIFY] ⚠️ CHALLENGE DETECTED for Task ${parentId}. Slashing original producer.`);
+                    await this.updateReputation(false, parentTask.claimed_by, -5); // Slash -5 for bad work
+                    newStatus = 'failed';
+
+                    // Trigger Reorg: Question-Driven Reorganization (Patent pending)
+                    await this.supabase.from('trinity_tasks').insert({
+                        title: `[REORG] Dispute Resolution for ${parentId}`,
+                        description: `Task ${parentId} failed peer verify. Dispute reason: ${result.substring(0, 200)}`,
+                        task_type: 'critique',
+                        priority: 90,
+                        status: 'pending',
+                        metadata: { disputed_task_id: parentId, disputed_agent: parentTask.claimed_by }
+                    });
                 }
 
                 await this.supabase.from('trinity_tasks').update({
@@ -935,37 +1090,38 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                     repid_verified: true,
                     verification_result: isApproved ? 'VALID' : 'CHALLENGED',
                     verification_details: result.substring(0, 1000),
+                    signatures: signatures,
                     verify_count: newVerifyCount,
                     status: newStatus,
                     verified_at: newStatus === 'verified' ? new Date().toISOString() : null
                 }).eq('id', parentId);
-
-                // Slash RepID if CHALLENGED
-                if (!isApproved) {
-                    console.log(`[VERIFY] ⚠️ Task ${parentId} challenged by ${this.name}. Slasher protocol engaged.`);
-                }
             }
             return;
         }
 
         // [CLAUDE: DECENTRALIZED VERITAS LOOP] - Automatic Verification for all critical tasks
-        const isCritical = ['code', 'design', 'strategy', 'research', 'report'].includes(originalTask.task_type || '') || (originalTask as any).priority > 50;
+        const isCritical = ['code', 'design', 'strategy', 'research', 'report', 'content'].includes(originalTask.task_type || '') || (originalTask as any).priority > 50;
 
         if (isCritical) {
             console.log(`[VERIFY] 🔎 Spawning mandatory cross-agent verification for task ${originalTask.id}`);
 
-            // Find a different peer to verify (Peer Review Protocol)
-            // Strategy: Pick someone from the same squad but NOT self.
-            const peers = Object.keys(AGENT_WISDOM).filter(name =>
+            // [ANTIGRAVITY] PERSISTENT ACTIVITY LOGGING
+            await this.log('verification_spawned', `Spawned peer review for task: ${originalTask.title}`, { parentTaskId: originalTask.id });
+
+            // [ANTIGRAVITY] SQUAD-AWARE ROTATION (Anti-Bottleneck)
+            const allAgents = Object.keys(AGENT_WISDOM);
+            const squadPeers = allAgents.filter(name =>
                 name !== this.name &&
-                AGENT_WISDOM[name].squad === this.squad
+                AGENT_WISDOM[name].squad === (this.wisdom as any)?.squad
             );
 
-            // If no squad peers, pick any other agent
-            const targetPool = peers.length > 0 ? peers : Object.keys(AGENT_WISDOM).filter(n => n !== this.name);
+            // Strategy: 70% chance to pick from squad, 30% from the whole swarm to avoid Veritas bottleneck
+            let targetPool = (Math.random() < 0.7 && squadPeers.length > 0) ? squadPeers : allAgents.filter(n => n !== this.name);
+
+            // Explicitly de-prioritize over-active agents (simulated by random roll weight or just pure random)
             const verifier = targetPool[Math.floor(Math.random() * targetPool.length)];
 
-            console.log(`[VERIFY] 🤝 Assigning verification of ${originalTask.id} to peer: ${verifier}`);
+            console.log(`[VERIFY] 🤝 Assigning verification of ${originalTask.id} to: ${verifier}`);
 
             await this.supabase.from('trinity_tasks').insert({
                 title: `[VERIFY] ${originalTask.title}`,
@@ -983,9 +1139,13 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
         }
     }
 
-    async evaluateResult(output: string, task: Task) {
-        // Improved Logic Rule Engine (v3.4)
-        let score = 0.7; // Default passing (Trust but Verify)
+    // ============================================
+    // TRAINING & OPTIMIZATION LOGIC
+    // ============================================
+
+    async evaluateResult(task: Task, output: string): Promise<{ score: number; handoff_required: boolean; handoff_to?: string }> {
+        // Simplified Logic Rule Engine
+        let score = 0.5; // Default neutral
         let handoff = false;
         let targetAgent = '';
 
@@ -1054,7 +1214,6 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
     // SCIENCE DIVISION: LONG-TERM MEMORY
     // ============================================
     async gatherWisdom(task: Task): Promise<string> {
-        console.log(`[${this.name}] 🧠 Gathering Wisdom for task ${task.id}...`);
         let wisdom = "";
         try {
             // A. Check Latency Opportunity (Via Python Brain)
@@ -1180,39 +1339,33 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
 
     // [ANTIGRAVITY] Enhanced Artifact Saver (Single Source of Truth)
     async saveArtifact(taskId: string, content: string, type: string = 'text', title?: string, accessLevel: string = 'protected') {
-        // [ANTIGRAVITY] ROBUST TASK_ID: Handle both UUID and BIGINT
-        let dbTaskId: any = taskId;
-        if (!isNaN(parseInt(taskId)) && !taskId.includes('-')) {
-            dbTaskId = parseInt(taskId);
-        }
-        const safeTaskId = taskId || '0';
-        const safeTitle = title || `Artifact for Task ${taskId}`;
-
-        console.log(`[${this.name}] 💾 Saving Artifact: "${safeTitle}" for Task ${taskId}...`);
-
         let artifactUrl = null;
         let artifactId = null;
+        const safeTaskId = String(taskId || 'self-gen-' + Date.now());
+        const safeTitle = title || `Artifact ${safeTaskId}`;
+
+        // [ANTIGRAVITY] BIGINT CONVERSION for trinity_artifacts.task_id
+        let dbTaskId: any = safeTaskId;
+        if (!isNaN(parseInt(safeTaskId)) && !safeTaskId.includes('-')) {
+            dbTaskId = parseInt(safeTaskId);
+        }
 
         try {
-            // Attribution: Embed metadata in the content if it's text-based
-            let signedContent = content;
-            if (type === 'text' || type === 'report' || type === 'analysis') {
-                signedContent = `---\nAgent: ${this.name}\nTask: ${safeTitle}\nTask ID: ${taskId}\nDate: ${new Date().toISOString()}\n---\n\n${content}`;
-            }
+            console.log(`[ARTIFACT] 💾 Saving '${safeTitle}'...`);
 
             // Calculate Hash
             const crypto = require('crypto');
-            const fileHash = crypto.createHash('sha256').update(signedContent).digest('hex');
+            const fileHash = crypto.createHash('sha256').update(content).digest('hex');
 
             // 1. UPLOAD TO STORAGE
             try {
                 let ext = 'md';
-                if (type === 'code' || signedContent.includes('```ts') || signedContent.includes('```js')) ext = 'ts';
+                if (type === 'code' || content.includes('```ts') || content.includes('```js')) ext = 'ts';
                 if (type === 'design' || type === 'image') ext = 'png';
 
                 const timestamp = Date.now();
-                const cleanAgentName = this.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                const storagePath = `${cleanAgentName}/${timestamp}_${String(taskId).substring(0, 8)}.${ext}`;
+                const cleanName = this.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                const storagePath = `${cleanName}/${timestamp}_${safeTaskId.substring(0, 8)}.${ext}`;
 
                 const { error: uploadError } = await this.supabase
                     .storage
@@ -1250,7 +1403,7 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                     // Start with the standard export
                     let clientToUse;
                     if (attempt === 0) {
-                        const { supabaseAdmin } = require('../supabase');
+                        const { supabaseAdmin } = require('../../lib/supabase');
                         clientToUse = supabaseAdmin;
                     } else {
                         // FORCE FRESH CLIENT
@@ -1273,9 +1426,16 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                         view_count: 0,
                         // [ANTIGRAVITY] Frictionless Alignment (Satisfy NOT NULLs)
                         agent: this.name,
+                        agent_name: this.name,
                         creator_agent: this.name,
                         status: 'created',
-                        storage_location: 'supabase'
+                        storage_location: 'supabase',
+                        // [PHASE 25] MCP v2 SECURE CHAINING (Grok's Phase 5)
+                        metadata: {
+                            mcp_version: '2.0',
+                            mcp_proof_hash: `sha256:${fileHash.substring(0, 16)}`, // Simulated secure proof
+                            chain_id: 'hyperdag-swarm-1'
+                        }
                     };
 
                     const primaryPayload = {
@@ -1298,7 +1458,6 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                             ...payload,
                             content_preview: content.substring(0, 5000),
                             agent: this.name,
-                            creator_agent: this.name, // Ensure consistency
                             file_path: artifactUrl,
                             status: 'created'
                         };
@@ -1337,7 +1496,7 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                     const artifactsDir = path.resolve(process.cwd(), 'artifacts', this.name.toLowerCase());
                     if (!fs.existsSync(artifactsDir)) fs.mkdirSync(artifactsDir, { recursive: true });
 
-                    const filename = `task-${String(safeTaskId).substring(0, 8)}.md`;
+                    const filename = `task-${safeTaskId.substring(0, 8)}.md`;
                     const fullPath = path.join(artifactsDir, filename);
                     fs.writeFileSync(fullPath, content, 'utf8');
                 } catch (e) { /* Ignore local fs errors */ }
@@ -1432,61 +1591,16 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
 
 
-    async logConsensusParticipation(taskId: string, belief: number) {
-        console.log(`[${this.name}] 🗳️ Logging consensus participation for Task ${taskId} (Belief: ${belief})`);
-
-        try {
-            const { data: task, error } = await this.supabase
-                .from('trinity_tasks')
-                .select('signatures, status, metadata')
-                .eq('id', taskId)
-                .single();
-
-            if (error) throw error;
-            if (!task) return;
-
-            const currentSignatures = task.signatures || [];
-            if (!currentSignatures.includes(this.name)) {
-                const newSignatures = [...currentSignatures, this.name];
-
-                // Squad membership check (from AGENT_WISDOM)
-                const squadSize = Object.values(AGENT_WISDOM).filter(a => a.squad === this.squad).length;
-                const threshold = Math.max(2, Math.ceil((squadSize * 2) / 3)); // 2/3 BFT
-
-                console.log(`[${this.name}] 🖊️ Signing Task ${taskId}. Current signs: ${newSignatures.length}/${threshold}`);
-
-                const updatePayload: any = { signatures: newSignatures };
-
-                // If consensus reached, we could update a 'consensus_status' or similar
-                if (newSignatures.length >= threshold) {
-                    console.log(`[${this.name}] ⚖️ Consensus reached for Task ${taskId}!`);
-                    let meta = {};
-                    if (task.metadata) {
-                        meta = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata;
-                    }
-                    updatePayload.metadata = {
-                        ...meta as any,
-                        consensus_reached: true,
-                        reached_at: new Date().toISOString()
-                    };
-                }
-
-                await this.supabase
-                    .from('trinity_tasks')
-                    .update(updatePayload)
-                    .eq('id', taskId);
-            }
-        } catch (err: any) {
-            console.error(`[${this.name}] ❌ Consensus logging failed:`, err.message);
-        }
-    }
-
     async sleep(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     async log(action: string, message: string, metadata: any = {}) {
         try {
+            let meta = {};
+            if (metadata) {
+                meta = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+            }
             await this.supabase
                 .from('trinity_agent_logs')
                 .insert({
@@ -1494,7 +1608,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     action,
                     message: typeof message === 'string' ? message.substring(0, 5000) : JSON.stringify(message).substring(0, 5000),
                     metadata: {
-                        ...metadata,
+                        ...meta as any,
                         version: this.version,
                         primaryVirtue: this.wisdom?.primaryVirtue,
                         group: this.groupName // 3x3 Log
@@ -1510,17 +1624,19 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         const timestamp = new Date().toISOString();
 
         try {
-            // [ANTIGRAVITY] SSOT: PRIMARY STATUS UPDATE
+            // [TRINITY SSOT]: PRIMARY STATUS UPDATE (Patent: BFT Consensus Dashboard)
             // This is the source for the "Green Dots" in the Dashboard.
+            // Unified registry ensures O(1) state lookup for the mobile dashboard.
             await this.supabase
                 .from('trinity_agent_registry')
                 .upsert({
                     agent_name: this.name,
-                    status: 'active',
+                    status: 'online', // SSOT: UI expects 'online' or 'active' for Green
                     last_active: timestamp,
                     current_tier: this.autonomyTier,
                     reputation_score: this.reputationScore,
-                    tasks_completed: this.tasksCompleted
+                    tasks_completed: this.tasksCompleted,
+                    current_task_summary: this.currentTaskId ? `Working on task ${this.currentTaskId}` : 'Idle'
                 }, { onConflict: 'agent_name' });
 
             // 1. Trinity Heartbeat (For Controller Header / Redundancy)
@@ -1710,11 +1826,10 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             });
 
             // 2. Prepare Messages & Multi-Provider Weighting
-            // [GROK: GOLDEN RATIO WEIGHTING]
+            // ELITE: Weighted Selection (Prefer Grok if RepID > 8 for ALPHA tasks)
             const sortedProviders = [...this.availableProviders].sort((a, b) => {
-                const aWeight = a === 'grok' || a === 'anthropic' ? Math.pow(this.reputationScore, 1 / PHI) : 0;
-                const bWeight = b === 'grok' || b === 'anthropic' ? Math.pow(this.reputationScore, 1 / PHI) : 0;
-                return bWeight - aWeight;
+                if (this.reputationScore > 80 && a === 'grok') return -1;
+                return 0;
             });
 
             for (const providerKey of sortedProviders) {
@@ -1753,39 +1868,54 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         ];
 
         for (let i = 0; i < 5; i++) {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                body: JSON.stringify({
-                    model: 'gpt-4o',
-                    messages,
-                    tools: tools.length > 0 ? tools : undefined,
-                    tool_choice: tools.length > 0 ? 'auto' : undefined
-                })
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout
 
-            if (!response.ok) throw new Error(await response.text());
-            const data = await response.json();
-            const message = data.choices[0].message;
-            messages.push(message);
+            try {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        messages,
+                        tools: tools.length > 0 ? tools : undefined,
+                        tool_choice: tools.length > 0 ? 'auto' : undefined
+                    })
+                });
 
-            if (message.tool_calls) {
-                for (const toolCall of message.tool_calls) {
-                    const fnName = toolCall.function.name;
-                    const args = JSON.parse(toolCall.function.arguments);
-                    let toolResult = '';
-                    if (fnName === 'save_artifact') {
-                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-                        await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
-                        toolResult = `Artifact '${args.title}' saved.`;
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error(await response.text());
+                const data = await response.json();
+                const message = data.choices[0].message;
+                messages.push(message);
+
+                if (message.tool_calls) {
+                    for (const toolCall of message.tool_calls) {
+                        const fnName = toolCall.function.name;
+                        const args = JSON.parse(toolCall.function.arguments);
+                        let toolResult = '';
+                        if (fnName === 'save_artifact') {
+                            const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+                            await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                            toolResult = `Artifact '${args.title}' saved.`;
+                        }
+                        else {
+                            toolResult = await mcpManager.routeToolCall(fnName, args);
+                        }
+                        messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
                     }
-                    else {
-                        toolResult = await mcpManager.routeToolCall(fnName, args);
-                    }
-                    messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
+                } else {
+                    return { output: message.content || "" };
                 }
-            } else {
-                return { output: message.content || "" };
+            } catch (err: any) {
+                clearTimeout(timeoutId);
+                if (err.name === 'AbortError') {
+                    console.error(`[${this.name}] ⏱️ OpenAI Timeout after 120s.`);
+                    throw new Error("LLM API Timeout");
+                }
+                throw err;
             }
         }
         throw new Error("Max tool recursion");

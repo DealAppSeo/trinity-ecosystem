@@ -49,7 +49,7 @@ const finalAgentName = normalizedName;
 
 async function startAgent() {
     // DYNAMIC IMPORT TO ENSURE ENV VARS ARE LOADED FIRST
-    const { ConstitutionalAgent } = await import('@trinity/agent-core');
+    const { ConstitutionalAgent } = await import('../lib/agent/ConstitutionalAgent');
 
     console.log(`🤖 Starting Agent: ${finalAgentName}...`);
 
@@ -64,9 +64,20 @@ async function startAgent() {
     const finalPort = process.env.PORT ? parseInt(process.env.PORT) : (3100 + Math.floor(Math.random() * 1000));
 
     const server = http.createServer((req, res) => {
-        if (req.url === '/health') {
-            res.writeHead(200);
-            res.end('OK');
+        if (req.url === '/health' || req.url === '/' || req.url === '/swarm-health') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                status: 'ONLINE',
+                agent: finalAgentName,
+                timestamp: new Date().toISOString(),
+                version: '8.1.3-Antigravity',
+                pillar: 'ImageBearer Phase 11',
+                metrics: {
+                    reputation: agent.reputationScore,
+                    tier: agent.autonomyTier,
+                    tasks_handled: agent.sessionMetrics?.tasksCompleted || 0
+                }
+            }));
         } else {
             res.writeHead(404);
             res.end();
