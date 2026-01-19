@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
-import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, Task, AutonomyTier, AgentRegistryRecord, SessionMetrics, MCPPhase } from './types';
+import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, AutonomyTier, AgentRegistryRecord, SessionMetrics, MCPPhase } from './types';
+import { Task } from '@trinity/types';
 import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
 // Dynamic imports for graphology/fs handled inside methods to avoid build issues
 import { mcpManager } from '../mcp/MCPManager';
@@ -619,8 +620,8 @@ export class ConstitutionalAgent {
 
         // Final aggregate logic (weighted influence)
         const isVerified = (belief * weight) > (disbelief * (1 / weight));
-        const newVerifyCount = (task.verify_count || 0) + 1;
-        const verifiers = [...(task.verified_by || []), this.name];
+        const newVerifyCount = ((task as Task & { verify_count?: number }).verify_count || 0) + 1;
+        const verifiers = ((task as Task & { verified_by?: string[] }).verified_by || []).concat(this.name);
 
         // 3. APPLY TRUNCATED BFT
         if (isVerified) {
@@ -712,14 +713,20 @@ export class ConstitutionalAgent {
             return { success: false, error: 'Already claimed' };
         }
 
-        // TRY LOCAL FIRST
-        if (this.canHandleLocally(task)) {
-            console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
-            return await this.handleLocal(task);
-        }
+        try {
+            // TRY LOCAL FIRST
+            if (this.canHandleLocally(task)) {
+                console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
+                return await this.handleLocal(task);
+            }
 
-        // ONLY THEN use LLM
-        return await this.processWithLLM(task);
+            // ONLY THEN use LLM
+            return await this.processWithLLM(task);
+        } catch (error) {
+            console.error(`[${this.name}] 🚨 Process failed for task ${task.id}:`, error);
+            await this.releaseClaim(task.id);
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
     }
 
     async claimTask(taskId: number | string): Promise<boolean> {
@@ -746,6 +753,23 @@ export class ConstitutionalAgent {
             console.log(`[${this.name}] 🛡️ Atomic claim SECURED for task ${taskId}`);
         }
         return success;
+    }
+
+    async releaseClaim(taskId: number | string) {
+        const { error } = await this.supabase
+            .from('trinity_tasks')
+            .update({
+                status: 'pending',
+                claimed_by: null
+            })
+            .eq('id', taskId)
+            .eq('claimed_by', this.name);
+
+        if (error) {
+            console.error(`[${this.name}] 🚨 Failed to release claim for task ${taskId}:`, error.message);
+        } else {
+            console.log(`[${this.name}] 🔓 Released claim on task ${taskId}`);
+        }
     }
 
     canHandleLocally(task: Task) {
@@ -964,6 +988,35 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
             return;
         }
 
+        // [GROK: WAKE SLEEPING AGENTS]
+        // 50% chance to check for pending evergreen tasks if idle
+        if (Math.random() < 0.5) {
+            console.log(`[IDLE] 🔍 Checking for pending evergreens...`);
+            const { data: evergreens } = await this.supabase
+                .from('trinity_tasks')
+                .select('*')
+                .eq('status', 'pending')
+                .ilike('title', '[EVERGREEN]%')
+                .limit(1);
+
+            if (evergreens && evergreens.length > 0) {
+                console.log(`[IDLE] 🌿 Resuming evergreen task: ${evergreens[0].title}`);
+                await this.processTask(evergreens[0]);
+                return;
+            } else {
+                // If NO evergreens exist, seed a high-priority system task to wake the swarm
+                console.log(`[IDLE] 🕯️ Swarm dormant. Seeding wake-up evergreen...`);
+                // await this.seedEvergreen(); (Method to be implemented or logic added here)
+                await this.supabase.from('trinity_tasks').insert({
+                    title: `[EVERGREEN] System Oversight & Swarm Health Audit`,
+                    description: `Automated maintenance run by ${this.name} to ensure ecosystem stability.`,
+                    task_type: 'maintenance',
+                    priority: 25,
+                    status: 'pending'
+                });
+            }
+        }
+
         // 3. Auto-Seed Evergreen Task (Legacy "Internal Auction") - 30% chance if idle
         // [ANTIGRAVITY] Shifted from "Internal Optimization" to "Visible Artifact Generation"
         if (Math.random() < 0.3) {
@@ -1065,9 +1118,9 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                     return;
                 }
 
-                let newVerifyCount = (parentTask.verify_count || 0) + (isApproved ? 1 : 0);
-                let newStatus = parentTask.status || 'done';
-                let signatures = parentTask.signatures || [];
+                let newVerifyCount = ((parentTask as Task & { verify_count?: number }).verify_count || 0) + (isApproved ? 1 : 0);
+                let newStatus = (parentTask as any).status || 'done';
+                let signatures = (parentTask as any).signatures || [];
 
                 // Track multi-agent signatures for BFT audit trail
                 signatures.push({
@@ -1120,34 +1173,44 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
             // [ANTIGRAVITY] PERSISTENT ACTIVITY LOGGING
             await this.log('verification_spawned', `Spawned peer review for task: ${originalTask.title}`, { parentTaskId: originalTask.id });
 
-            // [ANTIGRAVITY] SQUAD-AWARE ROTATION (Anti-Bottleneck)
-            const allAgents = Object.keys(AGENT_WISDOM);
-            const squadPeers = allAgents.filter(name =>
-                name !== this.name &&
-                AGENT_WISDOM[name].squad === (this.wisdom as any)?.squad
-            );
+            // [PHASE 26] MULTI-VERIFIER BFT CONSENSUS (Grok's Recommendation #2)
+            // Strategy: Spawn 3 verifiers (Alpha, Beta, Gamma) to ensure 2/3 majority robustness.
+            const squads = ['ALPHA', 'BETA', 'GAMMA'];
 
-            // Strategy: 70% chance to pick from squad, 30% from the whole swarm to avoid Veritas bottleneck
-            let targetPool = (Math.random() < 0.7 && squadPeers.length > 0) ? squadPeers : allAgents.filter(n => n !== this.name);
+            // Map agents to squads (Hardcoded fallback for O(1) during build)
+            const squadMap: Record<string, string[]> = {
+                'ALPHA': ['trinity-veritas', 'trinity-torch', 'trinity-gcm'],
+                'BETA': ['trinity-mel', 'trinity-chesed', 'trinity-apm'],
+                'GAMMA': ['trinity-hdm', 'trinity-sophia', 'trinity-nexus']
+            };
 
-            // Explicitly de-prioritize over-active agents (simulated by random roll weight or just pure random)
-            const verifier = targetPool[Math.floor(Math.random() * targetPool.length)];
+            for (const squad of squads) {
+                // EXCLUDE BOTH: (1) Self (the verifier spawner) and (2) The original task claimer
+                const originalAgent = originalTask.claimed_by || this.name;
+                const pool = squadMap[squad].filter(name => name !== this.name && name !== originalAgent);
 
-            console.log(`[VERIFY] 🤝 Assigning verification of ${originalTask.id} to: ${verifier}`);
+                // Fallback to squad peers if the pool is empty after filtering
+                const verifier = pool.length > 0
+                    ? pool[Math.floor(Math.random() * pool.length)]
+                    : squadMap[squad][0]; // Guaranteed at least one agent in squadMap
 
-            await this.supabase.from('trinity_tasks').insert({
-                title: `[VERIFY] ${originalTask.title}`,
-                description: `PEER REVIEW MISSION.\n\n1. Review artifact for Task ${originalTask.id} (Created by ${this.name}).\n2. Verify it meets the requirements and quality standards.\n3. If it is what it claims to be, mark as VALID. Otherwise challenge it.\n\nArtifact Context: ${result.substring(0, 300)}...`,
-                task_type: 'review',
-                assigned_to: verifier, // Decentralized Assignment
-                priority: 85, // Higher than research to ensure loop closure
-                status: 'pending',
-                metadata: {
-                    parent_task_id: originalTask.id,
-                    evidence: result.substring(0, 1000),
-                    creator_agent: this.name
-                }
-            });
+                console.log(`[VERIFY] 🤝 Assigning squad ${squad} verification of ${originalTask.id} to: ${verifier}`);
+
+                await this.supabase.from('trinity_tasks').insert({
+                    title: `[VERIFY] ${originalTask.title}`,
+                    description: `PEER REVIEW MISSION (Squad: ${squad}).\n\n1. Review artifact for Task ${originalTask.id} (Created by ${this.name}).\n2. Verify it meets the requirements and quality standards.\n3. If it is what it claims to be, mark as VALID. Otherwise challenge it.\n\nArtifact Context: ${result.substring(0, 300)}...`,
+                    task_type: 'review',
+                    assigned_to: verifier,
+                    priority: 85,
+                    status: 'pending',
+                    metadata: {
+                        parent_task_id: originalTask.id,
+                        evidence: result.substring(0, 1000),
+                        creator_agent: this.name,
+                        squad_verification: squad
+                    }
+                });
+            }
         }
     }
 

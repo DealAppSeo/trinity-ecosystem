@@ -51,13 +51,19 @@ export interface Task {
     transaction_hash?: string; // Proto-DAG audit trail
     task_type?: string;
     context?: string;
+    // v8.0 AUDIT COLUMNS
+    claimed_by?: string;
+    verify_count?: number;
+    verified_by?: string[];
+    result?: string;
+    artifact_url?: string;
     // SUBJECTIVE LOGIC: b+d+u=1
     belief?: number;
     disbelief?: number;
     uncertainty?: number;
     requires_consensus?: boolean;
     consensus_group?: string;
-    signatures?: string[];
+    signatures?: any[];
 }
 
 export type TaskRecord = Task;

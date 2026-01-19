@@ -303,14 +303,21 @@ export default function TasksPage() {
 
                                                 <div className="flex items-center gap-2">
                                                     {(task.assigned_to || task.claimed_by) && (
-                                                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10"
-                                                            title={`Owner: ${task.assigned_to || task.claimed_by}`}>
-                                                            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[8px] font-bold text-white shadow-sm">
-                                                                {(task.assigned_to || task.claimed_by || '').replace('trinity-', '')[0]?.toUpperCase() || '?'}
+                                                        <div className="flex flex-col items-end gap-1">
+                                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10"
+                                                                title={`Owner: ${task.assigned_to || task.claimed_by}`}>
+                                                                <div className="w-4 h-4 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[8px] font-bold text-white shadow-sm">
+                                                                    {(task.assigned_to || task.claimed_by || '').replace('trinity-', '')[0]?.toUpperCase() || '?'}
+                                                                </div>
+                                                                <span className="text-[10px] font-mono text-zinc-300">
+                                                                    {(task.assigned_to || task.claimed_by || '').replace('trinity-', '').toUpperCase()}
+                                                                </span>
                                                             </div>
-                                                            <span className="text-[10px] font-mono text-gray-300">
-                                                                {(task.assigned_to || task.claimed_by || '').replace('trinity-', '').toUpperCase()}
-                                                            </span>
+                                                            {task.verified_by && task.verified_by.length > 0 && (
+                                                                <div className="text-[9px] font-mono text-cyan-500 bg-cyan-500/5 px-1 rounded" title={`Verified by: ${task.verified_by.join(', ')}`}>
+                                                                    VERIFIED BY {task.verified_by.length} AGENTS
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                     <button

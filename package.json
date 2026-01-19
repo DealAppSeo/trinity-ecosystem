@@ -2,9 +2,14 @@
   "name": "trinity-symphony",
   "version": "8.1.3",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
+    "clean": "rm -rf .next node_modules/.cache/turbo",
     "dev": "next dev",
     "build": "next build",
+    "build:webpack": "next build --no-turbopack",
     "start": "next start",
     "lint": "eslint",
     "agent": "npx tsx scripts/run-agent.ts",

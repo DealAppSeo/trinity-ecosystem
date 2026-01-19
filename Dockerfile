@@ -9,18 +9,9 @@ RUN npm ci
 # Copy source
 COPY . .
 
-# ARGs allow Railway to inject variables during build
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ARG SUPABASE_SERVICE_ROLE_KEY
-
-# Persist ARGs as ENVs for the build command
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
-
 # Build Next.js app
-# This requires the ENVs above to be present
-RUN npm run build
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build:webpack
 
 
 # Stage 2: Runtime

@@ -63,7 +63,7 @@ export interface Task {
     uncertainty?: number;
     requires_consensus?: boolean;
     consensus_group?: string;
-    signatures?: string[];
+    signatures?: any[];
 }
 
 export type TaskRecord = Task;
