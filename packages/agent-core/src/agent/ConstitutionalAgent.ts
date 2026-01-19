@@ -89,6 +89,7 @@ export class ConstitutionalAgent {
 
     // BRAIN TRANSPLANT: New Organs
     private currentTaskId: string | null = null;
+    private currentTaskTitle: string | null = null;
     private bibleCache: string | null = null;
     bibleCacheTime: number = 0;
     BIBLE_CACHE_TTL: number = 10 * 60 * 1000;
@@ -441,6 +442,13 @@ export class ConstitutionalAgent {
 
         while (true) {
             try {
+                // [PHASE 21] 1-TASK busy lock
+                const { data: activeClaims, count: activeCount } = await this.supabase
+                    .from('trinity_tasks')
+                    .select('id, status', { count: 'exact' })
+                    .eq('claimed_by', this.name)
+                    .in('status', ['doing', 'in_progress', 'running', 'pending_clarification']);
+
                 if (activeCount && activeCount > 0) {
                     const firstBusy = activeClaims![0];
                     if (activeCount > 1) {
@@ -490,13 +498,15 @@ export class ConstitutionalAgent {
                 }
 
                 // ──────────────────────────────────────────────────────
-                // PRIORITY 2 — Explicitly Assigned Tasks
+                // PRIORITY 2 — Explicitly Assigned Tasks (Self, ShortName, or Squad)
                 // ──────────────────────────────────────────────────────
                 if (!taskHandled) {
                     const assignedTask = await this.getNextTask(true);
                     if (assignedTask) {
                         console.log(`[${this.name}] 🎯 P2: My assigned task -> ${assignedTask.title}`);
+                        this.currentTaskTitle = assignedTask.title;
                         await this.processTask(assignedTask);
+                        this.currentTaskTitle = null;
                         taskHandled = true;
                     }
                 }
@@ -508,7 +518,9 @@ export class ConstitutionalAgent {
                     const globalTask = await this.getNextTask(false);
                     if (globalTask) {
                         console.log(`[${this.name}] 📈 P3: Highest global -> ${globalTask.title}`);
+                        this.currentTaskTitle = globalTask.title;
                         await this.processTask(globalTask);
+                        this.currentTaskTitle = null;
                         taskHandled = true;
                     }
                 }
@@ -668,8 +680,8 @@ export class ConstitutionalAgent {
             .eq('status', 'pending');
 
         if (strictlyAssigned) {
-            // Check for both trinity-mel AND MEL
-            query = query.or(`assigned_to.eq.${this.name},assigned_to.eq.${shortName}`);
+            // Check for both trinity-mel AND MEL AND BETA (Squad)
+            query = query.or(`assigned_to.eq.${this.name},assigned_to.eq.${shortName},assigned_to.eq.${this.squad}`);
         } else {
             query = query.is('assigned_to', null);
         }
@@ -1636,7 +1648,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     current_tier: this.autonomyTier,
                     reputation_score: this.reputationScore,
                     tasks_completed: this.tasksCompleted,
-                    current_task_summary: this.currentTaskId ? `Working on task ${this.currentTaskId}` : 'Idle'
+                    current_task_summary: this.currentTaskTitle ? `Working: ${this.currentTaskTitle}` : 'Idle'
                 }, { onConflict: 'agent_name' });
 
             // 1. Trinity Heartbeat (For Controller Header / Redundancy)
