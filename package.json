@@ -6,10 +6,10 @@
     "packages/*"
   ],
   "scripts": {
-    "clean": "rm -rf .next node_modules/.cache/turbo",
+    "clean": "rm -rf .next node_modules/.cache && npm cache clean --force",
     "dev": "next dev",
     "build": "next build",
-    "build:webpack": "next build --no-turbopack",
+    "build:webpack": "next build",
     "start": "next start",
     "lint": "eslint",
     "agent": "npx tsx scripts/run-agent.ts",

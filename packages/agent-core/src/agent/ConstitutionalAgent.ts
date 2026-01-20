@@ -598,6 +598,13 @@ export class ConstitutionalAgent {
     }
 
     async verifyPeerTask(task: Task) {
+        // [LOOP PREVENTION] Do not verify own work
+        const creator = (task.metadata as any)?.creator_agent || task.claimed_by;
+        if (creator === this.name) {
+            console.log(`[BFT] 🛑 Loop detected! ${this.name} attempted self-verification on task ${task.id}. Skipping.`);
+            return;
+        }
+
         console.log(`[BFT] ⚔️ Commencing Triad Consensus on: ${task.title}`);
 
         // 1. GATHER EVIDENCE (Check artifacts)
@@ -969,8 +976,16 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
     async runIdleLoop() {
         console.log(`[${this.name}] 🌬️ Entering Evergreen Idle Mode(Web - Aware)...`);
 
-        // [PHASE 25] CHAOS INJECTION (Grok's Phase 4)
-        // 20% chance to simulate failure and trigger self-healing
+        // [GROK: WAKE SLEEPING AGENTS]
+        // Force check for any pending work, prioritising evergreens
+        const unclaimed = await this.getNextTask(false);
+        if (unclaimed) {
+            console.log(`[IDLE] 🌿 Found pending task: ${unclaimed.title}. Resuming work.`);
+            await this.processTask(unclaimed);
+            return;
+        }
+
+        // 20% chance to simulate failure and trigger self-healing (PHASE 25)
         if (Math.random() < 0.2) {
             console.log(`[CHAOS] 🌪️ Controlled failure injected to test swarm resilience...`);
             await this.updateReputation(false, this.name, -5); // Test-slash
@@ -1167,6 +1182,13 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
         // [CLAUDE: DECENTRALIZED VERITAS LOOP] - Automatic Verification for all critical tasks
         const isCritical = ['code', 'design', 'strategy', 'research', 'report', 'content'].includes(originalTask.task_type || '') || (originalTask as any).priority > 50;
 
+        // [GROK: VERIFIER CAP] Max 3 verifiers per task
+        const currentVerifyCount = (originalTask as any).verify_count || 0;
+        if (currentVerifyCount >= 3) {
+            console.log(`[VERIFY] 🛑 Verifier cap reached for task ${originalTask.id}. Skipping spawn.`);
+            return;
+        }
+
         if (isCritical) {
             console.log(`[VERIFY] 🔎 Spawning mandatory cross-agent verification for task ${originalTask.id}`);
 
@@ -1187,12 +1209,12 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
             for (const squad of squads) {
                 // EXCLUDE BOTH: (1) Self (the verifier spawner) and (2) The original task claimer
                 const originalAgent = originalTask.claimed_by || this.name;
-                const pool = squadMap[squad].filter(name => name !== this.name && name !== originalAgent);
+                const pool = squadMap[squad].filter(name => name !== this.name && name !== originalAgent && name !== 'trinity-veritas');
 
                 // Fallback to squad peers if the pool is empty after filtering
                 const verifier = pool.length > 0
                     ? pool[Math.floor(Math.random() * pool.length)]
-                    : squadMap[squad][0]; // Guaranteed at least one agent in squadMap
+                    : squadMap[squad][0] === this.name ? squadMap[squad][1] : squadMap[squad][0];
 
                 console.log(`[VERIFY] 🤝 Assigning squad ${squad} verification of ${originalTask.id} to: ${verifier}`);
 

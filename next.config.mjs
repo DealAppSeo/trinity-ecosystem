@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    webpack: (config) => {
+        return config;
+    },
     experimental: {
-        turbo: {
-            enabled: false,
-        },
+        turbopack: false,
     },
     transpilePackages: ['@trinity/agent-core'],
 };
