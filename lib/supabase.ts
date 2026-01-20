@@ -49,6 +49,64 @@ async function logMockCall(method: string, args: any[]) {
 // CLIENT INITIALIZATION
 // ------------------------------------------------------------------
 
+// ------------------------------------------------------------------
+// MOCK UTILITIES (Anti-Fragile Fallback)
+// ------------------------------------------------------------------
+
+export const createUniversalMock = (resolvedData: any = []): any => {
+    return new Proxy({}, {
+        get: (target, prop: string) => {
+            // A. Promise Resolution (End of Chain)
+            if (prop === 'then') {
+                return (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
+                    logMockCall('then', ['metrics_logged']);
+                    return Promise.resolve({ data: resolvedData, error: null }).then(onfulfilled, onrejected);
+                };
+            }
+
+            // B. Specific Handlers for Terminal Methods
+            if (prop === 'single' || prop === 'maybeSingle') {
+                return () => ({
+                    then: (cb: any) => cb({ data: null, error: null })
+                });
+            }
+
+            if (prop === 'select') {
+                return (...args: any[]) => {
+                    logMockCall('select', args);
+                    return createUniversalMock([]); // Return chain
+                }
+            }
+
+            if (prop === 'insert' || prop === 'update' || prop === 'upsert' || prop === 'delete') {
+                return (...args: any[]) => {
+                    logMockCall(prop, args);
+                    // Return mock that resolves to success
+                    return createUniversalMock([{ status: 201, statusText: 'Mock Success' }]);
+                }
+            }
+
+            // C. Realtime Handlers (Websockets)
+            if (prop === 'on') return () => createUniversalMock([]);
+            if (prop === 'subscribe') {
+                return (cb?: any) => {
+                    if (cb && typeof cb === 'function') setTimeout(() => cb('SUBSCRIBED'), 0);
+                    return createUniversalMock([]);
+                };
+            }
+            if (prop === 'unsubscribe') return () => { };
+            if (prop === 'url') return 'http://mock-supabase.local';
+            if (prop === 'headers') return {};
+
+            // D. Default: Log & Continue Chain
+            return (...args: any[]) => {
+                logMockCall(prop, args);
+                return createUniversalMock(resolvedData);
+            };
+        }
+    });
+};
+
 if (!supabaseUrl || !supabaseKey) {
     const missing = [];
     if (!supabaseUrl) missing.push('SUPABASE_URL');
@@ -56,60 +114,6 @@ if (!supabaseUrl || !supabaseKey) {
     console.warn(`⚠️ [Supabase] Missing: ${missing.join(', ')}. Initializing Mock Client.`);
     // 3. Universally handles all other chains via Proxy
     // 4. Returns safe empties to prevent crashes
-
-    const createUniversalMock = (resolvedData: any = []): any => {
-        return new Proxy({}, {
-            get: (target, prop: string) => {
-                // A. Promise Resolution (End of Chain)
-                if (prop === 'then') {
-                    return (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
-                        logMockCall('then', ['metrics_logged']);
-                        return Promise.resolve({ data: resolvedData, error: null }).then(onfulfilled, onrejected);
-                    };
-                }
-
-                // B. Specific Handlers for Terminal Methods
-                if (prop === 'single' || prop === 'maybeSingle') {
-                    return () => ({
-                        then: (cb: any) => cb({ data: null, error: null })
-                    });
-                }
-
-                if (prop === 'select') {
-                    return (...args: any[]) => {
-                        logMockCall('select', args);
-                        return createUniversalMock([]); // Return chain
-                    }
-                }
-
-                if (prop === 'insert' || prop === 'update' || prop === 'upsert' || prop === 'delete') {
-                    return (...args: any[]) => {
-                        logMockCall(prop, args);
-                        // Return mock that resolves to success
-                        return createUniversalMock([{ status: 201, statusText: 'Mock Success' }]);
-                    }
-                }
-
-                // C. Realtime Handlers (Websockets)
-                if (prop === 'on') return () => createUniversalMock([]);
-                if (prop === 'subscribe') {
-                    return (cb?: any) => {
-                        if (cb && typeof cb === 'function') setTimeout(() => cb('SUBSCRIBED'), 0);
-                        return createUniversalMock([]);
-                    };
-                }
-                if (prop === 'unsubscribe') return () => { };
-                if (prop === 'url') return 'http://mock-supabase.local';
-                if (prop === 'headers') return {};
-
-                // D. Default: Log & Continue Chain
-                return (...args: any[]) => {
-                    logMockCall(prop, args);
-                    return createUniversalMock(resolvedData);
-                };
-            }
-        });
-    };
 
     // Cast as "unknown" first to bypass strict type checks, then as SupabaseClient
     // This empowers the mock to "pretend" to be the rigorous typed client

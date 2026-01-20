@@ -1,5 +1,7 @@
 export interface AgentConfig {
     name: string;
+    projectId?: string;
+    provider?: string;
 }
 
 export type SquadRole = 'design' | 'engineering' | 'business_development' | 'governance';

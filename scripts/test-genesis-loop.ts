@@ -22,11 +22,14 @@ async function testGenesisLoop() {
             console.log(`[MOCK] ResearchTool.searchWeb("${query}") called.`);
             if (query.includes('LEGO') || query.includes('GNN') || query.includes('bid')) {
                 return [
-                    { title: "LEGO: Equivariant GNNs for Swarms", content: "New frame-independent architecture for variable agent teams..." },
-                    { title: "QMIX-GNN", content: "Hybrid MARL for heterogeneous cooperation..." }
+                    { title: "LEGO: Equivariant GNNs for Swarms", content: "New frame-independent architecture for variable agent teams...", url: "https://example.com/gnn" },
+                    { title: "QMIX-GNN", content: "Hybrid MARL for heterogeneous cooperation...", url: "https://example.com/qmix" }
                 ];
             }
             return [];
+        };
+        agent.researchTool.browsePage = async (url: string, instructions: string) => {
+            return "[MOCK] Browsed content";
         };
 
         // MOCK 2: callLLM

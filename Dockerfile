@@ -11,7 +11,7 @@ COPY . .
 
 # Build Next.js app
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN npm run clean && npm run build
 
 
 # Stage 2: Runtime

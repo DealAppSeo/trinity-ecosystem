@@ -9,7 +9,6 @@
     "clean": "rm -rf .next node_modules/.cache && npm cache clean --force",
     "dev": "next dev",
     "build": "next build",
-    "build:webpack": "next build",
     "start": "next start",
     "lint": "eslint",
     "agent": "npx tsx scripts/run-agent.ts",

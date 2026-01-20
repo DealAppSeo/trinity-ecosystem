@@ -553,6 +553,7 @@ export class ConstitutionalAgent {
             .select('*')
             .in('status', ['done', 'completed'])
             .neq('claimed_by', this.name)
+            .lt('verify_count', 3)
             .or(`verified_by.is.null,not.verified_by.cs.{${this.name}}`)
             .order('priority', { ascending: false })
             .order('completed_at', { ascending: true }) // FIFO: Oldest work first
@@ -1209,7 +1210,7 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
             for (const squad of squads) {
                 // EXCLUDE BOTH: (1) Self (the verifier spawner) and (2) The original task claimer
                 const originalAgent = originalTask.claimed_by || this.name;
-                const pool = squadMap[squad].filter(name => name !== this.name && name !== originalAgent && name !== 'trinity-veritas');
+                const pool = squadMap[squad].filter(name => name !== this.name && name !== originalAgent && name !== 'trinity-veritas' && name !== this.survivorName);
 
                 // Fallback to squad peers if the pool is empty after filtering
                 const verifier = pool.length > 0

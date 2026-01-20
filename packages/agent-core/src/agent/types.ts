@@ -1,5 +1,7 @@
 export interface AgentConfig {
     name: string;
+    projectId?: string;
+    provider?: string;
 }
 
 export type SquadRole = 'design' | 'engineering' | 'business_development' | 'governance';
@@ -77,7 +79,7 @@ export interface AgentRegistryRecord {
     tasks_failed: number;
     current_tier: AutonomyTier;
     last_active: string;
-    status: 'active' | 'idle' | 'offline' | 'error';
+    status: 'active' | 'idle' | 'offline' | 'error' | 'online' | 'green' | 'blue' | 'amber' | 'working' | 'stale';
     id?: string; // Optional ID for grid keys
     system_prompt?: string; // Dynamic Directive from Control Plane
     currentTask?: Task | null;
