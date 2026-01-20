@@ -1,43 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import * as dotenv from 'dotenv';
+import path from 'path';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('❌ Missing URL or Anon Key');
-    process.exit(1);
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(url, key);
+
+async function checkAnon() {
+    console.log("🕵️ Checking Anonymous (Public) Access...");
+
+    // 1. Try to read artifacts
+    const { data: art, error: artErr } = await supabase.from('trinity_artifacts').select('id, title').limit(5);
+    if (artErr) console.log("❌ Artifacts RLS Error:", artErr.message);
+    else console.log(`✅ Artifacts Read: ${art?.length} found (Anon)`);
+
+    // 2. Try to read tasks
+    const { data: tasks, error: taskErr } = await supabase.from('trinity_tasks').select('id').limit(5);
+    if (taskErr) console.log("❌ Tasks RLS Error:", taskErr.message);
+    else console.log(`✅ Tasks Read: ${tasks?.length} found (Anon)`);
 }
 
-// STRICTLY USE ANON KEY
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-async function checkAnonAccess() {
-    console.log('🕵️ Checking Public Access (Anon Key)...');
-
-    const { data: hbData, error: hbError } = await supabase
-        .from('trinity_heartbeat')
-        .select('*');
-
-    if (hbError) {
-        console.error('❌ Heartbeat Access Denied:', hbError.message);
-    } else {
-        console.log(`✅ Heartbeat Access Granted. Rows: ${hbData?.length || 0}`);
-    }
-
-    const { data: regData, error: regError } = await supabase
-        .from('trinity_agent_registry')
-        .select('*');
-
-    if (regError) {
-        console.error('❌ Registry Access Denied:', regError.message);
-    } else {
-        console.log(`✅ Registry Access Granted. Rows: ${regData?.length || 0}`);
-        if (regData) {
-            console.log('Visible Agents:', regData.map(a => a.agent_name));
-        }
-    }
-}
-
-checkAnonAccess();
+checkAnon();

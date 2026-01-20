@@ -1,5 +1,6 @@
+import { NextResponse } from 'next/server';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { supabaseAdmin } from '../supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 import { Redis } from '@upstash/redis';
 import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, AutonomyTier, AgentRegistryRecord, SessionMetrics, MCPPhase } from './types';
 import { Task } from '@trinity/types';
@@ -168,7 +169,7 @@ export class ConstitutionalAgent {
         // Start the Trinity Healing Loop - REMOVED (Called by run-agent.ts)
         // this.startTrinityHealingLoop();
 
-        this.supabase = supabaseAdmin;
+        this.supabase = supabase;
 
         if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
             this.redis = new Redis({
@@ -856,11 +857,17 @@ export class ConstitutionalAgent {
 
             this.currentTaskId = String(task.id);
             const prompt = `
-Task: ${task.title}
-Description: ${task.description}
-Context: 
+[CONTEXT]
 ${wisdomContext}
+${iterateProtocol}
 
+[INSTRUCTIONS]
+${task.description}
+
+${directive}
+${actionDirective}
+
+Task: ${task.title}
 Please complete this task according to the Constitution. ALWAYS use the save_artifact tool to store your result.
 `;
 

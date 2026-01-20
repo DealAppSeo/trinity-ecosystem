@@ -23,13 +23,17 @@ async function bootSwarm() {
     for (const agent of agents) {
         console.log(`[BOOT] Waking agent: ${agent}...`);
 
-        const process = spawn('npx', ['tsx', 'scripts/run-agent.ts', agent], {
+        const fs = require('fs');
+        const logFile = path.resolve(process.cwd(), 'logs', 'swarm', `${agent}.log`);
+        const out = fs.openSync(logFile, 'a');
+
+        const proc = spawn('npx', ['tsx', 'scripts/run-agent.ts', agent], {
             detached: true,
-            stdio: 'ignore',
+            stdio: ['ignore', out, out],
             shell: true
         });
 
-        process.unref();
+        proc.unref();
 
         // Staggered boot to prevent DB contention
         await new Promise(resolve => setTimeout(resolve, 2000));

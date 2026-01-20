@@ -55,7 +55,7 @@ export const useTrinityController = () => {
                 supabase.from('trinity_tasks').select('*').order('created_at', { ascending: false }).limit(150),
                 supabase.from('trinity_agent_logs').select('*').order('created_at', { ascending: false }).limit(100),
                 supabase.from('trinity_heartbeat').select('*'),
-                supabase.from('trinity_stats').select('*').single() // Assuming a stats table or view exists
+                supabase.from('trinity_stats').select('*').maybeSingle()
             ]);
 
             // Enrich Agent Data with Group and Status
@@ -127,7 +127,7 @@ export const useTrinityController = () => {
             setStats({
                 ...statsData, // Keep other stats if they exist
                 active_agents: calculatedActiveAgents,
-                tasks_completed_24h: calculatedCompleted // Sync Total Tasks too
+                tasks_completed_24h: Math.max(calculatedCompleted, statsData?.tasks_completed_24h || 0)
             });
 
         } catch (error) {
