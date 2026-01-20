@@ -1124,7 +1124,7 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                 // 2/3 BFT Consensus Logic – Provisional Aug 17, 2025
                 const { data: parentTask, error } = await this.supabase
                     .from('trinity_tasks')
-                    .select('signatures, status, metadata, verify_count, claimed_by, completed_at')
+                    .select('*')
                     .eq('id', parentId)
                     .single();
 
@@ -1133,7 +1133,7 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                     return;
                 }
 
-                let newVerifyCount = ((parentTask as Task & { verify_count?: number }).verify_count || 0) + (isApproved ? 1 : 0);
+                let newVerifyCount = (((parentTask as unknown) as Task & { verify_count?: number }).verify_count || 0) + (isApproved ? 1 : 0);
                 let newStatus = (parentTask as any).status || 'done';
                 let signatures = (parentTask as any).signatures || [];
 

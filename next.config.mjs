@@ -3,9 +3,6 @@ const nextConfig = {
     webpack: (config) => {
         return config;
     },
-    experimental: {
-        turbopack: false,
-    },
     transpilePackages: ['@trinity/agent-core'],
 };
 
