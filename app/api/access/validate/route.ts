@@ -1,17 +1,9 @@
 
-import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase';
 
-// Initialize Supabase Admin client to check codes securely
-// Initialize Supabase Admin client to check codes securely
-// Use safe pattern to prevent build-time crash
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-
-const supabaseAdmin = (URL && KEY)
-    ? createClient(URL, KEY)
-    : null;
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {

@@ -12,14 +12,14 @@ async function main() {
 
     const content = 'This is a direct test of the file system MCP.';
     const result = await fsMcp.callTool('write_file', {
-        filename: 'direct_test.txt',
+        path: 'direct_test.txt',
         content: content
     });
 
     console.log('📝 Write Result:', result);
 
     // Verify read
-    const readBack = await fsMcp.callTool('read_file', { filename: 'direct_test.txt' });
+    const readBack = await fsMcp.callTool('read_file', { path: 'direct_test.txt' });
     console.log('📖 Read Result:', readBack === content ? 'MATCH' : 'MISMATCH');
 }
 

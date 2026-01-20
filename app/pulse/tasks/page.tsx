@@ -302,7 +302,7 @@ export default function TasksPage() {
                                                 </span>
 
                                                 <div className="flex items-center gap-2">
-                                                    {(task.assigned_to || task.claimed_by) && (
+                                                    {column.id !== 'todo' && (task.assigned_to || task.claimed_by) && (
                                                         <div className="flex flex-col items-end gap-1">
                                                             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10"
                                                                 title={`Owner: ${task.assigned_to || task.claimed_by}`}>

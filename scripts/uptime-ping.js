@@ -19,11 +19,11 @@ async function pingAgents() {
 
     // Insert Heartbeat tasks for each agent to force them to wake and claim
     const pings = AGENTS.map(agentName => ({
-        title: `[HEARTBEAT] System Keep-Alive for ${agentName}`,
+        title: `[HEARTBEAT] System Keep-Alive`,
         description: 'Automated heartbeat to prevent agent idling and verify naming alignment.',
         task_type: 'heartbeat',
-        priority: 1,
-        assigned_to: agentName,
+        priority: 5,
+        assigned_to: null, // Open market - pull model
         status: 'pending'
     }));
 

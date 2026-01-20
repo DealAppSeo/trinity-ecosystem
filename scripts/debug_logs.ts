@@ -20,7 +20,10 @@ async function checkAgentLogs() {
     } else {
         logs.forEach(log => {
             const time = new Date(log.created_at).toLocaleTimeString();
-            console.log(`[${time}] [${log.agent_name}] [${log.log_level}]: ${log.message}`);
+            const name = log.agent_name || log.agent || 'unknown';
+            const level = log.log_level || log.action || 'info';
+            const msg = log.message || log.content || log.log_message || '';
+            console.log(`[${time}] [${name}] [${level}]: ${msg}`);
         });
     }
 }

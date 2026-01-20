@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '../supabase';
 import { Redis } from '@upstash/redis';
 import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, AutonomyTier, AgentRegistryRecord, SessionMetrics, MCPPhase } from './types';
 import { Task } from '@trinity/types';
@@ -167,10 +168,7 @@ export class ConstitutionalAgent {
         // Start the Trinity Healing Loop - REMOVED (Called by run-agent.ts)
         // this.startTrinityHealingLoop();
 
-        this.supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        this.supabase = supabaseAdmin;
 
         if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
             this.redis = new Redis({
@@ -601,7 +599,7 @@ export class ConstitutionalAgent {
     async verifyPeerTask(task: Task) {
         // [LOOP PREVENTION] Do not verify own work
         const creator = (task.metadata as any)?.creator_agent || task.claimed_by;
-        if (creator === this.name) {
+        if (creator === this.name || task.claimed_by === this.name) {
             console.log(`[BFT] 🛑 Loop detected! ${this.name} attempted self-verification on task ${task.id}. Skipping.`);
             return;
         }

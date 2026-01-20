@@ -50,8 +50,8 @@ export async function POST(req: Request) {
                         description: 'Manual wake signal from Conductor Dashboard.',
                         task_type: 'heartbeat',
                         status: 'pending',
-                        assigned_to: name,
-                        priority: 1
+                        assigned_to: null, // Open market - pull model
+                        priority: 5 // Higher priority to ensure immediate wake
                     }));
                     await supabase.from('trinity_tasks').insert(pings);
 

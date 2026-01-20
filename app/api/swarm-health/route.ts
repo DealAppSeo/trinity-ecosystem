@@ -1,10 +1,7 @@
-// app/api/swarm-health/route.ts
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
@@ -69,6 +66,8 @@ export async function GET() {
             },
             squad_health: squadHealth,
             health_score: Math.max(0, Math.round(healthScore)),
+            pillar: 'ImageBearer Phase 11',
+            consensus_mode: verifiedCount > 0 ? 'BFT_ACTIVE' : 'POLLING',
             status_summary: healthScore > 85 ? 'HyperDAG Optimal' : healthScore > 60 ? 'Healthy' : healthScore > 30 ? 'Degraded' : 'Critical',
             details: {
                 agents: agents?.map(a => ({

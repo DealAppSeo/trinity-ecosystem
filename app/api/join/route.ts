@@ -1,15 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse, NextRequest } from 'next/server';
+import { supabase } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!url || !key) {
-        return NextResponse.json({ error: 'Database config missing' }, { status: 500 });
-    }
-
-    const supabase = createClient(url, key);
 
     try {
         const body = await request.json();
@@ -54,14 +48,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!url || !key) {
-        return NextResponse.json({ error: 'Database config missing' }, { status: 500 });
-    }
-
-    const supabase = createClient(url, key);
 
     try {
         const body = await request.json();

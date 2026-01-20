@@ -1,15 +1,8 @@
 
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
 
-// Initialize Supabase with Service Key (Admin Access)
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''; // Fallback for build safety
-
-// Initializing safely to prevent build crash.
-// Ideally, use createClient inside the function if config is dynamic.
-const supabase = (process.env.NEXT_PUBLIC_SUPABASE_URL && SERVICE_KEY)
-    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, SERVICE_KEY)
-    : null;
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
     if (!supabase) {

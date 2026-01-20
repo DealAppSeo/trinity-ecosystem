@@ -1,6 +1,8 @@
 
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic';
 
 // Reuse the task definitions (simplified for the API)
 const GENESIS_CURRICULUM = [
@@ -56,10 +58,7 @@ export async function GET(request: Request) {
         console.warn('⚠️ Genesis Engine triggered without strict CRON_SECRET');
     }
 
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    // supabase is imported from @/lib/supabase
 
     try {
         // 2. Check Queue Depth

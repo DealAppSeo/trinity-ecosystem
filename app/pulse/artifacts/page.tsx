@@ -76,13 +76,7 @@ export default function ArtifactsPage() {
             const currentPage = reset ? 0 : page;
             const { data, error } = await supabase
                 .from('trinity_artifacts')
-                .select(`
-                    *,
-                    trinity_tasks!left (
-                        verified_by,
-                        status
-                    )
-                `)
+                .select(`*`)
                 .order('created_at', { ascending: false })
                 .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
@@ -107,8 +101,8 @@ export default function ArtifactsPage() {
                     url: item.url,
                     accessLevel: item.access_level || 'protected',
                     creator_agent: item.creator_agent || item.agent,
-                    verified_by: item.trinity_tasks?.verified_by || [],
-                    task_status: item.trinity_tasks?.status || 'created'
+                    verified_by: [], // To be fetched or augmented if needed
+                    task_status: 'completed'
                 };
             });
 

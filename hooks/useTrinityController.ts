@@ -121,7 +121,7 @@ export const useTrinityController = () => {
 
             // Set stats - PREFER DYNAMIC CALCULATION for Active Agents to match Grid
             // Fallback to table for accumulated stats like tasks_completed_24h if meaningful
-            const calculatedActiveAgents = enrichedAgents.filter((a: any) => ['active', 'green', 'blue'].includes(a.status)).length;
+            const calculatedActiveAgents = enrichedAgents.filter((a: any) => ['active', 'online', 'green', 'blue'].includes(a.status)).length;
             const calculatedCompleted = enrichedAgents.reduce((acc: number, curr: any) => acc + (curr.tasks_completed || 0), 0);
 
             setStats({
