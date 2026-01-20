@@ -8,7 +8,7 @@
   "scripts": {
     "clean": "rm -rf .next node_modules/.cache && npm cache clean --force",
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "agent": "npx tsx scripts/run-agent.ts",
