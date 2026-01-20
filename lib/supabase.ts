@@ -1,92 +1,75 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Environment Variable Check
-// Environment Variable Check with Anti-Fragile Fallback
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw';
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+// 1. Environment Variable Extraction (Strict Differentiation)
+const PUBLIC_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const PUBLIC_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Detect Build vs Runtime
+const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
+const isProduction = process.env.NODE_ENV === 'production' && !!process.env.RAILWAY_ENVIRONMENT;
 
 let client: SupabaseClient;
 
 // ------------------------------------------------------------------
-// LOGGING UTILITY (Swarm Wisdom)
-// Used by Mock to feed data to the Healer
+// MOCK UTILITIES (Anti-Fragile Fallback)
 // ------------------------------------------------------------------
 async function logMockCall(method: string, args: any[]) {
     // Only log if we have a service key (Backdoor Channel)
-    if (serviceKey && supabaseUrl) {
+    if (SERVICE_KEY && PUBLIC_URL) {
         try {
-            // Lazy / Stateless fetch to avoid circular deps or client overlap
-            await fetch(`${supabaseUrl}/rest/v1/trinity_mock_calls`, {
+            await fetch(`${PUBLIC_URL}/rest/v1/trinity_mock_calls`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${serviceKey}`,
-                    'apikey': serviceKey
+                    'Authorization': `Bearer ${SERVICE_KEY}`,
+                    'apikey': SERVICE_KEY
                 },
                 body: JSON.stringify({
                     method,
-                    args: JSON.stringify(args), // Sanitize?
+                    args: JSON.stringify(args),
                     timestamp: new Date().toISOString(),
-                    status: 'pending' // Ready for Healer
+                    status: 'pending'
                 })
             });
         } catch (e) {
-            // Silent fail - don't crash the mock
-            // console.warn('Mock log failed');
+            // Silent fail
         }
     }
-    // Always console for debugging
     if (process.env.NODE_ENV === 'development') {
-        console.groupCollapsed(`[Mock] 👻 .${method}()`);
+        console.groupCollapsed(`[Supabase-Mock] 👻 .${method}()`);
         console.log(args);
         console.groupEnd();
     }
 }
 
-// ------------------------------------------------------------------
-// CLIENT INITIALIZATION
-// ------------------------------------------------------------------
-
-// ------------------------------------------------------------------
-// MOCK UTILITIES (Anti-Fragile Fallback)
-// ------------------------------------------------------------------
-
 export const createUniversalMock = (resolvedData: any = []): any => {
     return new Proxy({}, {
         get: (target, prop: string) => {
-            // A. Promise Resolution (End of Chain)
             if (prop === 'then') {
                 return (onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) => {
-                    logMockCall('then', ['metrics_logged']);
+                    logMockCall('then', ['deferred_resolution']);
                     return Promise.resolve({ data: resolvedData, error: null }).then(onfulfilled, onrejected);
                 };
             }
-
-            // B. Specific Handlers for Terminal Methods
             if (prop === 'single' || prop === 'maybeSingle') {
                 return () => ({
                     then: (cb: any) => cb({ data: null, error: null })
                 });
             }
-
             if (prop === 'select') {
                 return (...args: any[]) => {
                     logMockCall('select', args);
-                    return createUniversalMock([]); // Return chain
+                    return createUniversalMock([]);
                 }
             }
-
-            if (prop === 'insert' || prop === 'update' || prop === 'upsert' || prop === 'delete') {
+            if (['insert', 'update', 'upsert', 'delete'].includes(prop)) {
                 return (...args: any[]) => {
                     logMockCall(prop, args);
-                    // Return mock that resolves to success
                     return createUniversalMock([{ status: 201, statusText: 'Mock Success' }]);
                 }
             }
-
-            // C. Realtime Handlers (Websockets)
             if (prop === 'on') return () => createUniversalMock([]);
             if (prop === 'subscribe') {
                 return (cb?: any) => {
@@ -98,7 +81,6 @@ export const createUniversalMock = (resolvedData: any = []): any => {
             if (prop === 'url') return 'http://mock-supabase.local';
             if (prop === 'headers') return {};
 
-            // D. Default: Log & Continue Chain
             return (...args: any[]) => {
                 logMockCall(prop, args);
                 return createUniversalMock(resolvedData);
@@ -107,60 +89,56 @@ export const createUniversalMock = (resolvedData: any = []): any => {
     });
 };
 
-if (!supabaseUrl || !supabaseKey) {
-    const missing = [];
-    if (!supabaseUrl) missing.push('SUPABASE_URL');
-    if (!supabaseKey) missing.push('SUPABASE_ANON_KEY');
-    console.warn(`⚠️ [Supabase] Missing: ${missing.join(', ')}. Initializing Mock Client.`);
-    // 3. Universally handles all other chains via Proxy
-    // 4. Returns safe empties to prevent crashes
+const createMockClient = () => ({
+    from: (table: string) => createUniversalMock([]),
+    channel: () => createUniversalMock([]),
+    removeChannel: () => { },
+    auth: {
+        getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
+        signInWithOAuth: () => Promise.resolve({ data: null, error: null }),
+        signOut: () => Promise.resolve({ error: null }),
+    },
+    storage: {
+        from: () => createUniversalMock([])
+    },
+    functions: {
+        invoke: () => Promise.resolve({ data: null, error: null })
+    }
+} as unknown as SupabaseClient<any, "public", any>);
 
-    // Cast as "unknown" first to bypass strict type checks, then as SupabaseClient
-    // This empowers the mock to "pretend" to be the rigorous typed client
-    client = {
-        from: (table: string) => createUniversalMock([]),
-        channel: () => createUniversalMock([]),
-        removeChannel: () => { },
-        auth: {
-            getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-            onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
-            signInWithOAuth: () => Promise.resolve({ data: null, error: null }),
-            signOut: () => Promise.resolve({ error: null }),
-        },
-        storage: {
-            from: () => createUniversalMock([])
-        },
-        functions: {
-            invoke: () => Promise.resolve({ data: null, error: null })
-        }
-    } as unknown as SupabaseClient<any, "public", any>;
+// ------------------------------------------------------------------
+// CLIENT INITIALIZATION
+// ------------------------------------------------------------------
 
-    // Log environmental error for the Swarm to see
-    if (typeof window === 'undefined') {
-        const missing = [];
-        if (!supabaseUrl) missing.push('NEXT_PUBLIC_SUPABASE_URL');
-        if (!supabaseKey) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-        console.error(`[Anti-Fragile] Active. Missing: ${missing.join(', ')}`);
+if (!PUBLIC_URL || !PUBLIC_KEY) {
+    if (isProduction && !isBuildTime) {
+        throw new Error('FATAL: Supabase environment variables missing in production runtime.');
     }
 
+    console.warn(`⚠️ [Supabase] Missing credentials during ${isBuildTime ? 'BUILD' : 'DEV'}. Fallback to Mock.`);
+    client = createMockClient();
 } else {
-    client = createClient(supabaseUrl, supabaseKey);
+    try {
+        client = createClient(PUBLIC_URL, PUBLIC_KEY);
+    } catch (e: any) {
+        console.error('[Supabase] Init failed:', e.message);
+        client = createMockClient();
+    }
 }
-
-// ... (previous code)
 
 export const supabase = client;
 
 // [ANTIGRAVITY] Admin Client (Service Role)
-// Agents need this to bypass RLS for writing Artifacts and updating Tasks
-export const supabaseAdmin = serviceKey
-    ? createClient(supabaseUrl, serviceKey, {
+// Never instantiated if URL is missing to prevent build-time crashes
+export const supabaseAdmin = (SERVICE_KEY && PUBLIC_URL)
+    ? createClient(PUBLIC_URL, SERVICE_KEY, {
         auth: {
             autoRefreshToken: false,
             persistSession: false
         }
     })
-    : client; // Fallback to anon if no service key (will fail RLS but prevents crash)
+    : client; // Fallback to public client (or mock) if no service key
 
-export const isMockMode = !supabaseUrl || !supabaseKey;
+export const isMockMode = !PUBLIC_URL || !PUBLIC_KEY;
 
