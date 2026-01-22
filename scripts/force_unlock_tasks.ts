@@ -27,9 +27,7 @@ async function unlockTasks() {
             assigned_to: null,
             status: 'pending'
         })
-        .in('status', ['todo', 'pending', 'in_progress', 'running'])
-        // Safety: Don't reset completed or failed tasks
-        .not('status', 'in', ['completed', 'done', 'failed', 'success']);
+        .in('status', ['todo', 'pending', 'in_progress', 'running']);
 
     if (resetError) {
         console.error('❌ Error unlocking tasks:', resetError.message);

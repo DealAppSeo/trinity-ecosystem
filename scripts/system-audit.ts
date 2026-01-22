@@ -1,6 +1,13 @@
-import { supabase } from '../lib/supabase';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
 async function runAudit() {
+    // 1. LOAD ENVIRONMENT IMMEDIATELY
+    dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+
+    // 2. DYNAMIC IMPORT TO ENSURE ENV VARS ARE LOADED FIRST
+    const { supabase } = await import('../lib/supabase');
+
     console.log("=== SYSTEM TRINITY AUDIT START ===");
 
     // 1. ANOMALY DETECTION (Grok's Phase 1)
