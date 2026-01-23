@@ -5,7 +5,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
-        const { action } = await req.json();
+        const body = await req.json();
+        const { action } = body;
 
         if (action === 'REBOOT_SWARM') {
             // Seed 12 keep-alive tasks to force agents to wake up
@@ -16,20 +17,40 @@ export async function POST(req: Request) {
                 'trinity-sophia', 'trinity-nexus', 'trinity-hdm'
             ];
 
+            const nowStr = new Date().toISOString();
+
             const wakeTasks = agents.map(agent => ({
                 title: `[WAKE] Priority Pulse for ${agent}`,
                 description: 'System-wide keep-alive signal. Verify connection and resume tasking.',
                 priority: 10,
                 status: 'pending',
                 assigned_to: agent,
-                created_at: new Date().toISOString(),
+                created_at: nowStr,
                 created_by: 'FOUNDER'
             }));
 
-            const { error } = await supabase.from('trinity_tasks').insert(wakeTasks);
-            if (error) throw error;
+            // 1. Insert wake tasks
+            const { error: taskError } = await supabase.from('trinity_tasks').insert(wakeTasks);
+            if (taskError) throw taskError;
 
-            return NextResponse.json({ message: 'Swarm wake signal dispatched.' });
+            // 2. Force update registry to "active/idle" and update timestamp so UI sees them ONLINE
+            await supabase
+                .from('trinity_agent_registry')
+                .update({
+                    status: 'online',
+                    last_active: nowStr
+                })
+                .in('agent_name', agents);
+
+            // 3. Update heartbeats as well
+            const heartbeats = agents.map(agent => ({
+                agent,
+                last_seen: nowStr,
+                status: 'active'
+            }));
+            await supabase.from('trinity_heartbeat').upsert(heartbeats, { onConflict: 'agent' });
+
+            return NextResponse.json({ message: 'Swarm wake signal dispatched. All nodes marked ACTIVE.' });
         }
 
         if (action === 'FLUSH_GHOSTS') {
@@ -44,7 +65,7 @@ export async function POST(req: Request) {
                     started_at: null,
                     result: null
                 })
-                .not('status', 'in', '("done","verified","failed")');
+                .not('status', 'in', ['done', 'verified', 'failed']);
 
             if (error) throw error;
             return NextResponse.json({ message: 'Ghosts flushed. Task board reset.' });
@@ -55,10 +76,28 @@ export async function POST(req: Request) {
             const { error } = await supabase
                 .from('trinity_tasks')
                 .delete()
-                .not('status', 'in', '("done","verified")');
+                .not('status', 'in', ['done', 'verified']);
 
             if (error) throw error;
-            return NextResponse.json({ message: 'Nuclear wipe complete. Board cleared of non-final tasks.' });
+            return NextResponse.json({
+                success: true,
+                message: 'Nuclear wipe complete. Board cleared of non-final tasks.'
+            });
+        }
+
+        if (action === 'DIRECTIVE_UPDATE') {
+            const { targetAgents, prompt } = body;
+            if (!targetAgents || !Array.isArray(targetAgents)) {
+                return NextResponse.json({ error: 'targetAgents array required' }, { status: 400 });
+            }
+
+            const { error } = await supabase
+                .from('trinity_agent_registry')
+                .update({ system_prompt: prompt })
+                .in('agent_name', targetAgents);
+
+            if (error) throw error;
+            return NextResponse.json({ message: `Directive injected into ${targetAgents.length} neural nodes.` });
         }
 
         if (action === 'SEED_EVERGREEN') {

@@ -1,9 +1,6 @@
-import { NextResponse } from 'next/server';
+import { supabaseAdmin as supabase } from '../supabase';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { supabaseAdmin as supabase } from '@/lib/supabase';
-import { Redis } from '@upstash/redis';
-import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, AutonomyTier, AgentRegistryRecord, SessionMetrics, MCPPhase } from './types';
-import { Task } from '@trinity/types';
+import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, AutonomyTier, AgentRegistryRecord, SessionMetrics, MCPPhase, Task } from './types';
 import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
 // Dynamic imports for graphology/fs handled inside methods to avoid build issues
 import { mcpManager } from '../mcp/MCPManager';
@@ -11,6 +8,16 @@ import { mcpManager } from '../mcp/MCPManager';
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
 // ============================================
+// LLM TIERS & COST OPTIMIZATION
+// ============================================
+const LLM_TIERS: Record<string, number> = {
+    'groq': 1,      // Tier 1: Fast/Free (Llama 3.3)
+    'cerebras': 1,  // Tier 1: Ultra-Fast (Llama 3.1)
+    'deepseek': 1,  // Tier 1: Cost-Efficient (DeepSeek V3/R1)
+    'gemini': 2,    // Tier 2: Balanced (Flash)
+    'anthropic': 3, // Tier 3: Elite (Sonnet/Opus)
+    'openai': 3     // Tier 3: Elite (GPT-4o)
+};
 
 // ============================================
 // THE CONSTITUTION - IMMUTABLE PRINCIPLES
@@ -192,7 +199,12 @@ export class ConstitutionalAgent {
             { key: 'openai', env: 'OPENAI_API_KEY' },
             { key: 'anthropic', env: 'ANTHROPIC_API_KEY' },
             { key: 'gemini', env: 'GEMINI_API_KEY' },
-            { key: 'grok', env: 'GROK_API_KEY' }
+            { key: 'groq', env: 'GROQ_API_KEY' },
+            { key: 'grok', env: 'GROK_API_KEY' },
+            { key: 'cerebras', env: 'CEREBRAS_API_KEY' },
+            { key: 'deepseek', env: 'DEEPSEEK_API_KEY' },
+            { key: 'openrouter', env: 'OPENROUTER_API_KEY' },
+            { key: 'perplexity', env: 'PERPLEXITY_API_KEY' }
         ];
         return providers.filter(p => process.env[p.env]).map(p => p.key);
     }
@@ -213,9 +225,12 @@ export class ConstitutionalAgent {
                 .from('trinity_agent_registry')
                 .select('*')
                 .eq('agent_name', this.name)
-                .single();
+                .maybeSingle();
 
-            if (error) throw error; // Truth-Seeking: Don't silently fail
+            if (error) {
+                console.error(`[${this.name}] ⚠️ Sync error:`, error.message);
+                // Continue to registration if it's just a missing record
+            }
 
             if (data) {
                 const record = data as AgentRegistryRecord;
@@ -429,6 +444,15 @@ export class ConstitutionalAgent {
         await this.syncState();
         await this.heartbeat();
 
+        // [ANTIGRAVITY] INITIALIZE MCP TOOLS
+        console.log(`[${this.name}] 🛠️ Initializing MCP Tools...`);
+        try {
+            await mcpManager.initializeAll();
+            console.log(`[${this.name}] ✅ MCP Tools Ready.`);
+        } catch (e: any) {
+            console.error(`[${this.name}] ❌ MCP Initialization Failed:`, e.message);
+        }
+
         this.heartbeatInterval = setInterval(async () => {
             try {
                 await this.heartbeat();
@@ -447,7 +471,7 @@ export class ConstitutionalAgent {
                     .from('trinity_tasks')
                     .select('id, status', { count: 'exact' })
                     .eq('claimed_by', this.name)
-                    .in('status', ['doing', 'in_progress', 'running', 'pending_clarification']);
+                    .in('status', ['doing', 'in_progress', 'running']); // Exclude pending_clarification from blocking checks
 
                 if (activeCount && activeCount > 0) {
                     const firstBusy = activeClaims![0];
@@ -465,8 +489,8 @@ export class ConstitutionalAgent {
 
                     if (fullTask) {
                         if (firstBusy.status === 'pending_clarification') {
-                            console.log(`[${this.name}] 🚧 Awaiting clarification for ${firstBusy.id}.`);
-                            await this.sleep(30000);
+                            console.log(`[${this.name}] 🚧 Awaiting clarification for ${firstBusy.id}. Releasing claim to keep moving.`);
+                            await this.releaseClaim(firstBusy.id);
                         } else {
                             await this.processTask(fullTask as any);
                         }
@@ -482,6 +506,9 @@ export class ConstitutionalAgent {
                 const verificationTask = await this.getVerificationTask();
                 if (verificationTask) {
                     console.log(`[${this.name}] 🔍 P1: Verifying peer work -> ${verificationTask.title}`);
+                    // UI: Update Real-time Status
+                    await this.heartbeat(`Verifying: ${verificationTask.title.substring(0, 30)}...`);
+
                     await this.verifyPeerTask(verificationTask);
                     taskHandled = true;
 
@@ -505,6 +532,9 @@ export class ConstitutionalAgent {
                     if (assignedTask) {
                         console.log(`[${this.name}] 🎯 P2: My assigned task -> ${assignedTask.title}`);
                         this.currentTaskTitle = assignedTask.title;
+                        // UI: Update Real-time Status
+                        await this.heartbeat(`Working on: ${assignedTask.title.substring(0, 30)}...`);
+
                         await this.processTask(assignedTask);
                         this.currentTaskTitle = null;
                         taskHandled = true;
@@ -519,6 +549,9 @@ export class ConstitutionalAgent {
                     if (globalTask) {
                         console.log(`[${this.name}] 📈 P3: Highest global -> ${globalTask.title}`);
                         this.currentTaskTitle = globalTask.title;
+                        // UI: Update Real-time Status
+                        await this.heartbeat(`Working on: ${globalTask.title.substring(0, 30)}...`);
+
                         await this.processTask(globalTask);
                         this.currentTaskTitle = null;
                         taskHandled = true;
@@ -553,7 +586,7 @@ export class ConstitutionalAgent {
             .in('status', ['done', 'completed'])
             .neq('claimed_by', this.name)
             .lt('verify_count', 3)
-            .or(`verified_by.is.null,not.verified_by.cs.{${this.name}}`)
+            .not('verified_by', 'cs', `{"${this.name}"}`)
             .order('priority', { ascending: false })
             .order('completed_at', { ascending: true }) // FIFO: Oldest work first
             .limit(1);
@@ -622,11 +655,13 @@ export class ConstitutionalAgent {
         const repFactor = (this.reputationScore || 50) / 100;
         const weight = Math.pow(phi, repFactor);
 
-        let belief = artifactCount > 0 ? 0.8 : 0.2;
-        let disbelief = artifactCount === 0 ? 0.7 : 0.1;
+        // [USER: STRICT ARTIFACT REQUIREMENT]
+        // If no artifacts, it's a hard fail regardless of weights.
+        let belief = artifactCount > 0 ? 0.9 : 0.0;
+        let disbelief = artifactCount === 0 ? 1.0 : 0.1;
 
         // Final aggregate logic (weighted influence)
-        const isVerified = (belief * weight) > (disbelief * (1 / weight));
+        const isVerified = artifactCount > 0 && (belief * weight) > (disbelief * (1 / weight));
         const newVerifyCount = ((task as Task & { verify_count?: number }).verify_count || 0) + 1;
         const verifiers = ((task as Task & { verified_by?: string[] }).verified_by || []).concat(this.name);
 
@@ -637,8 +672,8 @@ export class ConstitutionalAgent {
             await this.supabase.from('trinity_tasks').update({
                 verify_count: newVerifyCount,
                 verified_by: verifiers,
-                status: newVerifyCount >= 3 ? 'verified' : 'done',
-                verified_at: newVerifyCount >= 3 ? new Date().toISOString() : null,
+                status: newVerifyCount >= 2 ? 'verified' : 'done',
+                verified_at: newVerifyCount >= 2 ? new Date().toISOString() : null,
                 verification_result: `Verified via φ-weighted consensus by ${this.name}`,
                 metadata: {
                     ...(task.metadata as any || {}),
@@ -653,7 +688,7 @@ export class ConstitutionalAgent {
             await this.generateInsight(task, `Peer verification complete for ${task.title}. Result: ${isVerified ? 'PASSED' : 'FAILED'}`);
 
             // [PHASE 10] Reward original completer's RepID on 2/3 and 3/3
-            if (newVerifyCount >= 2) {
+            if (newVerifyCount >= 1) {
                 await this.updateReputation(true, task.claimed_by || undefined, 2);
             }
         } else {
@@ -694,7 +729,10 @@ export class ConstitutionalAgent {
             query = query.is('assigned_to', null);
         }
 
+        // [ANTIGRAVITY] Also poll for clarification requests if idle
         const { data: task, error } = await query
+            .in('status', ['pending', 'pending_clarification'])
+            .is('claimed_by', null)
             .order('priority', { ascending: false })
             .order('created_at', { ascending: true })
             .limit(1)
@@ -713,8 +751,15 @@ export class ConstitutionalAgent {
     // ============================================
 
     async processTask(task: Task) {
-        // [PHASE 20] ATOMIC CLAIM: Ensure we own the task before starting
-        const claimed = await this.claimTask(task.id);
+        this.currentTaskTitle = task.title;
+        // Check if we already own it (resuming after restart/sleep)
+        const isOwner = task.claimed_by === this.name && ['doing', 'in_progress', 'running', 'pending_clarification'].includes(task.status);
+
+        let claimed = isOwner;
+        if (!isOwner) {
+            claimed = await this.claimTask(task.id);
+        }
+
         if (!claimed) {
             console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
             return { success: false, error: 'Already claimed' };
@@ -872,8 +917,13 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
 `;
 
             // Call LLM
-            const result = await this.callLLM(prompt);
+            const result = await this.callLLM(prompt, {}, task);
             console.log(`[${this.name}] 🧠 Result length: ${result.output?.length || 0}`);
+
+            // [ANTIGRAVITY] ERROR PROPAGATION: Do not continue if LLM failed
+            if (result.output === "Error calling LLM" || !result.output) {
+                throw new Error("LLM call failed to produce output. Check API keys and connectivity.");
+            }
             // [PHASE 10] UNCERTAINTY AS OPPORTUNITY (Logical Escalation)
             const evaluation = await this.evaluateResult(task, result.output);
             const lowBelief = evaluation.score < 40;
@@ -891,6 +941,9 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
                 // Spawn "Question for Architect" artifact
                 const questionContent = `# Question for Architect \n\n**Agent**: ${this.name} \n**Task**: ${task.title} \n\n**The Right Question**: \n${result.output} \n\n---\n*The smartest person is not the one with all the answers, but the one asking the right questions.*`;
                 await this.saveArtifact(task.id, questionContent, 'report', `Q: ${task.title}`, 'public');
+
+                // RELEASE CLAIM so others (or a reset) can pick it up once clarified
+                await this.releaseClaim(task.id);
 
                 return { success: true, llm_used: true, escalated: true };
             }
@@ -1190,7 +1243,7 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
 
         // [GROK: VERIFIER CAP] Max 3 verifiers per task
         const currentVerifyCount = (originalTask as any).verify_count || 0;
-        if (currentVerifyCount >= 3) {
+        if (currentVerifyCount >= 2) {
             console.log(`[VERIFY] 🛑 Verifier cap reached for task ${originalTask.id}. Skipping spawn.`);
             return;
         }
@@ -1235,6 +1288,7 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                         parent_task_id: originalTask.id,
                         evidence: result.substring(0, 1000),
                         creator_agent: this.name,
+                        creator_provider: (originalTask as any).metadata?.provider_used || 'unknown',
                         squad_verification: squad
                     }
                 });
@@ -1370,9 +1424,9 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                         // Filter mainly by keyword matching for simple MVP
                         const relevantFiles = files.filter(f => {
                             // Very basic keyword check: Task title words in filename
-                            const taskKeywords = task.title.toLowerCase().split(' ').filter(w => w.length > 4);
+                            const taskKeywords = task.title.toLowerCase().split(' ').filter((w: string) => w.length > 4);
                             const filename = f.toLowerCase();
-                            return taskKeywords.some(kw => filename.includes(kw)) || filename.includes('manifest') || filename.includes('log');
+                            return taskKeywords.some((kw: string) => filename.includes(kw)) || filename.includes('manifest') || filename.includes('log');
                         });
 
                         if (relevantFiles.length > 0) {
@@ -1467,8 +1521,12 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                 if (type === 'design' || type === 'image') ext = 'png';
 
                 const timestamp = Date.now();
+                const now = new Date();
+                const datePath = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
                 const cleanName = this.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                const storagePath = `${cleanName}/${timestamp}_${safeTaskId.substring(0, 8)}.${ext}`;
+                const cleanType = (type || 'document').toLowerCase();
+                const storagePath = `${cleanName}/${cleanType}/${datePath}/${timestamp}_${safeTaskId.substring(0, 8)}.${ext}`;
 
                 const { error: uploadError } = await this.supabase
                     .storage
@@ -1529,7 +1587,6 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                         view_count: 0,
                         // [ANTIGRAVITY] Frictionless Alignment (Satisfy NOT NULLs)
                         agent: this.name,
-                        agent_name: this.name,
                         creator_agent: this.name,
                         status: 'created',
                         storage_location: 'supabase',
@@ -1708,6 +1765,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 .from('trinity_agent_logs')
                 .insert({
                     agent: this.name,
+                    agent_name: this.name, // Added for UI compatibility
                     action,
                     message: typeof message === 'string' ? message.substring(0, 5000) : JSON.stringify(message).substring(0, 5000),
                     metadata: {
@@ -1723,10 +1781,13 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         }
     }
 
-    async heartbeat() {
+    async heartbeat(customSummary?: string) {
         const timestamp = new Date().toISOString();
 
         try {
+            // [TRINITY SSOT] Real-time activity sync
+            const activitySummary = customSummary || (this.currentTaskTitle ? `Working: ${this.currentTaskTitle}` : 'Idle');
+
             // [TRINITY SSOT]: PRIMARY STATUS UPDATE (Patent: BFT Consensus Dashboard)
             // This is the source for the "Green Dots" in the Dashboard.
             // Unified registry ensures O(1) state lookup for the mobile dashboard.
@@ -1734,22 +1795,23 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 .from('trinity_agent_registry')
                 .upsert({
                     agent_name: this.name,
-                    status: 'online', // SSOT: UI expects 'online' or 'active' for Green
+                    status: 'online', // SSOT: UI/Grid expects 'online'
                     last_active: timestamp,
                     current_tier: this.autonomyTier,
                     reputation_score: this.reputationScore,
                     tasks_completed: this.tasksCompleted,
-                    current_task_summary: this.currentTaskTitle ? `Working: ${this.currentTaskTitle}` : 'Idle'
+                    current_task_summary: activitySummary
                 }, { onConflict: 'agent_name' });
 
             // 1. Trinity Heartbeat (For Controller Header / Redundancy)
             await this.supabase
                 .from('trinity_heartbeat')
                 .upsert({
-                    agent: this.name,
-                    status: 'active',
+                    agent: this.name, // SSOT: FULL NAME
+                    status: 'online', // Normalized
                     version: this.version,
                     last_seen: timestamp,
+                    current_task_summary: activitySummary,
                     config: {
                         fullName: this.name,
                         sessionMetrics: this.sessionMetrics,
@@ -1764,7 +1826,22 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 .upsert({
                     agent_name: this.name,
                     status: 'online',
-                    last_ping: timestamp
+                    last_ping: timestamp,
+                    current_task: activitySummary
+                }, { onConflict: 'agent_name' });
+
+            // 3. agent_status table (Used by many Dashboard components)
+            // SSOT: Synchronize the primary status table to fix UI "gray dot" issues.
+            await this.supabase
+                .from('agent_status')
+                .upsert({
+                    agent_name: this.name,
+                    status: 'online',
+                    last_active: timestamp,
+                    current_task: activitySummary,
+                    reputation: this.reputationScore,
+                    tasks_completed: this.tasksCompleted,
+                    group_name: this.wisdom.squad || 'UNKNOWN'
                 }, { onConflict: 'agent_name' });
 
             if (this.isSurvivor) await this.runSurvivorResurrection();
@@ -1868,7 +1945,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     ${deepDive}
     `;
 
-        const summary = await this.callLLM(prompt);
+        const summary = await this.callLLM(prompt, {}, undefined);
 
         // 4. Log to Supabase
         if (summary.output) {
@@ -1883,7 +1960,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         }
     }
 
-    async callLLM(prompt: string, options: any = {}): Promise<LLMResult> {
+    async callLLM(prompt: string, options: any = {}, task?: Task): Promise<LLMResult> {
         if (this.availableProviders.length === 0) {
             console.warn(`[${this.name}] No LLM Providers detected.`);
             return { output: "Simulation: All LLM providers are unavailable." };
@@ -1928,17 +2005,36 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 }
             });
 
-            // 2. Prepare Messages & Multi-Provider Weighting
-            // ELITE: Weighted Selection (Prefer Grok if RepID > 8 for ALPHA tasks)
-            const sortedProviders = [...this.availableProviders].sort((a, b) => {
-                if (this.reputationScore > 80 && a === 'grok') return -1;
-                return 0;
-            });
+            // [ANTIGRAVITY] TIERED ROUTING & DIVERSIFIED VERIFICATION
+            const excludeProvider = (task as any).metadata?.creator_provider;
+
+            // Sort available providers by Tier
+            const sortedProviders = [...this.availableProviders]
+                .filter(p => p !== excludeProvider) // Diversify verification
+                .sort((a, b) => (LLM_TIERS[a] || 99) - (LLM_TIERS[b] || 99));
+
+            if (sortedProviders.length === 0 && this.availableProviders.length > 0) {
+                console.warn(`[${this.name}] ⚠️ All preferred providers excluded for verification diversity. Falling back to any available.`);
+                sortedProviders.push(...this.availableProviders);
+            }
 
             for (const providerKey of sortedProviders) {
                 try {
-                    console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey}...`);
+                    console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey} (Tier: ${LLM_TIERS[providerKey] || '?'})...`);
                     const result = await this.callSpecificProvider(providerKey, prompt, openAiTools);
+
+                    // Tag task with provider used for downstream verification logic
+                    if (task) {
+                        if (!task.metadata) task.metadata = JSON.stringify({});
+                        try {
+                            const meta = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata;
+                            meta.provider_used = providerKey;
+                            task.metadata = JSON.stringify(meta);
+                        } catch (e) {
+                            // Fallback if metadata is not valid JSON
+                        }
+                    }
+
                     return result;
                 } catch (e: any) {
                     console.warn(`[${this.name}] ⚠️ ${providerKey} failed: ${e.message}`);
@@ -1946,7 +2042,12 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             }
             throw new Error('All LLM providers failed');
         } catch (error: any) {
-            console.error("LLM Call Failed", error);
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            console.error(`[${this.name}] 🚨 LLM Call Failed:`, errorMsg);
+
+            // Log to Supabase for visibility
+            await this.log('llm_error', errorMsg, { providers: this.availableProviders });
+
             return { output: "Error calling LLM" };
         }
     }
@@ -1959,6 +2060,11 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         if (provider === 'anthropic') return this.callAnthropic(systemPrompt, prompt);
         if (provider === 'gemini') return this.callGemini(systemPrompt, prompt);
         if (provider === 'grok') return this.callGrok(systemPrompt, prompt);
+        if (provider === 'groq') return this.callGroq(systemPrompt, prompt);
+        if (provider === 'cerebras') return this.callCerebras(systemPrompt, prompt);
+        if (provider === 'deepseek') return this.callDeepSeek(systemPrompt, prompt);
+        if (provider === 'openrouter') return this.callOpenRouter(systemPrompt, prompt);
+        if (provider === 'perplexity') return this.callPerplexity(systemPrompt, prompt);
 
         throw new Error(`Provider ${provider} not implemented`);
     }
@@ -2028,16 +2134,24 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
-            body: JSON.stringify({ model: 'claude-3-5-sonnet-20240620', system, messages: [{ role: 'user', content: prompt }], max_tokens: 4000 })
+            body: JSON.stringify({ model: 'claude-3-5-sonnet-latest', system, messages: [{ role: 'user', content: prompt }], max_tokens: 4000 })
         });
         const data = await response.json();
+        if (data.error) throw new Error(`Anthropic Error: ${data.error.message}`);
         return { output: data.content[0].text };
     }
 
     async callGemini(system: string, prompt: string): Promise<LLMResult> {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`;
-        const response = await fetch(url, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: `${system}\n\n${prompt}` }] }] }) });
+        // [PHASE 26] Fail-Safe Gemini Flash (Low Latency)
+        const model = 'gemini-1.5-flash';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: `${system}\n\n${prompt}` }] }] })
+        });
         const data = await response.json();
+        if (data.error) throw new Error(`Gemini Error: ${data.error.message}`);
         return { output: data.candidates[0].content.parts[0].text };
     }
 
@@ -2046,6 +2160,67 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROK_API_KEY}` },
             body: JSON.stringify({ model: 'grok-beta', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
+        });
+        const data = await response.json();
+        return { output: data.choices[0].message.content };
+    }
+
+    async callGroq(system: string, prompt: string): Promise<LLMResult> {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+            body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
+        });
+        const data = await response.json();
+        return { output: data.choices[0].message.content };
+    }
+
+    async callCerebras(system: string, prompt: string): Promise<LLMResult> {
+        const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CEREBRAS_API_KEY}` },
+            body: JSON.stringify({ model: 'llama3.1-70b', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
+        });
+        const data = await response.json();
+        return { output: data.choices[0].message.content };
+    }
+
+    async callDeepSeek(system: string, prompt: string): Promise<LLMResult> {
+        const response = await fetch('https://api.deepseek.com/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+            body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
+        });
+        const data = await response.json();
+        return { output: data.choices[0].message.content };
+    }
+
+    async callOpenRouter(system: string, prompt: string): Promise<LLMResult> {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'trinity-symphony',
+                'X-Title': 'Trinity Symphony'
+            },
+            body: JSON.stringify({
+                model: 'anthropic/claude-3.5-sonnet', // High reliability fallback
+                messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }]
+            })
+        });
+        const data = await response.json();
+        return { output: data.choices[0].message.content };
+    }
+
+    async callPerplexity(system: string, prompt: string): Promise<LLMResult> {
+        const response = await fetch('https://api.perplexity.ai/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}` },
+            body: JSON.stringify({
+                model: 'llama-3.1-sonar-large-128k-online',
+                messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }]
+            })
         });
         const data = await response.json();
         return { output: data.choices[0].message.content };

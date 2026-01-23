@@ -16,6 +16,26 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 }
 
+// [ANTIGRAVITY] VALIDATE LLM PROVIDERS
+const providers = [
+    { key: 'openai', env: 'OPENAI_API_KEY' },
+    { key: 'anthropic', env: 'ANTHROPIC_API_KEY' },
+    { key: 'gemini', env: 'GEMINI_API_KEY' },
+    { key: 'groq', env: 'GROQ_API_KEY' },
+    { key: 'grok', env: 'GROK_API_KEY' },
+    { key: 'cerebras', env: 'CEREBRAS_API_KEY' },
+    { key: 'deepseek', env: 'DEEPSEEK_API_KEY' },
+    { key: 'openrouter', env: 'OPENROUTER_API_KEY' },
+    { key: 'perplexity', env: 'PERPLEXITY_API_KEY' }
+];
+const availableProviders = providers.filter(p => process.env[p.env]).map(p => p.key);
+
+if (availableProviders.length === 0) {
+    console.error("❌ FATAL: No LLM Providers detected. Please set OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, or GROK_API_KEY.");
+    process.exit(1);
+}
+console.log(`[BOOT] Detected providers: ${availableProviders.join(', ')}`);
+
 import http, { IncomingMessage, ServerResponse } from 'http';
 
 const agentName = process.argv[2];

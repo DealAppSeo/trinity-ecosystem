@@ -23,20 +23,18 @@ async function bootSwarm() {
     for (const agent of agents) {
         console.log(`[BOOT] Waking agent: ${agent}...`);
 
-        const fs = require('fs');
         const logFile = path.resolve(process.cwd(), 'logs', 'swarm', `${agent}.log`);
-        const out = fs.openSync(logFile, 'a');
 
-        const proc = spawn('npx', ['tsx', 'scripts/run-agent.ts', agent], {
+        // Windows-specific robust background spawn
+        const command = `npx tsx scripts/run-agent.ts ${agent} > "${logFile}" 2>&1`;
+
+        spawn('powershell.exe', ['-Command', `Start-Process powershell.exe -ArgumentList '-Command', '${command.replace(/'/g, "''")}' -WindowStyle Hidden`], {
             detached: true,
-            stdio: ['ignore', out, out],
-            shell: true
-        });
-
-        proc.unref();
+            stdio: 'ignore'
+        }).unref();
 
         // Staggered boot to prevent DB contention
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
     console.log('--- SWARM ACTIVE. MONITOR VIA scripts/system-audit.ts ---');

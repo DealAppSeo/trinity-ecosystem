@@ -44,32 +44,35 @@ async function cleanup() {
         console.log(`Archived ${toArchive.length} tasks...`);
     }
 
-    // 2. BATCHED DELETE (Purge the archives)
-    console.log('2. Purging archived tasks older than 7 days...');
-    let deleteDone = false;
-    while (!deleteDone) {
-        const { data: toDelete, error: fetchErr } = await supabase
+    // 2. LONG-TERM ARCHIVE (Instead of Purging)
+    console.log('2. Transitioning archived tasks older than 7 days to permanent archive...');
+    let permanentArchiveDone = false;
+    while (!permanentArchiveDone) {
+        const { data: toArchive, error: fetchErr } = await supabase
             .from('trinity_tasks')
             .select('id')
             .eq('status', 'archived')
             .lt('created_at', sevenDaysAgo)
             .limit(500);
 
-        if (fetchErr || !toDelete || toDelete.length === 0) {
-            deleteDone = true;
+        if (fetchErr || !toArchive || toArchive.length === 0) {
+            permanentArchiveDone = true;
             break;
         }
 
-        const { error: delErr } = await supabase
+        const { error: updErr } = await supabase
             .from('trinity_tasks')
-            .delete()
-            .in('id', toDelete.map(t => t.id));
+            .update({
+                status: 'archived_permanent',
+                metadata: { archived_at: new Date().toISOString(), reason: 'long_term_retention' }
+            })
+            .in('id', toArchive.map(t => t.id));
 
-        if (delErr) {
-            console.error('❌ Delete batch failed:', delErr.message);
+        if (updErr) {
+            console.error('❌ Permanent archive batch failed:', updErr.message);
             break;
         }
-        console.log(`Deleted ${toDelete.length} tasks...`);
+        console.log(`Permanently archived ${toArchive.length} tasks.`);
     }
 
     console.log('✅ Batched cleanup complete.');

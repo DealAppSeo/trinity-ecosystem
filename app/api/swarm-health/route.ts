@@ -10,7 +10,7 @@ export async function GET() {
             .from('trinity_agent_registry')
             .select('agent_name, status, last_active, reputation_score, current_tier, squad, current_task_summary')
             .gte('last_active', new Date(Date.now() - 5 * 60 * 1000).toISOString())
-            .eq('status', 'online'); // SSOT: UI/API should look for 'online'
+            .in('status', ['online', 'active', 'idle', 'green', 'blue', 'amber']);
 
         if (agentsError) throw agentsError;
 

@@ -1,7 +1,9 @@
+import * as dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+
 import { supabaseAdmin as supabase } from '../lib/supabase';
-import { AGENT_WISDOM } from '../packages/agent-core/src/agent/wisdom';
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import { AGENT_WISDOM } from '../lib/agent/wisdom';
 
 async function seedProductionMission() {
     console.log('--- MISSION 2026: TOTAL RESET & PRODUCTION SEED ---');

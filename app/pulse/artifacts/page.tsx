@@ -53,18 +53,24 @@ export default function ArtifactsPage() {
 
     const fetchTotalCounts = async () => {
         try {
-            // We fetch all types just for the count - this is cheaper than the full content
-            const { data, error } = await supabase.from('trinity_artifacts').select('artifact_type');
-            if (error) throw error;
+            const types = ['code', 'document', 'design', 'report'];
+            const newCounts: Record<string, number> = { code: 0, document: 0, design: 0, report: 0 };
 
-            const newCounts = { code: 0, document: 0, design: 0, report: 0 };
-            data?.forEach((item: any) => {
-                const rawType = item.artifact_type || item.type || 'document';
-                if (rawType === 'report') newCounts.report++;
-                else if (rawType === 'code') newCounts.code++;
-                else if (rawType === 'design' || rawType === 'image') newCounts.design++;
-                else if (rawType === 'md' || rawType === 'markdown' || rawType === 'text_content' || rawType === 'document') newCounts.document++;
-            });
+            await Promise.all(types.map(async (type) => {
+                let statusFilters = ['document'];
+                if (type === 'code') statusFilters = ['code'];
+                else if (type === 'design') statusFilters = ['design', 'image'];
+                else if (type === 'report') statusFilters = ['report'];
+                else if (type === 'document') statusFilters = ['md', 'markdown', 'text_content', 'document'];
+
+                const { count, error } = await supabase
+                    .from('trinity_artifacts')
+                    .select('*', { count: 'exact', head: true })
+                    .in('artifact_type', statusFilters);
+
+                if (!error) newCounts[type] = count || 0;
+            }));
+
             setCounts(newCounts);
         } catch (e) {
             console.error('Error fetching total counts:', e);

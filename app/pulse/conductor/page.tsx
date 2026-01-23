@@ -15,6 +15,7 @@ import InviteManager from '@/components/InviteManager';
 import { Skull, Share2, AlertTriangle, ServerCrash, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
+import { toast } from 'sonner';
 import { AGENT_GROUPS } from '@/lib/agent/groups';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { RewardTuner } from '@/components/RewardTuner';
@@ -53,22 +54,37 @@ export default function ConductorPage() {
     };
 
     const wakeTrinity = async () => {
-        if (!confirm('☀️ WAKE ALL AGENTS? This will send keep-alive pings to the entire swarm.')) return;
-        await fetch('/api/captain', {
-            method: 'POST',
-            body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_WAKE' })
-        });
-        alert('SIGNAL DISPATCHED: SWARM WAKE');
+        toast.promise(
+            fetch('/api/captain', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_WAKE' }),
+                headers: { 'Content-Type': 'application/json' }
+            }),
+            {
+                loading: 'Dispatching wake signal...',
+                success: 'Swarm wake signal sent!',
+                error: 'Failed to wake swarm'
+            }
+        );
     };
 
     const resetTrinity = async () => {
         if (!confirm('🚨 KILL ALL ACTION AND REBOOT? This will clear all "Doing" tasks and mark the swarm offline. Use this for emergency recovery.')) return;
-        await fetch('/api/captain', {
-            method: 'POST',
-            body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_RESET' })
+
+        toast.promise(
+            fetch('/api/captain', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_RESET' }),
+                headers: { 'Content-Type': 'application/json' }
+            }),
+            {
+                loading: 'Resetting system...',
+                success: 'System reset completed!',
+                error: 'Failed to reset system'
+            }
+        ).then(() => {
+            setTimeout(refresh, 1000);
         });
-        alert('SYSTEM RESET: Board cleared and agents marked offline.');
-        refresh();
     };
 
     // --- SHARE FEATURE ---

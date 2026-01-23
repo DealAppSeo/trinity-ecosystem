@@ -152,14 +152,23 @@ export default function FoundersDashboard() {
                 targetAgents = [slot.targetId];
             }
 
-            const { error } = await supabase
-                .from('trinity_agent_registry')
-                .update({ system_prompt: slot.prompt })
-                .in('agent_name', targetAgents);
+            const res = await fetch('/api/swarm-control', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'DIRECTIVE_UPDATE',
+                    targetAgents,
+                    prompt: slot.prompt
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            });
 
-            if (error) throw error;
-            toast.success(`Directive injected into ${targetAgents.length} neural nodes.`);
-            fetchAgents();
+            const data = await res.json();
+            if (res.ok) {
+                toast.success(data.message);
+                fetchAgents();
+            } else {
+                throw new Error(data.error);
+            }
         } catch (error: any) {
             toast.error("Injection failed: " + error.message);
         } finally {

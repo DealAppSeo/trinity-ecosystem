@@ -49,13 +49,16 @@ export const useTrinityController = () => {
                 { data: taskData },
                 { data: logData },
                 { data: heartbeatData },
-                { data: statsData }
+                { count: completedCount24h }
             ] = await Promise.all([
                 supabase.from('trinity_agent_registry').select('*').order('agent_name'),
                 supabase.from('trinity_tasks').select('*').order('created_at', { ascending: false }).limit(150),
                 supabase.from('trinity_agent_logs').select('*').order('created_at', { ascending: false }).limit(100),
                 supabase.from('trinity_heartbeat').select('*'),
-                supabase.from('trinity_stats').select('*').maybeSingle()
+                supabase.from('trinity_tasks')
+                    .select('*', { count: 'exact', head: true })
+                    .in('status', ['completed', 'verified', 'done'])
+                    .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
             ]);
 
             // Enrich Agent Data with Group and Status
@@ -73,7 +76,7 @@ export const useTrinityController = () => {
 
                 // Thresholds
                 const isActive = minutesIdle < 5; // 5 mins active window
-                const isIdle = minutesIdle >= 10 && minutesIdle < 60; // Amber threshold
+                const isIdle = minutesIdle >= 5 && minutesIdle < 60; // Amber threshold (Start at 5 to close the gap)
 
                 // Tiered Logic
                 // Green: Active + Has recent task activity
@@ -95,7 +98,7 @@ export const useTrinityController = () => {
                     tierStatus = 'amber';
                 }
 
-                return {
+                const enriched = {
                     ...agent,
                     group_name: agent.group_name || getGroupForAgent(agent.agent_name)?.id || 'UNKNOWN',
                     status: tierStatus,
@@ -105,6 +108,8 @@ export const useTrinityController = () => {
                     reputation_score: agent.reputation_score || 0,
                     tasks_completed: agent.tasks_completed || 0
                 };
+                if (isActive) console.log(`[Enrich] ${agent.agent_name}: status=${tierStatus} (idle:${minutesIdle.toFixed(1)}m)`);
+                return enriched;
             });
 
             // Sort: Live first, then by name
@@ -121,13 +126,13 @@ export const useTrinityController = () => {
 
             // Set stats - PREFER DYNAMIC CALCULATION for Active Agents to match Grid
             // Fallback to table for accumulated stats like tasks_completed_24h if meaningful
-            const calculatedActiveAgents = enrichedAgents.filter((a: any) => ['active', 'online', 'green', 'blue'].includes(a.status)).length;
+            const calculatedActiveAgents = enrichedAgents.filter((a: any) => ['active', 'online', 'green', 'blue', 'amber'].includes(a.status)).length;
             const calculatedCompleted = enrichedAgents.reduce((acc: number, curr: any) => acc + (curr.tasks_completed || 0), 0);
 
             setStats({
-                ...statsData, // Keep other stats if they exist
-                active_agents: calculatedActiveAgents,
-                tasks_completed_24h: Math.max(calculatedCompleted, statsData?.tasks_completed_24h || 0)
+                online_agents: calculatedActiveAgents,
+                tasks_completed_24h: completedCount24h || 0,
+                active_tasks: taskList.filter(t => ['pending', 'in_progress', 'doing', 'running'].includes(t.status)).length
             });
 
         } catch (error) {

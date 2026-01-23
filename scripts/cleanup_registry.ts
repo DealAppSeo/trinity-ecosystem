@@ -10,6 +10,8 @@ const supabase = createClient(
 );
 
 const VALID_AGENTS = [
+    // ORCHESTRATION
+    'trinity-orch', 'trinity-w3c', 'trinity-shofet',
     // ALPHA
     'trinity-gcm', 'trinity-torch', 'trinity-veritas',
     // BETA

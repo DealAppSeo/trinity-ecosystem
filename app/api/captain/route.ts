@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 
 // FORCE DYNAMIC
 export const dynamic = 'force-dynamic';
@@ -40,32 +40,46 @@ export async function POST(req: Request) {
 
             if (signal === 'SYSTEM_WAKE') {
                 // 1. Get all agents from registry
-                const { data: agents } = await supabase.from('trinity_agent_registry').select('agent_name');
-                const agentNames = agents?.map(a => a.agent_name) || [];
+                const { data: agentsData } = await supabase.from('trinity_agent_registry').select('agent_name');
+                const agentNames = agentsData?.map(a => a.agent_name) || [];
 
-                // 2. Insert Heartbeat/Wake tasks for each agent
                 if (agentNames.length > 0) {
+                    const nowStr = new Date().toISOString();
                     const pings = agentNames.map(name => ({
                         title: `[HEARTBEAT] System Wake Signal`,
                         description: 'Manual wake signal from Conductor Dashboard.',
                         task_type: 'heartbeat',
                         status: 'pending',
-                        assigned_to: null, // Open market - pull model
-                        priority: 5 // Higher priority to ensure immediate wake
+                        assigned_to: name, // Specifically assigned to help them wake selectively
+                        priority: 5,
+                        created_at: nowStr
                     }));
+
+                    // 2. Insert Heartbeat/Wake tasks
                     await supabase.from('trinity_tasks').insert(pings);
 
-                    // Update registry last_active to show immediate pulse
+                    // 3. Update registry last_active to show immediate pulse
                     await supabase.from('trinity_agent_registry')
-                        .update({ last_active: new Date().toISOString() })
+                        .update({
+                            status: 'online',
+                            last_active: nowStr
+                        })
                         .in('agent_name', agentNames);
+
+                    // 4. Update heartbeats
+                    const heartbeats = agentNames.map(agent => ({
+                        agent,
+                        last_seen: nowStr,
+                        status: 'active'
+                    }));
+                    await supabase.from('trinity_heartbeat').upsert(heartbeats, { onConflict: 'agent' });
                 }
 
                 if (process.env.RAILWAY_DEPLOY_HOOK) {
                     await fetch(process.env.RAILWAY_DEPLOY_HOOK, { method: 'POST' });
                 }
 
-                return NextResponse.json({ message: 'SYSTEM_WAKE signal dispatched to all agents.' });
+                return NextResponse.json({ message: 'SYSTEM_WAKE signal dispatched. All nodes marked ACTIVE.' });
             }
 
             if (signal === 'SYSTEM_RESET') {

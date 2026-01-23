@@ -19,8 +19,8 @@ export async function GET(req: Request) {
         if (status) {
             query = query.eq('status', status);
         } else {
-            // Default: show pending and in_progress
-            query = query.in('status', ['pending', 'in_progress']);
+            // Default: show pending, in_progress, and agent-active states
+            query = query.in('status', ['pending', 'in_progress', 'doing', 'running', 'pending_clarification']);
         }
 
         const { data, error } = await query.limit(50);
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
             priority: priority || 3, // Default normal priority
             status: 'pending',
             task_type: task_type || 'general',
-            agent_assigned: agent_assigned || null, // Corrected column name
+            assigned_to: agent_assigned || null, // Corrected to assigned_to
             created_at: new Date().toISOString(),
             created_by: 'admin' // HITL
         };

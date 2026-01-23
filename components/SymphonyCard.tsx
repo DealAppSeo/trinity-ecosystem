@@ -13,9 +13,10 @@ interface SymphonyCardProps {
 
 export function SymphonyCard({ agent }: SymphonyCardProps) {
     // Unified Heartbeat Logic (v3.4 - SSOT Consolidation)
-    const isOnline = ['online', 'active', 'green', 'blue'].includes(agent.status);
-    const group = getGroupForAgent(agent.agent_name);
     const lastHeartbeat = agent.last_active ? new Date(agent.last_active) : null;
+    const isRecentlyActive = lastHeartbeat && (Date.now() - lastHeartbeat.getTime() < 5 * 60 * 1000);
+    const isOnline = isRecentlyActive && ['online', 'active', 'green', 'blue', 'amber', 'working', 'idle'].includes(agent.status);
+    const group = getGroupForAgent(agent.agent_name);
 
     // Derive visual role from Group
     const role = group?.focus.split(' - ')[0] || 'Autonomous Agent';
@@ -91,7 +92,9 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
                 <div className="flex flex-col items-end space-y-1">
                     <div className={cn(
                         "w-2.5 h-2.5 rounded-full mb-3 shadow-[0_0_8px_currentColor] transition-all duration-500",
-                        isOnline ? "bg-green-500 text-green-500" : "bg-zinc-800 text-zinc-800"
+                        agent.status === 'amber' ? "bg-amber-500 text-amber-500" :
+                            isOnline ? "bg-green-500 text-green-500" :
+                                "bg-zinc-800 text-zinc-800"
                     )} />
 
                     <div className="flex items-center gap-3 text-right">

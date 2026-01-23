@@ -32,7 +32,10 @@ export default function DashboardPage() {
                 <div className="bg-[#0B0B0F]/80 backdrop-blur-md rounded-xl p-6 border border-violet-500/30 shadow-[0_0_15px_rgba(139,92,246,0.15)]">
                     <div className="flex items-center justify-between mb-4">
                         <Activity className="w-8 h-8 text-violet-400" />
-                        <div className="w-3 h-3 rounded-full bg-green-400 animate-pulse" />
+                        <div className={cn(
+                            "w-3 h-3 rounded-full animate-pulse",
+                            systemHealth > 80 ? "bg-green-400" : systemHealth > 50 ? "bg-yellow-400" : "bg-red-400"
+                        )} />
                     </div>
                     <div className="text-3xl font-bold mb-1 text-white">{activeAgentsCount}</div>
                     <div className="text-sm text-gray-400">Active Agents</div>
@@ -101,7 +104,7 @@ export default function DashboardPage() {
                                     <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse mt-2 shrink-0" />
                                     <div className="flex-1">
                                         <p className="text-sm text-gray-300">
-                                            <span className="font-bold text-violet-300">{log.agent_name}</span>: {log.details || log.action}
+                                            <span className="font-bold text-violet-300">{log.agent_name || log.agent}</span>: {log.message || log.details || log.action}
                                         </p>
                                         <p className="text-xs text-gray-500 mt-1">
                                             {new Date(log.created_at).toLocaleString()}

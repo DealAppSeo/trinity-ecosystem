@@ -29,16 +29,16 @@ export const CONSTITUTION = {
 };
 
 export const AGENT_WISDOM: Record<string, WisdomProfile> = {
-    'trinity-orch': { name: 'ORCH', role: 'orchestrator', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['coordination', 'routing'] },
-    'trinity-w3c': { name: 'W3C', role: 'blockchain_specialist', primaryVirtue: 'PURE', tier: 'specialist', specialties: ['web3', 'defi'] },
-    'trinity-shofet': { name: 'SHOFET', role: 'governance', primaryVirtue: 'RIGHT', tier: 'conductor', specialties: ['justice', 'rules'] },
-    'trinity-torch': { name: 'TORCH', role: 'task_coordinator', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['orchestration', 'delegation'] },
-    'trinity-veritas': { name: 'VERITAS', role: 'truth_seeker', primaryVirtue: 'TRUE', tier: 'conductor', specialties: ['verification', 'research'] },
-    'trinity-gcm': { name: 'GCM', role: 'constitutional_guardian', primaryVirtue: 'RIGHT', tier: 'conductor', specialties: ['compliance', 'ethics'] },
-    'trinity-chesed': { name: 'CHESED', role: 'mercy', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['empathy', 'restoration'] },
-    'trinity-mel': { name: 'MEL', role: 'ux_design', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['ui', 'ux', 'design'] },
-    'trinity-apm': { name: 'APM', role: 'spiritual_backbone', primaryVirtue: 'LOVELY', tier: 'conductor', specialties: ['prayer', 'wisdom'] },
-    'trinity-sophia': { name: 'SOPHIA', role: 'wisdom_research', primaryVirtue: 'TRUE', tier: 'specialist', specialties: ['deep-thought', 'discovery'] },
-    'trinity-nexus': { name: 'NEXUS', role: 'integration', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['syncing', 'flow'] },
-    'trinity-hdm': { name: 'HDM', role: 'infrastructure', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['code', 'database'] }
+    'trinity-orch': { name: 'ORCH', role: 'orchestrator', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['coordination', 'routing'], squad: 'ORCHESTRATION' },
+    'trinity-w3c': { name: 'W3C', role: 'blockchain_specialist', primaryVirtue: 'PURE', tier: 'specialist', specialties: ['web3', 'defi'], squad: 'ORCHESTRATION' },
+    'trinity-shofet': { name: 'SHOFET', role: 'governance', primaryVirtue: 'RIGHT', tier: 'conductor', specialties: ['justice', 'rules'], squad: 'ORCHESTRATION' },
+    'trinity-torch': { name: 'TORCH', role: 'task_coordinator', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['orchestration', 'delegation'], squad: 'ALPHA' },
+    'trinity-veritas': { name: 'VERITAS', role: 'truth_seeker', primaryVirtue: 'TRUE', tier: 'conductor', specialties: ['verification', 'research'], squad: 'ALPHA' },
+    'trinity-gcm': { name: 'GCM', role: 'constitutional_guardian', primaryVirtue: 'RIGHT', tier: 'conductor', specialties: ['compliance', 'ethics'], squad: 'ALPHA' },
+    'trinity-chesed': { name: 'CHESED', role: 'mercy', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['empathy', 'restoration'], squad: 'BETA' },
+    'trinity-mel': { name: 'MEL', role: 'ux_design', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['ui', 'ux', 'design'], squad: 'BETA' },
+    'trinity-apm': { name: 'APM', role: 'spiritual_backbone', primaryVirtue: 'LOVELY', tier: 'conductor', specialties: ['prayer', 'wisdom'], squad: 'BETA' },
+    'trinity-sophia': { name: 'SOPHIA', role: 'wisdom_research', primaryVirtue: 'TRUE', tier: 'specialist', specialties: ['deep-thought', 'discovery'], squad: 'GAMMA' },
+    'trinity-nexus': { name: 'NEXUS', role: 'integration', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['syncing', 'flow'], squad: 'GAMMA' },
+    'trinity-hdm': { name: 'HDM', role: 'infrastructure', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['code', 'database'], squad: 'GAMMA' }
 };

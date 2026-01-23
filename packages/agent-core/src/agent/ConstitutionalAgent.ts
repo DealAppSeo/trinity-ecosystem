@@ -214,9 +214,12 @@ export class ConstitutionalAgent {
                 .from('trinity_agent_registry')
                 .select('*')
                 .eq('agent_name', this.name)
-                .single();
+                .maybeSingle();
 
-            if (error) throw error; // Truth-Seeking: Don't silently fail
+            if (error) {
+                console.error(`[${this.name}] ⚠️ Sync error:`, error.message);
+                // Continue to registration if it's just a missing record
+            }
 
             if (data) {
                 const record = data as AgentRegistryRecord;
@@ -553,7 +556,7 @@ export class ConstitutionalAgent {
             .select('*')
             .in('status', ['done', 'completed'])
             .neq('claimed_by', this.name)
-            .or(`verified_by.is.null,not.verified_by.cs.{${this.name}}`)
+            .or(`verified_by.is.null,verified_by.not.cs.{${this.name}}`)
             .order('priority', { ascending: false })
             .order('completed_at', { ascending: true }) // FIFO: Oldest work first
             .limit(1);
@@ -1740,7 +1743,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             await this.supabase
                 .from('trinity_heartbeat')
                 .upsert({
-                    agent: this.name,
+                    agent: this.name, // SSOT: FULL NAME
                     status: 'active',
                     version: this.version,
                     last_seen: timestamp,
