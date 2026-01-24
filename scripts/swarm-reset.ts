@@ -17,7 +17,7 @@ async function globalReset() {
         .from('trinity_tasks')
         .update({
             claimed_by: null,
-            status: 'pending' // Force move everything in 'Clarify' back to 'To Do'
+            status: 'pending' // Force move everything back to 'To Do'
         })
         .in('status', ['pending', 'pending_clarification']);
 
@@ -32,7 +32,7 @@ async function globalReset() {
             status: 'online',
             current_task_summary: '[RESET] Swarm balanced. Ready for work.'
         })
-        .is('status', 'idle'); // Wake the idle ones
+        .eq('status', 'idle');
 
     if (regError) console.error('❌ Failed to update registry:', regError.message);
     else console.log('✅ Registry pulsed.');

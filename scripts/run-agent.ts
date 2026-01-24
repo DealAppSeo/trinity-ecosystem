@@ -74,7 +74,11 @@ async function startAgent() {
     console.log(`🤖 Starting Agent: ${finalAgentName}...`);
 
     const agent = new ConstitutionalAgent({ name: finalAgentName });
-    await agent.syncState();
+    try {
+        await agent.syncState();
+    } catch (e: any) {
+        console.warn(`[BOOT] ⚠️ Sync state failed for ${finalAgentName} (Continuing):`, e.message);
+    }
 
     console.log(`✅ ${finalAgentName} is ONLINE (Tier: ${agent.autonomyTier}, Rep: ${agent.reputationScore})`);
 

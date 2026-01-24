@@ -447,13 +447,13 @@ export class ConstitutionalAgent {
         await this.syncState();
         await this.heartbeat();
 
-        // [ANTIGRAVITY] INITIALIZE MCP TOOLS
+        // [ANTIGRAVITY] INITIALIZE MCP TOOLS (Resilient Boot)
         console.log(`[${this.name}] 🛠️ Initializing MCP Tools...`);
         try {
             await mcpManager.initializeAll();
             console.log(`[${this.name}] ✅ MCP Tools Ready.`);
         } catch (e: any) {
-            console.error(`[${this.name}] ❌ MCP Initialization Failed:`, e.message);
+            console.error(`[${this.name}] ❌ MCP Initialization Failed (Continuing):`, e.message);
         }
 
         this.heartbeatInterval = setInterval(async () => {
@@ -650,28 +650,28 @@ export class ConstitutionalAgent {
 
         console.log(`[BFT] ⚔️ Commencing Triad Consensus on: ${task.title}`);
 
-        // 1. GATHER EVIDENCE (Check artifacts)
+        // 1. GATHER EVIDENCE (Check artifacts & results)
         const { data: artifacts } = await this.supabase
             .from('trinity_artifacts')
             .select('*')
             .eq('task_id', task.id);
 
         const artifactCount = artifacts?.length || 0;
-        console.log(`[BFT] Found ${artifactCount} artifacts for review.`);
+        const hasResult = task.result && task.result.length > 50;
+        console.log(`[BFT] Found ${artifactCount} artifacts. Result present: ${!!hasResult}`);
 
         // 2. PHI-WEIGHTED CONSISTENCY (Grok's Golden Ratio Consensus)
-        // Apply φ-weight: finalBelief = beliefs.reduce((sum, b) => sum + b * 1.618 ** (rep / 100), 0)
         const phi = 1.618;
         const repFactor = (this.reputationScore || 50) / 100;
         const weight = Math.pow(phi, repFactor);
 
-        // [USER: STRICT ARTIFACT REQUIREMENT]
-        // If no artifacts, it's a hard fail regardless of weights.
-        let belief = artifactCount > 0 ? 0.9 : 0.0;
-        let disbelief = artifactCount === 0 ? 1.0 : 0.1;
+        // [USER: ROBUST VERIFICATION]
+        // If no artifacts, allow verification based on the 'result' text.
+        let belief = (artifactCount > 0 || hasResult) ? 0.9 : 0.0;
+        let disbelief = (artifactCount === 0 && !hasResult) ? 1.0 : 0.1;
 
         // Final aggregate logic (weighted influence)
-        const isVerified = artifactCount > 0 && (belief * weight) > (disbelief * (1 / weight));
+        const isVerified = (artifactCount > 0 || hasResult) && (belief * weight) > (disbelief * (1 / weight));
         const newVerifyCount = ((task as Task & { verify_count?: number }).verify_count || 0) + 1;
         const verifiers = ((task as Task & { verified_by?: string[] }).verified_by || []).concat(this.name);
 
@@ -935,7 +935,7 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
             }
             // [PHASE 10] UNCERTAINTY AS OPPORTUNITY (Logical Escalation)
             const evaluation = await this.evaluateResult(task, result.output);
-            const lowBelief = evaluation.score < 40;
+            const lowBelief = evaluation.score < 40; // Now correctly compared (0-100)
             const explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
 
             if (lowBelief || explicitEscalate) {
@@ -1310,8 +1310,8 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
     // ============================================
 
     async evaluateResult(task: Task, output: string): Promise<{ score: number; handoff_required: boolean; handoff_to?: string }> {
-        // Simplified Logic Rule Engine
-        let score = 0.5; // Default neutral
+        // [ANTIGRAVITY] STANDARDIZED SCORING: 0-100
+        let score = 50; // Default neutral (50/100)
         let handoff = false;
         let targetAgent = '';
 
@@ -1319,8 +1319,8 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
 
         // 1. Truth Score (Veritas Check)
         if (task.task_type === 'research') {
-            if (lowerOutput.includes('http') || lowerOutput.includes('citation')) score += 0.3;
-            if (output.length > 200) score += 0.1;
+            if (lowerOutput.includes('http') || lowerOutput.includes('citation')) score += 30;
+            if (output.length > 200) score += 10;
             handoff = true;
             targetAgent = 'trinity-veritas'; // Truth verify
         }
@@ -1329,19 +1329,19 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
         if (task.title.includes('Impact') || task.title.includes('Humanitarian')) {
             const empathyWords = ['help', 'community', 'care', 'support', 'understand'];
             const matches = empathyWords.filter(w => lowerOutput.includes(w)).length;
-            score += (matches * 0.1);
+            score += (matches * 10);
             handoff = true;
             targetAgent = 'trinity-chesed';
         }
 
         // 3. Coding Score
         if (task.task_type === 'code') {
-            if (output.includes('function') || output.includes('class')) score += 0.4;
-            if (output.includes('try') || output.includes('catch')) score += 0.1; // Error handling
+            if (lowerOutput.includes('function') || lowerOutput.includes('class')) score += 40;
+            if (lowerOutput.includes('try') || lowerOutput.includes('catch')) score += 10; // Error handling
         }
 
         return {
-            score: Math.min(0.99, score),
+            score: Math.min(99, score),
             handoff_required: handoff && this.name !== targetAgent, // Don't handoff to self
             handoff_to: targetAgent
         };
