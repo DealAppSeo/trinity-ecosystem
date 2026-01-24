@@ -1,5 +1,6 @@
 import { supabaseAdmin as supabase } from '../supabase';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { Redis } from '@upstash/redis';
 import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, AutonomyTier, AgentRegistryRecord, SessionMetrics, MCPPhase, Task } from './types';
 import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
 // Dynamic imports for graphology/fs handled inside methods to avoid build issues
