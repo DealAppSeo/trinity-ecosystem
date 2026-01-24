@@ -728,8 +728,7 @@ export class ConstitutionalAgent {
 
         let query = this.supabase
             .from('trinity_tasks')
-            .select('*')
-            .eq('status', 'pending');
+            .select('*');
 
         if (strictlyAssigned) {
             // Check for both trinity-mel AND MEL AND BETA (Squad)

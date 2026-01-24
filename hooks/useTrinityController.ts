@@ -103,6 +103,7 @@ export const useTrinityController = () => {
                     status: tierStatus,
                     is_live: isActive,
                     currentTask: currentTask || null,
+                    current_task_summary: agent.current_task_summary || (currentTask ? currentTask.title : 'Idle'),
                     lastHeartbeat: lastSeen,
                     reputation_score: agent.reputation_score || 0,
                     tasks_completed: agent.tasks_completed || 0
