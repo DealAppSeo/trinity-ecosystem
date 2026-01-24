@@ -85,17 +85,29 @@ async function startAgent() {
 
     const server = http.createServer((req, res) => {
         if (req.url === '/health' || req.url === '/' || req.url === '/swarm-health') {
+            const now = Date.now();
+            const lastPulse = (agent as any).lastLoopPulse || 0;
+            const pulseDiff = now - lastPulse;
+            const isHealthy = pulseDiff < 5 * 60 * 1000; // 5 mins
+
+            if (!isHealthy) {
+                console.warn(`[HEALTH] 🚨 Agent ${finalAgentName} is a ZOMBIE. Last pulse: ${Math.round(pulseDiff / 1000)}s ago. Returning 503.`);
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'ZOMBIE', agent: finalAgentName, last_pulse_ms: pulseDiff }));
+                return;
+            }
+
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 status: 'ONLINE',
                 agent: finalAgentName,
                 timestamp: new Date().toISOString(),
                 version: '8.1.3-Antigravity',
-                pillar: 'ImageBearer Phase 11',
                 metrics: {
                     reputation: agent.reputationScore,
                     tier: agent.autonomyTier,
-                    tasks_handled: agent.sessionMetrics?.tasksCompleted || 0
+                    tasks_handled: agent.sessionMetrics?.tasksCompleted || 0,
+                    last_pulse_s: Math.round(pulseDiff / 1000)
                 }
             }));
         } else {

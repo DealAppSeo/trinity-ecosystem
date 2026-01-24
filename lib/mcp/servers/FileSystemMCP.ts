@@ -66,6 +66,18 @@ export class FileSystemMCP implements MCPServer {
                     }
                 },
                 execute: async (args: any) => this.listFiles(args.subpath)
+            },
+            {
+                name: 'find_task_artifact',
+                description: 'Recursively searches for an artifact file matching a task ID. Returns path if found.',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        taskId: { type: 'string', description: 'The Task ID to search for (e.g. "3718")' }
+                    },
+                    required: ['taskId']
+                },
+                execute: async (args: any) => this.findTaskArtifact(args.taskId)
             }
         ];
     }
@@ -74,6 +86,7 @@ export class FileSystemMCP implements MCPServer {
         if (toolName === 'write_file') return this.writeFile(args.path, args.content);
         if (toolName === 'read_file') return this.readFile(args.path);
         if (toolName === 'list_files') return this.listFiles(args.subpath);
+        if (toolName === 'find_task_artifact') return this.findTaskArtifact(args.taskId);
         throw new Error(`Tool ${toolName} not found`);
     }
 
@@ -160,5 +173,30 @@ export class FileSystemMCP implements MCPServer {
 
     private generateRepID(content: string): string {
         return crypto.createHash('sha256').update(content).digest('hex').substring(0, 8).toUpperCase();
+    }
+
+    private async findTaskArtifact(taskId: string): Promise<string> {
+        console.log(`[FileSystemMCP] 🔍 Searching for artifact: ${taskId}`);
+        const found = this.searchDir(this.rootDir, taskId);
+        if (found) {
+            const rel = path.relative(this.rootDir, found);
+            return `Found artifact at: ${rel}`;
+        }
+        return "Not Found. Try searching other providers or asking for clarification.";
+    }
+
+    private searchDir(dir: string, pattern: string): string | null {
+        const files = fs.readdirSync(dir);
+        for (const file of files) {
+            const fullPath = path.join(dir, file);
+            const stat = fs.statSync(fullPath);
+            if (stat.isDirectory()) {
+                const res = this.searchDir(fullPath, pattern);
+                if (res) return res;
+            } else if (file.toLowerCase().includes(pattern.toLowerCase())) {
+                return fullPath;
+            }
+        }
+        return null;
     }
 }

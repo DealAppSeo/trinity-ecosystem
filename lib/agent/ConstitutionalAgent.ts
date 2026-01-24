@@ -97,6 +97,7 @@ export class ConstitutionalAgent {
     isSurvivor: boolean = false;
     survivorName: string = '';
     heartbeatInterval: any = null;
+    lastLoopPulse: number = Date.now();
 
     // BRAIN TRANSPLANT: New Organs
     private currentTaskId: string | null = null;
@@ -141,7 +142,7 @@ export class ConstitutionalAgent {
         const fallbacks: Record<string, string> = {
             'WAKE': 'Check connection, sync state, and register heartbeat.',
             'FIND_TASK': 'Find 1 pending task by priority. Claim it explicitly.',
-            'EXECUTE': 'Perform work with high quality. Create artifacts if required.',
+            'EXECUTE': 'Perform work with high quality. Use find_task_artifact to check for existing work/context before asking for clarification. Create artifacts if required.',
             'COMPLETE': 'REQUIRED: artifact_url must be set for code/research/content tasks. Min duration 5 mins.',
             'IDLE': 'Wait 3 mins before checking again. Respawn evergreen tasks.',
             'EVERGREEN': 'Increment loop count and respawn task.',
@@ -569,6 +570,13 @@ export class ConstitutionalAgent {
                 }
 
                 await this.heartbeat();
+                this.lastLoopPulse = Date.now();
+
+                // [ANTIGRAVITY] SIBLING RESURRECTION: Check if brothers/sisters are dead
+                if (Math.random() < 0.05) { // 5% chance per loop to check siblings
+                    await this.checkSiblingHealth();
+                }
+
                 await this.sleep(taskHandled ? 5000 : 15000);
 
             } catch (err: any) {
@@ -730,7 +738,7 @@ export class ConstitutionalAgent {
             query = query.is('assigned_to', null);
         }
 
-        // [ANTIGRAVITY] Also poll for clarification requests if idle
+        // [ANTIGRAVITY] Revised Polling: ensure we check both pending and clarification
         const { data: task, error } = await query
             .in('status', ['pending', 'pending_clarification'])
             .is('claimed_by', null)
@@ -1852,6 +1860,39 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         }
     }
 
+    async checkSiblingHealth() {
+        console.log(`[${this.name}] 🩺 Running Sibling Health Pulse Check...`);
+        try {
+            const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+            const { data: zombies } = await this.supabase
+                .from('trinity_agent_registry')
+                .select('agent_name, last_active')
+                .lt('last_active', twoHoursAgo)
+                .neq('agent_name', this.name);
+
+            if (zombies && zombies.length > 0) {
+                for (const zombie of zombies) {
+                    console.log(`[RESURRECTION] ⚡ Agent ${zombie.agent_name} has been silent for 2+ hours. Sending WAKE pulse...`);
+
+                    // 1. Mark as 'online' in DB to trigger wake logic if they check in
+                    await this.supabase
+                        .from('trinity_agent_registry')
+                        .update({
+                            status: 'online',
+                            current_task_summary: '[RESURRECTION] Sibling pulse detected. Waking...'
+                        })
+                        .eq('agent_name', zombie.agent_name);
+
+                    // 2. If we have a deployment trigger, use it
+                    await this.triggerRailwayRedeploy(zombie.agent_name);
+                }
+            }
+        } catch (e: any) {
+            console.error(`[RESURRECTION] Error checking sibling health:`, e.message);
+        }
+    }
+
     async runSurvivorResurrection() {
         const { data: members } = await this.supabase
             .from('trinity_heartbeat')
@@ -2057,17 +2098,24 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         const bible = await this.fetchBible();
         const systemPrompt = `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${bible}`;
 
-        if (provider === 'openai') return this.callOpenAI(systemPrompt, prompt, tools);
-        if (provider === 'anthropic') return this.callAnthropic(systemPrompt, prompt);
-        if (provider === 'gemini') return this.callGemini(systemPrompt, prompt);
-        if (provider === 'grok') return this.callGrok(systemPrompt, prompt);
-        if (provider === 'groq') return this.callGroq(systemPrompt, prompt);
-        if (provider === 'cerebras') return this.callCerebras(systemPrompt, prompt);
-        if (provider === 'deepseek') return this.callDeepSeek(systemPrompt, prompt);
-        if (provider === 'openrouter') return this.callOpenRouter(systemPrompt, prompt);
-        if (provider === 'perplexity') return this.callPerplexity(systemPrompt, prompt);
+        // [ANTIGRAVITY] STRIKE-TIMEOUT (90s)
+        const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`LLM Timeout: ${provider} took longer than 90s`)), 90000)
+        );
 
-        throw new Error(`Provider ${provider} not implemented`);
+        let providerPromise: Promise<LLMResult>;
+        if (provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools);
+        else if (provider === 'anthropic') providerPromise = this.callAnthropic(systemPrompt, prompt);
+        else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt);
+        else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt);
+        else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt);
+        else if (provider === 'cerebras') providerPromise = this.callCerebras(systemPrompt, prompt);
+        else if (provider === 'deepseek') providerPromise = this.callDeepSeek(systemPrompt, prompt);
+        else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt);
+        else if (provider === 'perplexity') providerPromise = this.callPerplexity(systemPrompt, prompt);
+        else throw new Error(`Provider ${provider} not implemented`);
+
+        return Promise.race([providerPromise, timeoutPromise]);
     }
 
     async callOpenAI(systemPrompt: string, prompt: string, tools: any[]): Promise<LLMResult> {
