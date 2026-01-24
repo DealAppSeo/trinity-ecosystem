@@ -442,10 +442,14 @@ export class ConstitutionalAgent {
         console.log('========================================');
         console.log(`[${this.name}] 🏃 Starting main task loop (Spawn Control v8.1.1)...`);
 
-        // IMMEDIATE SYNC & HEARTBEAT ON BOOT
-        console.log('[HEARTBEAT] Writing initial heartbeat & Syncing state...');
+        // IMMEDIATE SYNC & HEARTBEAT
+        console.log(`[${this.name}] 🌀 Initializing Trinity Neural Symphony...`);
+
+        // [ANTIGRAVITY] PRE-INIT HEARTBEAT: Announce presence BEFORE heavy tool loading
+        await this.heartbeat('[BOOTING] Synchronizing CNS and Neural Pathways...');
+
         await this.syncState();
-        await this.heartbeat();
+        await this.heartbeat('[BOOTING] Mapping MCP Tools and Bridges...');
 
         // [ANTIGRAVITY] INITIALIZE MCP TOOLS (Resilient Boot)
         console.log(`[${this.name}] 🛠️ Initializing MCP Tools...`);
