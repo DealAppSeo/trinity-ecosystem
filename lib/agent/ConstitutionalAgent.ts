@@ -98,6 +98,7 @@ export class ConstitutionalAgent {
     survivorName: string = '';
     heartbeatInterval: any = null;
     lastLoopPulse: number = Date.now();
+    lastTaskCategory: 'execute' | 'verify' | null = null;
 
     // BRAIN TRANSPLANT: New Organs
     private currentTaskId: string | null = null;
@@ -468,95 +469,52 @@ export class ConstitutionalAgent {
 
         while (true) {
             try {
-                // [PHASE 21] 1-TASK busy lock
+                // [ANTIGRAVITY] ANTI-HOARDING: Strict 1-Task busy lock & Sticky Claim Cleanup
                 const { data: activeClaims, count: activeCount } = await this.supabase
                     .from('trinity_tasks')
                     .select('id, status', { count: 'exact' })
-                    .eq('claimed_by', this.name)
-                    .in('status', ['doing', 'in_progress', 'running']); // Exclude pending_clarification from blocking checks
+                    .eq('claimed_by', this.name);
 
                 if (activeCount && activeCount > 0) {
-                    const firstBusy = activeClaims![0];
-                    if (activeCount > 1) {
-                        console.warn(`[${this.name}] 🚨 CONCURRENCY VIOLATION: ${activeCount} tasks claimed.`);
+                    for (const claim of activeClaims!) {
+                        const isActive = ['doing', 'in_progress', 'running'].includes(claim.status);
+                        // If we "own" a task that isn't active, release it (Sticky Claim Cleanup)
+                        if (!isActive) {
+                            console.log(`[${this.name}] 🧹 Cleaning sticky claim on task ${claim.id} (Status: ${claim.status})`);
+                            await this.releaseClaim(claim.id);
+                        }
                     }
 
-                    console.log(`[${this.name}] 🚀 FOCUS: Resuming active task ${firstBusy.id} (${firstBusy.status})...`);
-
-                    const { data: fullTask } = await this.supabase
+                    // After cleanup, check if we still have an active task
+                    const { data: validActive } = await this.supabase
                         .from('trinity_tasks')
                         .select('*')
-                        .eq('id', firstBusy.id)
-                        .single();
+                        .eq('claimed_by', this.name)
+                        .in('status', ['doing', 'in_progress', 'running'])
+                        .maybeSingle();
 
-                    if (fullTask) {
-                        if (firstBusy.status === 'pending_clarification') {
-                            console.log(`[${this.name}] 🚧 Awaiting clarification for ${firstBusy.id}. Releasing claim to keep moving.`);
-                            await this.releaseClaim(firstBusy.id);
-                        } else {
-                            await this.processTask(fullTask as any);
-                        }
+                    if (validActive) {
+                        console.log(`[${this.name}] 🚀 FOCUS: Resuming active task ${validActive.id} (${validActive.status})...`);
+                        await this.processTask(validActive as any);
                         continue;
                     }
                 }
 
+                // [ANTIGRAVITY] WORKFLOW ALTERNATOR: Alternate between Execution and Verification
+                const preferVerify = this.lastTaskCategory === 'execute';
+                console.log(`[${this.name}] ⚖️ Workflow preference: ${preferVerify ? 'VERIFY' : 'EXECUTE'}`);
+
                 let taskHandled = false;
 
-                // ──────────────────────────────────────────────────────
-                // PRIORITY 1 — Peer Verification (Always First)
-                // ──────────────────────────────────────────────────────
-                const verificationTask = await this.getVerificationTask();
-                if (verificationTask) {
-                    console.log(`[${this.name}] 🔍 P1: Verifying peer work -> ${verificationTask.title}`);
-                    // UI: Update Real-time Status
-                    await this.heartbeat(`Verifying: ${verificationTask.title.substring(0, 30)}...`);
+                // Priority Strategy Map
+                const strategies = preferVerify
+                    ? [this.tryVerify.bind(this), this.tryExecute.bind(this)]
+                    : [this.tryExecute.bind(this), this.tryVerify.bind(this)];
 
-                    await this.verifyPeerTask(verificationTask);
-                    taskHandled = true;
-
-                    // [EVERGREEN PROTOCOL] Auto-respawn after successful verification
-                    const { data: updatedTask } = await this.supabase
-                        .from('trinity_tasks')
-                        .select('status, title')
-                        .eq('id', verificationTask.id)
-                        .single();
-
-                    if (updatedTask && updatedTask.title.includes('[EVERGREEN]') && updatedTask.status === 'verified') {
-                        await this.respawnEvergreen(verificationTask);
-                    }
-                }
-
-                // ──────────────────────────────────────────────────────
-                // PRIORITY 2 — Explicitly Assigned Tasks (Self, ShortName, or Squad)
-                // ──────────────────────────────────────────────────────
-                if (!taskHandled) {
-                    const assignedTask = await this.getNextTask(true);
-                    if (assignedTask) {
-                        console.log(`[${this.name}] 🎯 P2: My assigned task -> ${assignedTask.title}`);
-                        this.currentTaskTitle = assignedTask.title;
-                        // UI: Update Real-time Status
-                        await this.heartbeat(`Working on: ${assignedTask.title.substring(0, 30)}...`);
-
-                        await this.processTask(assignedTask);
-                        this.currentTaskTitle = null;
+                for (const strategy of strategies) {
+                    if (await strategy()) {
                         taskHandled = true;
-                    }
-                }
-
-                // ──────────────────────────────────────────────────────
-                // PRIORITY 3 — Global High-Priority Queue
-                // ──────────────────────────────────────────────────────
-                if (!taskHandled) {
-                    const globalTask = await this.getNextTask(false);
-                    if (globalTask) {
-                        console.log(`[${this.name}] 📈 P3: Highest global -> ${globalTask.title}`);
-                        this.currentTaskTitle = globalTask.title;
-                        // UI: Update Real-time Status
-                        await this.heartbeat(`Working on: ${globalTask.title.substring(0, 30)}...`);
-
-                        await this.processTask(globalTask);
-                        this.currentTaskTitle = null;
-                        taskHandled = true;
+                        break;
                     }
                 }
 
@@ -637,6 +595,49 @@ export class ConstitutionalAgent {
         } else {
             console.warn(`[${this.name}] ⚠️  Evergreen respawn failed:`, error.message);
         }
+    }
+
+    // Helper: Execution Strategy
+    private async tryExecute(): Promise<boolean> {
+        // Try Assigned first, then Global
+        const assignedTask = await this.getNextTask(true);
+        const task = assignedTask || await this.getNextTask(false);
+
+        if (task) {
+            console.log(`[${this.name}] 🎯 Executing mission -> ${task.title}`);
+            this.currentTaskTitle = task.title;
+            await this.heartbeat(`Working on: ${task.title.substring(0, 30)}...`);
+            await this.processTask(task);
+            this.currentTaskTitle = null;
+            this.lastTaskCategory = 'execute';
+            return true;
+        }
+        return false;
+    }
+
+    // Helper: Verification Strategy
+    private async tryVerify(): Promise<boolean> {
+        const verificationTask = await this.getVerificationTask();
+        if (verificationTask) {
+            console.log(`[${this.name}] 🔍 Verifying peer work -> ${verificationTask.title}`);
+            await this.heartbeat(`Verifying: ${verificationTask.title.substring(0, 30)}...`);
+            await this.verifyPeerTask(verificationTask);
+
+            // [EVERGREEN PROTOCOL] Auto-respawn after successful verification
+            const { data: updatedTask } = await this.supabase
+                .from('trinity_tasks')
+                .select('status, title')
+                .eq('id', verificationTask.id)
+                .single();
+
+            if (updatedTask && updatedTask.title.includes('[EVERGREEN]') && updatedTask.status === 'verified') {
+                await this.respawnEvergreen(verificationTask);
+            }
+
+            this.lastTaskCategory = 'verify';
+            return true;
+        }
+        return false;
     }
 
     async verifyPeerTask(task: Task) {
