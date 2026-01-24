@@ -90,10 +90,9 @@ export const useTrinityController = () => {
                     const hasVerifiedTask = taskList.some(t => t.claimed_by === agent.agent_name && t.status === 'verified');
                     const needsClarification = taskList.some(t => t.claimed_by === agent.agent_name && t.status === 'pending_clarification');
 
-                    if (needsClarification) tierStatus = 'amber'; // Amber pulse for clarification
+                    if (needsClarification) tierStatus = 'amber';
                     else if (hasDoneTask) tierStatus = 'blue';
-                    else if (hasVerifiedTask) tierStatus = 'green';
-                    else tierStatus = 'active'; // Default active (Greener/Live)
+                    else tierStatus = 'online'; // Map 'active' logic to 'online' (Green Dot)
                 } else if (isIdle) {
                     tierStatus = 'amber';
                 }

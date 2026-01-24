@@ -93,8 +93,9 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
                     <div className={cn(
                         "w-2.5 h-2.5 rounded-full mb-3 shadow-[0_0_8px_currentColor] transition-all duration-500",
                         agent.status === 'amber' ? "bg-amber-500 text-amber-500" :
-                            isOnline ? "bg-green-500 text-green-500" :
-                                "bg-zinc-800 text-zinc-800"
+                            agent.status === 'blue' ? "bg-blue-500 text-blue-500" :
+                                (isOnline || agent.status === 'online' || agent.status === 'active' || agent.status === 'green') ? "bg-green-500 text-green-500" :
+                                    "bg-zinc-800 text-zinc-800"
                     )} />
 
                     <div className="flex items-center gap-3 text-right">
