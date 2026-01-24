@@ -44,15 +44,23 @@ export const useTrinityController = () => {
             checkBrain();
 
             // Parallel Fetching for Speed
+            // [TRINITY v4.2] DYNAMIC STATUS FETCH: Fetch active tasks without 150 limit
             const [
                 { data: agentData },
-                { data: taskData },
+                { data: activeTasks }, // Doing / Clarify (No Limit)
+                { data: queueTasks },  // Pending / Done (150 Limit)
                 { data: logData },
                 { data: heartbeatData },
                 { count: completedCount24h }
             ] = await Promise.all([
                 supabase.from('trinity_agent_registry').select('*').order('agent_name'),
-                supabase.from('trinity_tasks').select('*').order('created_at', { ascending: false }).limit(150),
+                supabase.from('trinity_tasks').select('*')
+                    .in('status', ['doing', 'in_progress', 'running', 'pending_clarification'])
+                    .order('created_at', { ascending: false }),
+                supabase.from('trinity_tasks').select('*')
+                    .in('status', ['pending', 'done', 'completed'])
+                    .order('created_at', { ascending: false })
+                    .limit(150),
                 supabase.from('trinity_agent_logs').select('*').order('created_at', { ascending: false }).limit(100),
                 supabase.from('trinity_heartbeat').select('*'),
                 supabase.from('trinity_tasks')
@@ -60,6 +68,8 @@ export const useTrinityController = () => {
                     .in('status', ['completed', 'verified', 'done'])
                     .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
             ]);
+
+            const taskData = [...(activeTasks || []), ...(queueTasks || [])];
 
             // Enrich Agent Data with Group and Status
             const taskList = taskData || [];
