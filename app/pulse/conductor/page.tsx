@@ -71,20 +71,20 @@ export default function ConductorPage() {
     const resetTrinity = async () => {
         if (!confirm('🚨 KILL ALL ACTION AND REBOOT? This will clear all "Doing" tasks and mark the swarm offline. Use this for emergency recovery.')) return;
 
-        toast.promise(
-            fetch('/api/captain', {
-                method: 'POST',
-                body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_RESET' }),
-                headers: { 'Content-Type': 'application/json' }
-            }),
-            {
-                loading: 'Resetting system...',
-                success: 'System reset completed!',
-                error: 'Failed to reset system'
-            }
-        ).then(() => {
-            setTimeout(refresh, 1000);
+        const promise = fetch('/api/captain', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_RESET' }),
+            headers: { 'Content-Type': 'application/json' }
         });
+
+        toast.promise(promise, {
+            loading: 'Resetting system...',
+            success: 'System reset completed!',
+            error: 'Failed to reset system'
+        });
+
+        await promise;
+        setTimeout(refresh, 1000);
     };
 
     // --- SHARE FEATURE ---
