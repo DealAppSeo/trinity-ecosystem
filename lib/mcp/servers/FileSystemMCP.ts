@@ -1,7 +1,7 @@
 import { MCPServer, MCPTool } from '../types';
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
 import { supabase } from '../../supabase';
 
 export class FileSystemMCP implements MCPServer {
@@ -33,16 +33,17 @@ export class FileSystemMCP implements MCPServer {
         return [
             {
                 name: 'write_file',
-                description: 'Writes content to a file in the artifacts directory. Arguments: path (string), content (string).',
+                description: 'Writes content to a file in the artifacts directory. Arguments: path (string), content (string), taskId (string, optional).',
                 schema: {
                     type: 'object',
                     properties: {
                         path: { type: 'string', description: 'Relative path (e.g., "report.md")' },
-                        content: { type: 'string', description: 'File content' }
+                        content: { type: 'string', description: 'File content' },
+                        taskId: { type: 'string', description: 'Optional Task ID to link this artifact to' }
                     },
                     required: ['path', 'content']
                 },
-                execute: async (args: any) => this.writeFile(args.path, args.content)
+                execute: async (args: any) => this.writeFile(args.path, args.content, args.taskId)
             },
             {
                 name: 'read_file',
@@ -92,7 +93,7 @@ export class FileSystemMCP implements MCPServer {
 
     // --- implementations ---
 
-    private async writeFile(relativePath: string, content: string): Promise<string> {
+    private async writeFile(relativePath: string, content: string, taskId?: string): Promise<string> {
         const safePath = this.resolveSafePath(relativePath);
 
         // RepID Signing
@@ -125,7 +126,11 @@ export class FileSystemMCP implements MCPServer {
         if (lowerContent.includes('survey')) keywords.push('research');
 
         try {
+            // [ANTIGRAVITY] Link to task if taskId provided
+            const dbTaskId = taskId && !isNaN(parseInt(taskId)) ? parseInt(taskId) : null;
+
             const { error } = await supabase.from('trinity_artifacts').insert({
+                task_id: dbTaskId,
                 file_path: relativePath,
                 content: content,
                 repid_hash: repId,
@@ -137,7 +142,8 @@ export class FileSystemMCP implements MCPServer {
                     project: project,
                     category: category,
                     tags: keywords,
-                    smart_folder: `${project}/${category}`
+                    smart_folder: `${project}/${category}`,
+                    taskId: taskId // Preserve original if not number
                 }
             });
             if (error) console.error('[FileSystemMCP] DB Save Error:', error.message);

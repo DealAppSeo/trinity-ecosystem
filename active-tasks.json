@@ -1,0 +1,98 @@
+[
+  {
+    "id": 4733,
+    "title": "[BETA] [EASY] Artifact Scaling Test Doc",
+    "status": "doing",
+    "claimed_by": "trinity-orch"
+  },
+  {
+    "id": 4734,
+    "title": "[BETA] [MEDIUM] Log Aggregation Table",
+    "status": "doing",
+    "claimed_by": "trinity-mel"
+  },
+  {
+    "id": 4735,
+    "title": "[GAMMA] [EASY] Iconography Standard",
+    "status": "doing",
+    "claimed_by": "trinity-hdm"
+  },
+  {
+    "id": 4736,
+    "title": "[GAMMA] [MEDIUM] Responsive Grid Design Proprosal",
+    "status": "doing",
+    "claimed_by": "trinity-orch"
+  },
+  {
+    "id": 4737,
+    "title": "[ORCH] [EASY] Uptime Pulse Protocol",
+    "status": "doing",
+    "claimed_by": "trinity-veritas"
+  },
+  {
+    "id": 4738,
+    "title": "[ORCH] [MEDIUM] Planetary Restart Guide",
+    "status": "doing",
+    "claimed_by": "trinity-gcm"
+  },
+  {
+    "id": 4729,
+    "title": "[ORCH] [MEDIUM] Collaboration Test Case: Hidden Key",
+    "status": "pending_clarification",
+    "claimed_by": null
+  },
+  {
+    "id": 4716,
+    "title": "[ALPHA] [MEDIUM] ZK-SNARK Gap Analysis",
+    "status": "doing",
+    "claimed_by": "trinity-mel"
+  },
+  {
+    "id": 4717,
+    "title": "[ALPHA] [EASY] Dependency Conflict Check",
+    "status": "doing",
+    "claimed_by": "trinity-gcm"
+  },
+  {
+    "id": 4715,
+    "title": "[ALPHA] [EASY] Repository Structure Audit",
+    "status": "doing",
+    "claimed_by": "trinity-apm"
+  },
+  {
+    "id": 4718,
+    "title": "[ALPHA] [MEDIUM] Artifact MIME-Type Protocol",
+    "status": "doing",
+    "claimed_by": "trinity-gcm"
+  },
+  {
+    "id": 3798,
+    "title": "[ANTIFRAGILE] Investigate repeated failure: task_failed",
+    "status": "doing",
+    "claimed_by": "trinity-apm"
+  },
+  {
+    "id": 3799,
+    "title": "[ANTIFRAGILE] Investigate repeated failure: task_failed",
+    "status": "doing",
+    "claimed_by": "trinity-hdm"
+  },
+  {
+    "id": 4186,
+    "title": "[ANTIFRAGILE] Investigate repeated failure: task_failed",
+    "status": "doing",
+    "claimed_by": "trinity-veritas"
+  },
+  {
+    "id": 3755,
+    "title": "[ANTIFRAGILE] Investigate repeated failure: task_failed",
+    "status": "doing",
+    "claimed_by": "trinity-gcm"
+  },
+  {
+    "id": 3756,
+    "title": "[ANTIFRAGILE] Investigate repeated failure: task_failed",
+    "status": "doing",
+    "claimed_by": "trinity-mel"
+  }
+]

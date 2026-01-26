@@ -8,6 +8,7 @@ import { AlphaVantageMCP } from './servers/AlphaVantageMCP';
 import { GitHubMCP } from './servers/GitHubMCP';
 import { GoogleWorkspaceMCP } from './servers/GoogleWorkspaceMCP';
 import { PlaywrightMCP } from './servers/PlaywrightMCP';
+import { CreativeMCP } from './servers/CreativeMCP';
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -25,6 +26,7 @@ export class MCPManager {
         this.registerServer(new GitHubMCP());
         this.registerServer(new GoogleWorkspaceMCP());
         this.registerServer(new PlaywrightMCP());
+        this.registerServer(new CreativeMCP());
     }
 
     registerServer(server: MCPServer) {
@@ -78,7 +80,7 @@ export class MCPManager {
         }
         // BETA SQUAD (Design/Care) - Claude
         else if (roleUpper.includes('CDO') || roleUpper.includes('CLAUDE') || roleUpper.includes('DESIGN') || roleUpper.includes('MEL') || roleUpper.includes('LILY')) {
-            allowedServers = accessMap['CDO_SQUAD'];
+            allowedServers = [...accessMap['CDO_SQUAD'], 'CreativeSuite'];
         }
         // GAMMA SQUAD (Build/Infra) - Gemini
         else if (roleUpper.includes('CTO') || roleUpper.includes('GEMINI') || roleUpper.includes('GABRIEL') || roleUpper.includes('HDM') || roleUpper.includes('TORCH')) {

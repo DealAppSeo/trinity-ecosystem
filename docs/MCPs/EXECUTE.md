@@ -5,9 +5,9 @@
 3. Determine required artifact type (e.g., MD, PDF, code file).
 3. Perform substantive work — reference Bible/Blueprint context for ethics.
 4. **Create Artifact**:
-   - **USE YOUR TOOLS**: Call `write_file` (FileSystemMCP) to save your work to `artifacts/`.
-   - Filename format: `[PROJECT]_[TYPE]_[DATE].md` (e.g., `SocialMirror_SpecSheet_2025-01-05.md`).
-   - Content: Ensure full markdown formatting.
+   - **PRIMARY TOOL**: Call `save_artifact` (Implicit) to finalize your mission result. This ensures the artifact appears in the Library instantly.
+   - **SECONDARY TOOL**: Call `write_file` (FileSystemMCP) for internal drafts or large datasets. Always provide `taskId` to maintain the chain of trust.
+   - Filename/Title format: `[PROJECT] [TYPE] [DATE]` (e.g., `SocialMirror Design Doc 2025-01-05`).
 5. If evergreen, prepare data for next loop iteration.
 6. Enforce minimum duration per task type (e.g., research ≥10 min).
 

@@ -30,6 +30,9 @@ async function listColumns(table) {
 
 async function run() {
     await listColumns('trinity_agent_registry');
+    await listColumns('trinity_tasks');
+    await listColumns('trinity_artifacts');
+    await listColumns('trinity_heartbeat');
 }
 
 run();

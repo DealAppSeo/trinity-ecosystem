@@ -5,6 +5,8 @@ import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, AutonomyTier, Ag
 import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
 // Dynamic imports for graphology/fs handled inside methods to avoid build issues
 import { mcpManager } from '../mcp/MCPManager';
+import { IntelligenceRouter, PROVIDER_REGISTRY } from './IntelligenceRouter';
+import { EvolutionaryLogger } from './EvolutionaryLogger';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
@@ -110,6 +112,12 @@ export class ConstitutionalAgent {
     // Dynamic Directive
     systemPrompt: string | null = null;
 
+    // [PHASE 11] Intelligence Router
+    private router: IntelligenceRouter;
+
+    // [PHASE 12] Evolutionary Logger
+    private evolutionLogger: EvolutionaryLogger;
+
     // MCP Cache
     private mcpCache: Map<string, string> = new Map();
 
@@ -194,6 +202,8 @@ export class ConstitutionalAgent {
         this.researchTool = new WebResearchTool();
 
         this.availableProviders = this.detectProviders();
+        this.router = new IntelligenceRouter(this.name);
+        this.evolutionLogger = new EvolutionaryLogger(this.supabase, this.name);
         console.log(`[${this.name}] 🚀 Initialized v${this.version}`);
     }
 
@@ -473,6 +483,29 @@ export class ConstitutionalAgent {
 
         while (true) {
             try {
+                // [ANTIGRAVITY] STUCK TASK WATCHDOG: Release tasks stuck in 'doing' for > 15 mins
+                const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+                const { data: stuckTasks } = await this.supabase
+                    .from('trinity_tasks')
+                    .select('id, title')
+                    .eq('claimed_by', this.name)
+                    .in('status', ['doing', 'in_progress', 'running'])
+                    .lt('started_at', fifteenMinsAgo);
+
+                if (stuckTasks && stuckTasks.length > 0) {
+                    for (const stuck of stuckTasks) {
+                        console.log(`[${this.name}] 🚨 WATCHDOG: Task ${stuck.id} ("${stuck.title}") has STALLED. Releasing claim for escalation.`);
+                        await this.log('watchdog_release', `Releasing stalled task ${stuck.id}`, { taskId: stuck.id });
+                        await this.releaseClaim(stuck.id);
+
+                        // Escalate to pending_clarification if it stalled twice (simulated via metadata)
+                        await this.supabase.from('trinity_tasks').update({
+                            status: 'pending_clarification',
+                            result: `[WATCHDOG] Stalled during execution by ${this.name}. Possible provider hang or tool lock.`
+                        }).eq('id', stuck.id);
+                    }
+                }
+
                 // [ANTIGRAVITY] ANTI-HOARDING: Strict 1-Task busy lock & Sticky Claim Cleanup
                 const { data: activeClaims, count: activeCount } = await this.supabase
                     .from('trinity_tasks')
@@ -573,6 +606,26 @@ export class ConstitutionalAgent {
     async respawnEvergreen(original: Task) {
         if (!original.title.includes('[EVERGREEN]')) return;
 
+        // [PHASE 26] ENHANCED EVERGREEN CHAIN: Spawns until all agents have tried.
+        const { data: allAgents } = await this.supabase
+            .from('trinity_agent_registry')
+            .select('agent_name');
+
+        const agentList = allAgents?.map(a => a.agent_name) || [];
+        const completedBy = (original.metadata as any)?.completed_by_list || [];
+
+        // Add current completer if not already there
+        if (original.claimed_by && !completedBy.includes(original.claimed_by)) {
+            completedBy.push(original.claimed_by);
+        }
+
+        const remainingAgents = agentList.filter(name => !completedBy.includes(name));
+
+        if (remainingAgents.length === 0) {
+            console.log(`[${this.name}] 🏆 EVERGREEN EXHAUSTED: Every agent has completed "${original.title}".`);
+            return;
+        }
+
         // Clone the task for perpetual motion
         const newTask = {
             title: original.title,
@@ -581,12 +634,13 @@ export class ConstitutionalAgent {
             priority: original.priority || 50,
             status: 'pending',
             claimed_by: null,
-            assigned_to: original.assigned_to,
+            assigned_to: remainingAgents[0], // Pass it to the next agent in line
             created_at: new Date().toISOString(),
             metadata: {
                 ...(original.metadata as any || {}),
                 loop_generation: (original.metadata as any)?.loop_generation ? (original.metadata as any).loop_generation + 1 : 1,
-                previous_id: original.id
+                previous_id: original.id,
+                completed_by_list: completedBy
             }
         };
 
@@ -595,7 +649,7 @@ export class ConstitutionalAgent {
             .insert([newTask]);
 
         if (!error) {
-            console.log(`[${this.name}] ♻️  EVERGREEN RESPAWNED: ${original.title} (Gen: ${newTask.metadata.loop_generation})`);
+            console.log(`[${this.name}] ♻️  EVERGREEN RESPAWNED: ${original.title} (Gen: ${newTask.metadata.loop_generation}, Remaining: ${remainingAgents.length})`);
         } else {
             console.warn(`[${this.name}] ⚠️  Evergreen respawn failed:`, error.message);
         }
@@ -664,28 +718,36 @@ export class ConstitutionalAgent {
         const hasResult = task.result && task.result.length > 50;
         console.log(`[BFT] Found ${artifactCount} artifacts. Result present: ${!!hasResult}`);
 
-        // 2. PHI-WEIGHTED CONSISTENCY (Grok's Golden Ratio Consensus)
+        // 2. SUBJECTIVE LOGIC & PHI-WEIGHTED CONSISTENCY
         const phi = 1.618;
         const repFactor = (this.reputationScore || 50) / 100;
         const weight = Math.pow(phi, repFactor);
 
-        // [USER: ROBUST VERIFICATION]
-        // If no artifacts, allow verification based on the 'result' text.
-        let belief = (artifactCount > 0 || hasResult) ? 0.9 : 0.0;
-        let disbelief = (artifactCount === 0 && !hasResult) ? 1.0 : 0.1;
+        // [PHASE 10] CALCULATE BELIEF (b), DISBELIEF (d), UNCERTAINTY (u)
+        // b + d + u = 1
+        let belief = (artifactCount > 0) ? 0.7 : (hasResult ? 0.5 : 0.0);
+        let disbelief = (artifactCount === 0 && !hasResult) ? 0.9 : 0.1;
+
+        // Boost belief based on reputation weight
+        belief = Math.min(0.99, belief * weight);
+        disbelief = Math.max(0.01, disbelief / weight);
+        let uncertainty = Math.max(0.0, 1.0 - belief - disbelief);
 
         // Final aggregate logic (weighted influence)
-        const isVerified = (artifactCount > 0 || hasResult) && (belief * weight) > (disbelief * (1 / weight));
-        const newVerifyCount = ((task as Task & { verify_count?: number }).verify_count || 0) + 1;
-        const verifiers = ((task as Task & { verified_by?: string[] }).verified_by || []).concat(this.name);
+        const isVerified = (belief > disbelief) && (belief > 0.4);
+        const newVerifyCount = ((task as any).verify_count || 0) + 1;
+        const verifiers = ((task as any).verified_by || []).concat(this.name);
 
-        // 3. APPLY TRUNCATED BFT
+        // 3. APPLY BYZANTINE FAULT TOLERANCE (BFT)
         if (isVerified) {
-            console.log(`[BFT] ✅ Verified by ${this.name} (Weight: ${weight.toFixed(2)})`);
+            console.log(`[BFT] ✅ Verified by ${this.name} (b:${belief.toFixed(2)}, u:${uncertainty.toFixed(2)})`);
 
             await this.supabase.from('trinity_tasks').update({
                 verify_count: newVerifyCount,
                 verified_by: verifiers,
+                belief: belief,
+                disbelief: disbelief,
+                uncertainty: uncertainty,
                 status: newVerifyCount >= 2 ? 'verified' : 'done',
                 verified_at: newVerifyCount >= 2 ? new Date().toISOString() : null,
                 verification_result: `Verified via φ-weighted consensus by ${this.name}`,
@@ -825,7 +887,8 @@ export class ConstitutionalAgent {
             .from('trinity_tasks')
             .update({
                 status: 'pending',
-                claimed_by: null
+                claimed_by: null,
+                started_at: null // Clear started_at on release
             })
             .eq('id', taskId)
             .eq('claimed_by', this.name);
@@ -863,16 +926,28 @@ export class ConstitutionalAgent {
             this.sessionMetrics.tasksCompleted++; // Count it
         }
 
-        // Complete it immediately
-        await this.supabase
+        // [ANTIGRAVITY] ROBUST STATUS UPDATE
+        const { error: updateError } = await this.supabase
             .from('trinity_tasks')
             .update({
                 status: 'done', // v8.0: mark "done" to trigger BFT review
                 result: result,
                 claimed_by: this.name,
-                completed_at: new Date().toISOString()
+                completed_by: this.name, // Schema parity
+                agent_name: this.name,   // Schema parity
+                completed_at: new Date().toISOString(),
+                metadata: {
+                    processedBy: this.name,
+                    localEngine: true,
+                    timestamp: new Date().toISOString()
+                }
             })
             .eq('id', task.id);
+
+        if (updateError) {
+            console.error(`[${this.name}] ❌ Local task update failed:`, updateError.message);
+            throw new Error(`Local Update Failed: ${updateError.message}`);
+        }
 
         this.sessionMetrics.tasksCompleted++; // Count it
         return { success: true, llm_used: false };
@@ -915,18 +990,21 @@ export class ConstitutionalAgent {
 
             this.currentTaskId = String(task.id);
             const prompt = `
-[CONTEXT]
-${wisdomContext}
-${iterateProtocol}
-
-[INSTRUCTIONS]
-${task.description}
-
+### DIRECTIVE
 ${directive}
 ${actionDirective}
 
-Task: ${task.title}
-Please complete this task according to the Constitution. ALWAYS use the save_artifact tool to store your result.
+### INSTRUCTIONS
+${task.description}
+
+### CONTEXT
+${wisdomContext}
+${iterateProtocol}
+
+Task ID: ${task.id}
+Task Title: ${task.title}
+
+IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do not just talk about it. EXECUTE.
 `;
 
             // Call LLM
@@ -945,11 +1023,15 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
             if (lowBelief || explicitEscalate) {
                 console.log(`[ANTIGRAVITY] 🚨 UNCERTAINTY DETECTED (Score: ${evaluation.score}). Escalating to Architect...`);
 
-                await this.supabase.from('trinity_tasks').update({
+                const { error: escalateError } = await this.supabase.from('trinity_tasks').update({
                     status: 'pending_clarification',
                     result: `[ESCALATED] Agent ${this.name} is seeking clarification. \n\nReason: ${lowBelief ? 'Low certainty score' : 'Explicit escalation request'}. \n\nQuery: ${result.output.substring(0, 500)}`,
                     verification_result: `Searching high-dimension databases... seeking expert consensus.`
                 }).eq('id', task.id);
+
+                if (escalateError) {
+                    console.error(`[${this.name}] ❌ Escalation update failed:`, escalateError.message);
+                }
 
                 // Spawn "Question for Architect" artifact
                 const questionContent = `# Question for Architect \n\n**Agent**: ${this.name} \n**Task**: ${task.title} \n\n**The Right Question**: \n${result.output} \n\n---\n*The smartest person is not the one with all the answers, but the one asking the right questions.*`;
@@ -976,19 +1058,54 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
                 const artifactType = typeMap[task.task_type || ''] || 'text_content';
                 const dbArtifactLink = await this.saveArtifact(String(task.id), result.output, artifactType);
                 if (dbArtifactLink) externalArtifactUrl = dbArtifactLink;
+
+                // [PHASE 12] LOG CAUSE & EFFECT
+                await this.evolutionLogger.recordEvolution({
+                    intent: `Complete ${task.task_type} task: ${task.title}`,
+                    strategy: `LLM Processing (${(task as any).metadata?.provider_used || 'unknown'})`,
+                    action_details: {
+                        prompt_used: prompt.substring(0, 1000),
+                        output_received: result.output?.substring(0, 1000),
+                        artifact: dbArtifactLink
+                    },
+                    outcome: 'Success',
+                    effect_score: evaluation.score,
+                    learned_insight: `Task completed with score ${evaluation.score}. Provider: ${(task as any).metadata?.provider_used}.`,
+                    task_id: String(task.id)
+                });
             }
 
-            // [ANTIGRAVITY] MANDATORY ARTIFACT ENFORCEMENT
+            // [ANTIGRAVITY] MANDATORY ARTIFACT ENFORCEMENT & SMART PARSING
             if (!externalArtifactUrl) {
-                console.log(`[ANTIGRAVITY] 🛡️ No artifact produced for task ${task.id}.Auto - generating default report...`);
-                const reportContent = `# Task Completion Report: ${task.title} \n\n## Agent: ${this.name} \n## Result Summary\n${result.output} \n\n## Metadata\n - Priority: ${task.priority} \n - Type: ${task.task_type || 'General'} \n - Time: ${new Date().toISOString()} `;
-                const fallbackUrl = await this.saveArtifact(task.id, reportContent, 'report', `Report: ${task.title} `, 'protected');
+                console.log(`[ANTIGRAVITY] 🛡️ No artifact produced for task ${task.id}. Attempting smart-parse...`);
+
+                let extractedContent = result.output;
+                let artifactType = 'report';
+
+                // Try to extract code blocks
+                const codeBlockRegex = /```(?:\w+)?\n([\s\S]*?)```/g;
+                const matches = Array.from(result.output.matchAll(codeBlockRegex));
+
+                if (matches.length > 0) {
+                    console.log(`[ANTIGRAVITY] 📝 Extracted ${matches.length} code blocks from text.`);
+                    extractedContent = matches.map(m => m[1]).join('\n\n---\n\n');
+                    artifactType = 'code';
+                } else if (result.output.length > 500) {
+                    // If it's long but has no code blocks, treat as a document
+                    artifactType = 'document';
+                }
+
+                const reportContent = artifactType === 'code'
+                    ? extractedContent
+                    : `# ${task.title}\n\n${extractedContent}\n\n---\n*Generated via Smart-Parse Fallback by ${this.name}*`;
+
+                const fallbackUrl = await this.saveArtifact(task.id, reportContent, artifactType, `Result: ${task.title}`, 'protected');
                 if (fallbackUrl) externalArtifactUrl = fallbackUrl;
                 else console.warn(`[ANTIGRAVITY] ⚠️ Failed to save fallback artifact.`);
             }
 
             // Mark Completed
-            await this.supabase
+            const { error: doneError } = await this.supabase
                 .from('trinity_tasks')
                 .update({
                     status: 'done', // Moving to 'done' status for verification pipeline
@@ -996,19 +1113,26 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
                     result: result.output,
                     artifact_url: externalArtifactUrl,
                     completed_at: new Date().toISOString(),
+                    completed_by: this.name, // Satisfy newer schema columns
                     // SUBJECTIVE LOGIC: b+d+u=1
                     belief: evaluation.score / 100,
                     disbelief: evaluation.score < 50 ? (50 - evaluation.score) / 100 : 0,
                     uncertainty: evaluation.score > 90 ? 0.05 : 0.2,
-                    metadata: JSON.stringify({
-                        provider: 'openai',
+                    metadata: {
+                        provider: (task as any).metadata?.provider_used || 'unknown',
                         certainty: evaluation.score / 100,
                         evaluation: evaluation,
                         processedBy: this.name,
-                        version: this.version
-                    })
+                        version: this.version,
+                        tenacity_failover: !!(task as any).metadata?.provider_used && (task as any).metadata.provider_used !== 'openai'
+                    }
                 })
                 .eq('id', task.id);
+
+            if (doneError) {
+                console.error(`[${this.name}] ❌ Failed to mark task ${task.id} as 'done':`, doneError.message);
+                throw new Error(`Database Update Failed: ${doneError.message}`);
+            }
 
             // Log Benchmark Score if applicable (Training Loop)
             // 3. LOG BENCHMARK
@@ -1036,8 +1160,18 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
 
         } catch (err: any) {
             this.currentTaskId = null;
-            console.error(`[${this.name}] processTask failed: `, err.message);
-            await this.supabase.from('trinity_tasks').update({ status: 'failed', result: err.message, completed_at: new Date().toISOString() }).eq('id', task.id);
+            const errorMsg = err.message || String(err);
+            console.error(`[${this.name}] processTask failed: `, errorMsg);
+
+            // Log to agent logs for visibility
+            await this.log('task_failure', errorMsg, { taskId: task.id, title: task.title });
+
+            await this.supabase.from('trinity_tasks').update({
+                status: 'failed',
+                result: `ERROR: ${errorMsg}`,
+                completed_at: new Date().toISOString(),
+                completed_by: this.name
+            }).eq('id', task.id);
         }
     }
 
@@ -1057,124 +1191,27 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
             return;
         }
 
-        // 20% chance to simulate failure and trigger self-healing (PHASE 25)
+        // Chaos injection disabled to focus on simple bootstrapping
+        /*
         if (Math.random() < 0.2) {
-            console.log(`[CHAOS] 🌪️ Controlled failure injected to test swarm resilience...`);
-            await this.updateReputation(false, this.name, -5); // Test-slash
-
-            // Trigger self-diagnostic to "heal"
-            await this.runSelfDiagnostic();
-
-            // Trigger an internal ANFIS re-route sim if available
-            try {
-                const { ANFISRouter } = require('../ai/ANFISRouter');
-                const anfis = new ANFISRouter();
-                anfis.optimize(0.15);
-                console.log(`[ANFIS] 🧠 Self-healing: Logic re-optimized after chaos event.`);
-            } catch (e) { /* ignore */ }
-            return;
+            ...
         }
+        */
 
-        // [GROK: WAKE SLEEPING AGENTS]
-        // 50% chance to check for pending evergreen tasks if idle
+        // Automated task seeding disabled for bootstrapping phase
+        /*
         if (Math.random() < 0.5) {
-            console.log(`[IDLE] 🔍 Checking for pending evergreens...`);
-            const { data: evergreens } = await this.supabase
-                .from('trinity_tasks')
-                .select('*')
-                .eq('status', 'pending')
-                .ilike('title', '[EVERGREEN]%')
-                .limit(1);
-
-            if (evergreens && evergreens.length > 0) {
-                console.log(`[IDLE] 🌿 Resuming evergreen task: ${evergreens[0].title}`);
-                await this.processTask(evergreens[0]);
-                return;
-            } else {
-                // If NO evergreens exist, seed a high-priority system task to wake the swarm
-                console.log(`[IDLE] 🕯️ Swarm dormant. Seeding wake-up evergreen...`);
-                // await this.seedEvergreen(); (Method to be implemented or logic added here)
-                await this.supabase.from('trinity_tasks').insert({
-                    title: `[EVERGREEN] System Oversight & Swarm Health Audit`,
-                    description: `Automated maintenance run by ${this.name} to ensure ecosystem stability.`,
-                    task_type: 'maintenance',
-                    priority: 25,
-                    status: 'pending'
-                });
-            }
+            ...
         }
-
-        // 3. Auto-Seed Evergreen Task (Legacy "Internal Auction") - 30% chance if idle
-        // [ANTIGRAVITY] Shifted from "Internal Optimization" to "Visible Artifact Generation"
         if (Math.random() < 0.3) {
-            console.log(`[${this.name}] 💡 Generating Evergreen Content Task...`);
-            const topics = ['System Health', 'User Experience', 'Market Trends', 'Code Quality', 'Future Roadmap'];
-            const topic = topics[Math.floor(Math.random() * topics.length)];
-
-            await this.supabase.from('trinity_tasks').insert({
-                title: `[EVERGREEN] ${topic} Report`,
-                description: `Generate a brief ${topic} analysis report to demonstrate system activity.`,
-                task_type: 'content', // Explicitly 'content' to trigger artifact flow
-                assigned_to: this.name,
-                priority: 5, // Medium priority
-                status: 'pending'
-            });
+            ...
         }
+        */
     }
 
     async runWebAwareGenesis() {
-        try {
-            // A. Search for Trends (Rotating Topics from Phase 10)
-            const TOPICS = [
-                "LEGO equivariant GNN swarm control 2025",
-                "QMIX-GNN heterogeneous MARL 2025",
-                "relational GNN IoT swarm anomaly detection 2025",
-                "Web3 AI agent decentralized bidding optimization"
-            ];
-            const query = TOPICS[Math.floor(Math.random() * TOPICS.length)];
-
-            console.log(`[GENESIS] 🔍 Scanning: "${query}"...`);
-            const searchResults = await this.researchTool.searchWeb(query);
-
-            if (!searchResults || searchResults.length === 0) return;
-
-            // B. Parse Insights (Structured Output via Prompt)
-            const prompt = `
-            Analyze these search results about AI Swarms / GNNs:
-            ${JSON.stringify(searchResults.slice(0, 3))}
-
-            Identify 1 concrete "Genesis Task" for an autonomous agent swarm.
-Format as JSON: { "title": "...", "description": "...", "priority": 15 }
-`;
-
-            const analysis = await this.callLLM(prompt);
-
-            // Minimal Parsing (Robustness)
-            let taskIdea: any = null;
-            try {
-                const jsonMatch = analysis.output.match(/\{[\s\S]*\}/);
-                if (jsonMatch) taskIdea = JSON.parse(jsonMatch[0]);
-            } catch (e: any) {
-                console.warn(`[GENESIS] Failed to parse JSON: ${e.message} `);
-            }
-
-            // C. Seed Task
-            if (taskIdea && taskIdea.title) {
-                await this.supabase.from('trinity_tasks').insert({
-                    title: `[GENESIS - V2] ${taskIdea.title} `,
-                    description: `${taskIdea.description} \n\n[SOURCE]: Web Trend Scan`,
-                    task_type: 'research',
-                    assigned_to: this.name, // Self-claim
-                    priority: taskIdea.priority || 15,
-                    status: 'pending',
-                    metadata: { source: 'web-aware-idle', rep_trigger: this.reputationScore }
-                });
-                console.log(`[${this.name}] 🌱 Seeded Genesis - V2 task: ${taskIdea.title} `);
-            }
-
-        } catch (error: any) {
-            console.warn(`[GENESIS] Web Scan Failed: ${error.message} `);
-        }
+        // WebAware Genesis disabled for bootstrapping phase
+        return;
     }
 
     async spawnNextStep(originalTask: Task, result: string, evaluation: { score: number; handoff_required: boolean; handoff_to?: string }) {
@@ -2051,42 +2088,49 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 }
             });
 
-            // [ANTIGRAVITY] TIERED ROUTING & DIVERSIFIED VERIFICATION
-            const excludeProvider = (task as any).metadata?.creator_provider;
+            let sortedProviders = this.router.route(task as any, this.availableProviders);
+            const forcedModel = this.router.detectSpecializedRequest(task as any);
 
-            // Sort available providers by Tier
-            const sortedProviders = [...this.availableProviders]
-                .filter(p => p !== excludeProvider) // Diversify verification
-                .sort((a, b) => (LLM_TIERS[a] || 99) - (LLM_TIERS[b] || 99));
-
-            if (sortedProviders.length === 0 && this.availableProviders.length > 0) {
-                console.warn(`[${this.name}] ⚠️ All preferred providers excluded for verification diversity. Falling back to any available.`);
-                sortedProviders.push(...this.availableProviders);
+            // [LATENCY AS OPPORTUNITY]
+            if (prompt.includes('Slow / Complex') || prompt.includes('Score: 8')) {
+                sortedProviders = this.router.applyLatencyLogic(sortedProviders.map(p => ({ key: p })), 4000).map(c => c.key);
             }
 
             for (const providerKey of sortedProviders) {
                 try {
-                    console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey} (Tier: ${LLM_TIERS[providerKey] || '?'})...`);
-                    const result = await this.callSpecificProvider(providerKey, prompt, openAiTools);
+                    const providerInfo = PROVIDER_REGISTRY[providerKey];
+                    console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey} (Tier: ${providerInfo?.tier || '?'}${forcedModel ? `, Specialized: ${forcedModel}` : ''})...`);
 
-                    // Tag task with provider used for downstream verification logic
-                    if (task) {
-                        if (!task.metadata) task.metadata = JSON.stringify({});
-                        try {
-                            const meta = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata;
-                            meta.provider_used = providerKey;
-                            task.metadata = JSON.stringify(meta);
-                        } catch (e) {
-                            // Fallback if metadata is not valid JSON
+                    // [ANTIFRAGILE] PROVIDER TIMEOUT RACE (Tenacity v2)
+                    // If a specific provider takes > 120s, we trigger the switch to the next one.
+                    const providerResult = await Promise.race([
+                        this.callSpecificProvider(providerKey, prompt, openAiTools, forcedModel || undefined),
+                        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('PROVIDER_STALL')), 120000))
+                    ]);
+
+                    if (providerResult) {
+                        // Tag task with provider used for downstream verification logic
+                        if (task) {
+                            if (!task.metadata) task.metadata = JSON.stringify({});
+                            try {
+                                const meta = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata;
+                                meta.provider_used = providerKey;
+                                task.metadata = JSON.stringify(meta);
+                            } catch (e) { }
                         }
+                        return providerResult;
                     }
-
-                    return result;
                 } catch (e: any) {
-                    console.warn(`[${this.name}] ⚠️ ${providerKey} failed: ${e.message}`);
+                    const errorMsg = e.message === 'PROVIDER_STALL' ? 'STALLED (45s)' : e.message;
+                    console.warn(`[${this.name}] ⚠️ ${providerKey} ${errorMsg}. Rotating...`);
+                    await this.log('llm_failover', `${providerKey} failed or stalled: ${errorMsg}. Rotating...`, {
+                        error: errorMsg,
+                        provider: providerKey,
+                        taskId: task?.id
+                    });
                 }
             }
-            throw new Error('All LLM providers failed');
+            throw new Error('All LLM providers exhausted or stalled.');
         } catch (error: any) {
             const errorMsg = error instanceof Error ? error.message : String(error);
             console.error(`[${this.name}] 🚨 LLM Call Failed:`, errorMsg);
@@ -2098,7 +2142,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         }
     }
 
-    async callSpecificProvider(provider: string, prompt: string, tools: any[]): Promise<LLMResult> {
+    async callSpecificProvider(provider: string, prompt: string, tools: any[], modelOverride?: string): Promise<LLMResult> {
         const bible = await this.fetchBible();
         const systemPrompt = `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${bible}`;
 
@@ -2109,14 +2153,14 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
         let providerPromise: Promise<LLMResult>;
         if (provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools);
-        else if (provider === 'anthropic') providerPromise = this.callAnthropic(systemPrompt, prompt);
-        else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt);
-        else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt);
-        else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt);
-        else if (provider === 'cerebras') providerPromise = this.callCerebras(systemPrompt, prompt);
-        else if (provider === 'deepseek') providerPromise = this.callDeepSeek(systemPrompt, prompt);
-        else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt);
-        else if (provider === 'perplexity') providerPromise = this.callPerplexity(systemPrompt, prompt);
+        else if (provider === 'anthropic') providerPromise = this.callAnthropic(systemPrompt, prompt, tools);
+        else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt, tools);
+        else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt, tools);
+        else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt, tools);
+        else if (provider === 'cerebras') providerPromise = this.callCerebras(systemPrompt, prompt, tools);
+        else if (provider === 'deepseek') providerPromise = this.callDeepSeek(systemPrompt, prompt, tools);
+        else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt, tools, modelOverride);
+        else if (provider === 'perplexity') providerPromise = this.callPerplexity(systemPrompt, prompt, tools);
         else throw new Error(`Provider ${provider} not implemented`);
 
         return Promise.race([providerPromise, timeoutPromise]);
@@ -2183,100 +2227,257 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         throw new Error("Max tool recursion");
     }
 
-    async callAnthropic(system: string, prompt: string): Promise<LLMResult> {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
-            body: JSON.stringify({ model: 'claude-3-5-sonnet-latest', system, messages: [{ role: 'user', content: prompt }], max_tokens: 4000 })
-        });
-        const data = await response.json();
-        if (data.error) throw new Error(`Anthropic Error: ${data.error.message}`);
-        return { output: data.content[0].text };
+    async callAnthropic(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) throw new Error("ANTHROPIC_API_KEY is missing");
+
+        const anthropicTools = tools.map((tool: any) => ({
+            name: tool.function.name,
+            description: tool.function.description,
+            input_schema: tool.function.parameters
+        }));
+
+        const messages: any[] = [{ role: 'user', content: prompt }];
+
+        for (let i = 0; i < 5; i++) {
+            const body: any = {
+                model: 'claude-3-5-sonnet-20241022',
+                system,
+                messages,
+                max_tokens: 4000,
+                tools: anthropicTools.length > 0 ? anthropicTools : undefined
+            };
+
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify(body)
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(`Anthropic Error: ${JSON.stringify(data.error)}`);
+
+            const message = data;
+            messages.push({ role: 'assistant', content: message.content });
+
+            const toolCalls = message.content.filter((c: any) => c.type === 'tool_use');
+            if (toolCalls.length > 0) {
+                const toolResults = [];
+                for (const toolCall of toolCalls) {
+                    const fnName = toolCall.name;
+                    const args = toolCall.input;
+                    let toolResult = '';
+
+                    console.log(`[${this.name}] [Anthropic] Tool Call: ${fnName}`);
+
+                    if (fnName === 'save_artifact') {
+                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+                        const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                        toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
+                    } else {
+                        toolResult = await mcpManager.routeToolCall(fnName, args);
+                    }
+
+                    toolResults.push({
+                        type: 'tool_result',
+                        tool_use_id: toolCall.id,
+                        content: toolResult
+                    });
+                }
+                messages.push({ role: 'user', content: toolResults });
+            } else {
+                const textContent = message.content.find((c: any) => c.type === 'text');
+                return { output: textContent ? textContent.text : "" };
+            }
+        }
+        throw new Error("Max tool recursion");
     }
 
-    async callGemini(system: string, prompt: string): Promise<LLMResult> {
-        // [PHASE 26] Fail-Safe Gemini Flash (Low Latency)
-        const model = 'gemini-1.5-flash';
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: `${system}\n\n${prompt}` }] }] })
-        });
-        const data = await response.json();
-        if (data.error) throw new Error(`Gemini Error: ${data.error.message}`);
-        return { output: data.candidates[0].content.parts[0].text };
+    async callGemini(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) throw new Error("GEMINI_API_KEY is missing");
+
+        const model = 'gemini-1.5-flash-latest';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+        // Gemini Tools Schema
+        const geminiTools = tools.length > 0 ? [{
+            function_declarations: tools.map((tool: any) => ({
+                name: tool.function.name,
+                description: tool.function.description,
+                parameters: tool.function.parameters
+            }))
+        }] : undefined;
+
+        const contents: any[] = [{
+            role: 'user',
+            parts: [{ text: `System Instruction: ${system}\n\nUser Prompt: ${prompt}` }]
+        }];
+
+        for (let i = 0; i < 5; i++) {
+            const body = {
+                contents,
+                tools: geminiTools
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(`Gemini Error: ${JSON.stringify(data.error)}`);
+
+            if (!data.candidates || data.candidates.length === 0) {
+                console.error('[GEMINI] No candidates. Data:', JSON.stringify(data));
+                throw new Error('Gemini returned no candidates');
+            }
+
+            const candidate = data.candidates[0];
+            const parts = candidate.content.parts;
+            contents.push(candidate.content);
+
+            const toolCalls = parts.filter((p: any) => p.functionCall);
+            if (toolCalls.length > 0) {
+                const toolResponseParts = [];
+                for (const toolCall of toolCalls) {
+                    const fnName = toolCall.functionCall.name;
+                    const args = toolCall.functionCall.args;
+                    let toolResult = '';
+
+                    console.log(`[${this.name}] [Gemini] Tool Call: ${fnName}`);
+
+                    if (fnName === 'save_artifact') {
+                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+                        const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                        toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
+                    } else {
+                        toolResult = await mcpManager.routeToolCall(fnName, args);
+                    }
+
+                    toolResponseParts.push({
+                        functionResponse: {
+                            name: fnName,
+                            response: { content: toolResult }
+                        }
+                    });
+                }
+                contents.push({ role: 'function', parts: toolResponseParts });
+            } else {
+                const textPart = parts.find((p: any) => p.text);
+                return { output: textPart ? textPart.text : "" };
+            }
+        }
+        throw new Error("Max tool recursion");
     }
 
-    async callGrok(system: string, prompt: string): Promise<LLMResult> {
-        const response = await fetch('https://api.x.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROK_API_KEY}` },
-            body: JSON.stringify({ model: 'grok-beta', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
-        });
-        const data = await response.json();
-        return { output: data.choices[0].message.content };
+    async callGrok(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.x.ai/v1/chat/completions', process.env.GROK_API_KEY!, 'grok-beta', system, prompt, tools);
     }
 
-    async callGroq(system: string, prompt: string): Promise<LLMResult> {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
-            body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
-        });
-        const data = await response.json();
-        return { output: data.choices[0].message.content };
+    async callGroq(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', process.env.GROQ_API_KEY!, 'llama-3.3-70b-versatile', system, prompt, tools);
     }
 
-    async callCerebras(system: string, prompt: string): Promise<LLMResult> {
-        const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CEREBRAS_API_KEY}` },
-            body: JSON.stringify({ model: 'llama3.1-70b', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
-        });
-        const data = await response.json();
-        return { output: data.choices[0].message.content };
+    async callCerebras(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.cerebras.ai/v1/chat/completions', process.env.CEREBRAS_API_KEY!, 'llama3.1-70b', system, prompt, tools);
     }
 
-    async callDeepSeek(system: string, prompt: string): Promise<LLMResult> {
-        const response = await fetch('https://api.deepseek.com/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}` },
-            body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
-        });
-        const data = await response.json();
-        return { output: data.choices[0].message.content };
+    async callDeepSeek(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.deepseek.com/chat/completions', process.env.DEEPSEEK_API_KEY!, 'deepseek-chat', system, prompt, tools);
     }
 
-    async callOpenRouter(system: string, prompt: string): Promise<LLMResult> {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'trinity-symphony',
-                'X-Title': 'Trinity Symphony'
-            },
-            body: JSON.stringify({
-                model: 'anthropic/claude-3.5-sonnet', // High reliability fallback
-                messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }]
-            })
-        });
-        const data = await response.json();
-        return { output: data.choices[0].message.content };
+    async callOpenRouter(system: string, prompt: string, tools: any[] = [], modelOverride?: string): Promise<LLMResult> {
+        // [PHASE 10] OpenRouter defaults to DeepSeek-V3 for cost-performance arbitrage
+        // [PHASE 11] Intelligence Router can override with specialized models (Qwen, Mistral, Llama, etc.)
+        const model = modelOverride || process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
+        return this.callOpenAICompatible('https://openrouter.ai/api/v1/chat/completions', process.env.OPENROUTER_API_KEY!, model, system, prompt, tools);
     }
 
-    async callPerplexity(system: string, prompt: string): Promise<LLMResult> {
-        const response = await fetch('https://api.perplexity.ai/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}` },
-            body: JSON.stringify({
-                model: 'llama-3.1-sonar-large-128k-online',
-                messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }]
-            })
-        });
-        const data = await response.json();
-        return { output: data.choices[0].message.content };
+    async callPerplexity(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.perplexity.ai/chat/completions', process.env.PERPLEXITY_API_KEY!, 'llama-3.1-sonar-large-128k-online', system, prompt, tools);
+    }
+
+    async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[]): Promise<LLMResult> {
+        const messages: any[] = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+        ];
+
+        for (let i = 0; i < 5; i++) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'trinity-symphony',
+                        'X-Title': 'Trinity Symphony'
+                    },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        model,
+                        messages,
+                        tools: tools.length > 0 ? tools : undefined,
+                        tool_choice: tools.length > 0 ? 'auto' : undefined
+                    })
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error (${model}): ${errorText}`);
+                }
+
+                const data = await response.json();
+                const message = data.choices[0].message;
+                messages.push(message);
+
+                if (message.tool_calls) {
+                    for (const toolCall of message.tool_calls) {
+                        const fnName = toolCall.function.name;
+                        const args = JSON.parse(toolCall.function.arguments);
+                        let toolResult = '';
+
+                        console.log(`[${this.name}] [${model}] Tool Call: ${fnName}`);
+
+                        if (fnName === 'save_artifact') {
+                            const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+                            const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                            toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
+                        } else {
+                            toolResult = await mcpManager.routeToolCall(fnName, args);
+                        }
+                        messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
+                    }
+                } else {
+                    // [PHASE 10] Smart-Parse Artifact Fallback
+                    const content = message.content || "";
+                    if (content.includes('```md') || content.includes('# Artifact')) {
+                        console.log(`[${this.name}] 🧪 Smart-Parse Artifact detected in raw output.`);
+                        const titleMatch = content.match(/# (.*?)\n/) || content.match(/Title: (.*?)\n/);
+                        const title = titleMatch ? titleMatch[1] : `Report from ${this.name}`;
+                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+                        await this.saveArtifact(taskId, content, 'report', title, 'protected');
+                    }
+                    return { output: content };
+                }
+            } catch (err: any) {
+                clearTimeout(timeoutId);
+                if (err.name === 'AbortError') throw new Error(`LLM API Timeout (${model})`);
+                throw err;
+            }
+        }
+        throw new Error("Max tool recursion");
     }
 
     // ============================================

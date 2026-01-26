@@ -9,7 +9,7 @@ const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVIC
 const supabase = createClient(url, key);
 
 async function run() {
-    console.log('--- Searching for "docs" in any column ---');
+    console.log('--- Analyzing Task Statuses ---');
     const { data, error } = await supabase
         .from('trinity_tasks')
         .select('*');
@@ -19,16 +19,34 @@ async function run() {
         return;
     }
 
-    console.log(`Checking ${data.length} tasks...`);
+    const stats = {
+        pending: 0,
+        doing: 0,
+        done: 0,
+        verify: 0,
+        pending_clarification: 0,
+        other: 0
+    };
+
+    console.log(`Analyzing ${data.length} tasks...`);
     data.forEach(t => {
-        const matches = Object.entries(t).filter(([k, v]) =>
-            v && typeof v === 'string' && v.toLowerCase().includes('docs')
-        );
-        if (matches.length > 0) {
-            console.log(`\nTask ID: ${t.id} (Status: ${t.status})`);
-            matches.forEach(([k, v]) => console.log(`  - Found in [${k}]: "${v}"`));
-            console.log(`  - artifact_url: ${t.artifact_url}`);
+        stats[t.status] = (stats[t.status] || 0) + 1;
+
+        if (['done', 'verify'].includes(t.status) && !t.artifact_url) {
+            console.log(`[WARNING] Task ${t.id} (${t.status}) has no artifact_url! Title: ${t.title}`);
         }
+    });
+
+    console.log('\nTask Status Counts:');
+    console.table(stats);
+
+    console.log('\n--- Recent Tasks in Flight ---');
+    const recent = data
+        .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
+        .slice(0, 10);
+
+    recent.forEach(t => {
+        console.log(`[${t.status}] ${t.title} (ID: ${t.id}, Assigned: ${t.assigned_to})`);
     });
 }
 
