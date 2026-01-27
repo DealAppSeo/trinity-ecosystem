@@ -2200,13 +2200,22 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
                 if (!response.ok) throw new Error(await response.text());
                 const data = await response.json();
+                if (data.error) throw new Error(`OpenAI Error: ${JSON.stringify(data.error)}`);
+                if (!data.choices || data.choices.length === 0) throw new Error("OpenAI returned no choices");
+
                 const message = data.choices[0].message;
                 messages.push(message);
 
                 if (message.tool_calls) {
                     for (const toolCall of message.tool_calls) {
                         const fnName = toolCall.function.name;
-                        const args = JSON.parse(toolCall.function.arguments);
+                        let args: any;
+                        try {
+                            args = JSON.parse(toolCall.function.arguments);
+                        } catch (e) {
+                            console.error(`[${this.name}] ❌ Failed to parse tool arguments from OpenAI:`, toolCall.function.arguments);
+                            continue;
+                        }
                         let toolResult = '';
                         if (fnName === 'save_artifact') {
                             const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
@@ -2270,10 +2279,10 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             const message = data;
             messages.push({ role: 'assistant', content: message.content });
 
-            const toolCalls = message.content.filter((c: any) => c.type === 'tool_use');
-            if (toolCalls.length > 0) {
+            const resultParts = message.content.filter((c: any) => c.type === 'tool_use');
+            if (resultParts.length > 0) {
                 const toolResults = [];
-                for (const toolCall of toolCalls) {
+                for (const toolCall of resultParts) {
                     const fnName = toolCall.name;
                     const args = toolCall.input;
                     let toolResult = '';
@@ -2285,7 +2294,12 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
                         toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
                     } else {
-                        toolResult = await mcpManager.routeToolCall(fnName, args);
+                        try {
+                            toolResult = await mcpManager.routeToolCall(fnName, args);
+                        } catch (e) {
+                            console.error(`[${this.name}] [Anthropic] ❌ Tool execution failed:`, e);
+                            toolResult = `Error: Tool execution failed.`;
+                        }
                     }
 
                     toolResults.push({
@@ -2363,7 +2377,12 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
                         toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
                     } else {
-                        toolResult = await mcpManager.routeToolCall(fnName, args);
+                        try {
+                            toolResult = await mcpManager.routeToolCall(fnName, args);
+                        } catch (e) {
+                            console.error(`[${this.name}] [Gemini] ❌ Tool execution failed:`, e);
+                            toolResult = `Error: Tool execution failed.`;
+                        }
                     }
 
                     toolResponseParts.push({
@@ -2439,19 +2458,26 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
                 clearTimeout(timeoutId);
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`API Error (${model}): ${errorText}`);
+                const data = await response.json();
+                if (data.error) throw new Error(`API Error (${model}): ${JSON.stringify(data.error)}`);
+                if (!data.choices || data.choices.length === 0) {
+                    console.error(`[COMPATIBLE] No choices for ${model}. Data:`, JSON.stringify(data));
+                    throw new Error(`API Error (${model}): No choices returned in response.`);
                 }
 
-                const data = await response.json();
                 const message = data.choices[0].message;
                 messages.push(message);
 
                 if (message.tool_calls) {
                     for (const toolCall of message.tool_calls) {
                         const fnName = toolCall.function.name;
-                        const args = JSON.parse(toolCall.function.arguments);
+                        let args: any;
+                        try {
+                            args = JSON.parse(toolCall.function.arguments);
+                        } catch (e) {
+                            console.error(`[${this.name}] [${model}] ❌ Failed to parse tool arguments:`, toolCall.function.arguments);
+                            continue;
+                        }
                         let toolResult = '';
 
                         console.log(`[${this.name}] [${model}] Tool Call: ${fnName}`);
@@ -2461,7 +2487,12 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                             const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
                             toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
                         } else {
-                            toolResult = await mcpManager.routeToolCall(fnName, args);
+                            try {
+                                toolResult = await mcpManager.routeToolCall(fnName, args);
+                            } catch (e) {
+                                console.error(`[${this.name}] [${model}] ❌ Tool execution failed:`, e);
+                                toolResult = `Error: Tool execution failed.`;
+                            }
                         }
                         messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
                     }
