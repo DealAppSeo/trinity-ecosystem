@@ -22,7 +22,8 @@
     "train-agents": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/train-agents.ts",
     "test-swarm": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/test-swarm.ts",
     "scheduler": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/scheduler.ts",
-    "wake-monitor": "npx tsx scripts/wake-monitor.ts"
+    "wake-monitor": "npx tsx scripts/wake-monitor.ts",
+    "infra-heartbeat": "npx tsx scripts/service-heartbeat.ts"
   },
   "dependencies": {
     "@trinity/agent-core": "file:./packages/agent-core",

@@ -507,32 +507,35 @@ export class ConstitutionalAgent {
                 }
 
                 // [ANTIGRAVITY] ANTI-HOARDING: Strict 1-Task busy lock & Sticky Claim Cleanup
-                const { data: activeClaims, count: activeCount } = await this.supabase
+                const { data: allClaims } = await this.supabase
                     .from('trinity_tasks')
-                    .select('id, status', { count: 'exact' })
+                    .select('*')
                     .eq('claimed_by', this.name);
 
-                if (activeCount && activeCount > 0) {
-                    for (const claim of activeClaims!) {
-                        const isActive = ['doing', 'in_progress', 'running'].includes(claim.status);
-                        // If we "own" a task that isn't active, release it (Sticky Claim Cleanup)
-                        if (!isActive) {
-                            console.log(`[${this.name}] 🧹 Cleaning sticky claim on task ${claim.id} (Status: ${claim.status})`);
-                            await this.releaseClaim(claim.id);
-                        }
+                if (allClaims && allClaims.length > 0) {
+                    // 1. Separate Active from Stagnant/Finished
+                    const activeClaims = allClaims.filter(c => ['doing', 'in_progress', 'running', 'pending_clarification'].includes(c.status));
+                    const finishedClaims = allClaims.filter(c => !['doing', 'in_progress', 'running', 'pending_clarification'].includes(c.status));
+
+                    // 2. Cleanup Finished (Sticky Claims)
+                    for (const finished of finishedClaims) {
+                        console.log(`[${this.name}] 🧹 Cleaning sticky claim on task ${finished.id} (Status: ${finished.status})`);
+                        await this.releaseClaim(finished.id);
                     }
 
-                    // After cleanup, check if we still have an active task
-                    const { data: validActive } = await this.supabase
-                        .from('trinity_tasks')
-                        .select('*')
-                        .eq('claimed_by', this.name)
-                        .in('status', ['doing', 'in_progress', 'running'])
-                        .maybeSingle();
+                    // 3. Throttle Active (Anti-Hoarding)
+                    if (activeClaims.length > 0) {
+                        // If we have more than 1, release all but the first (Keep the "primary" focus)
+                        if (activeClaims.length > 1) {
+                            console.warn(`[${this.name}] 🚨 HOARDING DETECTED: ${activeClaims.length} active tasks found. Releasing duplicates.`);
+                            for (let i = 1; i < activeClaims.length; i++) {
+                                await this.releaseClaim(activeClaims[i].id);
+                            }
+                        }
 
-                    if (validActive) {
-                        console.log(`[${this.name}] 🚀 FOCUS: Resuming active task ${validActive.id} (${validActive.status})...`);
-                        await this.processTask(validActive as any);
+                        const focusTask = activeClaims[0];
+                        console.log(`[${this.name}] 🚀 FOCUS: Resuming active task ${focusTask.id} (${focusTask.status})...`);
+                        await this.processTask(focusTask as any);
                         continue;
                     }
                 }
@@ -902,10 +905,13 @@ export class ConstitutionalAgent {
 
     canHandleLocally(task: Task) {
         const localTypes = ['self-healing', 'system', 'wake', 'heartbeat', 'meta', 'status_check'];
-        const localTitles = ['[HEALING]', '[WAKE]', '[SYSTEM]', '[HEARTBEAT]'];
+        const localTitles = ['[HEALING]', '[WAKE]', '[SYSTEM]', '[HEARTBEAT]', '[CLEANUP]', '[PULSE]'];
 
-        if (task.task_type && localTypes.includes(task.task_type)) return true;
-        if (task.title && localTitles.some(t => task.title.includes(t))) return true;
+        const type = task.task_type?.toLowerCase();
+        const title = task.title?.toUpperCase();
+
+        if (type && localTypes.includes(type)) return true;
+        if (title && localTitles.some(t => title.includes(t))) return true;
         return false;
     }
 

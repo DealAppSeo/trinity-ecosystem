@@ -1,18 +1,66 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Literal, Optional, Dict, Union
 import os
 import logging
+import asyncio
+from datetime import datetime
+from supabase import create_client, Client
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("trinity-science")
+
+# --- HEARTBEAT LOGIC ---
+SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+
+async def run_heartbeat():
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        logger.warning("Supabase credentials missing. Heartbeat disabled.")
+        return
+
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    service_name = "trinity-science"
+    
+    while True:
+        try:
+            now = datetime.utcnow().isoformat()
+            # 1. Update Registry
+            supabase.table("trinity_agent_registry").upsert({
+                "agent_name": service_name,
+                "status": "online",
+                "last_active": now,
+                "squad": "INFRA",
+                "current_tier": "BRAIN",
+                "current_task_summary": f"[SERVICE] Brain processing enabled. v0.1.0",
+                "reputation_score": 100
+            }).execute()
+
+            # 2. Update Heartbeat
+            supabase.table("trinity_heartbeat").upsert({
+                "agent": service_name,
+                "status": "active",
+                "last_seen": now,
+                "version": "8.1.5-System-Py"
+            }).execute()
+            
+            # logger.info(f"Pulse sent for {service_name}")
+        except Exception as e:
+            logger.error(f"Heartbeat failed: {str(e)}")
+        
+        await asyncio.sleep(30)
 
 app = FastAPI(
     title="Trinity Science Division",
     description="Python Microservice for GNN and ANFIS operations",
     version="0.1.0"
 )
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(run_heartbeat())
+    logger.info("Science Brain Heartbeat Started.")
 
 # --- CORS ---
 from fastapi.middleware.cors import CORSMiddleware

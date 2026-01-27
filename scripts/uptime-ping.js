@@ -15,35 +15,23 @@ const AGENTS = [
 ];
 
 async function pingAgents() {
-    console.log(`[${new Date().toISOString()}] ☀️ Swarm Wake-Up Initiated (Universal Alignment)...`);
+    console.log(`[${new Date().toISOString()}] ☀️ Zero-Cost Swarm Wake-Up (Registry Pulse)...`);
 
-    // Insert Heartbeat tasks for each agent to force them to wake and claim
-    const pings = AGENTS.map(agentName => ({
-        title: `[HEARTBEAT] System Keep-Alive`,
-        description: 'Automated heartbeat to prevent agent idling and verify naming alignment.',
-        task_type: 'heartbeat',
-        priority: 5,
-        assigned_to: null, // Open market - pull model
-        status: 'pending'
-    }));
-
-    // Use upsert or just insert - we want fresh tasks
-    const { error } = await supabase.from('trinity_tasks').insert(pings);
-
-    if (error) {
-        console.error('❌ Error sending keep-alive pings:', error.message);
-    } else {
-        console.log(`✅ Successfully sent ${AGENTS.length} keep-alive tasks to the swarm.`);
-    }
-
-    // Force Registry Status for missing heartbeats
+    // [ANTIGRAVITY] Task-less Waking: We update the registry directly 
+    // to trigger the Railway container restart/health check without creating LLM tasks.
     const { error: regError } = await supabase
         .from('trinity_agent_registry')
-        .update({ last_active: new Date().toISOString() })
+        .update({
+            last_active: new Date().toISOString(),
+            status: 'online', // Ensure they show as online
+            current_task_summary: '[WAKE] Receiving system pulse via UptimeRobot.'
+        })
         .in('agent_name', AGENTS);
 
     if (regError) {
         console.error('❌ Error updating registry timestamps:', regError.message);
+    } else {
+        console.log(`✅ Successfully pulsed ${AGENTS.length} agents in the registry.`);
     }
 }
 
