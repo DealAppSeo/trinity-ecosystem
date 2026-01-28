@@ -1,0 +1,123 @@
+{
+    "name": "Trinity Genesis Artifact Generator",
+    "nodes": [
+        {
+            "id": "artifact-webhook",
+            "type": "n8n-nodes-base.webhook",
+            "name": "Genesis Artifact Request",
+            "parameters": {
+                "path": "genesis-artifact",
+                "httpMethod": "POST",
+                "responseMode": "onReceived"
+            },
+            "position": [
+                100,
+                300
+            ]
+        },
+        {
+            "id": "router",
+            "type": "n8n-nodes-base.if",
+            "name": "Route by Type",
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{ $json.type }}",
+                            "value2": "design"
+                        }
+                    ]
+                }
+            },
+            "position": [
+                320,
+                300
+            ]
+        },
+        {
+            "id": "v0-creation",
+            "type": "n8n-nodes-base.httpRequest",
+            "name": "v0.dev UI Mockup (Mock)",
+            "parameters": {
+                "method": "POST",
+                "url": "https://v0.dev/api/generate",
+                "body": {
+                    "prompt": "={{ $json.description }}",
+                    "theme": "dark"
+                }
+            },
+            "position": [
+                540,
+                200
+            ]
+        },
+        {
+            "id": "google-docs",
+            "type": "n8n-nodes-base.googleDocs",
+            "name": "Create Report",
+            "parameters": {
+                "operation": "create",
+                "title": "={{ $json.title }}",
+                "content": "={{ $json.content }}",
+                "folderId": "TRINITY_REPORTS_FOLDER_ID"
+            },
+            "position": [
+                540,
+                400
+            ]
+        },
+        {
+            "id": "supabase-notify",
+            "type": "n8n-nodes-base.supabase",
+            "name": "Register Artifact",
+            "parameters": {
+                "operation": "insert",
+                "table": "trinity_artifacts",
+                "additionalFields": {
+                    "title": "={{ $json.title }}",
+                    "content": "={{ $json.text_content || $json.body }}",
+                    "artifact_type": "={{ $json.type }}",
+                    "url": "={{ $json.webViewLink || $json.url }}",
+                    "creator_agent": "n8n-genesis-loop"
+                }
+            },
+            "position": [
+                800,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "artifact-webhook": {
+            "main": [
+                [
+                    "router"
+                ]
+            ]
+        },
+        "router": {
+            "main": [
+                [
+                    "v0-creation"
+                ],
+                [
+                    "google-docs"
+                ]
+            ]
+        },
+        "v0-creation": {
+            "main": [
+                [
+                    "supabase-notify"
+                ]
+            ]
+        },
+        "google-docs": {
+            "main": [
+                [
+                    "supabase-notify"
+                ]
+            ]
+        }
+    }
+}

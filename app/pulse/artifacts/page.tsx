@@ -8,6 +8,7 @@ import { FileCode, FileText, Image, FileSpreadsheet, Share2, Download, Eye, Lock
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { RegistrationModal, UnlockModal } from '@/components/AccessModals';
+import ArtifactContent from '@/components/ArtifactContent';
 
 interface Artifact {
     id: string;
@@ -297,7 +298,7 @@ export default function ArtifactsPage() {
                             <button onClick={() => setSelectedArtifact(null)} className="text-gray-400 hover:text-white p-2">✕</button>
                         </div>
                         <div className="bg-[#0B0B0F] p-6 rounded-lg font-mono text-sm text-gray-300 whitespace-pre-wrap overflow-auto flex-1 border border-white/5">
-                            {selectedArtifact.content}
+                            <ArtifactContent content={selectedArtifact.content} type={selectedArtifact.type} />
                         </div>
                     </div>
                 </div>

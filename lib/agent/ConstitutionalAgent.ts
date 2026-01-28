@@ -592,9 +592,8 @@ export class ConstitutionalAgent {
                 // IDLE STATE — Maintenance & Genesis
                 // ──────────────────────────────────────────────────────
                 if (!taskHandled) {
-                    console.log(`[${this.name}] 🌙 Swarm Idle — running maintenance checks...`);
-                    await this.runIdleLoop();
-                    if (Math.random() < 0.15) await this.runWebAwareGenesis();
+                    console.log(`[${this.name}] 🌙 Swarm Genesis — entering proactive discovery mode...`);
+                    await this.runGenesisLoop();
                 }
 
                 await this.heartbeat();
@@ -1080,9 +1079,12 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                 return { success: true, llm_used: true, escalated: true };
             }
 
-            let externalArtifactUrl = '';
-            // Artifact Logic
-            if ((task.task_type && ['content', 'research', 'code', 'design', 'data', 'report'].includes(task.task_type)) || task.requires_external_artifact) {
+            let externalArtifactUrl = result.artifactLinks && result.artifactLinks.length > 0
+                ? result.artifactLinks[0]
+                : '';
+
+            // [ANTIGRAVITY] Artifact Logic: Only save summary if NO artifact link was returned by LLM
+            if (!externalArtifactUrl && ((task.task_type && ['content', 'research', 'code', 'design', 'data', 'report'].includes(task.task_type)) || task.requires_external_artifact)) {
                 // [ANTIGRAVITY] Map task_type to artifact type
                 const typeMap: Record<string, string> = {
                     'code': 'code',
@@ -1096,7 +1098,7 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                 const dbArtifactLink = await this.saveArtifact(String(task.id), result.output, artifactType);
                 if (dbArtifactLink) externalArtifactUrl = dbArtifactLink;
 
-                // [PHASE 12] LOG CAUSE & EFFECT
+                // [PHASE 12] LOG CAUSE & EFFECT (Only for auto-generated artifacts)
                 await this.evolutionLogger.recordEvolution({
                     intent: `Complete ${task.task_type} task: ${task.title}`,
                     strategy: `LLM Processing (${(task as any).metadata?.provider_used || 'unknown'})`,
@@ -1216,13 +1218,13 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
     // EVERGREEN LIFE CYCLE (Phase 9)
     // ============================================
 
-    async runIdleLoop() {
-        console.log(`[${this.name}] 🌬️ Entering Evergreen Idle Mode (Web-Aware)...`);
+    async runGenesisLoop() {
+        console.log(`[${this.name}] 🌬️ Entering Genesis Mode (Proactive)...`);
 
         // 1. Check for pending work first (Be productive)
         const unclaimed = await this.getNextTask(false);
         if (unclaimed) {
-            console.log(`[IDLE] 🌿 Found pending task: ${unclaimed.title}. Resuming work.`);
+            console.log(`[GENESIS] 🌿 Found pending task: ${unclaimed.title}. Resuming work.`);
             await this.processTask(unclaimed);
             return;
         }
@@ -1240,9 +1242,39 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
             await this.retrospective();
         }
 
-        // 4. Web-Aware Genesis (O(1) World Sync)
-        if (Math.random() < 0.05) {
+        // 4. Proactive Market Seeding (Genesis)
+        if (Math.random() < 0.2) {
             await this.runWebAwareGenesis();
+        }
+
+        // 5. System Optimization (Maintenance)
+        if (Math.random() < 0.1) {
+            await this.spawnMaintenanceTask();
+        }
+    }
+
+    async spawnMaintenanceTask() {
+        console.log(`[${this.name}] 🛠️ Seeding maintenance task...`);
+        const maintenanceTasks = [
+            { title: '[MAINTENANCE] Audit recent RepID updates', description: 'Review recent reputation changes for BFT compliance.' },
+            { title: '[MAINTENANCE] Clean up artifact noise', description: 'Identify and flag redundant or low-quality artifacts.' },
+            { title: '[MAINTENANCE] Optimize agent health scores', description: 'Review long-term health trends across the swarm.' },
+            { title: '[MAINTENANCE] Cache optimization', description: 'Review Redis usage and suggest eviction strategies.' }
+        ];
+
+        const selected = maintenanceTasks[Math.floor(Math.random() * maintenanceTasks.length)];
+
+        try {
+            await this.supabase.from('trinity_tasks').insert([{
+                ...selected,
+                status: 'pending',
+                task_type: 'genesis',
+                priority: 3,
+                metadata: { source: 'maintenance_genesis', agent: this.name }
+            }]);
+            console.log(`[GENESIS] 🛠️ Maintenance seeded: ${selected.title}`);
+        } catch (e) {
+            console.warn(`[GENESIS] Maintenance seeding failed:`, e);
         }
     }
 
@@ -1250,16 +1282,17 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
         console.log(`[${this.name}] 🌍 Commencing Web-Aware Genesis...`);
         try {
             // Research a trending topic in AI/Web3/Ethics
-            const topics = ['AI Agent Orchestration', 'DeFi Security Trends', 'Constitutional AI best practices', 'HyperDAG architecture'];
+            const topics = ['AI Agent Orchestration', 'DeFi Security Trends', 'Constitutional AI best practices', 'HyperDAG architecture', 'X Arbitrage Semantic Analysis'];
             const topic = topics[Math.floor(Math.random() * topics.length)];
 
-            const results = await this.researchTool.searchWeb(`Latest trends and breakthroughs in ${topic} 2026`);
+            const results = await this.researchTool.searchWeb(`Latest trends and breakthroughs in ${topic} January 2026`);
             const context = JSON.stringify(results.slice(0, 2));
 
-            const prompt = `Based on these recent trends, propose ONE high-priority task for the Trinity Swarm to increase its resourcefulness or capabilities.\n\nTrend Context: ${context}\n\nReturn JSON: { "title": "[GENESIS] ...", "description": "...", "priority": 80 }`;
+            const prompt = `Based on these recent trends, propose ONE high-priority task for the Trinity Swarm to increase its resourcefulness or market edge.\n\nTrend Context: ${context}\n\nReturn JSON ONLY: { "title": "[GENESIS] ...", "description": "...", "priority": 80 }`;
 
             const proposal = await this.callLLM(prompt);
-            const taskObj = JSON.parse(proposal.output.replace(/```json/g, '').replace(/```/g, ''));
+            const jsonMatch = proposal.output.match(/\{[\s\S]*\}/);
+            const taskObj = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
 
             if (taskObj && taskObj.title) {
                 await this.supabase.from('trinity_tasks').insert([{
@@ -1268,10 +1301,10 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                     task_type: 'genesis',
                     metadata: { source: 'web_aware_genesis', agent: this.name }
                 }]);
-                console.log(`[IDLE] ✨ Genesis spawned new mission: ${taskObj.title}`);
+                console.log(`[GENESIS] ✨ spawned new mission: ${taskObj.title}`);
             }
         } catch (e) {
-            console.warn(`[IDLE] Web-Aware Genesis failed:`, e);
+            console.warn(`[GENESIS] Web-Aware Genesis failed:`, e);
         }
     }
 
@@ -2359,8 +2392,9 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         let toolResult = '';
                         if (fnName === 'save_artifact') {
                             const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-                            await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
-                            toolResult = `Artifact '${args.title}' saved.`;
+                            const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                            artifactLinks.push(link);
+                            toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
                         }
                         else {
                             toolResult = await mcpManager.routeToolCall(fnName, args);
@@ -2368,7 +2402,10 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
                     }
                 } else {
-                    return { output: message.content || "" };
+                    return {
+                        output: message.content || "",
+                        artifactLinks: artifactLinks
+                    };
                 }
             } catch (err: any) {
                 clearTimeout(timeoutId);
@@ -2393,6 +2430,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         }));
 
         const messages: any[] = [{ role: 'user', content: prompt }];
+
+        const artifactLinks: string[] = [];
 
         for (let i = 0; i < 5; i++) {
             const body: any = {
@@ -2432,6 +2471,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     if (fnName === 'save_artifact') {
                         const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
                         const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                        artifactLinks.push(link);
                         toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
                     } else {
                         try {
@@ -2451,7 +2491,10 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 messages.push({ role: 'user', content: toolResults });
             } else {
                 const textContent = message.content.find((c: any) => c.type === 'text');
-                return { output: textContent ? textContent.text : "" };
+                return {
+                    output: textContent ? textContent.text : "",
+                    artifactLinks: artifactLinks
+                };
             }
         }
         throw new Error("Max tool recursion");
@@ -2478,6 +2521,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             parts: [{ text: `System Instruction: ${system}\n\nUser Prompt: ${prompt}` }]
         }];
 
+        const artifactLinks: string[] = [];
         for (let i = 0; i < 5; i++) {
             const body = {
                 contents,
@@ -2515,6 +2559,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     if (fnName === 'save_artifact') {
                         const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
                         const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                        artifactLinks.push(link);
                         toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
                     } else {
                         try {
@@ -2535,7 +2580,10 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 contents.push({ role: 'function', parts: toolResponseParts });
             } else {
                 const textPart = parts.find((p: any) => p.text);
-                return { output: textPart ? textPart.text : "" };
+                return {
+                    output: textPart ? textPart.text : "",
+                    artifactLinks: artifactLinks
+                };
             }
         }
         throw new Error("Max tool recursion");
@@ -2625,6 +2673,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         if (fnName === 'save_artifact') {
                             const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
                             const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                            artifactLinks.push(link);
                             toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
                         } else {
                             try {
@@ -2643,10 +2692,13 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         console.log(`[${this.name}] 🧪 Smart-Parse Artifact detected in raw output.`);
                         const titleMatch = content.match(/# (.*?)\n/) || content.match(/Title: (.*?)\n/);
                         const title = titleMatch ? titleMatch[1] : `Report from ${this.name}`;
-                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-                        await this.saveArtifact(taskId, content, 'report', title, 'protected');
+                        const link = await this.saveArtifact(taskId, content, 'report', title, 'protected');
+                        artifactLinks.push(link);
                     }
-                    return { output: content };
+                    return {
+                        output: content,
+                        artifactLinks: artifactLinks
+                    };
                 }
             } catch (err: any) {
                 clearTimeout(timeoutId);

@@ -9,6 +9,7 @@ import { useTrinityController } from '@/hooks/useTrinityController';
 import { TaskRecord } from '@/lib/agent/types';
 import { useToast } from '@/components/ui/Toast';
 import { UnlockModal, RegistrationModal } from '@/components/AccessModals';
+import ArtifactContent from '@/components/ArtifactContent';
 
 export default function TasksPage() {
     const { tasks: initialTasks, refresh } = useTrinityController();
@@ -27,6 +28,9 @@ export default function TasksPage() {
     // Clarification Modal States
     const [clarifyTask, setClarifyTask] = useState<TaskRecord | null>(null);
     const [clarification, setClarification] = useState('');
+
+    // Spreadsheet / Archive Explorer
+    const [explorerType, setExplorerType] = useState<'failed' | 'archived' | null>(null);
 
     useEffect(() => {
         if (localStorage.getItem('trinity_registration')) {
@@ -102,23 +106,23 @@ export default function TasksPage() {
         }
     };
 
-    const deleteTask = async (taskId: string) => {
-        if (!confirm('Are you sure you want to delete this task?')) return;
+    const archiveTask = async (taskId: string) => {
+        if (!confirm('Archive this task? it will be moved to the archives below.')) return;
 
-        // Haptic on Delete
+        // Haptic on Archive
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([20, 50]);
 
-        setTasks(tasks.filter((t) => t.id !== taskId));
+        setTasks(tasks.map((t) => t.id === taskId ? { ...t, status: 'archived' } : t));
 
         try {
-            const { error } = await supabase.from('trinity_tasks').delete().eq('id', taskId);
+            const { error } = await supabase.from('trinity_tasks').update({ status: 'archived' }).eq('id', taskId);
             if (error) throw error;
             refresh();
-            showToast('Task Deleted', 'info');
+            showToast('Task Archived', 'info');
         } catch (error) {
-            console.error('Error deleting task:', error);
+            console.error('Error archiving task:', error);
             refresh();
-            showToast('Failed to delete task', 'error');
+            showToast('Failed to archive task', 'error');
         }
     };
 
@@ -130,6 +134,7 @@ export default function TasksPage() {
         if (status === 'verified') dbStatus = ['verified', 'success'];
         if (status === 'pending_clarification') dbStatus = ['pending_clarification'];
         if (status === 'failed') dbStatus = ['failed'];
+        if (status === 'archived') dbStatus = ['archived'];
 
         return tasks
             .filter((task) => dbStatus.includes(task.status))
@@ -179,15 +184,22 @@ export default function TasksPage() {
             // Extract artifact ID from db://trinity_artifacts/ID or use task ID
             let artifactId = task.artifact_url?.split('/').pop();
 
+            // Build query part safely
+            let query = `task_id.eq.${task.id}`;
+            if (artifactId && artifactId !== 'undefined' && artifactId !== 'null' && isNaN(parseInt(artifactId)) === false) {
+                query = `id.eq.${artifactId},${query}`;
+            }
+
             const { data, error } = await supabase
                 .from('trinity_artifacts')
                 .select('*')
-                .or(`id.eq.${artifactId},task_id.eq.${task.id}`)
+                .or(query)
+                .order('created_at', { ascending: false }) // Take latest if multiple
                 .limit(1)
-                .single();
+                .maybeSingle();
 
             if (error || !data) {
-                showToast('Artifact not found in database', 'error');
+                showToast('No artifact found for this task yet.', 'info');
                 return;
             }
 
@@ -223,7 +235,6 @@ export default function TasksPage() {
         { id: 'pending_clarification', title: 'Clarify', icon: HelpCircle, color: 'amber' },
         { id: 'done', title: 'Done', icon: CheckCircle, color: 'orange' },
         { id: 'verified', title: 'Verified', icon: CheckCircle, color: 'green' },
-        { id: 'failed', title: 'Failed', icon: XCircle, color: 'red' },
     ];
 
     return (
@@ -299,7 +310,7 @@ export default function TasksPage() {
             )}
 
             {/* Kanban Board */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
                 {columns.map((column) => {
                     const Icon = column.icon;
                     const columnTasks = getTasksByStatus(column.id);
@@ -321,7 +332,7 @@ export default function TasksPage() {
                             </div>
 
                             <div
-                                className="space-y-3 min-h-[200px]"
+                                className="space-y-3 min-h-[200px] max-h-[70vh] overflow-y-auto pr-2 scrollbar-hide hover:scrollbar-default transition-all"
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={(e) => {
                                     e.preventDefault();
@@ -403,8 +414,9 @@ export default function TasksPage() {
                                                         </div>
                                                     )}
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                                                        className="text-gray-600 hover:text-white hover:bg-red-500/20 transition-all p-1.5 rounded-md"
+                                                        onClick={(e) => { e.stopPropagation(); archiveTask(task.id); }}
+                                                        className="text-gray-600 hover:text-white hover:bg-amber-500/20 transition-all p-1.5 rounded-md"
+                                                        title="Archive Task"
                                                     >
                                                         <XCircle className="w-4 h-4" />
                                                     </button>
@@ -443,19 +455,46 @@ export default function TasksPage() {
                 })}
             </div>
 
+            {/* Footer with Stats / Archive Links */}
+            <div className="mt-8 flex flex-wrap gap-4 border-t border-white/5 pt-6">
+                <button
+                    onClick={() => setExplorerType('failed')}
+                    className="glass-light px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-500/10 transition-colors border border-red-500/20"
+                >
+                    <XCircle className="w-4 h-4 text-red-500" />
+                    <span className="text-sm font-bold text-gray-300">Failed Tasks</span>
+                    <span className="bg-red-500/20 px-2 py-0.5 rounded text-[10px] text-red-400 font-mono">{getTasksByStatus('failed').length}</span>
+                </button>
+
+                <button
+                    onClick={() => setExplorerType('archived')}
+                    className="glass-light px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-amber-500/10 transition-colors border border-amber-500/20"
+                >
+                    <Lock className="w-4 h-4 text-amber-500" />
+                    <span className="text-sm font-bold text-gray-300">Archived Tasks</span>
+                    <span className="bg-amber-500/20 px-2 py-0.5 rounded text-[10px] text-amber-400 font-mono">{getTasksByStatus('archived').length}</span>
+                </button>
+            </div>
+
             {/* GATE PROTECTION DISABLED BY AGENT FOR UNRESTRICTED ACCESS */}
 
             {/* Artifact Viewer Modal */}
             {selectedArtifact && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setSelectedArtifact(null)} />
-                    <div className="relative glass rounded-2xl p-6 w-full max-w-4xl border border-white/20 glow-violet max-h-[90vh] overflow-y-auto flex flex-col">
-                        <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-2xl font-bold text-white">{selectedArtifact.title}</h3>
-                            <button onClick={() => setSelectedArtifact(null)} className="text-gray-400 hover:text-white p-2">✕</button>
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setSelectedArtifact(null)} />
+                    <div className="relative glass rounded-2xl p-6 w-full max-w-4xl border border-white/20 glow-violet max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 className="text-2xl font-bold text-white mb-1">{selectedArtifact.title}</h3>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                    <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Artifact View Optimized</span>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedArtifact(null)} className="text-gray-400 hover:text-white p-2 bg-white/5 rounded-lg">✕</button>
                         </div>
-                        <div className="bg-[#0B0B0F] p-6 rounded-lg font-mono text-sm text-gray-300 whitespace-pre-wrap overflow-auto flex-1 border border-white/5">
-                            {selectedArtifact.content}
+                        <div className="bg-[#040406] p-6 rounded-xl overflow-auto flex-1 border border-white/5">
+                            <ArtifactContent content={selectedArtifact.content} />
                         </div>
                     </div>
                 </div>
@@ -480,6 +519,7 @@ export default function TasksPage() {
                             <div className="space-y-4">
                                 <div className="p-4 bg-white/5 rounded-xl border border-white/10">
                                     <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest block mb-2">Original Mission:</span>
+                                    <h4 className="text-sm font-bold text-gray-200 mb-1">{clarifyTask.title}</h4>
                                     <p className="text-xs text-zinc-400 line-clamp-3">{clarifyTask.description}</p>
                                 </div>
 
@@ -512,16 +552,96 @@ export default function TasksPage() {
 
                             <button
                                 onClick={() => {
-                                    if (clarifyTask.artifact_url || clarifyTask.status === 'done') {
-                                        handleViewArtifact(clarifyTask);
-                                    } else {
-                                        showToast('No partial artifact available yet.', 'info');
-                                    }
+                                    handleViewArtifact(clarifyTask);
                                 }}
                                 className="w-full py-2 text-xs text-gray-500 hover:text-violet-400 transition-colors flex items-center justify-center gap-1"
                             >
-                                <Eye className="w-3 h-3" /> View Partial Artifact
+                                <Eye className="w-3 h-3" /> View Artifact in Progress
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Spreadsheet / Explorer Modal */}
+            {explorerType && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setExplorerType(null)} />
+                    <div className="relative glass rounded-2xl w-full max-w-5xl border border-white/10 flex flex-col max-h-[85vh] shadow-[0_0_50px_-12px_rgba(139,92,246,0.3)]">
+                        <div className="p-6 border-b border-white/5 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-bold text-white capitalize">{explorerType} Tasks Repository</h3>
+                                <p className="text-xs text-gray-400 mt-1">Audit log of {explorerType} operations and artifacts.</p>
+                            </div>
+                            <button onClick={() => setExplorerType(null)} className="text-gray-500 hover:text-white p-2 bg-white/5 rounded-lg transition-all">✕</button>
+                        </div>
+
+                        <div className="flex-1 overflow-auto p-4">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold border-b border-white/5">
+                                        <th className="px-4 py-3">Task ID</th>
+                                        <th className="px-4 py-3">Title</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3">Priority</th>
+                                        <th className="px-4 py-3">Last Owned By</th>
+                                        <th className="px-4 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-sm">
+                                    {getTasksByStatus(explorerType).map((task) => (
+                                        <tr key={task.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
+                                            <td className="px-4 py-4 font-mono text-[10px] text-zinc-500">#{task.id.slice(0, 8)}</td>
+                                            <td className="px-4 py-4 font-medium text-gray-200">{task.title}</td>
+                                            <td className="px-4 py-4">
+                                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${task.status === 'failed' ? 'text-red-400 bg-red-400/10' : 'text-amber-400 bg-amber-400/10'
+                                                    }`}>
+                                                    {task.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <span className="text-[10px] font-mono text-zinc-400 capitalize">{task.priority}</span>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <span className="text-[10px] font-mono text-zinc-500 uppercase">{task.claimed_by || task.assigned_to || 'N/A'}</span>
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {task.artifact_url && (
+                                                        <button
+                                                            onClick={() => handleViewArtifact(task)}
+                                                            className="p-2 text-violet-400 hover:bg-violet-400/10 rounded-lg transition-all"
+                                                            title="View Artifact"
+                                                        >
+                                                            <Eye className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {/* Restore Button */}
+                                                    <button
+                                                        onClick={() => updateTaskStatus(task.id, 'pending')}
+                                                        className="p-2 text-cyan-400 hover:bg-cyan-400/10 rounded-lg transition-all"
+                                                        title="Restore to Todo"
+                                                    >
+                                                        <Plus className="w-4 h-4 rotate-45" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {getTasksByStatus(explorerType).length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-16 text-center text-gray-500">
+                                                <FileText className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                                                <p>No tasks found in {explorerType} category.</p>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center text-[10px] text-zinc-500 font-mono uppercase">
+                            <span>Total Items: {getTasksByStatus(explorerType).length}</span>
+                            <span>Trinity Symphony Task Explorer v1.2</span>
                         </div>
                     </div>
                 </div>

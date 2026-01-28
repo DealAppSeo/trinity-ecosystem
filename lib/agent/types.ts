@@ -36,6 +36,7 @@ export interface LLMResult {
     provider?: string;
     fromCache?: boolean;
     latency?: number;
+    artifactLinks?: string[]; // track tool-generated artifacts
 }
 
 

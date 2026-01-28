@@ -9,6 +9,7 @@ import { GitHubMCP } from './servers/GitHubMCP';
 import { GoogleWorkspaceMCP } from './servers/GoogleWorkspaceMCP';
 import { PlaywrightMCP } from './servers/PlaywrightMCP';
 import { CreativeMCP } from './servers/CreativeMCP';
+import { ComposioMCP } from './servers/ComposioMCP';
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -27,6 +28,7 @@ export class MCPManager {
         this.registerServer(new GoogleWorkspaceMCP());
         this.registerServer(new PlaywrightMCP());
         this.registerServer(new CreativeMCP());
+        this.registerServer(new ComposioMCP());
     }
 
     registerServer(server: MCPServer) {
@@ -66,8 +68,8 @@ export class MCPManager {
         // Define Role-to-Server Mappings
         const accessMap: Record<string, string[]> = {
             'CMO_SQUAD': ['AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Puppeteer', 'Supabase'],
-            'CDO_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Puppeteer'],
-            'CTO_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem'],
+            'CDO_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Puppeteer', 'Composio'],
+            'CTO_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio'],
             'ORCHESTRATOR': ['ALL']
         };
 
