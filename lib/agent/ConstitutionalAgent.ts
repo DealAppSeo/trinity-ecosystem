@@ -2352,6 +2352,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             { role: 'user', content: prompt }
         ];
 
+        const artifactLinks: string[] = [];
+
         for (let i = 0; i < 5; i++) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout
@@ -2622,6 +2624,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             { role: 'user', content: prompt }
         ];
 
+        const artifactLinks: string[] = [];
+
         for (let i = 0; i < 5; i++) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 120000);
@@ -2692,6 +2696,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         console.log(`[${this.name}] 🧪 Smart-Parse Artifact detected in raw output.`);
                         const titleMatch = content.match(/# (.*?)\n/) || content.match(/Title: (.*?)\n/);
                         const title = titleMatch ? titleMatch[1] : `Report from ${this.name}`;
+                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
                         const link = await this.saveArtifact(taskId, content, 'report', title, 'protected');
                         artifactLinks.push(link);
                     }
