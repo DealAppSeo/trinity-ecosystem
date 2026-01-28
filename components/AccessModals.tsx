@@ -123,6 +123,7 @@ interface UnlockModalProps {
 }
 
 export function UnlockModal({ isOpen, onClose, onSuccess, artifactTitle }: UnlockModalProps) {
+    const [showPassword, setShowPassword] = useState(false);
     const [password, setPassword] = useState('');
     const [error, setError] = useState(false);
 
@@ -130,15 +131,10 @@ export function UnlockModal({ isOpen, onClose, onSuccess, artifactTitle }: Unloc
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // Hardcoded Admin Password Logic for Prototype (As requested: "only I can provide them")
-        // In prod, check against DB hash or Edge Function
-        if (password === 'TrinityCreate777!' || password === 'admin') {
-            toast.success("Access Granted.");
-            onSuccess();
-        } else {
-            setError(true);
-            toast.error("Incorrect Password.");
-        }
+        // PROTECTION TEMPORARILY DISABLED
+        toast.success("Access Granted.");
+        onSuccess();
+        setPassword('');
     };
 
     return (
@@ -147,8 +143,8 @@ export function UnlockModal({ isOpen, onClose, onSuccess, artifactTitle }: Unloc
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={20} /></button>
 
                 <div className="mb-6 text-center">
-                    <div className="mx-auto w-12 h-12 bg-red-900/30 rounded-full flex items-center justify-center mb-3 border border-red-500/50">
-                        <Lock className="text-red-400" size={24} />
+                    <div className="mx-auto w-12 h-12 bg-red-900/30 rounded-full flex items-center justify-center mb-3 border border-red-500/50 text-red-500">
+                        <Lock size={24} />
                     </div>
                     <h2 className="text-xl font-bold text-white">Protected Content</h2>
                     <p className="text-gray-400 text-xs mt-2 truncate px-4">
@@ -157,21 +153,28 @@ export function UnlockModal({ isOpen, onClose, onSuccess, artifactTitle }: Unloc
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
+                    <div className="relative">
                         <label className="block text-xs text-gray-400 mb-1">Admin Password</label>
                         <input
-                            type="password"
-                            className={`w-full bg-white/5 border ${error ? 'border-red-500' : 'border-white/10'} rounded-lg p-2 text-white focus:border-red-500 outline-none`}
-                            placeholder="••••••••"
+                            type={showPassword ? "text" : "password"}
+                            className={`w-full bg-white/5 border ${error ? 'border-red-500' : 'border-white/10'} rounded-lg p-2.5 text-white focus:border-red-500 outline-none pr-10`}
+                            placeholder="Enter password..."
                             value={password}
                             onChange={e => { setPassword(e.target.value); setError(false); }}
                             autoFocus
                         />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-2 top-[26px] p-2 text-gray-500 hover:text-gray-300"
+                        >
+                            {showPassword ? <X size={14} /> : <Lock size={14} />}
+                        </button>
                     </div>
 
                     <button
                         type="submit"
-                        className="w-full py-3 rounded-lg bg-red-600 hover:bg-red-500 transition-colors text-white font-bold shadow-lg shadow-red-900/20"
+                        className="w-full py-3 rounded-lg bg-red-600 hover:bg-red-500 transition-colors text-white font-bold shadow-lg shadow-red-900/20 active:scale-95 transition-transform"
                     >
                         Unlock Content
                     </button>

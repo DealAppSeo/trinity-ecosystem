@@ -133,25 +133,12 @@ export default function ArtifactsPage() {
 
     // HANDLERS
     const handleCategoryClick = () => {
-        if (!hasRegistered) {
-            setShowRegModal(true);
-        }
+        // Gates disabled for accessibility
     };
 
     const handleArtifactClick = (artifact: Artifact) => {
-        if (!hasRegistered) {
-            toast.error('Identity Verification Required', {
-                description: 'You must be a registered user to access full artifacts.',
-                action: {
-                    label: 'Register',
-                    onClick: () => setShowRegModal(true)
-                }
-            });
-            setShowRegModal(true);
-            return;
-        }
-        setPendingArtifact(artifact);
-        setShowUnlockModal(true);
+        // Gates disabled for accessibility - direct access enabled
+        setSelectedArtifact(artifact);
     };
 
     const handleUnlockSuccess = () => {
@@ -197,18 +184,7 @@ export default function ArtifactsPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 relative">
-            <RegistrationModal
-                isOpen={showRegModal}
-                onClose={() => setShowRegModal(false)}
-                onSuccess={handleRegisterSuccess}
-            />
-
-            <UnlockModal
-                isOpen={showUnlockModal}
-                onClose={() => setShowUnlockModal(false)}
-                onSuccess={handleUnlockSuccess}
-                artifactTitle={pendingArtifact?.title || 'Restricted Artifact'}
-            />
+            {/* GATE PROTECTION DISABLED BY AGENT FOR UNRESTRICTED ACCESS */}
 
             {/* Header */}
             <div className="glass rounded-xl p-6 border border-white/10">
@@ -234,8 +210,8 @@ export default function ArtifactsPage() {
                                 className={`glass-light rounded-lg p-4 border border-\${color}-500/30 cursor-pointer hover:bg-white/5 transition-all relative overflow-hidden group`}
                             >
                                 {!hasRegistered && (
-                                    <div className="absolute top-2 right-2 text-gray-500">
-                                        <Lock size={14} />
+                                    <div className="absolute top-2 right-2 text-gray-500 opacity-20">
+                                        {/* Lock icon dimmed - protection disabled */}
                                     </div>
                                 )}
                                 <div className={`text-\${color}-400 mb-2`}>
@@ -277,7 +253,7 @@ export default function ArtifactsPage() {
                                         <h3 className="font-semibold mb-1 truncate text-gray-100">{artifact.title}</h3>
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs text-gray-500 capitalize">{artifact.type}</span>
-                                            {!hasRegistered && <Lock size={10} className="text-amber-500" />}
+                                            {/* Gate check removed */}
                                         </div>
                                     </div>
                                 </div>

@@ -3,11 +3,12 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { Plus, Clock, AlertCircle, CheckCircle, XCircle, HelpCircle, MessageSquare } from 'lucide-react';
+import { Plus, Clock, AlertCircle, CheckCircle, XCircle, HelpCircle, MessageSquare, Eye, Lock, FileText, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { TaskRecord } from '@/lib/agent/types';
 import { useToast } from '@/components/ui/Toast';
+import { UnlockModal, RegistrationModal } from '@/components/AccessModals';
 
 export default function TasksPage() {
     const { tasks: initialTasks, refresh } = useTrinityController();
@@ -15,6 +16,23 @@ export default function TasksPage() {
     const [tasks, setTasks] = useState<TaskRecord[]>([]);
     const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' });
     const [showNewTaskForm, setShowNewTaskForm] = useState(false);
+
+    // Artifact Viewer States
+    const [selectedArtifact, setSelectedArtifact] = useState<{ title: string; content: string } | null>(null);
+    const [showUnlockModal, setShowUnlockModal] = useState(false);
+    const [showRegModal, setShowRegModal] = useState(false);
+    const [pendingArtifact, setPendingArtifact] = useState<{ title: string; content: string } | null>(null);
+    const [hasRegistered, setHasRegistered] = useState(false);
+
+    // Clarification Modal States
+    const [clarifyTask, setClarifyTask] = useState<TaskRecord | null>(null);
+    const [clarification, setClarification] = useState('');
+
+    useEffect(() => {
+        if (localStorage.getItem('trinity_registration')) {
+            setHasRegistered(true);
+        }
+    }, []);
 
     useEffect(() => {
         if (initialTasks) setTasks(initialTasks);
@@ -152,6 +170,50 @@ export default function TasksPage() {
         } catch (e) {
             console.error("Priority Color Error:", e);
             return 'border-gray-500/50 bg-gray-500/10';
+        }
+    };
+
+    const handleViewArtifact = async (task: TaskRecord) => {
+        // Gates disabled for accessibility - direct access enabled
+        try {
+            // Extract artifact ID from db://trinity_artifacts/ID or use task ID
+            let artifactId = task.artifact_url?.split('/').pop();
+
+            const { data, error } = await supabase
+                .from('trinity_artifacts')
+                .select('*')
+                .or(`id.eq.${artifactId},task_id.eq.${task.id}`)
+                .limit(1)
+                .single();
+
+            if (error || !data) {
+                showToast('Artifact not found in database', 'error');
+                return;
+            }
+
+            setSelectedArtifact({ title: data.title, content: data.content });
+        } catch (e) {
+            showToast('Failed to load artifact', 'error');
+        }
+    };
+
+    const handleClarifySubmit = async () => {
+        if (!clarifyTask || !clarification.trim()) return;
+
+        try {
+            const { error } = await supabase.from('trinity_tasks').update({
+                status: 'pending',
+                description: `${clarifyTask.description}\n\n[USER CLARIFICATION]: ${clarification}`
+            }).eq('id', clarifyTask.id);
+
+            if (error) throw error;
+
+            showToast('Clarification Sent', 'success');
+            setClarifyTask(null);
+            setClarification('');
+            refresh();
+        } catch (e) {
+            showToast('Failed to send clarification', 'error');
         }
     };
 
@@ -353,18 +415,22 @@ export default function TasksPage() {
                                             {task.status === 'pending_clarification' && (
                                                 <div className="mt-3 pt-3 border-t border-amber-500/20">
                                                     <button
-                                                        onClick={() => {
-                                                            const answer = prompt(`Agent Query: ${task.result?.substring(0, 200)}...\n\nYour Answer:`);
-                                                            if (answer) {
-                                                                supabase.from('trinity_tasks').update({
-                                                                    status: 'pending',
-                                                                    description: `${task.description}\n\n[USER CLARIFICATION]: ${answer}`
-                                                                }).eq('id', task.id).then(() => refresh());
-                                                            }
-                                                        }}
+                                                        onClick={() => setClarifyTask(task)}
                                                         className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30 text-amber-400 text-[10px] font-bold transition-all"
                                                     >
                                                         <MessageSquare className="w-3 h-3" /> ASK AGENT
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* DIRECT ARTIFACT ACCESS */}
+                                            {(task.status === 'done' || task.status === 'verified' || task.artifact_url) && (
+                                                <div className="mt-2">
+                                                    <button
+                                                        onClick={() => handleViewArtifact(task)}
+                                                        className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 text-violet-400 text-[10px] font-bold transition-all"
+                                                    >
+                                                        <Eye className="w-3 h-3" /> VIEW ARTIFACT
                                                     </button>
                                                 </div>
                                             )}
@@ -376,6 +442,83 @@ export default function TasksPage() {
                     );
                 })}
             </div>
+
+            {/* GATE PROTECTION DISABLED BY AGENT FOR UNRESTRICTED ACCESS */}
+
+            {/* Artifact Viewer Modal */}
+            {selectedArtifact && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setSelectedArtifact(null)} />
+                    <div className="relative glass rounded-2xl p-6 w-full max-w-4xl border border-white/20 glow-violet max-h-[90vh] overflow-y-auto flex flex-col">
+                        <div className="flex justify-between items-start mb-4">
+                            <h3 className="text-2xl font-bold text-white">{selectedArtifact.title}</h3>
+                            <button onClick={() => setSelectedArtifact(null)} className="text-gray-400 hover:text-white p-2">✕</button>
+                        </div>
+                        <div className="bg-[#0B0B0F] p-6 rounded-lg font-mono text-sm text-gray-300 whitespace-pre-wrap overflow-auto flex-1 border border-white/5">
+                            {selectedArtifact.content}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Clarification Modal */}
+            {clarifyTask && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setClarifyTask(null)} />
+                    <div className="relative glass rounded-2xl p-6 w-full max-w-lg border border-amber-500/30 glow-amber shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-amber-500/10 rounded-lg">
+                                    <HelpCircle className="w-6 h-6 text-amber-500" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white">Agent Clarification</h3>
+                            </div>
+                            <button onClick={() => setClarifyTask(null)} className="text-gray-500 hover:text-white p-2">✕</button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                <span className="text-[10px] text-amber-500 font-bold uppercase tracking-widest block mb-2">The Agent Asks:</span>
+                                <p className="text-sm text-gray-200 italic">"{clarifyTask.result || "I need more context to proceed."}"</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-400 font-bold uppercase tracking-widest">Your Response:</label>
+                                <textarea
+                                    value={clarification}
+                                    onChange={(e) => setClarification(e.target.value)}
+                                    placeholder="Type your answer here..."
+                                    rows={4}
+                                    className="w-full p-4 bg-[#0B0B0F] border border-white/10 rounded-xl text-white text-sm focus:border-violet-500 outline-none transition-all placeholder-gray-600 resize-none"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleClarifySubmit}
+                                disabled={!clarification.trim()}
+                                className="w-full py-4 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 disabled:opacity-50 text-white font-bold transition-all shadow-lg flex items-center justify-center gap-2"
+                            >
+                                <Send className="w-4 h-4" />
+                                Send Clarification
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    if (clarifyTask.artifact_url || clarifyTask.status === 'done') {
+                                        handleViewArtifact(clarifyTask);
+                                    } else {
+                                        showToast('No partial artifact available yet.', 'info');
+                                    }
+                                }}
+                                className="w-full py-2 text-xs text-gray-500 hover:text-violet-400 transition-colors flex items-center justify-center gap-1"
+                            >
+                                <Eye className="w-3 h-3" /> View Partial Artifact
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

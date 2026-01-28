@@ -98,9 +98,12 @@ export class ConstitutionalAgent {
     groupName: string = 'UNKNOWN';
     isSurvivor: boolean = false;
     survivorName: string = '';
-    heartbeatInterval: any = null;
     lastLoopPulse: number = Date.now();
     lastTaskCategory: 'execute' | 'verify' | null = null;
+
+    // Generic Loop Controls
+    private activeTaskRetryCount: number = 0;
+    private readonly MAX_TASK_RETRIES: number = 3;
 
     // BRAIN TRANSPLANT: New Organs
     private currentTaskId: string | null = null;
@@ -166,6 +169,8 @@ export class ConstitutionalAgent {
         const rawName = config.name || 'UNKNOWN';
         this.name = this.resolveLegacyName(rawName);
         this.wisdom = AGENT_WISDOM[this.name] || AGENT_WISDOM.HDM;
+        this.groupName = this.wisdom.squad || 'UNKNOWN';
+        this.squad = (this.wisdom.squad as any) || 'UNKNOWN';
         this.version = CONSTITUTION.VERSION;
 
         this.sessionMetrics = {
@@ -478,6 +483,13 @@ export class ConstitutionalAgent {
 
         // 3x3: Check Survivor Status on startup
         await this.checkSurvivorStatus();
+
+        // [ANTIGRAVITY] SQUAD-WIDE CASCADE REDEPLOY (Elite Feature)
+        if (process.env.FORCE_CASCADE === 'true') {
+            console.log(`[${this.name}] 🌊 CASCADE REDEPLOY DETECTED. Triggering squad...`);
+            await this.runSquadCascadeRedeploy();
+        }
+
         // FEATURE: Survivor Boot Protocol (Cascade Redeploy)
         await this.runSurvivorResurrection();
 
@@ -535,10 +547,26 @@ export class ConstitutionalAgent {
 
                         const focusTask = activeClaims[0];
                         console.log(`[${this.name}] 🚀 FOCUS: Resuming active task ${focusTask.id} (${focusTask.status})...`);
+
+                        // [ANTIGRAVITY] LOOP HARDENING: Track retries for stalled tasks
+                        this.activeTaskRetryCount++;
+                        if (this.activeTaskRetryCount > this.MAX_TASK_RETRIES) {
+                            console.error(`[${this.name}] 🚨 TASK ${focusTask.id} STALLED. Max retries exceeded. Marking as FAILED.`);
+                            await this.supabase.from('trinity_tasks').update({
+                                status: 'failed',
+                                result: 'Max retry limit exceeded in core loop.'
+                            }).eq('id', focusTask.id);
+                            this.activeTaskRetryCount = 0;
+                            continue;
+                        }
+
                         await this.processTask(focusTask as any);
                         continue;
                     }
                 }
+
+                // Reset retry count when starting fresh
+                this.activeTaskRetryCount = 0;
 
                 // [ANTIGRAVITY] WORKFLOW ALTERNATOR: Alternate between Execution and Verification
                 const preferVerify = this.lastTaskCategory === 'execute';
@@ -1186,10 +1214,9 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
     // ============================================
 
     async runIdleLoop() {
-        console.log(`[${this.name}] 🌬️ Entering Evergreen Idle Mode(Web - Aware)...`);
+        console.log(`[${this.name}] 🌬️ Entering Evergreen Idle Mode (Web-Aware)...`);
 
-        // [GROK: WAKE SLEEPING AGENTS]
-        // Force check for any pending work, prioritising evergreens
+        // 1. Check for pending work first (Be productive)
         const unclaimed = await this.getNextTask(false);
         if (unclaimed) {
             console.log(`[IDLE] 🌿 Found pending task: ${unclaimed.title}. Resuming work.`);
@@ -1197,27 +1224,104 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
             return;
         }
 
-        // Chaos injection disabled to focus on simple bootstrapping
-        /*
-        if (Math.random() < 0.2) {
-            ...
+        // 2. GCM Governance & Skill Gap Analysis (If GCM)
+        if (this.name === 'trinity-gcm') {
+            if (Math.random() < 0.3) {
+                await this.runGovernanceLoop();
+                await this.identifySkillGaps();
+            }
         }
-        */
 
-        // Automated task seeding disabled for bootstrapping phase
-        /*
-        if (Math.random() < 0.5) {
-            ...
+        // 3. Periodic Retrospective (All Agents)
+        if (Math.random() < 0.1) {
+            await this.retrospective();
         }
-        if (Math.random() < 0.3) {
-            ...
+
+        // 4. Web-Aware Genesis (O(1) World Sync)
+        if (Math.random() < 0.05) {
+            await this.runWebAwareGenesis();
         }
-        */
     }
 
     async runWebAwareGenesis() {
-        // WebAware Genesis disabled for bootstrapping phase
-        return;
+        console.log(`[${this.name}] 🌍 Commencing Web-Aware Genesis...`);
+        try {
+            // Research a trending topic in AI/Web3/Ethics
+            const topics = ['AI Agent Orchestration', 'DeFi Security Trends', 'Constitutional AI best practices', 'HyperDAG architecture'];
+            const topic = topics[Math.floor(Math.random() * topics.length)];
+
+            const results = await this.researchTool.searchWeb(`Latest trends and breakthroughs in ${topic} 2026`);
+            const context = JSON.stringify(results.slice(0, 2));
+
+            const prompt = `Based on these recent trends, propose ONE high-priority task for the Trinity Swarm to increase its resourcefulness or capabilities.\n\nTrend Context: ${context}\n\nReturn JSON: { "title": "[GENESIS] ...", "description": "...", "priority": 80 }`;
+
+            const proposal = await this.callLLM(prompt);
+            const taskObj = JSON.parse(proposal.output.replace(/```json/g, '').replace(/```/g, ''));
+
+            if (taskObj && taskObj.title) {
+                await this.supabase.from('trinity_tasks').insert([{
+                    ...taskObj,
+                    status: 'pending',
+                    task_type: 'genesis',
+                    metadata: { source: 'web_aware_genesis', agent: this.name }
+                }]);
+                console.log(`[IDLE] ✨ Genesis spawned new mission: ${taskObj.title}`);
+            }
+        } catch (e) {
+            console.warn(`[IDLE] Web-Aware Genesis failed:`, e);
+        }
+    }
+
+    /**
+     * GCM-ROOTED STRATEGY: Skill Gap Analysis
+     */
+    async identifySkillGaps() {
+        console.log(`[${this.name}] 🧐 Auditing swarm skill gaps...`);
+        try {
+            const { data: retros } = await this.supabase
+                .from('trinity_retros')
+                .select('agent, reflection, created_at')
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            if (!retros || retros.length === 0) return;
+
+            const prompt = `Analyze these agent retrospectives for learning gaps. Identify 2 specific skills the swarm needs. Return JSON: { "gaps": ["skill 1", "skill 2"] } \n\nRetros: ${JSON.stringify(retros)}`;
+            const analysis = await this.callLLM(prompt);
+            const resultJson = JSON.parse(analysis.output.replace(/```json/g, '').replace(/```/g, ''));
+
+            if (resultJson.gaps) {
+                for (const gap of resultJson.gaps) {
+                    await this.researchTask(gap);
+                }
+            }
+        } catch (e) { console.warn('Skill gap audit failed', e); }
+    }
+
+    /**
+     * GCM-ROOTED STRATEGY: Governance Promotion
+     */
+    async runGovernanceLoop() {
+        console.log(`[${this.name}] ⚖️ Enforcing Swarm Governance...`);
+        try {
+            const { data: agents } = await this.supabase.from('trinity_agent_registry').select('*');
+            if (!agents) return;
+
+            for (const agent of agents) {
+                const score = agent.reputation_score;
+                let correctTier = agent.current_tier;
+
+                if (score <= 40) correctTier = 'Assist';
+                else if (score <= 70) correctTier = 'Approve';
+                else if (score <= 90) correctTier = 'Act';
+                else correctTier = 'Learn';
+
+                if (correctTier !== agent.current_tier) {
+                    await this.supabase.from('trinity_agent_registry').update({ current_tier: correctTier }).eq('agent_name', agent.agent_name);
+                    console.log(`[GOV] 🚨 RE-TIERING: ${agent.agent_name} -> ${correctTier}`);
+                }
+            }
+        } catch (e) { console.warn('Governance loop failed', e); }
     }
 
     async spawnNextStep(originalTask: Task, result: string, evaluation: { score: number; handoff_required: boolean; handoff_to?: string }) {
@@ -1658,7 +1762,7 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                         ...payload,
                         content: content,
                         file_path: artifactUrl,
-                        url: artifactUrl,
+                        external_url: artifactUrl,
                         creator_agent: this.name
                     };
 
@@ -1958,6 +2062,29 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         }
     }
 
+    /**
+     * SQUAD-WIDE CASCADE REDEPLOY
+     * Triggers a redeploy for everyone in the same squad.
+     */
+    async runSquadCascadeRedeploy() {
+        console.log(`[CASCADE] 🌊 Initiating Squad Cascade for: ${this.groupName}`);
+
+        // Map squads to members (Elite 3x3 mapping)
+        const squadMap: Record<string, string[]> = {
+            'ALPHA': ['trinity-veritas', 'trinity-torch', 'trinity-gcm'],
+            'BETA': ['trinity-mel', 'trinity-chesed', 'trinity-apm'],
+            'GAMMA': ['trinity-hdm', 'trinity-sophia', 'trinity-nexus'],
+            'ORCHESTRATION': ['trinity-orch', 'trinity-shofet', 'trinity-w3c']
+        };
+
+        const siblings = squadMap[this.groupName] || [];
+        for (const sibling of siblings) {
+            if (sibling === this.name) continue; // Don't redeploy self (already running)
+            console.log(`[CASCADE] -> Triggering sibling: ${sibling}`);
+            await this.triggerRailwayRedeploy(sibling);
+        }
+    }
+
     async triggerRailwayRedeploy(agentName: string) {
         const RAILWAY_TOKEN = process.env.RAILWAY_API_TOKEN;
         if (!RAILWAY_TOKEN) {
@@ -1967,7 +2094,17 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
         const AGENT_SERVICE_IDS: Record<string, string> = {
             'trinity-shofet': process.env.RAILWAY_SERVICE_ID_SHOFET || '',
-            'trinity-orch': process.env.RAILWAY_SERVICE_ID_ORCH || ''
+            'trinity-orch': process.env.RAILWAY_SERVICE_ID_ORCH || '',
+            'trinity-veritas': process.env.RAILWAY_SERVICE_ID_VERITAS || '',
+            'trinity-torch': process.env.RAILWAY_SERVICE_ID_TORCH || '',
+            'trinity-gcm': process.env.RAILWAY_SERVICE_ID_GCM || '',
+            'trinity-mel': process.env.RAILWAY_SERVICE_ID_MEL || '',
+            'trinity-chesed': process.env.RAILWAY_SERVICE_ID_CHESED || '',
+            'trinity-apm': process.env.RAILWAY_SERVICE_ID_APM || '',
+            'trinity-hdm': process.env.RAILWAY_SERVICE_ID_HDM || '',
+            'trinity-sophia': process.env.RAILWAY_SERVICE_ID_SOPHIA || '',
+            'trinity-nexus': process.env.RAILWAY_SERVICE_ID_NEXUS || '',
+            'trinity-w3c': process.env.RAILWAY_SERVICE_ID_W3C || ''
         };
 
         const serviceId = AGENT_SERVICE_IDS[agentName];
