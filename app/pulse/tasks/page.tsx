@@ -477,9 +477,16 @@ export default function TasksPage() {
                         </div>
 
                         <div className="space-y-4">
-                            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                <span className="text-[10px] text-amber-500 font-bold uppercase tracking-widest block mb-2">The Agent Asks:</span>
-                                <p className="text-sm text-gray-200 italic">"{clarifyTask.result || "I need more context to proceed."}"</p>
+                            <div className="space-y-4">
+                                <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest block mb-2">Original Mission:</span>
+                                    <p className="text-xs text-zinc-400 line-clamp-3">{clarifyTask.description}</p>
+                                </div>
+
+                                <div className="p-4 bg-amber-500/5 rounded-xl border border-amber-500/20">
+                                    <span className="text-[10px] text-amber-500 font-bold uppercase tracking-widest block mb-2">The Agent Asks:</span>
+                                    <p className="text-sm text-gray-200 italic">"{clarifyTask.result || "I need more context to proceed."}"</p>
+                                </div>
                             </div>
 
                             <div className="space-y-2">

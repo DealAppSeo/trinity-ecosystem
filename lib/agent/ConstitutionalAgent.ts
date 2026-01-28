@@ -526,7 +526,8 @@ export class ConstitutionalAgent {
 
                 if (allClaims && allClaims.length > 0) {
                     // 1. Separate Active from Stagnant/Finished
-                    const activeClaims = allClaims.filter(c => ['doing', 'in_progress', 'running', 'pending_clarification'].includes(c.status));
+                    const activeClaims = allClaims.filter(c => ['doing', 'in_progress', 'running'].includes(c.status));
+                    const stagnantClaims = allClaims.filter(c => ['pending_clarification'].includes(c.status));
                     const finishedClaims = allClaims.filter(c => !['doing', 'in_progress', 'running', 'pending_clarification'].includes(c.status));
 
                     // 2. Cleanup Finished (Sticky Claims)
@@ -1059,6 +1060,7 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
 
                 const { error: escalateError } = await this.supabase.from('trinity_tasks').update({
                     status: 'pending_clarification',
+                    claimed_by: null, // [ANTIGRAVITY] Release claim so agent can do other work while waiting
                     result: `[ESCALATED] Agent ${this.name} is seeking clarification. \n\nReason: ${lowBelief ? 'Low certainty score' : 'Explicit escalation request'}. \n\nQuery: ${result.output.substring(0, 500)}`,
                     verification_result: `Searching high-dimension databases... seeking expert consensus.`
                 }).eq('id', task.id);
@@ -1072,7 +1074,7 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                 await this.saveArtifact(task.id, questionContent, 'report', `Q: ${task.title}`, 'public');
 
                 // RELEASE CLAIM so others (or a reset) can pick it up once clarified
-                await this.releaseClaim(task.id);
+                // No need for releaseClaim here, we already set claimed_by: null in the update above
 
                 return { success: true, llm_used: true, escalated: true };
             }
