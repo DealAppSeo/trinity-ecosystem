@@ -12,6 +12,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { AddTaskModal } from '@/components/modals/AddTaskModal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import InviteManager from '@/components/InviteManager';
+import Link from 'next/link';
 import { Skull, Share2, AlertTriangle, ServerCrash, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
@@ -27,6 +28,15 @@ export default function ConductorPage() {
 
     // Stats are now fetched via Realtime hook
     const [showAddTask, setShowAddTask] = useState(false);
+    const [activeTab, setActiveTab] = useState<'grid' | 'tasks' | 'logs'>('grid');
+    const [role, setRole] = useState<'founder' | 'guest'>('guest');
+
+    useEffect(() => {
+        const roleMatch = document.cookie.match(/trinity_role=([^;]+)/);
+        if (roleMatch) setRole(roleMatch[1] as any);
+    }, []);
+
+    const isFounder = role === 'founder';
 
     // Initial load happens in hook. Realtime subscriptions handle subsequent updates.
     // No explicit refresh interval needed here.
@@ -151,8 +161,46 @@ export default function ConductorPage() {
                     </div>
                 ) : (
                     <>
+                        {/* Iron Gate Banner (Guest Mode) */}
+                        {!isFounder && (
+                            <div className="lg:col-span-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center justify-between mb-4 animate-in slide-in-from-top duration-500">
+                                <div className="flex items-center gap-3">
+                                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                                    <div>
+                                        <p className="text-sm font-bold text-amber-400">Guest Access: Read-Only Mode</p>
+                                        <p className="text-xs text-amber-500/70">You can monitor swarm activity, but controls are reserved for Founders.</p>
+                                    </div>
+                                </div>
+                                <Link href="/join">
+                                    <Button variant="secondary" size="sm" className="bg-amber-500/20 border-amber-500/30 text-amber-400 hover:bg-amber-500/30">
+                                        Take Command →
+                                    </Button>
+                                </Link>
+                            </div>
+                        )}
+                        {/* Mobile Tab Switcher */}
+                        <div className="lg:hidden flex border-b border-white/5 bg-obsidian-surface/50 rounded-t-xl overflow-hidden shrink-0">
+                            {(['grid', 'tasks', 'logs'] as const).map((tab) => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={cn(
+                                        "flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-all",
+                                        activeTab === tab
+                                            ? "bg-white/10 text-cyan-400 border-b-2 border-cyan-400"
+                                            : "text-zinc-500"
+                                    )}
+                                >
+                                    {tab}
+                                </button>
+                            ))}
+                        </div>
+
                         {/* LEFT COLUMN: Grid & Activity (Active State) */}
-                        <div className="lg:col-span-3 flex flex-col gap-6 h-full overflow-hidden">
+                        <div className={cn(
+                            "lg:col-span-3 flex flex-col gap-6 h-full overflow-hidden",
+                            activeTab !== 'grid' && 'hidden lg:flex'
+                        )}>
 
                             {/* Chaos & Squad Panel */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
@@ -179,7 +227,10 @@ export default function ConductorPage() {
                                 </div>
 
                                 {/* Chaos Testing */}
-                                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden group">
+                                <div className={cn(
+                                    "bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden group",
+                                    !isFounder && "opacity-50 grayscale pointer-events-none"
+                                )}>
                                     <div className="absolute inset-0 bg-red-900/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     <div className="flex items-start justify-between relative z-10">
                                         <div className="flex items-center gap-2">
@@ -189,32 +240,36 @@ export default function ConductorPage() {
                                                 <p className="text-zinc-500 text-[10px]">Anti-fragility simulation</p>
                                             </div>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={wakeTrinity}
-                                                className="px-3 py-1 bg-emerald-950/50 border border-emerald-900/30 text-emerald-300 text-xs rounded hover:bg-emerald-900/80 transition-colors flex items-center gap-1"
-                                                title="Send Keep-Alive Pings"
-                                            >
-                                                <Activity className="w-3 h-3" /> Wake Swarm
-                                            </button>
-                                            <button
-                                                onClick={resetTrinity}
-                                                className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors flex items-center gap-1"
-                                                title="Emergency Board Reset"
-                                            >
-                                                <AlertTriangle className="w-3 h-3" /> Kill All
-                                            </button>
-                                        </div>
+                                        {isFounder && (
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={wakeTrinity}
+                                                    className="px-3 py-1 bg-emerald-950/50 border border-emerald-900/30 text-emerald-300 text-xs rounded hover:bg-emerald-900/80 transition-colors flex items-center gap-1"
+                                                    title="Send Keep-Alive Pings"
+                                                >
+                                                    <Activity className="w-3 h-3" /> Wake Swarm
+                                                </button>
+                                                <button
+                                                    onClick={resetTrinity}
+                                                    className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors flex items-center gap-1"
+                                                    title="Emergency Board Reset"
+                                                >
+                                                    <AlertTriangle className="w-3 h-3" /> Kill All
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="mt-3 grid grid-cols-2 gap-2">
                                         <button
                                             onClick={() => confirm('Kill Random Agent?') && killRandomAgent()}
+                                            disabled={!isFounder}
                                             className="px-3 py-1 bg-zinc-900/50 border border-white/5 text-zinc-500 text-[10px] rounded hover:bg-red-950/30 hover:text-red-400 transition-all flex items-center justify-center gap-1"
                                         >
                                             <Skull className="w-3 h-3" /> Kill Random
                                         </button>
                                         <button
                                             onClick={() => triggerChaosEvent('SIMULATED_FAILURE')}
+                                            disabled={!isFounder}
                                             className="px-3 py-1 bg-zinc-900/50 border border-white/5 text-zinc-500 text-[10px] rounded hover:bg-amber-950/30 hover:text-amber-400 transition-all flex items-center justify-center gap-1"
                                         >
                                             <ServerCrash className="w-3 h-3" /> Trip Circuit
@@ -274,7 +329,9 @@ export default function ConductorPage() {
                                 </div>
 
                                 {/* Reward Tuner (ANFIS Control) */}
-                                <RewardTuner />
+                                <div className={cn(!isFounder && "opacity-50 grayscale pointer-events-none")}>
+                                    <RewardTuner />
+                                </div>
                             </div>
 
                             {/* Agents Grid */}
@@ -316,7 +373,10 @@ export default function ConductorPage() {
                         </div>
 
                         {/* RIGHT COLUMN: Tasks & Stats */}
-                        <div className="lg:col-span-1 flex flex-col gap-6 h-full">
+                        <div className={cn(
+                            "lg:col-span-1 flex flex-col gap-6 h-full",
+                            activeTab !== 'tasks' && 'hidden lg:flex'
+                        )}>
 
                             {/* Invite Manager */}
                             <div className="shrink-0">
@@ -327,23 +387,35 @@ export default function ConductorPage() {
                             <div className="flex-1 flex flex-col min-h-0">
                                 <TaskQueue
                                     tasks={tasks as any}
-                                    onAddTask={() => setShowShareModal(true)}
+                                    onAddTask={() => setShowAddTask(true)}
                                 />
                             </div>
 
                             <button
                                 onClick={() => confirm('⚠️ EMERGENCY PAUSE ALL AGENTS?') && triggerChaosEvent('SYSTEM_HALT')}
-                                className="w-full bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2"
+                                disabled={!isFounder}
+                                className={cn(
+                                    "w-full bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2",
+                                    !isFounder && "opacity-50 cursor-not-allowed"
+                                )}
                             >
                                 <ServerCrash className="w-4 h-4" /> EMERGENCY PAUSE
                             </button>
+                        </div>
+
+                        {/* MOBILE LOGS VIEW */}
+                        <div className={cn(
+                            "lg:hidden flex flex-col gap-6 h-[70vh]",
+                            activeTab !== 'logs' && 'hidden'
+                        )}>
+                            <ActivityFeed logs={logs} />
                         </div>
                     </>
                 )}
 
             </main >
 
-            <CostTicker traditional={847.00} trinity={0.47} />
+            <CostTicker traditional={847.00} trinity={0.47} googleStitch={0.00} /> {/* Added Google Stitch to plan */}
 
             <AddTaskModal
                 isOpen={showAddTask}

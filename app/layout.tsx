@@ -43,7 +43,6 @@ export default function RootLayout({
             <MockBanner />
             <NavBar />
             {children}
-            <MobileNav />
           </GlobalErrorBoundary>
         </ToastProvider>
       </body>

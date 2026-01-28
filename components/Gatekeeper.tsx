@@ -20,14 +20,16 @@ export function Gatekeeper() {
         // 2. Check for Access Token (Cookie)
         const cookieString = document.cookie || '';
         const hasAccess = cookieString.split(';').some((item) => item.trim().startsWith('trinity_access='));
+        const roleMatch = cookieString.match(/trinity_role=([^;]+)/);
+        const role = roleMatch ? roleMatch[1] : 'guest';
 
-        console.log(`🔒 [Gatekeeper] Path: ${pathname} | Access: ${hasAccess} | Cookie: ${cookieString}`);
+        console.log(`🔒 [Gatekeeper] Path: ${pathname} | Access: ${hasAccess} | Role: ${role}`);
 
         if (!hasAccess) {
             console.warn('⛔ [Gatekeeper] Access Denied. Redirecting to /join...');
             router.push('/join');
         } else {
-            console.log('✅ [Gatekeeper] Authorized.');
+            console.log(`✅ [Gatekeeper] Authorized as ${role}.`);
             setAuthorized(true);
         }
     }, [pathname, router]);

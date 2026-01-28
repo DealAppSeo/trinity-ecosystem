@@ -15,10 +15,14 @@ interface ShareModalProps {
 export function ShareModal({ isOpen, onClose }: ShareModalProps) {
     const [qrUrl, setQrUrl] = useState<string>('');
     const [shareUrl, setShareUrl] = useState<string>('');
+    const [copied, setCopied] = useState(false);
+
+    // Mock Code for UI flavor
+    const uniqueCode = `TRINITY-${Math.floor(Math.random() * 10000)}`;
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const url = window.location.href;
+            const url = window.location.origin + '/join?ref=' + uniqueCode;
             setShareUrl(url);
             generateQR(url);
         }
@@ -43,7 +47,9 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(shareUrl);
-            alert('Link copied to clipboard!'); // Using alert for now as sonner might not be configured efficiently globally yet
+            setCopied(true);
+            toast.success('Link copied to clipboard!');
+            setTimeout(() => setCopied(false), 2000);
         } catch (err) {
             console.error('Failed to copy', err);
         }
@@ -66,62 +72,62 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-md bg-obsidian-surface border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/5">
-                    <div>
-                        <h2 className="text-xl font-bold text-white">Share Trinity Controller</h2>
-                        <p className="text-xs text-zinc-400 mt-1">Share your autonomous AI swarm with the world</p>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-white/10 rounded-full transition-colors text-zinc-400 hover:text-white"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-4" onClick={onClose}>
+            <div
+                className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Close Button */}
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-full transition-colors text-zinc-500 hover:text-white z-10"
+                >
+                    <X className="w-5 h-5" />
+                </button>
 
                 {/* Body */}
-                <div className="p-6 flex flex-col items-center gap-6">
+                <div className="p-8 flex flex-col items-center gap-6 text-center">
+                    <div className="space-y-2">
+                        <h2 className="text-xl font-bold text-white tracking-tight">Grow the Swarm</h2>
+                        <p className="text-sm text-zinc-400">
+                            Invite a fellow founder. You <span className="text-accent-violet font-semibold">BOTH</span> unlock a free Personal Agent.
+                        </p>
+                    </div>
+
                     {/* QR Code */}
-                    <div className="bg-white p-4 rounded-xl shadow-inner">
+                    <div className="bg-white p-4 rounded-xl shadow-inner ring-1 ring-white/10">
                         {qrUrl ? (
-                            <img src={qrUrl} alt="QR Code" className="w-48 h-48" />
+                            <img src={qrUrl} alt="QR Code" className="w-40 h-40" />
                         ) : (
-                            <div className="w-48 h-48 bg-zinc-200 animate-pulse rounded" />
+                            <div className="w-40 h-40 bg-zinc-200 animate-pulse rounded" />
                         )}
                     </div>
 
-                    {/* Link Copy */}
-                    <div className="w-full space-y-2">
-                        <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Share Link</label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={shareUrl}
-                                readOnly
-                                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-accent-violet transition-colors"
-                            />
-                            <Button onClick={handleCopy} variant="primary" className="bg-[#4D4D99] hover:bg-[#5D5DA9]">
-                                <Copy className="w-4 h-4 mr-2" /> Copy
-                            </Button>
-                        </div>
+                    {/* Status / Code */}
+                    <div className="w-full bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mb-1 font-bold">Your Access Code</p>
+                        <p className="text-2xl font-mono text-white tracking-[0.1em]">{uniqueCode}</p>
                     </div>
 
-                    {/* Social Buttons */}
-                    <div className="w-full space-y-2">
-                        <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Share on Social</label>
+                    {/* Actions */}
+                    <div className="w-full space-y-3">
+                        <Button
+                            onClick={handleCopy}
+                            className="w-full py-6 text-base bg-white text-black hover:bg-zinc-200 font-bold shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                            {copied ? 'Copied!' : 'Copy Invite Link'}
+                        </Button>
+
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 onClick={() => handleSocialShare('twitter')}
-                                className="flex items-center justify-center gap-2 py-2.5 bg-[#1DA1F2]/10 hover:bg-[#1DA1F2]/20 text-[#1DA1F2] border border-[#1DA1F2]/20 rounded-lg transition-all font-medium text-sm"
+                                className="flex items-center justify-center gap-2 py-3 bg-[#1DA1F2]/10 hover:bg-[#1DA1F2]/20 text-[#1DA1F2] border border-[#1DA1F2]/20 rounded-lg transition-all font-medium text-xs"
                             >
                                 <Twitter className="w-4 h-4" /> Twitter
                             </button>
                             <button
                                 onClick={() => handleSocialShare('linkedin')}
-                                className="flex items-center justify-center gap-2 py-2.5 bg-[#0077B5]/10 hover:bg-[#0077B5]/20 text-[#0077B5] border border-[#0077B5]/20 rounded-lg transition-all font-medium text-sm"
+                                className="flex items-center justify-center gap-2 py-3 bg-[#0077B5]/10 hover:bg-[#0077B5]/20 text-[#0077B5] border border-[#0077B5]/20 rounded-lg transition-all font-medium text-xs"
                             >
                                 <Linkedin className="w-4 h-4" /> LinkedIn
                             </button>

@@ -11,6 +11,7 @@ function JoinContent() {
 
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -27,32 +28,39 @@ function JoinContent() {
         setLoading(true);
         setError('');
 
-        // 1. Check Access Code (Backdoor)
-        if (code.toLowerCase() === 'mel') {
-            grantAccess();
+        // 1. Check Symphony Key (Founder Access)
+        const SYMPHONY_KEY = 'Symphony2026'; // Mock key, ideally fetched from env or DB
+        if (password === SYMPHONY_KEY) {
+            grantAccess('founder');
             return;
         }
 
-        // 2. Check Email (Simulation)
+        // 2. Check Access Code (Soft Gate)
+        if (code.toLowerCase() === 'mel' || code.toLowerCase() === 'spark') {
+            grantAccess('guest');
+            return;
+        }
+
+        // 3. Check Email (Simulation)
         if (email && email.includes('@')) {
-            // TODO: Log lead to Supabase
             console.log('📝 Lead Captured:', email);
-            grantAccess();
+            grantAccess('guest');
             return;
         }
 
-        setError('Please enter a valid Access Code or Email.');
+        setError('Invalid Symphony Key, Access Code, or Email.');
         setLoading(false);
     };
 
-    const grantAccess = () => {
-        // Set Cookie
-        document.cookie = "trinity_access=true; path=/; max-age=31536000"; // 1 Year
-        console.log('🔓 Access Granted.');
+    const grantAccess = (role: 'founder' | 'guest') => {
+        // Set Cookies
+        document.cookie = `trinity_access=true; path=/; max-age=31536000`; // 1 Year
+        document.cookie = `trinity_role=${role}; path=/; max-age=31536000`;
+        console.log(`🔓 Access Granted as ${role}.`);
 
         // Redirect
         setTimeout(() => {
-            router.push('/');
+            router.push('/pulse/conductor');
         }, 500);
     };
 
@@ -96,13 +104,25 @@ function JoinContent() {
 
                 {/* Access Code Input */}
                 <div>
-                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Or Access Code</label>
+                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Access Code (Guest)</label>
                     <input
                         type="text"
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
-                        placeholder="Access Code"
+                        placeholder="e.g. SPARK"
                         className="w-full bg-gray-900 border border-gray-800 rounded-md p-4 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    />
+                </div>
+
+                {/* Symphony Key Input */}
+                <div className="pt-4 border-t border-white/5">
+                    <label className="block text-xs uppercase tracking-widest text-gold mb-2">Symphony Key (Founder)</label>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-gold/5 border border-gold/20 rounded-md p-4 text-gold focus:outline-none focus:border-gold transition-colors"
                     />
                 </div>
 

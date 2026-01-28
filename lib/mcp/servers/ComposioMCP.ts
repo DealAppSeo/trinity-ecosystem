@@ -78,6 +78,29 @@ export class ComposioMCP extends BaseMCP {
                 }
             });
 
+            // Authentication tool to allow agents to request connections
+            this.registerTool({
+                name: 'composio_connect_app',
+                description: 'Get an OAuth connection link for a specific app. If an agent tries to use GitHub but it is not linked, use this to get the link for the user.',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        app: { type: 'string', description: 'App to connect (e.g., github, slack, linear, figma)' }
+                    },
+                    required: ['app']
+                },
+                execute: async (args: any) => {
+                    console.log(`[Composio] 🔗 Generating connection link for ${args.app}...`);
+                    try {
+                        const entity = await this.composio.getEntity("default");
+                        const connection = await entity.initiateConnection(args.app);
+                        return `Connection Link for ${args.app}: ${connection.redirectUrl}\n\nIMPORTANT: Please click this link to authorize the agent. Once done, let the agent know.`;
+                    } catch (e: any) {
+                        return `Error initiating connection: ${e.message}`;
+                    }
+                }
+            });
+
             this.isConnected = true;
         } catch (e: any) {
             console.error(`[ComposioMCP] ❌ Handshake failed: ${e.message}`);

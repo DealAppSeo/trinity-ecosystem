@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { Plus, Clock, AlertCircle, CheckCircle, XCircle, HelpCircle, MessageSquare, Eye, Lock, FileText, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
@@ -31,6 +32,14 @@ export default function TasksPage() {
 
     // Spreadsheet / Archive Explorer
     const [explorerType, setExplorerType] = useState<'failed' | 'archived' | null>(null);
+    const [role, setRole] = useState<'founder' | 'guest'>('guest');
+
+    useEffect(() => {
+        const roleMatch = document.cookie.match(/trinity_role=([^;]+)/);
+        if (roleMatch) setRole(roleMatch[1] as any);
+    }, []);
+
+    const isFounder = role === 'founder';
 
     useEffect(() => {
         if (localStorage.getItem('trinity_registration')) {
@@ -43,6 +52,10 @@ export default function TasksPage() {
     }, [initialTasks]);
 
     const createTask = async () => {
+        if (!isFounder) {
+            showToast('Founder access required to create tasks.', 'error');
+            return;
+        }
         if (!newTask.title.trim()) return;
 
         // Haptic
@@ -81,6 +94,10 @@ export default function TasksPage() {
     };
 
     const updateTaskStatus = async (taskId: string, newStatus: string) => {
+        if (!isFounder) {
+            showToast('Founder access required to move tasks.', 'error');
+            return;
+        }
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(5);
 
         let dbStatus = newStatus;
@@ -107,6 +124,10 @@ export default function TasksPage() {
     };
 
     const archiveTask = async (taskId: string) => {
+        if (!isFounder) {
+            showToast('Founder access required to archive tasks.', 'error');
+            return;
+        }
         if (!confirm('Archive this task? it will be moved to the archives below.')) return;
 
         // Haptic on Archive
@@ -210,6 +231,10 @@ export default function TasksPage() {
     };
 
     const handleClarifySubmit = async () => {
+        if (!isFounder) {
+            showToast('Founder access required to clarify tasks.', 'error');
+            return;
+        }
         if (!clarifyTask || !clarification.trim()) return;
 
         try {
@@ -246,13 +271,29 @@ export default function TasksPage() {
                     <p className="text-gray-400 text-sm">Manage and track your swarm's objectives <span className="text-xs text-gray-600">(v3.2)</span></p>
                 </div>
                 <button
-                    onClick={() => setShowNewTaskForm(!showNewTaskForm)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-500 hover:from-violet-600 hover:to-cyan-600 transition-all duration-200 glow-violet shadow-lg shadow-violet-500/20"
+                    onClick={() => isFounder ? setShowNewTaskForm(!showNewTaskForm) : showToast('Founder access required.', 'info')}
+                    className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-500 hover:from-violet-600 hover:to-cyan-600 transition-all duration-200 glow-violet shadow-lg shadow-violet-500/20",
+                        !isFounder && "opacity-50 grayscale cursor-not-allowed"
+                    )}
                 >
                     <Plus className="w-5 h-5" />
                     <span className="font-medium">New Task</span>
                 </button>
             </div>
+
+            {/* Iron Gate Banner (Guest Mode) */}
+            {!isFounder && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center justify-between mb-4 animate-in slide-in-from-top duration-500">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-500" />
+                        <div>
+                            <p className="text-sm font-bold text-amber-400">Guest Access: Read-Only Board</p>
+                            <p className="text-xs text-amber-500/70">You can audit mission progress, but command actions require registration.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* New Task Form */}
             {showNewTaskForm && (

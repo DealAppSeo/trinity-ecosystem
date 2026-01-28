@@ -26,7 +26,9 @@ export const PROVIDER_REGISTRY: Record<string, ProviderDetails> = {
     'groq': { key: 'groq', tier: ProviderTier.ECONOMY, speed: 10, reasoning: 6, isFree: true, family: 'distilled', specialties: ['speed', 'tool-calling'] },
     'cerebras': { key: 'cerebras', tier: ProviderTier.ECONOMY, speed: 10, reasoning: 6, isFree: true, family: 'distilled', specialties: ['ultra-fast', 'inference'] },
     'perplexity': { key: 'perplexity', tier: ProviderTier.BALANCED, speed: 7, reasoning: 8, isFree: false, family: 'specialized', specialties: ['research', 'web-search'] },
-    'openrouter': { key: 'openrouter', tier: ProviderTier.ECONOMY, speed: 7, reasoning: 8, isFree: false, family: 'moe', specialties: ['diversity', 'arbitrage'] }
+    'openrouter': { key: 'openrouter', tier: ProviderTier.ECONOMY, speed: 7, reasoning: 8, isFree: false, family: 'moe', specialties: ['diversity', 'arbitrage'] },
+    'together': { key: 'together', tier: ProviderTier.ECONOMY, speed: 9, reasoning: 7, isFree: false, family: 'transformer', specialties: ['speed', 'code'] },
+    'deepinfra': { key: 'deepinfra', tier: ProviderTier.ECONOMY, speed: 9, reasoning: 7, isFree: false, family: 'transformer', specialties: ['speed', 'tool-calling'] }
 };
 
 // [PHASE 11] INTELLIGENCE ROUTER

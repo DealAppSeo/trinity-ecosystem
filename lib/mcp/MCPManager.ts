@@ -10,6 +10,7 @@ import { GoogleWorkspaceMCP } from './servers/GoogleWorkspaceMCP';
 import { PlaywrightMCP } from './servers/PlaywrightMCP';
 import { CreativeMCP } from './servers/CreativeMCP';
 import { ComposioMCP } from './servers/ComposioMCP';
+import { StitchMCP } from './servers/StitchMCP';
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -29,6 +30,7 @@ export class MCPManager {
         this.registerServer(new PlaywrightMCP());
         this.registerServer(new CreativeMCP());
         this.registerServer(new ComposioMCP());
+        this.registerServer(new StitchMCP());
     }
 
     registerServer(server: MCPServer) {
@@ -68,8 +70,8 @@ export class MCPManager {
         // Define Role-to-Server Mappings
         const accessMap: Record<string, string[]> = {
             'CMO_SQUAD': ['AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Puppeteer', 'Supabase'],
-            'CDO_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Puppeteer', 'Composio'],
-            'CTO_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio'],
+            'CDO_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Puppeteer', 'Composio', 'stitch'],
+            'CTO_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio', 'stitch'],
             'ORCHESTRATOR': ['ALL']
         };
 
@@ -114,6 +116,11 @@ export class MCPManager {
             instruction += `**Description**: ${tool.description}\n`;
             instruction += `**Usage**: \n\`\`\`json\n${JSON.stringify(tool.schema, null, 2)}\n\`\`\`\n\n`;
         });
+
+        // [ANTIGRAVITY] SQUAD-SPECIFIC VISUAL TRUST ENFORCEMENT
+        if (role.includes('CTO_SQUAD') || role.includes('GEMINI')) {
+            instruction += `\n> [!IMPORTANT]\n> **BUILD SQUAD REQUIREMENT**: You MUST provide a Mermaid diagram for all architecture, logic, or code structure tasks to ensure Visual Trust during BFT review.\n`;
+        }
 
         return instruction;
     }

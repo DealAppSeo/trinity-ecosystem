@@ -1023,11 +1023,16 @@ export class ConstitutionalAgent {
 
             const actionDirective = `\n\n[ACTION REQUIRED]: DO NOT just plan.EXECUTE the task.Use your tools(write_file, research) to create tangible artifacts.Output must include[Artifact: filename]if created.`;
 
+            // [ANTIGRAVITY] SQUAD-SPECIFIC MERMAID ENFORCEMENT (Priority 2)
+            const isGamma = this.name.includes('hdm') || this.name.includes('torch') || this.name.includes('nexus') || this.name.includes('gabriel');
+            const mermaidRequirement = isGamma ? "\n\n[PROTOCOL: VISUAL TRUST]\nYou are a member of the Build(Gamma) Squad. You MUST include a Mermaid diagram(e.g., graph TD, classDiagram) in your final artifact to visualize the logic, architecture, or flow of your work." : "";
+
             this.currentTaskId = String(task.id);
             const prompt = `
 ### DIRECTIVE
 ${directive}
 ${actionDirective}
+${mermaidRequirement}
 
 ### INSTRUCTIONS
 ${task.description}
@@ -1042,8 +1047,20 @@ Task Title: ${task.title}
 IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do not just talk about it. EXECUTE.
 `;
 
-            // Call LLM
-            const result = await this.callLLM(prompt, {}, task);
+            // Call LLM (First Pass)
+            let result = await this.callLLM(prompt, {}, task);
+
+            // [PHASE 10] AGENT REFLECTION (Priority 1)
+            // Perform a self-critique loop to improve artifact quality before peer review.
+            if (result.output && result.output !== "Error calling LLM") {
+                const reflectionResult = await this.reflectOnResult(task, result.output);
+                if (reflectionResult.improvement_required) {
+                    console.log(`[${this.name}] 🧠 Self-Reflection triggered: ${reflectionResult.critique}. Refining result...`);
+                    const refinePrompt = `${prompt}\n\n[SELF-REFLECTIONS]:\n${reflectionResult.critique}\n\nPlease regenerate your final output incorporating these improvements.`;
+                    result = await this.callLLM(refinePrompt, {}, task);
+                }
+            }
+
             console.log(`[${this.name}] 🧠 Result length: ${result.output?.length || 0}`);
 
             // [ANTIGRAVITY] ERROR PROPAGATION: Do not continue if LLM failed
@@ -1532,6 +1549,45 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
             handoff_required: handoff && this.name !== targetAgent, // Don't handoff to self
             handoff_to: targetAgent
         };
+    }
+
+    /**
+     * Agent Reflection (Phase 10): Self-critique of the produced output.
+     * Reducing BFT failures and repo deductions at near-zero cost.
+     */
+    private async reflectOnResult(task: Task, output: string): Promise<{ improvement_required: boolean; critique: string }> {
+        const reflectionPrompt = `
+You are evaluating your own output for the following task:
+Task: ${task.title}
+Description: ${task.description}
+
+YOUR OUTPUT:
+${output.substring(0, 2000)}... (truncated)
+
+CRITIQUE CRITERIA:
+1. Does the output directly address all requirements in the description?
+2. If this is a CODE or DESIGN task, is there a Mermaid diagram included (REQUIRED for Gamma Squad)?
+3. Is the quality "Symphony Grade" (premium, readable, robust)?
+4. Is there any obvious hallucination or missing detail?
+
+Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points explaining why" }
+`;
+
+        try {
+            const reflection = await this.callLLM(reflectionPrompt, { model: 'gpt-4o-mini' }); // Use cheap model for reflection
+            const jsonMatch = reflection.output.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                return {
+                    improvement_required: parsed.improvement_required === true,
+                    critique: parsed.critique || "General improvements needed."
+                };
+            }
+        } catch (e) {
+            console.warn(`[REFLECTION] ⚠️ Failed for ${task.id}:`, e);
+        }
+
+        return { improvement_required: false, critique: "" };
     }
 
     async logBenchmark(task: Task, score: number) {
