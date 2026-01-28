@@ -17,15 +17,15 @@ async function verifyEvergreen() {
         });
 
         // 1. Check Method Existence
-        if (typeof agent.runIdleLoop !== 'function') throw new Error('runIdleLoop missing');
+        if (typeof agent.runGenesisLoop !== 'function') throw new Error('runGenesisLoop missing');
         if (typeof agent.spawnNextStep !== 'function') throw new Error('spawnNextStep missing');
-        console.log('✅ Methods Detected: runIdleLoop, spawnNextStep');
+        console.log('✅ Methods Detected: runGenesisLoop, spawnNextStep');
 
         // 2. Mock Supabase (Partial)
-        // We can't fully mock here without complex setup, but we can try running runIdleLoop 
+        // We can't fully mock here without complex setup, but we can try running runGenesisLoop 
         // and see if it catches the require() error or proceeds.
-        await agent.runIdleLoop();
-        console.log('✅ runIdleLoop executed (passed imports/logic check)');
+        await agent.runGenesisLoop();
+        console.log('✅ runGenesisLoop executed (passed imports/logic check)');
 
         console.log('🎉 VERIFICATION PASSED: Phase 9 Codebase Integrity Verified.');
     } catch (err: any) {
