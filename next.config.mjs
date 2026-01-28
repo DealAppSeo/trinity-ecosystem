@@ -5,9 +5,7 @@ const nextConfig = {
         return config;
     },
     transpilePackages: ['@trinity/agent-core'],
-    experimental: {
-        instrumentationHook: true,
-    },
+    experimental: {},
 };
 
 export default nextConfig;

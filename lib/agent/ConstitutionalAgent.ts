@@ -100,6 +100,7 @@ export class ConstitutionalAgent {
     survivorName: string = '';
     lastLoopPulse: number = Date.now();
     lastTaskCategory: 'execute' | 'verify' | null = null;
+    private heartbeatInterval: NodeJS.Timeout | null = null;
 
     // Generic Loop Controls
     private activeTaskRetryCount: number = 0;
