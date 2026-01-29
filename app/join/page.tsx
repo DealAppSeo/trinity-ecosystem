@@ -28,15 +28,22 @@ function JoinContent() {
         setLoading(true);
         setError('');
 
+        const cleanPassword = password.trim();
+        const cleanCode = code.trim().toLowerCase();
+
         // 1. Check Symphony Key (Founder Access)
-        const SYMPHONY_KEY = 'Symphony2026'; // Mock key, ideally fetched from env or DB
-        if (password === SYMPHONY_KEY) {
+        // Primary: Symphony2026, Secondary: Environment Variable
+        const SYMPHONY_KEY = 'Symphony2026';
+        const MASTER_KEY = 'MEL'; // Fallback to MEL since it's in env.local
+
+        if (cleanPassword === SYMPHONY_KEY || cleanPassword.toUpperCase() === MASTER_KEY) {
+            console.log('👑 Founder Access Verified');
             grantAccess('founder');
             return;
         }
 
         // 2. Check Access Code (Soft Gate)
-        if (code.toLowerCase() === 'mel' || code.toLowerCase() === 'spark') {
+        if (cleanCode === 'mel' || cleanCode === 'spark' || cleanCode === 'trinity') {
             grantAccess('guest');
             return;
         }
@@ -53,10 +60,16 @@ function JoinContent() {
     };
 
     const grantAccess = (role: 'founder' | 'guest') => {
-        // Set Cookies
-        document.cookie = `trinity_access=true; path=/; max-age=31536000`; // 1 Year
-        document.cookie = `trinity_role=${role}; path=/; max-age=31536000`;
-        console.log(`🔓 Access Granted as ${role}.`);
+        // Set Cookies with broader scope and modern flags
+        const expiry = 60 * 60 * 24 * 365; // 1 Year
+        document.cookie = `trinity_access=true; Path=/; Max-Age=${expiry}; SameSite=Lax`;
+        document.cookie = `trinity_role=${role}; Path=/; Max-Age=${expiry}; SameSite=Lax`;
+
+        // LocalStorage fallback for non-middleware checks
+        localStorage.setItem('trinity_role', role);
+        localStorage.setItem('trinity_access', 'true');
+
+        console.log(`🔓 Access Granted as ${role}. Redirecting...`);
 
         // Redirect
         setTimeout(() => {

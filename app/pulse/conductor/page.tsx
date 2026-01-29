@@ -33,7 +33,13 @@ export default function ConductorPage() {
 
     useEffect(() => {
         const roleMatch = document.cookie.match(/trinity_role=([^;]+)/);
-        if (roleMatch) setRole(roleMatch[1] as any);
+        if (roleMatch) {
+            setRole(roleMatch[1] as any);
+        } else {
+            // Fallback to localStorage
+            const localRole = localStorage.getItem('trinity_role');
+            if (localRole) setRole(localRole as any);
+        }
     }, []);
 
     const isFounder = role === 'founder';
