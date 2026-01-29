@@ -140,8 +140,14 @@ current_config = RewardConfig()
 # --- Endpoints ---
 
 @app.get("/")
+@app.head("/")
 async def root():
     return {"status": "online", "system": "Trinity Science Division"}
+
+@app.get("/health")
+@app.head("/health")
+async def health():
+    return {"status": "online", "agent": "trinity-science", "timestamp": datetime.utcnow().isoformat()}
 
 @app.post("/anfis/decide", response_model=AnfisOutput)
 async def decide_anfis(data: AnfisInput):
@@ -154,9 +160,9 @@ async def decide_anfis(data: AnfisInput):
     # "Latency as Opportunity" Heuristic
     # If latency is high but User Preference for Accuracy is strictly high -> Interaction Opportunity
     
-    latency = input_data.latency_ms
-    rep = input_data.user_reputation
-    complexity = input_data.task_complexity
+    latency = data.latency_ms
+    rep = data.user_reputation
+    complexity = data.task_complexity
     
     # 1. Heuristic: Latency Rule
     # If latency is high (>1000ms), we MUST engage to maintain flow.

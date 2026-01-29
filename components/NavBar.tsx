@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Mic, Activity, Layers, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
-import { ShareModal } from '@/components/ShareModal';
+import { ShareModal } from '@/components/modals/ShareModal';
 
 export function NavBar() {
     const pathname = usePathname();

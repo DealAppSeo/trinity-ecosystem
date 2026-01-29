@@ -3,10 +3,11 @@
 interface CostTickerProps {
     traditional: number;
     trinity: number;
+    googleStitch?: number;
 }
 
-export function CostTicker({ traditional = 847.00, trinity = 0.47 }: CostTickerProps) {
-    const saved = traditional - trinity;
+export function CostTicker({ traditional = 847.00, trinity = 0.47, googleStitch = 0.00 }: CostTickerProps) {
+    const saved = traditional - (trinity + googleStitch);
     const percentage = ((saved / traditional) * 100).toFixed(2);
 
     return (
@@ -22,7 +23,7 @@ export function CostTicker({ traditional = 847.00, trinity = 0.47 }: CostTickerP
             </div>
 
             <div className="text-xs text-text-muted font-mono hidden sm:block">
-                ${traditional.toFixed(2)} → ${trinity.toFixed(2)}
+                ${traditional.toFixed(2)} → ${trinity.toFixed(2)} [S:${googleStitch.toFixed(2)}]
             </div>
         </div>
     );

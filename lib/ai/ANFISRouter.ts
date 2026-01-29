@@ -22,16 +22,16 @@ export class ANFISRouter {
     private rules: { premise: number[]; consequent: number[] }[] = [];
     private membershipFuncs: ((x: number) => number)[] = [];
 
-    constructor(numInputs: number = 3, numRules: number = 5) {
+    constructor(numInputs: number = 5, numRules: number = 8) {
         // Initialize Fuzzy Membership Functions (Gaussian Bell-shaped)
-        // Inputs: [Complexity, Urgency, SemanticMatch]
+        // Inputs: [Complexity, Urgency, SemanticMatch, CostSensitivity, LatencyRequirement]
         this.membershipFuncs = Array(numInputs).fill(0).map(() => (x: number) => {
             const center = 0.5;
             const width = 0.2;
             return Math.exp(-Math.pow(x - center, 2) / (2 * Math.pow(width, 2)));
         });
 
-        // Initialize Rules with Random Weights (to be optimized)
+        // Initialize Rules with Random Weights (optimized via ChHHO)
         for (let i = 0; i < numRules; i++) {
             this.rules.push({
                 premise: Array(numInputs).fill(0).map(() => Math.random()),
@@ -96,20 +96,27 @@ export class ANFISRouter {
             return sum + norm * this.rules[i].consequent[0];
         }, 0);
 
-        // 4. Decision Logic (Squad Selection)
-        // Output 0.0-0.33: ALPHA | 0.33-0.66: BETA | 0.66-1.0: GAMMA
+        // 4. Decision Logic (Squad & Model Selection)
+        // Highly optimized mapping based on User Heuristics
         let targetSquad: GroupId = 'GAMMA';
-        let suggestedModel: any = 'gemini-1.5-pro';
+        let suggestedModel: any = 'mistral-small-3';
 
-        if (outputScore < 0.33) {
-            targetSquad = 'ALPHA'; // Truth
-            suggestedModel = 'grok-beta';
-        } else if (outputScore < 0.66) {
-            targetSquad = 'BETA'; // Care
+        if (outputScore < 0.25) {
+            targetSquad = 'ALPHA';
+            // Speed Champion for interactive lookups
+            suggestedModel = 'groq';
+        } else if (outputScore < 0.50) {
+            targetSquad = 'BETA';
+            // Cost Leader for standard text/design work
+            suggestedModel = 'local_4090';
+        } else if (outputScore < 0.75) {
+            targetSquad = 'GAMMA';
+            // Elite tier for deep code/architecture
             suggestedModel = 'claude-3-5-sonnet';
         } else {
-            targetSquad = 'GAMMA'; // Build
-            suggestedModel = 'gemini-1.5-pro';
+            targetSquad = 'ORCHESTRATION';
+            // Deep reasoning for complex multi-hop tasks
+            suggestedModel = 'deepseek-r1';
         }
 
         return {
@@ -122,14 +129,15 @@ export class ANFISRouter {
 
     // Static Helper for legacy compat (wraps instance)
     static async route(taskDescription: string): Promise<RoutingResult> {
-        // Convert text to mock vector
-        // Complexity: length, Urgency: keywords, Semantic: random hash
+        // Convert text to mock 5-D vector
         const complexity = Math.min(taskDescription.length / 500, 1);
         const urgency = taskDescription.match(/urgent|critical|now/i) ? 0.9 : 0.4;
         const semantic = (taskDescription.length % 10) / 10;
+        const costSensitivity = taskDescription.match(/cheap|budget|save|local/i) ? 0.8 : 0.2;
+        const latencyRequirement = taskDescription.match(/sync|real-time|fast|instant/i) ? 0.9 : 0.3;
 
         const router = new ANFISRouter();
         router.optimize(); // Run one optimization step
-        return router.route([complexity, urgency, semantic]);
+        return router.route([complexity, urgency, semantic, costSensitivity, latencyRequirement]);
     }
 }

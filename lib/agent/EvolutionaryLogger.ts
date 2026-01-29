@@ -101,4 +101,31 @@ export class EvolutionaryLogger {
         // [PHASE 12] Future implementation for RAG-style strategy retrieval
         return [];
     }
+
+    /**
+     * Checks recent performance and returns true if a "Learning Loop" (Self-Healing) should be triggered.
+     */
+    async checkOperationalHealth(): Promise<{ shouldHeal: boolean; reason: string }> {
+        try {
+            // Query last 5 logs for this agent
+            const { data: logs, error } = await this.supabase
+                .from('trinity_evolution_vault')
+                .select('outcome, effect_score')
+                .eq('agent_name', this.agentName)
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            if (error || !logs || logs.length < 3) return { shouldHeal: false, reason: 'Insufficient history' };
+
+            const failureCount = logs.filter(l => l.outcome === 'Failure' || (l.effect_score !== undefined && l.effect_score < 40)).length;
+
+            if (failureCount >= 3) {
+                return { shouldHeal: true, reason: `Repetitive failure detected (${failureCount}/5 recent tasks failed or scored low)` };
+            }
+
+            return { shouldHeal: false, reason: 'Status: Optimal' };
+        } catch (e: any) {
+            return { shouldHeal: false, reason: `Health check error: ${e.message}` };
+        }
+    }
 }

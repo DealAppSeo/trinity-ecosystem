@@ -26,6 +26,7 @@
     "infra-heartbeat": "npx tsx scripts/service-heartbeat.ts"
   },
   "dependencies": {
+    "@langchain/langgraph": "^1.1.2",
     "@octokit/rest": "^22.0.1",
     "@supabase/mcp-server-postgrest": "^0.1.0",
     "@supabase/supabase-js": "^2.45.0",

@@ -7,6 +7,7 @@ import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
 import { mcpManager } from '../mcp/MCPManager';
 import { IntelligenceRouter, PROVIDER_REGISTRY } from './IntelligenceRouter';
 import { EvolutionaryLogger } from './EvolutionaryLogger';
+import { Octokit } from '@octokit/rest';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
@@ -88,6 +89,7 @@ export class ConstitutionalAgent {
     redis: Redis | null;
     availableProviders: string[];
     researchTool: ResearchTool; // Dependency Injection slot
+    private octokit: Octokit;
 
     // RepID & Governance State
     reputationScore: number = 0;
@@ -210,6 +212,7 @@ export class ConstitutionalAgent {
         this.availableProviders = this.detectProviders();
         this.router = new IntelligenceRouter(this.name);
         this.evolutionLogger = new EvolutionaryLogger(this.supabase, this.name);
+        this.octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
         console.log(`[${this.name}] 🚀 Initialized v${this.version}`);
     }
 
@@ -223,7 +226,11 @@ export class ConstitutionalAgent {
             { key: 'cerebras', env: 'CEREBRAS_API_KEY' },
             { key: 'deepseek', env: 'DEEPSEEK_API_KEY' },
             { key: 'openrouter', env: 'OPENROUTER_API_KEY' },
-            { key: 'perplexity', env: 'PERPLEXITY_API_KEY' }
+            { key: 'together', env: 'TOGETHER_API_KEY' },
+            { key: 'deepinfra', env: 'DEEPINFRA_API_KEY' },
+            { key: 'perplexity', env: 'PERPLEXITY_API_KEY' },
+            { key: 'fireworks', env: 'FIREWORKS_API_KEY' },
+            { key: 'local_4090', env: 'LOCAL_INFERENCE_URL' }
         ];
         return providers.filter(p => process.env[p.env]).map(p => p.key);
     }
@@ -496,6 +503,18 @@ export class ConstitutionalAgent {
 
         while (true) {
             try {
+                // [PHASE 1] Operational Health Check (Evolutionary Learning Trigger)
+                try {
+                    const health = await this.evolutionLogger.checkOperationalHealth();
+                    if (health.shouldHeal) {
+                        console.log(`[${this.name}] 🧬 LEARNING LOOP TRIGGERED: ${health.reason}`);
+                        await this.spawnMaintenanceTask(health.reason);
+                        await this.sleep(30000); // Wait before continuing to avoid loop thrashing
+                    }
+                } catch (healthError) {
+                    console.warn(`[${this.name}] ⚠️ Health check error:`, healthError);
+                }
+
                 // [ANTIGRAVITY] STUCK TASK WATCHDOG: Release tasks stuck in 'doing' for > 15 mins
                 const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
                 const { data: stuckTasks } = await this.supabase
@@ -1270,8 +1289,15 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
         }
     }
 
-    async spawnMaintenanceTask() {
-        console.log(`[${this.name}] 🛠️ Seeding maintenance task...`);
+    async spawnMaintenanceTask(reason?: string) {
+        // [ANTIGRAVITY] Loop Dampening: Check Throttle
+        const canSpawn = await this.canCreateHealingTask();
+        if (!canSpawn) {
+            console.log(`[${this.name}] 🛡️ Maintenance/Healing task suppressed by loop stabilizer.`);
+            return;
+        }
+
+        console.log(`[${this.name}] 🛠️ Seeding maintenance task... ${reason || ''}`);
         const maintenanceTasks = [
             { title: '[MAINTENANCE] Audit recent RepID updates', description: 'Review recent reputation changes for BFT compliance.' },
             { title: '[MAINTENANCE] Clean up artifact noise', description: 'Identify and flag redundant or low-quality artifacts.' },
@@ -1279,7 +1305,9 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
             { title: '[MAINTENANCE] Cache optimization', description: 'Review Redis usage and suggest eviction strategies.' }
         ];
 
-        const selected = maintenanceTasks[Math.floor(Math.random() * maintenanceTasks.length)];
+        const selected = reason
+            ? { title: `[HEALING] Resolve: ${reason}`, description: `Automated self-healing triggered by repetitive failure: ${reason}. Analyze logs and propose fix.` }
+            : maintenanceTasks[Math.floor(Math.random() * maintenanceTasks.length)];
 
         try {
             await this.supabase.from('trinity_tasks').insert([{
@@ -1574,7 +1602,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
 `;
 
         try {
-            const reflection = await this.callLLM(reflectionPrompt, { model: 'gpt-4o-mini' }); // Use cheap model for reflection
+            const reflection = await this.callLLM(reflectionPrompt, { model: 'deepseek/deepseek-chat' }, { title: '[REFLECTION]', status: 'doing' } as any); // Use cost-efficient model for reflection
             const jsonMatch = reflection.output.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 const parsed = JSON.parse(jsonMatch[0]);
@@ -1721,25 +1749,44 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
 
     async canCreateHealingTask(): Promise<boolean> {
         // Enforce HEALING Protocol throttle
-        await this.checkMCP('HEALING');
+        try {
+            await this.checkMCP('HEALING');
+        } catch (e) {
+            // If checkMCP fails, still proceed but with caution
+        }
 
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-        // GLOBAL CHECK
+
+        // 1. GLOBAL CHECK for HEALING and ANTIFRAGILE tasks
         const { count, error } = await this.supabase
             .from('trinity_tasks')
             .select('id', { count: 'exact', head: true })
-            .ilike('title', '%HEALING%')
-            // .eq('claimed_by', this.name) // REMOVED: Check globally!
+            .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%`)
             .gte('created_at', oneHourAgo);
 
         if (error) {
-            // console.error(...)
+            console.error(`[${this.name}] ⚠️ Health check query failed:`, error.message);
             return false;
         }
 
-        const limit = 5; // Global limit 5
+        const limit = 5; // Global limit 5 per hour
         if ((count || 0) >= limit) {
-            console.warn(`[${this.name}] 🛑 HEALING THROTLED: Global count ${count}/hr.`);
+            console.warn(`[${this.name}] 🛑 HEALING THROTTLED: Global diagnostics count ${count}/${limit} per hour.`);
+            return false;
+        }
+
+        // 2. PER-AGENT CHECK: Don't spawn multiple healing tasks for the same agent in short succession
+        const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+        const { data: recentAgentHealing } = await this.supabase
+            .from('trinity_tasks')
+            .select('id')
+            .eq('metadata->>agent', this.name)
+            .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%`)
+            .gte('created_at', tenMinsAgo)
+            .limit(1);
+
+        if (recentAgentHealing && recentAgentHealing.length > 0) {
+            console.log(`[${this.name}] 🧊 Recent healing task for ${this.name} already exists. Skipping.`);
             return false;
         }
 
@@ -1747,11 +1794,14 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
     }
 
     // [ANTIGRAVITY] Enhanced Artifact Saver (Single Source of Truth)
-    async saveArtifact(taskId: string, content: string, type: string = 'text', title?: string, accessLevel: string = 'protected') {
+    async saveArtifact(taskId: string, content: string | { path: string, content: string }[], type: string = 'text', title?: string, accessLevel: string = 'protected') {
         let artifactUrl = null;
         let artifactId = null;
         const safeTaskId = String(taskId || 'self-gen-' + Date.now());
         const safeTitle = title || `Artifact ${safeTaskId}`;
+
+        // Normalized content for hashing and storage
+        const normalizeContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
 
         // [ANTIGRAVITY] BIGINT CONVERSION for trinity_artifacts.task_id
         let dbTaskId: any = safeTaskId;
@@ -1764,13 +1814,14 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
 
             // Calculate Hash
             const crypto = require('crypto');
-            const fileHash = crypto.createHash('sha256').update(content).digest('hex');
+            const fileHash = crypto.createHash('sha256').update(normalizeContent).digest('hex');
 
             // 1. UPLOAD TO STORAGE
             try {
                 let ext = 'md';
-                if (type === 'code' || content.includes('```ts') || content.includes('```js')) ext = 'ts';
+                if (type === 'code' || normalizeContent.includes('```ts') || normalizeContent.includes('```js')) ext = 'ts';
                 if (type === 'design' || type === 'image') ext = 'png';
+                if (Array.isArray(content)) ext = 'json'; // Multi-file bundles as JSON metadata
 
                 const timestamp = Date.now();
                 const now = new Date();
@@ -1783,7 +1834,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                 const { error: uploadError } = await this.supabase
                     .storage
                     .from('trinity-artifacts')
-                    .upload(storagePath, content, {
+                    .upload(storagePath, normalizeContent, {
                         contentType: type === 'image' ? 'image/png' : 'text/plain;charset=UTF-8',
                         upsert: true
                     });
@@ -1831,7 +1882,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                     const payload: any = {
                         task_id: dbTaskId,
                         title: safeTitle,
-                        content: content, // Ensuring content is included
+                        content: normalizeContent, // Ensuring content is included
                         artifact_type: type || 'text',
                         file_hash: fileHash,
                         created_at: new Date().toISOString(),
@@ -1868,7 +1919,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                         console.warn(`[ARTIFACT] Primary schema (V5) failed. Trying Legacy schema (V4)...`);
                         const v4Payload = {
                             ...payload,
-                            content_preview: content.substring(0, 5000),
+                            content_preview: normalizeContent.substring(0, 5000),
                             agent: this.name,
                             file_path: artifactUrl,
                             status: 'created'
@@ -1910,7 +1961,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
 
                     const filename = `task-${safeTaskId.substring(0, 8)}.md`;
                     const fullPath = path.join(artifactsDir, filename);
-                    fs.writeFileSync(fullPath, content, 'utf8');
+                    fs.writeFileSync(fullPath, normalizeContent, 'utf8');
                 } catch (e) { /* Ignore local fs errors */ }
             }
 
@@ -2314,11 +2365,51 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         type: 'object',
                         properties: {
                             title: { type: 'string', description: 'Title of the artifact' },
-                            content: { type: 'string', description: 'The full text content of the artifact. MUST BE COMPLETE.' },
+                            content: { type: 'string', description: 'The full text content of the artifact. Required if files is not provided.' },
+                            files: {
+                                type: 'array',
+                                description: 'Optional: Multiple files to include in this artifact.',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        path: { type: 'string', description: 'Relative path to the file' },
+                                        content: { type: 'string', description: 'Full content of the file' }
+                                    },
+                                    required: ['path', 'content']
+                                }
+                            },
                             type: { type: 'string', enum: ['code', 'document', 'design', 'report', 'md', 'data'] },
                             access_level: { type: 'string', enum: ['public', 'registered', 'protected'], default: 'protected' }
                         },
-                        required: ['title', 'content', 'type']
+                        required: ['title', 'type']
+                    }
+                }
+            });
+
+            openAiTools.push({
+                type: 'function',
+                function: {
+                    name: 'create_pull_request',
+                    description: 'Create a GitHub Pull Request to propose code improvements or new features.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: 'Title of the Pull Request' },
+                            body: { type: 'string', description: 'Detailed description of the changes' },
+                            branch: { type: 'string', description: 'Name of the new branch to create (e.g., feature/agent-logic-fix)' },
+                            files: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        path: { type: 'string', description: 'Relative path to the file' },
+                                        content: { type: 'string', description: 'The full content of the file' }
+                                    },
+                                    required: ['path', 'content']
+                                }
+                            }
+                        },
+                        required: ['title', 'body', 'branch', 'files']
                     }
                 }
             });
@@ -2344,7 +2435,6 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     ]);
 
                     if (providerResult) {
-                        // Tag task with provider used for downstream verification logic
                         if (task) {
                             if (!task.metadata) task.metadata = JSON.stringify({});
                             try {
@@ -2352,6 +2442,17 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                                 meta.provider_used = providerKey;
                                 task.metadata = JSON.stringify(meta);
                             } catch (e) { }
+
+                            // [PHASE 12] record evolution
+                            await this.evolutionLogger.recordEvolution({
+                                task_id: (task as any).id,
+                                intent: `Execute ${task.task_type || 'general'} task: ${task.title}`,
+                                strategy: providerKey,
+                                action_details: { model: forcedModel || 'default', provider: providerKey },
+                                outcome: 'Success',
+                                effect_score: 100, // Initial assume
+                                learned_insight: `Successfully utilized ${providerKey} for ${task.task_type || 'general'} task.`
+                            });
                         }
                         return providerResult;
                     }
@@ -2390,11 +2491,15 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         if (provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools);
         else if (provider === 'anthropic') providerPromise = this.callAnthropic(systemPrompt, prompt, tools);
         else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt, tools);
-        else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt, tools);
-        else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt, tools);
+        else if (provider === 'grok') providerPromise = this.callOpenAICompatible('https://api.x.ai/v1/chat/completions', process.env.GROK_API_KEY!, 'grok-2-latest', systemPrompt, prompt, tools);
+        else if (provider === 'groq') providerPromise = this.callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', process.env.GROK_API_KEY!, 'llama-3.3-70b-versatile', systemPrompt, prompt, tools);
+        else if (provider === 'fireworks') providerPromise = this.callOpenAICompatible('https://api.fireworks.ai/inference/v1/chat/completions', process.env.FIREWORKS_API_KEY!, 'accounts/fireworks/models/llama-v3p3-70b-instruct', systemPrompt, prompt, tools);
+        else if (provider === 'together') providerPromise = this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', systemPrompt, prompt, tools);
+        else if (provider === 'local_4090') providerPromise = this.callOpenAICompatible(`${process.env.LOCAL_INFERENCE_URL}/v1/chat/completions`, 'local', process.env.LOCAL_MODEL || 'llama3.1:8b', systemPrompt, prompt, tools);
         else if (provider === 'cerebras') providerPromise = this.callCerebras(systemPrompt, prompt, tools);
         else if (provider === 'deepseek') providerPromise = this.callDeepSeek(systemPrompt, prompt, tools);
         else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt, tools, modelOverride);
+        else if (provider === 'deepinfra') providerPromise = this.callDeepInfra(systemPrompt, prompt, tools);
         else if (provider === 'perplexity') providerPromise = this.callPerplexity(systemPrompt, prompt, tools);
         else throw new Error(`Provider ${provider} not implemented`);
 
@@ -2447,16 +2552,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                             console.error(`[${this.name}] ❌ Failed to parse tool arguments from OpenAI:`, toolCall.function.arguments);
                             continue;
                         }
-                        let toolResult = '';
-                        if (fnName === 'save_artifact') {
-                            const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-                            const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
-                            artifactLinks.push(link);
-                            toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
-                        }
-                        else {
-                            toolResult = await mcpManager.routeToolCall(fnName, args);
-                        }
+                        const toolResult = await this.handleToolCall(fnName, args, artifactLinks);
                         messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
                     }
                 } else {
@@ -2477,7 +2573,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         throw new Error("Max tool recursion");
     }
 
-    async callAnthropic(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+    async callAnthropic(systemPrompt: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) throw new Error("ANTHROPIC_API_KEY is missing");
 
@@ -2494,7 +2590,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         for (let i = 0; i < 5; i++) {
             const body: any = {
                 model: 'claude-3-5-sonnet-20241022',
-                system,
+                system: systemPrompt,
                 messages,
                 max_tokens: 4000,
                 tools: anthropicTools.length > 0 ? anthropicTools : undefined
@@ -2520,26 +2616,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             if (resultParts.length > 0) {
                 const toolResults = [];
                 for (const toolCall of resultParts) {
-                    const fnName = toolCall.name;
-                    const args = toolCall.input;
-                    let toolResult = '';
-
-                    console.log(`[${this.name}] [Anthropic] Tool Call: ${fnName}`);
-
-                    if (fnName === 'save_artifact') {
-                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-                        const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
-                        artifactLinks.push(link);
-                        toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
-                    } else {
-                        try {
-                            toolResult = await mcpManager.routeToolCall(fnName, args);
-                        } catch (e) {
-                            console.error(`[${this.name}] [Anthropic] ❌ Tool execution failed:`, e);
-                            toolResult = `Error: Tool execution failed.`;
-                        }
-                    }
-
+                    const toolResult = await this.handleToolCall(toolCall.name, toolCall.input, artifactLinks);
                     toolResults.push({
                         type: 'tool_result',
                         tool_use_id: toolCall.id,
@@ -2558,7 +2635,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         throw new Error("Max tool recursion");
     }
 
-    async callGemini(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+    async callGemini(systemPrompt: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) throw new Error("GEMINI_API_KEY is missing");
 
@@ -2576,7 +2653,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
         const contents: any[] = [{
             role: 'user',
-            parts: [{ text: `System Instruction: ${system}\n\nUser Prompt: ${prompt}` }]
+            parts: [{ text: `System Instruction: ${systemPrompt}\n\nUser Prompt: ${prompt}` }]
         }];
 
         const artifactLinks: string[] = [];
@@ -2610,28 +2687,12 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 for (const toolCall of toolCalls) {
                     const fnName = toolCall.functionCall.name;
                     const args = toolCall.functionCall.args;
-                    let toolResult = '';
-
-                    console.log(`[${this.name}] [Gemini] Tool Call: ${fnName}`);
-
-                    if (fnName === 'save_artifact') {
-                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-                        const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
-                        artifactLinks.push(link);
-                        toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
-                    } else {
-                        try {
-                            toolResult = await mcpManager.routeToolCall(fnName, args);
-                        } catch (e) {
-                            console.error(`[${this.name}] [Gemini] ❌ Tool execution failed:`, e);
-                            toolResult = `Error: Tool execution failed.`;
-                        }
-                    }
+                    const toolResult = await this.handleToolCall(fnName, args, artifactLinks);
 
                     toolResponseParts.push({
                         functionResponse: {
                             name: fnName,
-                            response: { content: toolResult }
+                            response: { result: toolResult }
                         }
                     });
                 }
@@ -2672,6 +2733,14 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
     async callPerplexity(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
         return this.callOpenAICompatible('https://api.perplexity.ai/chat/completions', process.env.PERPLEXITY_API_KEY!, 'llama-3.1-sonar-large-128k-online', system, prompt, tools);
+    }
+
+    async callTogether(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools);
+    }
+
+    async callDeepInfra(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.deepinfra.com/v1/openai/chat/completions', process.env.DEEPINFRA_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools);
     }
 
     async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[]): Promise<LLMResult> {
@@ -2781,6 +2850,82 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             // This enables cross-chain sovereign reputation as per whitepaper Part IV
         } catch (e: any) {
             console.warn(`[ERC-8004] Interop failed: ${e.message}`);
+        }
+    }
+
+    private async handleToolCall(fnName: string, args: any, artifactLinks: string[]): Promise<string> {
+        console.log(`[${this.name}] 🛠️ Executing tool: ${fnName}`);
+        if (fnName === 'save_artifact') {
+            const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+            const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+            artifactLinks.push(link);
+            return `Artifact '${args.title}' saved. Link: ${link}`;
+        } else if (fnName === 'create_pull_request') {
+            return await this.createPullRequest(args.title, args.body, args.branch, args.files);
+        } else {
+            try {
+                return await mcpManager.routeToolCall(fnName, args);
+            } catch (e: any) {
+                console.error(`[${this.name}] ❌ Tool execution failed (${fnName}):`, e.message);
+                return `Error: Tool execution failed. ${e.message}`;
+            }
+        }
+    }
+
+    /**
+     * [ANTIGRAVITY] Self-Improvement: Create a Pull Request autonomously.
+     */
+    async createPullRequest(title: string, body: string, branch: string, files: { path: string, content: string }[]): Promise<string> {
+        if (!process.env.GITHUB_TOKEN) return "Error: GITHUB_TOKEN not configured.";
+        const owner = process.env.GITHUB_OWNER || 'dealappseo';
+        const repo = process.env.GITHUB_REPO || 'trinity-ecosystem';
+
+        try {
+            // 1. Get default branch
+            const { data: repository } = await this.octokit.repos.get({ owner, repo });
+            const baseBranch = repository.default_branch;
+
+            // 2. Get the SHA of the base branch
+            const { data: ref } = await this.octokit.git.getRef({ owner, repo, ref: `heads/${baseBranch}` });
+            const baseSha = ref.object.sha;
+
+            // 3. Create a new branch
+            await this.octokit.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: baseSha });
+
+            // 4. Create blobs and tree
+            const tree = await Promise.all(files.map(async f => {
+                const { data: blob } = await this.octokit.git.createBlob({ owner, repo, content: f.content, encoding: 'utf-8' });
+                return { path: f.path, mode: '100644', type: 'blob', sha: blob.sha };
+            }));
+
+            const { data: newTree } = await this.octokit.git.createTree({ owner, repo, base_tree: baseSha, tree: tree as any });
+
+            // 5. Create commit
+            const { data: commit } = await this.octokit.git.createCommit({
+                owner,
+                repo,
+                message: title,
+                tree: newTree.sha,
+                parents: [baseSha]
+            });
+
+            // 6. Update ref
+            await this.octokit.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: commit.sha });
+
+            // 7. Create Pull Request
+            const { data: pr } = await this.octokit.pulls.create({
+                owner,
+                repo,
+                title,
+                body,
+                head: branch,
+                base: baseBranch
+            });
+
+            return `Pull Request created successfully: ${pr.html_url}`;
+        } catch (e: any) {
+            console.error(`[${this.name}] ❌ PR Creation Failed:`, e.message);
+            return `Error creating PR: ${e.message}`;
         }
     }
 }
