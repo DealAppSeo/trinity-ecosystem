@@ -36,7 +36,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="font-display antialiased pt-16 pb-16 md:pb-0">
+      <body className="font-display antialiased md:pb-0">
         <ToastProvider>
           <GlobalErrorBoundary>
             <Gatekeeper />

@@ -51,19 +51,9 @@ export default function WatchPage() {
 
     return (
         <div className="min-h-screen bg-[#060608] flex flex-col animate-in fade-in duration-700">
-            {/* WATCHING BANNER */}
-            <div className="bg-violet-500/10 border-b border-violet-500/20 px-4 py-3 text-center text-[10px] font-mono text-violet-400 flex items-center justify-center gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-ping" />
-                EYE OF THE SWARM: LIVE HYPERDAG TELEMETRY ACTIVE
-            </div>
+            {/* The root layout NavBar now handles the title and actions */}
 
-            <Header
-                title="Symphony Observatory"
-                showLive
-                viewerCount={1243}
-            />
-
-            <main className="flex-1 max-w-7xl mx-auto w-full px-4 lg:px-8 py-8 space-y-12 pb-24">
+            <main className="flex-1 max-w-7xl mx-auto w-full px-4 lg:px-8 py-12 space-y-12 pb-24">
                 {/* Intro Section */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8">
                     <div>

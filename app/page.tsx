@@ -16,7 +16,7 @@ export default async function LandingPage() {
   const trinityCost = cost?.trinity_cost ?? 0.47;
 
   return (
-    <main className="min-h-screen bg-obsidian-base">
+    <main className="min-h-screen bg-obsidian-base pt-20 pb-16">
 
       {/* HERO SECTION */}
       <section className="relative px-6 py-24 md:py-32 flex flex-col items-center justify-center text-center overflow-hidden">

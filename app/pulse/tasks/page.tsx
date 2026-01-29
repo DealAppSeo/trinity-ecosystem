@@ -270,12 +270,8 @@ export default function TasksPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold mb-2">Mission Tasks</h2>
-                    <p className="text-gray-400 text-sm">Manage and track your swarm's objectives <span className="text-xs text-gray-600">(v3.2)</span></p>
-                </div>
+            {/* Header consolidated into root NavBar */}
+            <div className="flex justify-end mb-4">
                 <button
                     onClick={() => isFounder ? setShowNewTaskForm(!showNewTaskForm) : showToast('Founder access required.', 'info')}
                     className={cn(
