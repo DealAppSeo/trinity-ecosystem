@@ -32,9 +32,9 @@ function JoinContent() {
         const cleanCode = code.trim().toLowerCase();
 
         // 1. Check Symphony Key (Founder Access)
-        // Primary: Symphony2026, Secondary: Environment Variable
+        // Primary: Symphony2026, Secondary: JOHN316 (User's new MASTER_ACCESS_KEY)
         const SYMPHONY_KEY = 'Symphony2026';
-        const MASTER_KEY = 'MEL'; // Fallback to MEL since it's in env.local
+        const MASTER_KEY = 'JOHN316';
 
         if (cleanPassword === SYMPHONY_KEY || cleanPassword.toUpperCase() === MASTER_KEY) {
             console.log('👑 Founder Access Verified');
