@@ -47,22 +47,21 @@ export function NavBar() {
                         <div className="w-8 h-8 rounded-lg bg-accent-violet flex items-center justify-center shadow-glow-violet group-hover:scale-105 transition-transform">
                             <Activity className="w-5 h-5 text-white" />
                         </div>
-                        <span className="font-display font-bold text-xl text-text-primary tracking-tight hidden sm:block">
-                            Trinity
-                        </span>
                     </Link>
 
                     <div className="h-6 w-px bg-white/10 mx-1 hidden md:block" />
 
-                    <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent truncate max-w-[180px] sm:max-w-none">
-                        {getPageTitle()}
-                    </h1>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] md:text-xs font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent uppercase tracking-widest leading-none mb-1">
+                            AI Trinity Symphony
+                        </span>
+                        <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent truncate max-w-[180px] sm:max-w-none leading-tight">
+                            {getPageTitle()}
+                        </h1>
+                    </div>
                 </div>
 
-                {/* Desktop Navigation (REMOVED REDUNDANT LINKS) */}
-                <nav className="hidden md:flex items-center gap-8">
-                    {/* Centered links removed as per user request */}
-                </nav>
+                <nav className="hidden md:flex items-center gap-8 flex-1" />
 
                 {/* Actions (Voice / Profile) */}
                 <div className="flex items-center gap-2 sm:gap-4">
