@@ -1,8 +1,6 @@
-'use client';
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
     Home,
     Users,
@@ -13,7 +11,9 @@ import {
     Layers,
     Activity,
     Lightbulb,
-    LayoutGrid
+    LayoutGrid,
+    LogOut,
+    ShieldCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -23,13 +23,38 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
+    const [role, setRole] = useState<'founder' | 'guest' | 'verified'>('guest');
+
+    useEffect(() => {
+        const roleMatch = document.cookie.match(/trinity_role=([^;]+)/);
+        if (roleMatch) {
+            setRole(roleMatch[1] as any);
+        } else {
+            const localRole = localStorage.getItem('trinity_role');
+            if (localRole) setRole(localRole as any);
+        }
+    }, []);
+
+    const handleLogout = () => {
+        // Clear Cookies
+        document.cookie = "trinity_access=; Path=/; Max-Age=0; SameSite=Lax";
+        document.cookie = "trinity_role=; Path=/; Max-Age=0; SameSite=Lax";
+
+        // Clear LocalStorage
+        localStorage.removeItem('trinity_role');
+        localStorage.removeItem('trinity_access');
+
+        // Redirect to Join Gate
+        router.push('/join');
+    };
 
     const navItems = [
         { path: '/pulse/dashboard', icon: Home, label: 'Dashboard' },
         { path: '/pulse/tasks', icon: CheckSquare, label: 'Tasks' },
-        { path: '/pulse/directives', icon: Lightbulb, label: 'Ideas' }, // New
+        { path: '/pulse/directives', icon: Lightbulb, label: 'Ideas' },
         { path: '/pulse/agents', icon: Users, label: 'Agents' },
-        { path: '/pulse/sandbox', icon: LayoutGrid, label: 'Apps' }, // New
+        { path: '/pulse/sandbox', icon: LayoutGrid, label: 'Apps' },
         { path: '/pulse/artifacts', icon: Package, label: 'Artifacts' },
         { path: '/pulse/wisdom', icon: Layers, label: 'Governance' },
         { path: '/pulse/watch', icon: Activity, label: 'Public View' },
@@ -71,7 +96,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     </div>
 
                     {/* Navigation */}
-                    <nav className="flex-1 space-y-2">
+                    <nav className="flex-1 space-y-2 overflow-y-auto scrollbar-hide">
                         {navItems.map((item) => {
                             const isActive = pathname === item.path;
                             const Icon = item.icon;
@@ -97,13 +122,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         })}
                     </nav>
 
-                    {/* Footer Info */}
-                    <div className="bg-white/5 rounded-lg p-4 mt-4 border border-white/5">
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                            <span className="text-xs text-gray-400">System Online</span>
+                    {/* Footer Info & Logout */}
+                    <div className="mt-auto pt-6 space-y-4">
+                        <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <ShieldCheck className={role === 'founder' ? 'text-emerald-400' : 'text-violet-400'} size={14} />
+                                    <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400 truncate max-w-[100px]">
+                                        {role}
+                                    </span>
+                                </div>
+                                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                            </div>
+                            <p className="text-[10px] text-gray-500 font-mono">Trinity OS v1.0.2</p>
                         </div>
-                        <p className="text-xs text-gray-500">v1.0.0 • Trinity OS</p>
+
+                        <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors font-medium border border-transparent hover:border-red-500/20"
+                        >
+                            <LogOut className="w-5 h-5" />
+                            <span>Logout</span>
+                        </button>
                     </div>
                 </div>
             </aside>

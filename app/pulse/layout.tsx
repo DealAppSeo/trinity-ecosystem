@@ -5,6 +5,8 @@ import { BottomNav } from '@/components/BottomNav';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { Mic } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 
 export default function PulseLayout({ children }: { children: React.ReactNode }) {
     // Sidebar state only relevant for desktop expand/collapse in future if needed
@@ -45,6 +47,30 @@ export default function PulseLayout({ children }: { children: React.ReactNode })
                             <h2 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
                                 {getTitle()}
                             </h2>
+                        </div>
+
+                        {/* Actions (Voice / Share) */}
+                        <div className="flex items-center gap-3">
+                            <button className="flex items-center justify-center w-10 h-10 rounded-full bg-accent-violet/10 hover:bg-accent-violet/20 text-accent-violet transition-colors">
+                                <Mic className="w-5 h-5" />
+                            </button>
+
+                            <Button
+                                size="sm"
+                                onClick={() => setShowShareModal(true)}
+                                className="hidden sm:flex bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-glow-violet border-none"
+                            >
+                                Share & Earn
+                            </Button>
+
+                            {/* Mobile Share Icon (Optional but helpful for consistency if Button is hidden) */}
+                            <button
+                                onClick={() => setShowShareModal(true)}
+                                className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full bg-accent-violet/10 hover:bg-accent-violet/20 text-accent-violet transition-colors"
+                            >
+                                <ShareModal isOpen={false} onClose={() => { }} /> {/* Just for icon reference if needed, but we'll use a lucide icon */}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-share-2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
+                            </button>
                         </div>
                     </div>
                 </header>

@@ -69,44 +69,48 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
         window.open(link, '_blank', 'width=600,height=400');
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-4" onClick={onClose}>
+        <div
+            className="fixed inset-0 z-[10000] flex items-start justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-300 p-4 pt-[8vh] sm:pt-[15vh] overflow-y-auto scrollbar-hide"
+            onClick={onClose}
+        >
             <div
-                className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative"
+                className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-[2rem] shadow-[0_0_50px_-12px_rgba(139,92,246,0.3)] overflow-hidden animate-in zoom-in-95 duration-300 relative mb-8"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-full transition-colors text-zinc-500 hover:text-white z-10"
+                    className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-all text-zinc-500 hover:text-white z-10 hover:scale-110 active:scale-90"
                 >
-                    <X className="w-5 h-5" />
+                    <X className="w-6 h-6" />
                 </button>
 
                 {/* Body */}
-                <div className="p-8 flex flex-col items-center gap-6 text-center">
-                    <div className="space-y-2">
-                        <h2 className="text-xl font-bold text-white tracking-tight">Grow the Swarm</h2>
-                        <p className="text-sm text-zinc-400">
-                            Invite a fellow founder. You <span className="text-accent-violet font-semibold">BOTH</span> unlock a free Personal Agent.
+                <div className="p-8 flex flex-col items-center gap-8 text-center">
+                    <div className="space-y-3">
+                        <h2 className="text-2xl font-bold text-white tracking-tight">Grow the Swarm</h2>
+                        <p className="text-sm text-zinc-400 leading-relaxed px-4">
+                            Invite a fellow founder. You <span className="text-violet-400 font-bold uppercase tracking-wider">BOTH</span> unlock a free Personal Agent.
                         </p>
                     </div>
 
-                    {/* QR Code */}
-                    <div className="bg-white p-4 rounded-xl shadow-inner ring-1 ring-white/10">
-                        {qrUrl ? (
-                            <img src={qrUrl} alt="QR Code" className="w-40 h-40" />
-                        ) : (
-                            <div className="w-40 h-40 bg-zinc-200 animate-pulse rounded" />
-                        )}
+                    {/* QR Code Section */}
+                    <div className="relative group">
+                        <div className="absolute -inset-4 bg-gradient-to-tr from-violet-500/20 to-cyan-500/20 rounded-[2.5rem] blur-2xl opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
+                        <div className="relative bg-white p-5 rounded-[2rem] shadow-2xl ring-1 ring-white/20 transform transition-transform duration-500 group-hover:scale-105">
+                            {qrUrl ? (
+                                <img src={qrUrl} alt="QR Code" className="w-32 h-32 sm:w-40 sm:h-40" />
+                            ) : (
+                                <div className="w-32 h-32 sm:w-40 sm:h-40 bg-zinc-100 animate-pulse rounded-xl" />
+                            )}
+                        </div>
                     </div>
 
-                    {/* Status / Code */}
-                    <div className="w-full bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mb-1 font-bold">Your Access Code</p>
-                        <p className="text-2xl font-mono text-white tracking-[0.1em]">{uniqueCode}</p>
+                    {/* Access Code */}
+                    <div className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 backdrop-blur-sm">
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] mb-2 font-black">Authorized Access Code</p>
+                        <p className="text-2xl font-mono text-white tracking-[0.15em] font-bold">{uniqueCode}</p>
                     </div>
 
                     {/* Actions */}

@@ -13,16 +13,6 @@ function JoinContent() {
     const [code, setCode] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-        const refCode = searchParams.get('ref');
-        if (refCode) {
-            console.log('🔗 Referral Detected:', refCode);
-            setCode(refCode); // Auto-fill the code for UX
-        }
-    }, [searchParams]);
-
     const handleAccess = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -31,8 +21,7 @@ function JoinContent() {
         const cleanPassword = password.trim();
         const cleanCode = code.trim().toLowerCase();
 
-        // 1. Check Symphony Key (Founder Access)
-        // Primary: Symphony2026, Secondary: JOHN316 (User's new MASTER_ACCESS_KEY)
+        // 1. Check Symphony Key (Founder Access - Level 2)
         const SYMPHONY_KEY = 'Symphony2026';
         const MASTER_KEY = 'JOHN316';
 
@@ -42,24 +31,27 @@ function JoinContent() {
             return;
         }
 
-        // 2. Check Access Code (Soft Gate)
-        if (cleanCode === 'mel' || cleanCode === 'spark' || cleanCode === 'trinity') {
+        // 2. Check Access Code (Verified Access - Level 1)
+        // Note: In a real app, this would check a DB for activated invite codes
+        const VERIFIED_CODES = ['trinity', 'genesis', 'alpha'];
+        if (VERIFIED_CODES.includes(cleanCode)) {
+            console.log('✅ Verified Access Granted');
+            grantAccess('verified');
+            return;
+        }
+
+        // 3. Guest Access (Soft Gate - Level 0)
+        if (cleanCode === 'mel' || cleanCode === 'spark' || (email && email.includes('@'))) {
+            console.log('👀 Guest Access Granted (Read-Only)');
             grantAccess('guest');
             return;
         }
 
-        // 3. Check Email (Simulation)
-        if (email && email.includes('@')) {
-            console.log('📝 Lead Captured:', email);
-            grantAccess('guest');
-            return;
-        }
-
-        setError('Invalid Symphony Key, Access Code, or Email.');
+        setError('Invalid Symphony Key or Access Code. Please enter your email for guest access.');
         setLoading(false);
     };
 
-    const grantAccess = (role: 'founder' | 'guest') => {
+    const grantAccess = (role: 'founder' | 'guest' | 'verified') => {
         // Set Cookies with broader scope and modern flags
         const expiry = 60 * 60 * 24 * 365; // 1 Year
         document.cookie = `trinity_access=true; Path=/; Max-Age=${expiry}; SameSite=Lax`;

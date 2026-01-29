@@ -40,18 +40,30 @@ export default function middleware(request: NextRequest) {
         pathname.startsWith('/pulse/sandbox');
 
     // Check for Access Tokens
+    const role = request.cookies.get('trinity_role')?.value || 'guest';
     const hasAccess = request.cookies.has('trinity_access');
-    const hasFounderKey = request.cookies.get('trinity_role')?.value === 'founder';
 
-    // Logic for Controller/Directives
+    const isFounder = role === 'founder';
+    const isVerified = role === 'verified' || role === 'founder';
+
+    // Logic for Controller/Directives Pages
     if (isProtectedRoute && !hasAccess) {
         return NextResponse.redirect(new URL('/join', request.url));
     }
 
-    // Logic for Control APIs (Requires Founder Key)
-    if (isControlRoute && !hasFounderKey && request.method !== 'GET') {
+    // RBAC: Guest Enforcement (Level 0 - Read Only Everywhere)
+    if (role === 'guest' && request.method !== 'GET' && !isPublicRoute) {
         return NextResponse.json(
-            { error: 'Forbidden: Founder key required for command actions.' },
+            { error: 'Verification Required: Please register to perform actions.' },
+            { status: 403 }
+        );
+    }
+
+    // RBAC: Control APIs (Level 2 - Founder Only)
+    // Destructive or system-wide configuration changes
+    if (isControlRoute && !isFounder && request.method !== 'GET') {
+        return NextResponse.json(
+            { error: 'Forbidden: Founder privileges required for system control.' },
             { status: 403 }
         );
     }

@@ -12,17 +12,13 @@ export function NavBar() {
     const pathname = usePathname();
     const [isShareOpen, setIsShareOpen] = useState(false);
 
-    // Hide NavBar in Pulse (App) mode - Sidebar takes over
-    if (pathname?.startsWith('/pulse')) return null;
-
-    const navItems = [
-        { name: 'Dashboard', href: '/pulse/conductor' },
-        { name: 'Governance', href: '/pulse/wisdom' },
-        { name: 'Public View', href: '/pulse/watch' },
-    ];
+    // Hide NavBar in Pulse (App) mode or on controller subdomain
+    // The PulseLayout header handles navigation actions there.
+    const isController = typeof window !== 'undefined' && window.location.hostname.startsWith('controller');
+    if (pathname?.startsWith('/pulse') || isController) return null;
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-obsidian-surface/80 backdrop-blur-md border-b border-white/5">
+        <header className="fixed top-0 left-0 right-0 z-50 bg-obsidian-surface/80 backdrop-blur-md border-b border-white/5 mx-auto max-w-7xl">
             <div className="container mx-auto px-4 h-16 flex items-center justify-between">
                 {/* Logo / Brand */}
                 <Link href="/" className="flex items-center gap-2 group">
@@ -30,29 +26,18 @@ export function NavBar() {
                         <Activity className="w-5 h-5 text-white" />
                     </div>
                     <span className="font-display font-bold text-xl text-text-primary tracking-tight">
-                        Founders App
+                        Trinity
                     </span>
                 </Link>
 
-                {/* Desktop Navigation */}
+                {/* Desktop Navigation (REMOVED REDUNDANT LINKS) */}
                 <nav className="hidden md:flex items-center gap-8">
-                    {navItems.map((item) => (
-                        <Link
-                            key={item.name}
-                            href={item.href}
-                            className={cn(
-                                "text-sm font-medium transition-colors hover:text-accent-violet",
-                                pathname === item.href ? "text-accent-violet" : "text-text-secondary"
-                            )}
-                        >
-                            {item.name}
-                        </Link>
-                    ))}
+                    {/* Navigation now managed by Pulse Sidebar/Header */}
                 </nav>
 
                 {/* Actions (Voice / Profile) */}
                 <div className="flex items-center gap-4">
-                    {/* Voice Mode Toggle (Placeholder for Voice First) */}
+                    {/* Voice Mode Toggle */}
                     <button className="flex items-center justify-center w-10 h-10 rounded-full bg-accent-violet/10 hover:bg-accent-violet/20 text-accent-violet transition-colors">
                         <Mic className="w-5 h-5" />
                     </button>
