@@ -82,18 +82,7 @@ export default function NewMissionPage() {
 
     return (
         <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-500 pb-10">
-            {/* Header */}
-            <div className="glass rounded-xl p-6 border border-violet-500/30 glow-violet">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
-                        <Rocket className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-bold text-white">Deploy New Mission</h2>
-                        <p className="text-sm text-gray-400">Configure and launch an autonomous swarm objective</p>
-                    </div>
-                </div>
-            </div>
+            {/* Header consolidated into root NavBar */}
 
             {/* Mission Configuration Form */}
             <form onSubmit={handleSubmit} className="space-y-6">

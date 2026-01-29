@@ -54,7 +54,7 @@ export function NavBar() {
 
                     <div className="h-6 w-px bg-white/10 mx-1 hidden md:block" />
 
-                    <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent truncate max-w-[150px] sm:max-w-none">
+                    <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent truncate max-w-[180px] sm:max-w-none">
                         {getPageTitle()}
                     </h1>
                 </div>

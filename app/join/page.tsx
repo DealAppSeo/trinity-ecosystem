@@ -13,6 +13,15 @@ function JoinContent() {
     const [code, setCode] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const refCode = searchParams.get('ref');
+        if (refCode) {
+            console.log('🔗 Referral Detected:', refCode);
+            setCode(refCode); // Auto-fill the code for UX
+        }
+    }, [searchParams]);
     const handleAccess = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);

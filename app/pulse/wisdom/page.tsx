@@ -196,29 +196,18 @@ export default function WisdomPage() {
 
     return (
         <div className="p-6 space-y-8 min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-            {/* Header */}
-            <div className="flex justify-between items-end border-b border-white/10 pb-4">
-                <div>
-                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400 flex items-center gap-3">
-                        <BrainCircuit className="w-8 h-8 text-blue-400" />
-                        Symphony Controller
-                    </h1>
-                    <p className="text-gray-400 mt-1">Wisdom & Truth Real-time Oversight</p>
+            {/* Header consolidated into root NavBar */}
+            <div className="flex justify-end gap-4 p-2 bg-white/5 rounded-lg border border-white/10">
+                <div className="text-right">
+                    <div className="text-lg font-mono text-green-400">{avgRep}</div>
+                    <div className="text-[10px] text-gray-500 uppercase tracking-tighter">Avg Rep</div>
                 </div>
-                <div className="flex gap-4 items-end">
-                    <div className="text-right">
-                        <a href="/pulse/conductor" className="text-xs font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest border-b border-transparent hover:border-white mb-2 block">
-                            Switch to Operations View &rarr;
-                        </a>
-                        <div className="text-2xl font-mono text-green-400">{avgRep}</div>
-                        <div className="text-xs text-gray-500 uppercase">Avg Truth Score</div>
+                <div className="w-px h-8 bg-white/10" />
+                <div className="text-right">
+                    <div className={`text-lg font-mono ${brainStatus === 'online' ? 'text-green-400' : 'text-red-500'}`}>
+                        {brainStatus === 'online' ? 'ON' : 'OFF'}
                     </div>
-                    <div className="text-right">
-                        <div className={`text-2xl font-mono ${brainStatus === 'online' ? 'text-green-400' : 'text-red-500'}`}>
-                            {brainStatus === 'online' ? 'ONLINE' : 'OFFLINE'}
-                        </div>
-                        <div className="text-xs text-gray-500 uppercase">Py-Brain Status</div>
-                    </div>
+                    <div className="text-[10px] text-gray-500 uppercase tracking-tighter">Py-Brain</div>
                 </div>
             </div>
 

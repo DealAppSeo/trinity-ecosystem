@@ -59,24 +59,7 @@ export default function SandboxPage() {
 
     return (
         <div className="min-h-screen bg-black text-white p-8 font-sans">
-            <header className="mb-12 flex justify-between items-center border-b border-gray-800 pb-4">
-                <div>
-                    <h1 className="text-3xl font-light tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
-                        HYPERDAG SWARM <span className="text-xs ml-2 text-gray-500 font-mono">3x3+3 TOPOLOGY</span>
-                    </h1>
-                    <p className="text-gray-400 text-sm mt-1">
-                        ZKP-Secured Multiplicative Intelligence
-                    </p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <span className="text-xs text-green-500 font-mono flex items-center gap-2">
-                        <Shield size={12} /> ZKP REPUTATION ACTIVE
-                    </span>
-                    <button onClick={() => window.location.reload()} className="p-2 rounded-full hover:bg-gray-800 transition-colors">
-                        <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-                    </button>
-                </div>
-            </header>
+            {/* Header consolidated into root NavBar */}
 
             {/* ORCHESTRATION LAYER */}
             <div className="mb-16">
