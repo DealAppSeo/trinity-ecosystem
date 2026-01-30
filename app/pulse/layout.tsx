@@ -2,12 +2,9 @@
 
 import { Sidebar } from '@/components/Sidebar';
 import { BottomNav } from '@/components/BottomNav';
-import { ShareModal } from '@/components/modals/ShareModal';
-import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 export default function PulseLayout({ children }: { children: React.ReactNode }) {
-    const [showShareModal, setShowShareModal] = useState(false);
     const pathname = usePathname();
 
     return (
@@ -31,11 +28,6 @@ export default function PulseLayout({ children }: { children: React.ReactNode })
                     {children}
                 </main>
             </div>
-
-            <ShareModal
-                isOpen={showShareModal}
-                onClose={() => setShowShareModal(false)}
-            />
         </div>
     );
 }

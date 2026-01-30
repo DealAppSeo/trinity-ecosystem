@@ -18,7 +18,6 @@ import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { toast } from 'sonner';
 import { AGENT_GROUPS } from '@/lib/agent/groups';
-import { ShareModal } from '@/components/modals/ShareModal';
 import { RewardTuner } from '@/components/RewardTuner';
 import { cn } from '@/lib/utils';
 
@@ -104,7 +103,6 @@ export default function ConductorPage() {
     };
 
     // --- SHARE FEATURE ---
-    const [showShareModal, setShowShareModal] = useState(false);
 
     return (
         <div className="min-h-screen bg-obsidian-base flex flex-col pb-24 md:pb-0">
@@ -430,11 +428,6 @@ export default function ConductorPage() {
                     refresh(); // Refresh after add
                 }}
                 availableAgents={agents}
-            />
-
-            <ShareModal
-                isOpen={showShareModal}
-                onClose={() => setShowShareModal(false)}
             />
         </div >
     );

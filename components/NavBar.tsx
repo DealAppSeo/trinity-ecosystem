@@ -1,16 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Mic, Activity, Layers, Menu } from 'lucide-react';
+import { Mic, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/Button';
-import { ShareModal } from '@/components/modals/ShareModal';
 
 export function NavBar() {
     const pathname = usePathname();
-    const [isShareOpen, setIsShareOpen] = useState(false);
 
     // Dynamic Title Mapping
     const getPageTitle = () => {
@@ -36,52 +32,43 @@ export function NavBar() {
     const isPulse = pathname?.startsWith('/pulse');
 
     return (
-        <header className={cn(
-            "fixed top-0 left-0 right-0 z-[100] bg-obsidian-surface/80 backdrop-blur-md border-b border-white/5 transition-all duration-300",
-            isPulse ? "lg:pl-64" : ""
-        )}>
-            <div className="px-4 h-16 flex items-center justify-between">
-                {/* Left: Brand + Title */}
-                <div className="flex items-center gap-4">
-                    <Link href="/" className="flex items-center gap-2 group">
-                        <div className="w-8 h-8 rounded-lg bg-accent-violet flex items-center justify-center shadow-glow-violet group-hover:scale-105 transition-transform">
-                            <Activity className="w-5 h-5 text-white" />
+        <>
+            <header className={cn(
+                "fixed top-0 left-0 right-0 z-[100] bg-obsidian-surface/80 backdrop-blur-md border-b border-white/5 transition-all duration-300",
+                isPulse ? "lg:pl-64" : ""
+            )}>
+                <div className="px-4 h-16 flex items-center justify-between">
+                    {/* Left: Brand + Title */}
+                    <div className="flex items-center gap-4">
+                        <Link href="/" className="flex items-center gap-2 group">
+                            <div className="w-8 h-8 rounded-lg bg-accent-violet flex items-center justify-center shadow-glow-violet group-hover:scale-105 transition-transform">
+                                <Activity className="w-5 h-5 text-white" />
+                            </div>
+                        </Link>
+
+                        <div className="h-6 w-px bg-white/10 mx-1 hidden md:block" />
+
+                        <div className="flex flex-col">
+                            <span className="text-[10px] md:text-xs font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent uppercase tracking-widest leading-none mb-1">
+                                AI Trinity Symphony
+                            </span>
+                            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent truncate max-w-[180px] sm:max-w-none leading-tight">
+                                {getPageTitle()}
+                            </h1>
                         </div>
-                    </Link>
+                    </div>
 
-                    <div className="h-6 w-px bg-white/10 mx-1 hidden md:block" />
+                    <nav className="hidden md:flex items-center gap-8 flex-1" />
 
-                    <div className="flex flex-col">
-                        <span className="text-[10px] md:text-xs font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent uppercase tracking-widest leading-none mb-1">
-                            AI Trinity Symphony
-                        </span>
-                        <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent truncate max-w-[180px] sm:max-w-none leading-tight">
-                            {getPageTitle()}
-                        </h1>
+                    {/* Actions (Voice / Profile) */}
+                    <div className="flex items-center gap-2 sm:gap-4">
+                        {/* Voice Mode Toggle */}
+                        <button className="flex items-center justify-center w-10 h-10 rounded-full bg-accent-violet/10 hover:bg-accent-violet/20 text-accent-violet transition-colors">
+                            <Mic className="w-5 h-5" />
+                        </button>
                     </div>
                 </div>
-
-                <nav className="hidden md:flex items-center gap-8 flex-1" />
-
-                {/* Actions (Voice / Profile) */}
-                <div className="flex items-center gap-2 sm:gap-4">
-                    {/* Voice Mode Toggle */}
-                    <button className="flex items-center justify-center w-10 h-10 rounded-full bg-accent-violet/10 hover:bg-accent-violet/20 text-accent-violet transition-colors">
-                        <Mic className="w-5 h-5" />
-                    </button>
-
-                    <Button
-                        size="sm"
-                        onClick={() => setIsShareOpen(true)}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-glow-violet border-none px-3 sm:px-4"
-                    >
-                        <span className="hidden sm:inline">Share & Earn</span>
-                        <span className="sm:hidden text-xs">Share</span>
-                    </Button>
-                </div>
-            </div>
-
-            <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
-        </header>
+            </header>
+        </>
     );
 }
