@@ -8,6 +8,7 @@ import { FileCode, FileText, Image, FileSpreadsheet, Share2, Download, Eye, Lock
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { RegistrationModal, UnlockModal } from '@/components/AccessModals';
+import { cn } from '@/lib/utils';
 import ArtifactContent from '@/components/ArtifactContent';
 
 interface Artifact {
