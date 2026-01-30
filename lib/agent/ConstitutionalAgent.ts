@@ -517,26 +517,66 @@ export class ConstitutionalAgent {
 
                 // [ANTIGRAVITY] STUCK TASK WATCHDOG: Release tasks stuck in 'doing' for > 15 mins
                 const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-                const { data: stuckTasks } = await this.supabase
+
+                // 1. Monitor MY OWN stuck tasks
+                const { data: myStuckTasks } = await this.supabase
                     .from('trinity_tasks')
                     .select('id, title')
                     .eq('claimed_by', this.name)
                     .in('status', ['doing', 'in_progress', 'running'])
                     .lt('started_at', fifteenMinsAgo);
 
-                if (stuckTasks && stuckTasks.length > 0) {
-                    for (const stuck of stuckTasks) {
+                if (myStuckTasks && myStuckTasks.length > 0) {
+                    for (const stuck of myStuckTasks) {
                         console.log(`[${this.name}] 🚨 WATCHDOG: Task ${stuck.id} ("${stuck.title}") has STALLED. Releasing claim for escalation.`);
                         await this.log('watchdog_release', `Releasing stalled task ${stuck.id}`, { taskId: stuck.id });
                         await this.releaseClaim(stuck.id);
 
-                        // Escalate to pending_clarification if it stalled twice (simulated via metadata)
+                        // Escalate to pending_clarification if it stalled
                         await this.supabase.from('trinity_tasks').update({
                             status: 'pending_clarification',
                             result: `[WATCHDOG] Stalled during execution by ${this.name}. Possible provider hang or tool lock.`
                         }).eq('id', stuck.id);
                     }
                 }
+
+                // 2. [ANTIGRAVITY] GLOBAL SQUAD WATCHDOG: Release tasks orphaned by STALE PEERS
+                // Only HDM and APM take on the "Inspector" role to avoid collision
+                if (['HDM', 'APM', 'ORCH'].includes(this.squad)) {
+                    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+                    // Find tasks claimed by others that are "doing"
+                    const { data: peerTasks } = await this.supabase
+                        .from('trinity_tasks')
+                        .select('id, title, claimed_by, started_at')
+                        .neq('claimed_by', this.name)
+                        .not('claimed_by', 'is', null) // Ensure claimed_by is not null
+                        .in('status', ['doing', 'in_progress', 'running'])
+                        .lt('started_at', fifteenMinsAgo);
+
+                    if (peerTasks && peerTasks.length > 0) {
+                        for (const task of peerTasks) {
+                            // Check if the owner is stale
+                            const { data: ownerHb } = await this.supabase
+                                .from('trinity_heartbeat')
+                                .select('last_seen')
+                                .eq('agent', task.claimed_by)
+                                .maybeSingle();
+
+                            if (ownerHb && new Date(ownerHb.last_seen) < new Date(Date.now() - 10 * 60 * 1000)) {
+                                console.log(`[${this.name}] 🕵️ SQUAD WATCHDOG: Task ${task.id} owned by STALE peer ${task.claimed_by}. FORCING RELEASE.`);
+                                await this.log('squad_watchdog_hijack', `Releasing task ${task.id} from stale peer ${task.claimed_by}`, { taskId: task.id, peer: task.claimed_by });
+
+                                await this.supabase.from('trinity_tasks').update({
+                                    status: 'pending_clarification',
+                                    claimed_by: null,
+                                    result: `[SQUAD-WATCHDOG] Revoked from stale agent ${task.claimed_by} by ${this.name}.`
+                                }).eq('id', task.id);
+                            }
+                        }
+                    }
+                }
+
 
                 // [ANTIGRAVITY] ANTI-HOARDING: Strict 1-Task busy lock & Sticky Claim Cleanup
                 const { data: allClaims } = await this.supabase
@@ -856,9 +896,11 @@ export class ConstitutionalAgent {
         }
 
         // [ANTIGRAVITY] Revised Polling: ensure we check both pending and clarification
+        // We prioritize 'pending_clarification' to ensure stalled tasks are recovered first
         const { data: task, error } = await query
             .in('status', ['pending', 'pending_clarification'])
             .is('claimed_by', null)
+            .order('status', { ascending: false }) // 'pending_clarification' (p) > 'pending' (p) alphabetically? No, use explicit order or just priority
             .order('priority', { ascending: false })
             .order('created_at', { ascending: true })
             .limit(1)
@@ -917,7 +959,7 @@ export class ConstitutionalAgent {
                 started_at: new Date().toISOString()
             })
             .eq('id', taskId)
-            .eq('status', 'pending')
+            .in('status', ['pending', 'pending_clarification']) // FIX: Allow claiming clarification tasks
             .is('claimed_by', null)
             .select();
 
