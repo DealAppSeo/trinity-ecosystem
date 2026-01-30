@@ -33,6 +33,7 @@ export default function ArtifactsPage() {
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [activeCategory, setActiveCategory] = useState<string>('all');
     const PAGE_SIZE = 24;
 
     // ACCESS GATES
@@ -166,10 +167,12 @@ export default function ArtifactsPage() {
         }
     };
 
-    const filteredArtifacts = artifacts.filter(a =>
-        a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.content.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredArtifacts = artifacts.filter(a => {
+        const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            a.content.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = activeCategory === 'all' || a.type === activeCategory;
+        return matchesSearch && matchesCategory;
+    });
 
     if (loading && page === 0) return <div className="h-96 flex items-center justify-center"><div className="w-10 h-10 border-4 border-violet-500 rounded-full animate-spin border-t-transparent" /></div>;
 
@@ -177,7 +180,43 @@ export default function ArtifactsPage() {
         <div className="space-y-6 animate-in fade-in duration-500 relative">
 
             {/* Header consolidated into root NavBar */}
-            <div className="flex justify-end items-center gap-4">
+            {/* Filters and Categories */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        onClick={() => setActiveCategory('all')}
+                        className={cn(
+                            "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 border",
+                            activeCategory === 'all'
+                                ? "bg-violet-500/20 border-violet-500/50 text-violet-400 shadow-glow-violet"
+                                : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10"
+                        )}
+                    >
+                        All
+                    </button>
+                    {[
+                        { id: 'report', label: 'Reports', color: 'text-green-400', icon: FileSpreadsheet },
+                        { id: 'code', label: 'Code', color: 'text-violet-400', icon: FileCode },
+                        { id: 'design', label: 'Design', color: 'text-pink-400', icon: Image },
+                        { id: 'document', label: 'Documents', color: 'text-cyan-400', icon: FileText }
+                    ].map((cat) => (
+                        <button
+                            key={cat.id}
+                            onClick={() => setActiveCategory(cat.id)}
+                            className={cn(
+                                "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 border flex items-center gap-2",
+                                activeCategory === cat.id
+                                    ? "bg-white/10 border-white/20 shadow-lg"
+                                    : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10"
+                            )}
+                        >
+                            <cat.icon className={cn("w-4 h-4", activeCategory === cat.id ? cat.color : "text-gray-500")} />
+                            <span className={activeCategory === cat.id ? "text-white" : ""}>{cat.label}</span>
+                            <span className="text-[10px] opacity-50 bg-white/5 px-1.5 rounded">{counts[cat.id] || 0}</span>
+                        </button>
+                    ))}
+                </div>
+
                 <div className="w-full md:w-64">
                     <div className="relative">
                         <input
