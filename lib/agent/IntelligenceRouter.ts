@@ -40,6 +40,7 @@ export const PROVIDER_REGISTRY: Record<string, ProviderDetails> = {
 export class IntelligenceRouter {
     private agentName: string;
     private sessionTasksCompleted: number = 0;
+    private demotedProviders: Set<string> = new Set();
 
     constructor(agentName: string) {
         this.agentName = agentName;
@@ -49,6 +50,16 @@ export class IntelligenceRouter {
      * Determines the optimal provider based on task context and diversity requirements.
      */
     route(task: Task, availableProviders: string[]): string[] {
+        // [ANTIFRAGILE] Filter out demoted providers
+        const activeProviders = availableProviders.filter(p => !this.demotedProviders.has(p));
+
+        // If everything is demoted, reset the set (circuit breaker)
+        if (activeProviders.length === 0 && availableProviders.length > 0) {
+            console.warn(`[ROUTER] ⚠️ All providers demoted. Reseting circuit breaker.`);
+            this.demotedProviders.clear();
+            return availableProviders;
+        }
+
         const isVerification = task.title.includes('[REVIEW]') || task.status === 'done';
         const taskType = task.task_type || 'general';
 
@@ -72,7 +83,7 @@ export class IntelligenceRouter {
         }
 
         // 4. FILTER & SCORE (ANFIS Arbitrage Logic)
-        const candidates = availableProviders
+        const candidates = activeProviders
             .filter(p => p !== excludeProvider)
             .map(p => {
                 const info = PROVIDER_REGISTRY[p] || { key: p, tier: ProviderTier.ECONOMY, speed: 50, latency: 100, costPerMillion: 0.5, reasoning: 5, family: 'transformer', specialties: [] };
@@ -143,6 +154,21 @@ export class IntelligenceRouter {
         console.log(`[ROUTER] 🚦 Selected priority: ${result.slice(0, 3).join(', ')} (Reason: ${isFirstImpression ? 'FirstImpression' : 'Standard'}, Verification: ${isVerification})`);
 
         return result;
+    }
+
+    /**
+     * Temporarily demotes a provider (e.g. on 429 or timeout)
+     */
+    demote(provider: string) {
+        console.warn(`[ROUTER] 📉 Demoting ${provider} due to failure/quota.`);
+        this.demotedProviders.add(provider);
+        // Auto-recovery after 5 minutes
+        setTimeout(() => {
+            if (this.demotedProviders.has(provider)) {
+                console.log(`[ROUTER] 📈 Restoring ${provider} to active rotation.`);
+                this.demotedProviders.delete(provider);
+            }
+        }, 300000);
     }
 
     /**

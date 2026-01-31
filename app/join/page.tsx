@@ -52,6 +52,20 @@ function JoinContent() {
         // 3. Guest Access (Soft Gate - Level 0)
         if (cleanCode === 'mel' || cleanCode === 'spark' || (email && email.includes('@'))) {
             console.log('👀 Guest Access Granted (Read-Only)');
+
+            // Persist Lead if email provided
+            if (email && email.includes('@')) {
+                try {
+                    await fetch('/api/join', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, referral_from: code })
+                    });
+                } catch (err) {
+                    console.error('Failed to persist lead:', err);
+                }
+            }
+
             grantAccess('guest');
             return;
         }

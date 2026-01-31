@@ -270,18 +270,18 @@ export class ConstitutionalAgent {
                 console.log(`[${this.name}] Synced State: Tier [${this.autonomyTier}] | Rep [${this.reputationScore}] | Source [${source}]`);
             } else {
                 // Register new agent logic...
-                // ... (existing registration code)
                 console.log(`[${this.name}] New agent detected. Registering in Ledger...`);
                 await this.supabase.from('trinity_agent_registry').insert({
                     agent_name: this.name,
                     reputation_score: 10,
                     current_tier: 'Assist',
                     tasks_completed: 0,
-                    tasks_failed: 0
+                    tasks_failed: 0,
+                    squad: this.squad // FIX: Ensure squad is set on first registration
                 });
                 this.reputationScore = 10;
                 this.autonomyTier = 'Assist';
-                console.log(`[${this.name}] Registered new agent.`);
+                console.log(`[${this.name}] Registered new agent with squad: ${this.squad}`);
             }
         } catch (err: any) {
             console.error(`[${this.name}] ⚠️ SYNC ERROR (Anti-Fragile Fallback Active): ${err.message}`);
@@ -2161,7 +2161,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         fullName: this.name,
                         sessionMetrics: this.sessionMetrics,
                         group: this.groupName,
-                        tier: this.autonomyTier
+                        tier: this.autonomyTier,
+                        deployment: process.env.RAILWAY_PROJECT_NAME || 'local'
                     }
                 }, { onConflict: 'agent' });
 
@@ -2499,7 +2500,13 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         return providerResult;
                     }
                 } catch (e: any) {
-                    const errorMsg = e.message === 'PROVIDER_STALL' ? 'STALLED (45s)' : e.message;
+                    const errorMsg = e.message === 'PROVIDER_STALL' ? 'STALLED (120s)' : e.message;
+
+                    // [ANTIFRAGILE] Demote temporarily if it's a structural failure (429, 404, Timeout)
+                    if (errorMsg.includes('429') || errorMsg.includes('404') || errorMsg.includes('Timeout') || errorMsg.includes('STALLED')) {
+                        this.router.demote(providerKey);
+                    }
+
                     console.warn(`[${this.name}] ⚠️ ${providerKey} ${errorMsg}. Rotating...`);
                     await this.log('llm_failover', `${providerKey} failed or stalled: ${errorMsg}. Rotating...`, {
                         error: errorMsg,
@@ -2631,7 +2638,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
         for (let i = 0; i < 5; i++) {
             const body: any = {
-                model: 'claude-3-5-sonnet-20241022',
+                model: 'claude-3-5-sonnet-latest',
                 system: systemPrompt,
                 messages,
                 max_tokens: 4000,
