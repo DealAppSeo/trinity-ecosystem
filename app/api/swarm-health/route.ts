@@ -47,11 +47,12 @@ export async function GET() {
 
         // 6. Antigravity Health Score (Weighted by Consensus)
         const currentBacklog = backlogCount || 0;
+        const totalPossible = 12; // Static swarm size
         const healthScore = Math.min(100,
-            (activeCount / 12) * 50 +                  // % of expected agents active
-            (currentBacklog < 5 ? 30 : currentBacklog < 15 ? 15 : 0) + // Low backlog = high score
-            (verifiedCount > 0 ? 10 : 0) -             // Recent verifications are bonus
-            (failedCount * 5)                          // Failures are penalty
+            (activeCount / totalPossible) * 60 +       // Weight activity more
+            (currentBacklog < 10 ? 20 : 0) +           // Small backlog bonus
+            (verifiedCount > 0 ? 20 : 0) -             // Recent success bonus
+            (failedCount * 10)                         // Failures are heavy penalty
         );
 
         return NextResponse.json({
