@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import QRCode from 'qrcode';
-import { X, Copy, Share2, Check, Download, Referral } from 'lucide-react';
+import { X, Copy, Share2, Check, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
