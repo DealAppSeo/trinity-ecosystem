@@ -18,7 +18,8 @@ export class GoogleWorkspaceMCP extends BaseMCP {
             this.auth = new google.auth.GoogleAuth({
                 scopes: [
                     'https://www.googleapis.com/auth/calendar.readonly',
-                    'https://www.googleapis.com/auth/gmail.readonly'
+                    'https://www.googleapis.com/auth/gmail.readonly',
+                    'https://www.googleapis.com/auth/spreadsheets'
                 ]
             });
             const client = await this.auth.getClient();
@@ -40,6 +41,24 @@ export class GoogleWorkspaceMCP extends BaseMCP {
             description: 'List recent emails',
             schema: { type: 'object', properties: { maxResults: { type: 'number' } }, required: [] },
             execute: this.listEmails.bind(this)
+        });
+
+        this.registerTool({
+            name: 'create_spreadsheet',
+            description: 'Create a new Google Spreadsheet with initial data.',
+            schema: {
+                type: 'object',
+                properties: {
+                    title: { type: 'string' },
+                    rows: {
+                        type: 'array',
+                        items: { type: 'array', items: { type: 'string' } },
+                        description: '2D array of strings representing rows and columns'
+                    }
+                },
+                required: ['title', 'rows']
+            },
+            execute: this.createSpreadsheet.bind(this)
         });
     }
 
@@ -68,5 +87,32 @@ export class GoogleWorkspaceMCP extends BaseMCP {
             maxResults: args.maxResults || 5
         });
         return JSON.stringify(res.data.messages, null, 2);
+    }
+
+    private async createSpreadsheet(args: { title: string, rows: string[][] }): Promise<string> {
+        if (!this.auth) throw new Error('Not authenticated');
+        const sheets = google.sheets({ version: 'v4', auth: this.auth });
+
+        try {
+            const spreadsheet = await sheets.spreadsheets.create({
+                requestBody: {
+                    properties: { title: args.title }
+                }
+            });
+
+            const spreadsheetId = spreadsheet.data.spreadsheetId;
+            if (spreadsheetId && args.rows.length > 0) {
+                await sheets.spreadsheets.values.update({
+                    spreadsheetId,
+                    range: 'Sheet1!A1',
+                    valueInputOption: 'RAW',
+                    requestBody: { values: args.rows }
+                });
+            }
+
+            return `Spreadsheet created: ${spreadsheet.data.spreadsheetUrl}`;
+        } catch (e: any) {
+            return `Failed to create spreadsheet: ${e.message}`;
+        }
     }
 }

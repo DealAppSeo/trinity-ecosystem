@@ -1,10 +1,41 @@
 from pydantic_ai import Agent, RunContext
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
-import logfire
+import structlog
+import logging
+from openinference.instrumentation.pydantic_ai import PydanticAIInstrumentor
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
 
-# Configure Logfire
-logfire.configure(pydantic_plugin=pydantic.PydanticPlugin(record='all'))
+# Configure Structlog
+structlog.configure(
+    processors=[
+        structlog.processors.add_log_level,
+        structlog.processors.StackInfoRenderer(),
+        structlog.dev.set_exc_info,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer(),
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+    context_class=dict,
+    logger_factory=structlog.PrintLoggerFactory(),
+    cache_logger_on_first_use=True,
+)
+logger = structlog.get_logger()
+
+# Configure Phoenix/OpenTelemetry Tracing
+resource = Resource(attributes={"service.name": "trinity-science"})
+span_exporter = OTLPSpanExporter(endpoint="http://localhost:6006/v1/traces")
+span_processor = BatchSpanProcessor(span_exporter)
+trace_provider = TracerProvider(resource=resource)
+trace_provider.add_span_processor(span_processor)
+trace.set_tracer_provider(trace_provider)
+
+# Instrument Pydantic AI
+PydanticAIInstrumentor().instrument()
 
 class DecisionInput(BaseModel):
     latency_ms: float = Field(..., description="Current system latency")
@@ -33,8 +64,9 @@ async def check_rep_threshold(ctx: RunContext[None], rep: float) -> str:
     return "Threshold Met" if rep > 80 else "Threshold Not Met"
 
 async def get_science_decision(data: DecisionInput) -> DecisionOutput:
-    with logfire.span("science_decision", data=data):
-        result = await science_agent.run(
-            f"Determine interaction strategy for: Latency={data.latency_ms}, Rep={data.user_reputation}, Complexity={data.task_complexity}"
-        )
-        return result.data
+    logger.info("science_decision_start", latency_ms=data.latency_ms, rep=data.user_reputation)
+    result = await science_agent.run(
+        f"Determine interaction strategy for: Latency={data.latency_ms}, Rep={data.user_reputation}, Complexity={data.task_complexity}"
+    )
+    logger.info("science_decision_end", result=result.data.interaction_type)
+    return result.data

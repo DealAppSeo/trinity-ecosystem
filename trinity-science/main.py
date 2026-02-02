@@ -5,14 +5,24 @@ import os
 import logging
 import asyncio
 from datetime import datetime
-import logfire
+import structlog
 from supabase import create_client, Client
 
-# Configure Logging & Logfire
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("trinity-science")
-
-logfire.configure(pydantic_plugin=logfire.PydanticPlugin(record='all'))
+# Configure Structlog
+structlog.configure(
+    processors=[
+        structlog.processors.add_log_level,
+        structlog.processors.StackInfoRenderer(),
+        structlog.dev.set_exc_info,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer(),
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+    context_class=dict,
+    logger_factory=structlog.PrintLoggerFactory(),
+    cache_logger_on_first_use=True,
+)
+logger = structlog.get_logger("trinity-science")
 
 # --- HEARTBEAT LOGIC ---
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
@@ -83,8 +93,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Instrument FastAPI with Logfire
-logfire.instrument_fastapi(app)
+# Instrument FastAPI with Arize Phoenix (via OpenTelemetry)
+try:
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    FastAPIInstrumentor.instrument_app(app)
+    logger.info("FastAPI instrumented with OpenTelemetry")
+except ImportError:
+    logger.warning("FastAPI instrumentation failed: opentelemetry-instrumentation-fastapi not installed")
 
 # --- PROMETHEUS METRICS ---
 try:
