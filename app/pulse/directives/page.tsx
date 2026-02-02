@@ -49,11 +49,23 @@ export default function FoundersDashboard() {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [saving, setSaving] = useState<string | null>(null);
+    const [adminKey, setAdminKey] = useState<string>('');
 
     // Directive slot states
     const [slots, setSlots] = useState([
         { id: 1, targetType: 'agent' as 'agent' | 'squad', targetId: '', prompt: '' },
     ]);
+
+    useEffect(() => {
+        // Load key from localStorage on mount
+        const savedKey = localStorage.getItem('TRINITY_ADMIN_KEY');
+        if (savedKey) setAdminKey(savedKey);
+    }, []);
+
+    const saveKey = (key: string) => {
+        setAdminKey(key);
+        localStorage.setItem('TRINITY_ADMIN_KEY', key);
+    };
 
     useEffect(() => {
         fetchAllData();
@@ -103,7 +115,10 @@ export default function FoundersDashboard() {
             const res = await fetch('/api/swarm-control', {
                 method: 'POST',
                 body: JSON.stringify({ action }),
-                headers: { 'Content-Type': 'application/json' }
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-trinity-admin-key': adminKey
+                }
             });
             const data = await res.json();
             if (res.ok) {
@@ -125,7 +140,10 @@ export default function FoundersDashboard() {
             const res = await fetch(`/api/tasks/${taskId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ priority: newPriority }),
-                headers: { 'Content-Type': 'application/json' }
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-trinity-admin-key': adminKey
+                }
             });
             if (res.ok) {
                 toast.success(`Task prioritized to ${newPriority}`);
@@ -159,7 +177,10 @@ export default function FoundersDashboard() {
                     targetAgents,
                     prompt: slot.prompt
                 }),
-                headers: { 'Content-Type': 'application/json' }
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-trinity-admin-key': adminKey
+                }
             });
 
             const data = await res.json();
@@ -298,6 +319,28 @@ export default function FoundersDashboard() {
                                 <span className="text-xs font-black tracking-widest text-red-200 group-hover:text-white uppercase">Nuclear Wipe</span>
                                 <span className="text-[8px] text-red-400/60 group-hover:text-white/60 mt-2 font-mono">DANGER ZONE</span>
                             </button>
+                        </div>
+                    </Card>
+
+                    {/* Security Settings */}
+                    <Card className="bg-[#0B0B0F]/80 border-white/10 backdrop-blur-xl overflow-hidden p-6">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <Shield className="w-5 h-5 text-sky-400" />
+                                <h2 className="text-sm font-bold text-white uppercase tracking-wider">Security Access</h2>
+                            </div>
+                            <div className="flex-1 max-w-md">
+                                <input
+                                    type="password"
+                                    value={adminKey}
+                                    onChange={(e) => saveKey(e.target.value)}
+                                    placeholder="Enter Trinity Admin Key..."
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-xs text-emerald-400 font-mono focus:border-emerald-500 transition-all placeholder:text-gray-700"
+                                />
+                            </div>
+                            <div className="text-[10px] text-gray-500 font-mono italic">
+                                SECURED IN LOCAL STORAGE
+                            </div>
                         </div>
                     </Card>
 

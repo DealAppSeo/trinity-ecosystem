@@ -107,20 +107,29 @@ export class EvolutionaryLogger {
      */
     async checkOperationalHealth(): Promise<{ shouldHeal: boolean; reason: string }> {
         try {
-            // Query last 5 logs for this agent
+            // [ANTIFRAGILE] Cooldown Check: Only check health every 5 minutes to avoid flood
+            const lastCheck = (global as any).lastHealthCheck?.[this.agentName];
+            if (lastCheck && Date.now() - lastCheck < 300000) {
+                return { shouldHeal: false, reason: 'Cooldown active' };
+            }
+            if (!(global as any).lastHealthCheck) (global as any).lastHealthCheck = {};
+            (global as any).lastHealthCheck[this.agentName] = Date.now();
+
+            // Query last 10 logs for this agent (larger window)
             const { data: logs, error } = await this.supabase
                 .from('trinity_evolution_vault')
                 .select('outcome, effect_score')
                 .eq('agent_name', this.agentName)
                 .order('created_at', { ascending: false })
-                .limit(5);
+                .limit(10);
 
-            if (error || !logs || logs.length < 3) return { shouldHeal: false, reason: 'Insufficient history' };
+            if (error || !logs || logs.length < 5) return { shouldHeal: false, reason: 'Insufficient history' };
 
-            const failureCount = logs.filter(l => l.outcome === 'Failure' || (l.effect_score !== undefined && l.effect_score < 40)).length;
+            const failureCount = logs.filter(l => l.outcome === 'Failure' || (l.effect_score !== undefined && l.effect_score < 30)).length;
 
-            if (failureCount >= 3) {
-                return { shouldHeal: true, reason: `Repetitive failure detected (${failureCount}/5 recent tasks failed or scored low)` };
+            // Higher threshold for healing trigger
+            if (failureCount >= 6) {
+                return { shouldHeal: true, reason: `Persistent failure detected (${failureCount}/10 recent tasks failed)` };
             }
 
             return { shouldHeal: false, reason: 'Status: Optimal' };

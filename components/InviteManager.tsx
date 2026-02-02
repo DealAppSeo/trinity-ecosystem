@@ -76,7 +76,7 @@ export default function InviteManager({ supabase }: { supabase: any }) {
                     </div>
                     <div>
                         <h2 className="text-lg font-bold text-white font-geist">Access Keys</h2>
-                        <p className="text-xs text-white/40">Manage subdomain entry codes</p>
+                        <p className="text-xs text-white/40">Generate temporary entry codes for partners or subdomains (e.g. controller access)</p>
                     </div>
                 </div>
                 <button

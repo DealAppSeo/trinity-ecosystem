@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase';
+import { verifyAdminKey, unauthorizedResponse } from '@/lib/auth';
 
 // Force dynamic behavior
 export const dynamic = 'force-dynamic';
@@ -37,6 +38,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
+        if (!verifyAdminKey(req)) {
+            return unauthorizedResponse();
+        }
         const body = await req.json();
         const { title, description, priority, task_type, agent_assigned } = body;
 

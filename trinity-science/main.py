@@ -5,11 +5,14 @@ import os
 import logging
 import asyncio
 from datetime import datetime
+import logfire
 from supabase import create_client, Client
 
-# Configure Logging
+# Configure Logging & Logfire
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("trinity-science")
+
+logfire.configure(pydantic_plugin=logfire.PydanticPlugin(record='all'))
 
 # --- HEARTBEAT LOGIC ---
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
@@ -80,6 +83,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Instrument FastAPI with Logfire
+logfire.instrument_fastapi(app)
+
 # --- PROMETHEUS METRICS ---
 try:
     from prometheus_client import make_asgi_app
@@ -149,57 +155,37 @@ async def root():
 async def health():
     return {"status": "online", "agent": "trinity-science", "timestamp": datetime.utcnow().isoformat()}
 
+from app.pydantic_agents import get_science_decision, DecisionInput as PyDecisionInput
+
 @app.post("/anfis/decide", response_model=AnfisOutput)
 async def decide_anfis(data: AnfisInput):
     logger.info(f"Received ANFIS request: {data}")
     
-    # PHASE 2 TODO: Load real Logic/Model here
-    # For now, implementing the "Simulation" logic in Python as placeholder
-    # while we wait for scikit-fuzzy implementation in next step.
-    
-    # "Latency as Opportunity" Heuristic
-    # If latency is high but User Preference for Accuracy is strictly high -> Interaction Opportunity
-    
-    latency = data.latency_ms
-    rep = data.user_reputation
-    complexity = data.task_complexity
-    
-    # 1. Heuristic: Latency Rule
-    # If latency is high (>1000ms), we MUST engage to maintain flow.
-    # If user is Trustworthy (Rep > 80), we can ask Deep questions.
-    
-    interaction = "none"
-    depth = "none"
-    score = 0.5
-    
-    if latency > 2000:
-        # High Latency Opportunity
-        score = 0.9
-        if rep > 70:
-            interaction = "email_notification" # Async
-            depth = "deep"
-        else:
-            interaction = "deep_clarification" # Synchronous chat
-            depth = "shallow"
-    elif latency > 500:
-        # Medium Latency
-        score = 0.7
-        interaction = "shallow_check"
-        depth = "shallow"
-    
-    # 2. Heuristic: Complexity Rule
-    if complexity > 0.8 and interaction == "none":
-        interaction = "deep_clarification"
-        score = 0.8
-        depth = "deep"
-
-    return AnfisOutput(
-        should_query_user=(interaction != "none"),
-        interaction_type=interaction,
-        query_depth=depth,
-        score=score,
-        reason=f"Latency {latency}ms triggered {interaction}."
-    )
+    try:
+        # Use the new Pydantic AI Agent for structured decision making
+        py_data = PyDecisionInput(
+            latency_ms=data.latency_ms,
+            user_reputation=data.user_reputation,
+            task_complexity=data.task_complexity
+        )
+        decision = await get_science_decision(py_data)
+        
+        return AnfisOutput(
+            should_query_user=decision.should_query_user,
+            interaction_type=decision.interaction_type,
+            score=0.9 if decision.should_query_user else 0.5,
+            reason=decision.reason
+        )
+    except Exception as e:
+        logger.error(f"Pydantic AI Agent failed: {str(e)}")
+        # Fallback to legacy heuristic
+        latency = data.latency_ms
+        return AnfisOutput(
+            should_query_user=latency > 2000,
+            interaction_type="deep_clarification" if latency > 2000 else "none",
+            score=0.5,
+            reason=f"Fallback: {str(e)}"
+        )
 
 from rewards import reward_system
 

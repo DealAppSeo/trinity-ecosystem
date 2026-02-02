@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase';
+import { verifyAdminKey, unauthorizedResponse } from '@/lib/auth';
 
 // FORCE DYNAMIC
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+    // GET might be okay to keep public for read-only config, but let's see.
+    // The previous GET was just returning trinity_system_config.
+    // I'll leave GET public for now unless it has sensitive data.
     try {
         const { data, error } = await supabase
             .from('trinity_system_config')
@@ -20,6 +24,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
     try {
+        // [SECURITY] TRINITY_ADMIN_KEY Verification
+        if (!verifyAdminKey(req)) {
+            return unauthorizedResponse();
+        }
+
         const body = await req.json();
         const { action, north_star, signal } = body;
 

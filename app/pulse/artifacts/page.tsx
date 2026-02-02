@@ -30,7 +30,7 @@ export default function ArtifactsPage() {
     const [artifacts, setArtifacts] = useState<Artifact[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
-    const [counts, setCounts] = useState<Record<string, number>>({ code: 0, document: 0, design: 0, report: 0 });
+    const [counts, setCounts] = useState<Record<string, number>>({ code: 0, document: 0, design: 0, report: 0, archived: 0 });
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -56,8 +56,8 @@ export default function ArtifactsPage() {
 
     const fetchTotalCounts = async () => {
         try {
-            const types = ['code', 'document', 'design', 'report'];
-            const newCounts: Record<string, number> = { code: 0, document: 0, design: 0, report: 0 };
+            const types = ['code', 'document', 'design', 'report', 'archived'];
+            const newCounts: Record<string, number> = { code: 0, document: 0, design: 0, report: 0, archived: 0 };
 
             await Promise.all(types.map(async (type) => {
                 let statusFilters = ['document'];
@@ -65,6 +65,7 @@ export default function ArtifactsPage() {
                 else if (type === 'design') statusFilters = ['design', 'image'];
                 else if (type === 'report') statusFilters = ['report'];
                 else if (type === 'document') statusFilters = ['md', 'markdown', 'text_content', 'document'];
+                else if (type === 'archived') statusFilters = ['archived'];
 
                 const { count, error } = await supabase
                     .from('trinity_artifacts')
@@ -199,7 +200,8 @@ export default function ArtifactsPage() {
                         { id: 'report', label: 'Reports', color: 'text-green-400', icon: FileSpreadsheet },
                         { id: 'code', label: 'Code', color: 'text-violet-400', icon: FileCode },
                         { id: 'design', label: 'Design', color: 'text-pink-400', icon: Image },
-                        { id: 'document', label: 'Documents', color: 'text-cyan-400', icon: FileText }
+                        { id: 'document', label: 'Documents', color: 'text-cyan-400', icon: FileText },
+                        { id: 'archived', label: 'Archived', color: 'text-amber-400', icon: Lock }
                     ].map((cat) => (
                         <button
                             key={cat.id}

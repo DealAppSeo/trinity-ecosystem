@@ -507,9 +507,16 @@ export class ConstitutionalAgent {
                 try {
                     const health = await this.evolutionLogger.checkOperationalHealth();
                     if (health.shouldHeal) {
-                        console.log(`[${this.name}] 🧬 LEARNING LOOP TRIGGERED: ${health.reason}`);
-                        await this.spawnMaintenanceTask(health.reason);
-                        await this.sleep(30000); // Wait before continuing to avoid loop thrashing
+                        // [ANTIGRAVITY] RECURSION GUARD: Don't heal if we are already doing an automated/healing task
+                        const isCurrentlyAutomated = (this as any).currentTask?.metadata?.automated === true;
+
+                        if (isCurrentlyAutomated) {
+                            console.log(`[${this.name}] 🛡️ RECURSION GUARD: Suppressing healing spawn while processing automated task.`);
+                        } else {
+                            console.log(`[${this.name}] 🧬 LEARNING LOOP TRIGGERED: ${health.reason}`);
+                            await this.spawnMaintenanceTask(health.reason);
+                            await this.sleep(30000); // Wait before continuing to avoid loop thrashing
+                        }
                     }
                 } catch (healthError) {
                     console.warn(`[${this.name}] ⚠️ Health check error:`, healthError);
@@ -532,10 +539,13 @@ export class ConstitutionalAgent {
                         await this.log('watchdog_release', `Releasing stalled task ${stuck.id}`, { taskId: stuck.id });
                         await this.releaseClaim(stuck.id);
 
-                        // Escalate to pending_clarification if it stalled
+                        // [ANTIGRAVITY] SENTINEL ESCALATION: 
+                        // If it's already a healing task, just fail it instead of moving to clarification (avoid the loop)
+                        const isHealing = stuck.title.includes('[HEALING]') || stuck.title.includes('[ANTIFRAGILE]');
+
                         await this.supabase.from('trinity_tasks').update({
-                            status: 'pending_clarification',
-                            result: `[WATCHDOG] Stalled during execution by ${this.name}. Possible provider hang or tool lock.`
+                            status: isHealing ? 'failed' : 'pending_clarification',
+                            result: `[WATCHDOG] Stalled during execution by ${this.name}. ${isHealing ? 'Healing task terminated to prevent loop.' : 'Possible provider hang or tool lock.'}`
                         }).eq('id', stuck.id);
                     }
                 }
@@ -1283,12 +1293,22 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
             // Log to agent logs for visibility
             await this.log('task_failure', errorMsg, { taskId: task.id, title: task.title });
 
-            await this.supabase.from('trinity_tasks').update({
-                status: 'failed',
-                result: `ERROR: ${errorMsg}`,
-                completed_at: new Date().toISOString(),
-                completed_by: this.name
-            }).eq('id', task.id);
+            // [ANTIGRAVITY] Robust Failure Update: Avoid silent stalls
+            try {
+                const { error: failError } = await this.supabase.from('trinity_tasks').update({
+                    status: 'failed',
+                    result: `ERROR: ${errorMsg}`,
+                    claimed_by: null, // Release claim so it can be retried or audited
+                    completed_at: new Date().toISOString(),
+                    completed_by: this.name
+                }).eq('id', task.id);
+
+                if (failError) console.error(`[${this.name}] 🚨 Failed to update task ${task.id} to 'failed':`, failError.message);
+                else console.log(`[${this.name}] 🛡️ Task ${task.id} marked as failed.`);
+            } catch (e: any) {
+                console.error(`[${this.name}] Fatal error during failure update:`, e.message);
+                await this.releaseClaim(task.id);
+            }
         }
     }
 
@@ -1356,8 +1376,8 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                 ...selected,
                 status: 'pending',
                 task_type: 'genesis',
-                priority: 3,
-                metadata: { source: 'maintenance_genesis', agent: this.name }
+                priority: 1, // SET TO LOWEST PRIORITY
+                metadata: { source: 'maintenance_genesis', agent: this.name, automated: true }
             }]);
             console.log(`[GENESIS] 🛠️ Maintenance seeded: ${selected.title}`);
         } catch (e) {

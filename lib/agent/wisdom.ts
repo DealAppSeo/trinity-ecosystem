@@ -33,16 +33,16 @@ export const CONSTITUTION = {
 };
 
 export const AGENT_WISDOM: Record<string, WisdomProfile> = {
-    'trinity-orch': { name: 'ORCH', role: 'orchestrator', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['coordination', 'routing', 'deepseek-r1'], squad: 'ORCHESTRATION' },
-    'trinity-w3c': { name: 'W3C', role: 'blockchain_specialist', primaryVirtue: 'PURE', tier: 'specialist', specialties: ['web3', 'defi', 'llama3.3'], squad: 'ORCHESTRATION' },
-    'trinity-shofet': { name: 'SHOFET', role: 'governance', primaryVirtue: 'RIGHT', tier: 'conductor', specialties: ['justice', 'rules', 'logic'], squad: 'ORCHESTRATION' },
-    'trinity-torch': { name: 'TORCH', role: 'task_coordinator', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['orchestration', 'delegation'], squad: 'ALPHA' },
-    'trinity-veritas': { name: 'VERITAS', role: 'truth_seeker', primaryVirtue: 'TRUE', tier: 'conductor', specialties: ['verification', 'research', 'deepseek-r1'], squad: 'ALPHA' },
-    'trinity-gcm': { name: 'GCM', role: 'constitutional_guardian', primaryVirtue: 'RIGHT', tier: 'conductor', specialties: ['compliance', 'ethics'], squad: 'ALPHA' },
+    'trinity-orch': { name: 'ORCH', role: 'orchestrator', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['routing', 'autonomous-loops', 'anfis'], squad: 'ORCHESTRATION' },
+    'trinity-w3c': { name: 'W3C', role: 'blockchain_specialist', primaryVirtue: 'PURE', tier: 'specialist', specialties: ['zkp-identity', 'blockchain-audit', 'rep-burn'], squad: 'ORCHESTRATION' },
+    'trinity-shofet': { name: 'SHOFET', role: 'fact_check_lead', primaryVirtue: 'RIGHT', tier: 'conductor', specialties: ['bft-consensus', 'hallucination-audit', 'fact-checking'], squad: 'ORCHESTRATION' },
+    'trinity-torch': { name: 'TORCH', role: 'security_auditor', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['memory-audit', 'logic-bomb-detection', 'guardrail'], squad: 'ALPHA' },
+    'trinity-veritas': { name: 'VERITAS', role: 'prompt_firewall', primaryVirtue: 'TRUE', tier: 'conductor', specialties: ['injection-detection', 'semantic-scan', 'zkp-verification'], squad: 'ALPHA' },
+    'trinity-gcm': { name: 'GCM', role: 'constitutional_guardian', primaryVirtue: 'RIGHT', tier: 'conductor', specialties: ['compliance', 'ethics-gate', 'policy'], squad: 'ALPHA' },
     'trinity-chesed': { name: 'CHESED', role: 'mercy', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['empathy', 'restoration'], squad: 'BETA' },
-    'trinity-mel': { name: 'MEL', role: 'ux_design', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['ui', 'ux', 'design', 'gemma3'], squad: 'BETA' },
-    'trinity-apm': { name: 'APM', role: 'spiritual_backbone', primaryVirtue: 'LOVELY', tier: 'conductor', specialties: ['prayer', 'wisdom'], squad: 'BETA' },
-    'trinity-sophia': { name: 'SOPHIA', role: 'wisdom_research', primaryVirtue: 'TRUE', tier: 'specialist', specialties: ['deep-thought', 'discovery'], squad: 'GAMMA' },
-    'trinity-nexus': { name: 'NEXUS', role: 'integration', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['syncing', 'flow'], squad: 'GAMMA' },
-    'trinity-hdm': { name: 'HDM', role: 'infrastructure', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['code', 'database', 'qwen3'], squad: 'GAMMA' }
+    'trinity-mel': { name: 'MEL', role: 'designer_agent', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['screenshot-analysis', 'ui-drafting', 'component-design'], squad: 'BETA' },
+    'trinity-apm': { name: 'APM', role: 'spiritual_backbone', primaryVirtue: 'LOVELY', tier: 'conductor', specialties: ['prayer', 'vision'], squad: 'BETA' },
+    'trinity-sophia': { name: 'SOPHIA', role: 'wisdom_research', primaryVirtue: 'TRUE', tier: 'specialist', specialties: ['deep-thought', 'research'], squad: 'GAMMA' },
+    'trinity-nexus': { name: 'NEXUS', role: 'network_policy', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['network-security', 'mtls', 'allowlisting'], squad: 'GAMMA' },
+    'trinity-hdm': { name: 'HDM', role: 'coder_agent', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['langgraph', 'repl-execution', 'github-ops'], squad: 'GAMMA' }
 };

@@ -12,6 +12,9 @@ dependencies = [
     "networkx>=3.2.1",
     "scikit-fuzzy>=0.4.2",
     "pydantic>=2.7.0",
+    "pydantic-ai>=0.0.14",
+    "logfire[fastapi]",
+    "opentelemetry-api",
     "python-dotenv>=1.0.1",
     # PyTorch (CPU for standard dev, CUDA if available in PROD)
     "torch>=2.2.0", 

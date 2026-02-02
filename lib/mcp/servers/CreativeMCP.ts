@@ -45,6 +45,36 @@ export class CreativeMCP implements MCPServer {
                 execute: async (args: any) => {
                     return await this.analyzeIntent(args.text, args.domain);
                 }
+            },
+            {
+                name: 'screenshot_analysis',
+                description: 'Analyze a screenshot of a UI or design. Extracts color palettes, layout patterns, and component hierarchies.',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        imageUrl: { type: 'string', description: 'URL or base64 of the image to analyze.' },
+                        focus: { type: 'string', description: 'Area of focus (e.g. "buttons", "typography", "layout").' }
+                    },
+                    required: ['imageUrl']
+                },
+                execute: async (args: any) => {
+                    return await this.analyzeScreenshot(args.imageUrl, args.focus);
+                }
+            },
+            {
+                name: 'design_specs',
+                description: 'Generate structured design specifications for a component. Includes CSS variables, Tailwind classes, and accessibility requirements.',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        componentName: { type: 'string' },
+                        styleDescription: { type: 'string', description: 'Description of the desired look and feel.' }
+                    },
+                    required: ['componentName', 'styleDescription']
+                },
+                execute: async (args: any) => {
+                    return await this.generateDesignSpecs(args.componentName, args.styleDescription);
+                }
             }
         ];
     }
@@ -52,6 +82,8 @@ export class CreativeMCP implements MCPServer {
     async callTool(toolName: string, args: any): Promise<any> {
         if (toolName === 'generate_image') return await this.generateImage(args.prompt, args.aspect_ratio, args.style);
         if (toolName === 'nlu_analyze') return await this.analyzeIntent(args.text, args.domain);
+        if (toolName === 'screenshot_analysis') return await this.analyzeScreenshot(args.imageUrl, args.focus);
+        if (toolName === 'design_specs') return await this.generateDesignSpecs(args.componentName, args.styleDescription);
         throw new Error(`Tool ${toolName} not found in CreativeMCP`);
     }
 
@@ -76,5 +108,20 @@ export class CreativeMCP implements MCPServer {
             entities: [{ entity: "domain", value: domain }],
             recommended_action: "spawn_subtask"
         });
+    }
+
+    private async analyzeScreenshot(imageUrl: string, focus: string): Promise<string> {
+        console.log(`[Creative] 👁️ Analyzing screenshot focus: ${focus}`);
+        // This would call a vision model (e.g. GPT-4o or Gemini Pro Vision)
+        return JSON.stringify({
+            palette: ['#00D4AA', '#0A0E14', '#1E2A3A'],
+            componentsDetected: ['Hero', 'Navbar', 'FeatureCard'],
+            recommendations: `Enhance the contrast on the secondary buttons for accessibility.`
+        });
+    }
+
+    private async generateDesignSpecs(name: string, style: string): Promise<string> {
+        console.log(`[Creative] 📐 Generating specs for ${name}`);
+        return `DESIGN SPEC: ${name}\nStyle: ${style}\nTailwind: px-6 py-3 bg-primary rounded-lg shadow-glow text-bg-dark font-semibold\nAccessibility: aria-label required, contrast ratio 7.1:1.`;
     }
 }

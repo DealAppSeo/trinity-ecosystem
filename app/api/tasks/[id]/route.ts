@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase';
+import { verifyAdminKey, unauthorizedResponse } from '@/lib/auth';
 
 export async function PATCH(
     req: Request,
     { params }: { params: { id: string } }
 ) {
     try {
+        if (!verifyAdminKey(req)) {
+            return unauthorizedResponse();
+        }
         const id = params.id;
         const body = await req.json();
 
@@ -28,6 +32,9 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
+        if (!verifyAdminKey(req)) {
+            return unauthorizedResponse();
+        }
         const id = params.id;
         const { error } = await supabase
             .from('trinity_tasks')

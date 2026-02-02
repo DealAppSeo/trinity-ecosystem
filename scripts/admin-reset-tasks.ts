@@ -1,8 +1,16 @@
-
-import { supabaseAdmin } from '../lib/supabase';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
 async function resetStuckTasks() {
     console.log("🧹 Starting Admin Task Reset (Batched)...");
+
+    // Dynamic import to ensure process.env is populated by dotenv first
+    const { supabaseAdmin } = require('../lib/supabase');
+
+    // Allow passing status as an argument: npx tsx scripts/admin-reset-tasks.ts doing
+    const argStatus = process.argv[2];
+    const isForce = process.argv.includes('--force');
+    const statusesToReset = argStatus && argStatus !== '--force' ? [argStatus] : ['in_progress', 'assigned', 'processing', 'doing'];
 
     const batchSize = 1000;
 
@@ -13,12 +21,16 @@ async function resetStuckTasks() {
 
         while (hasMore) {
             // 1. Fetch IDs to update
-            const { data: batch, error: fetchError } = await supabaseAdmin
+            let query = supabaseAdmin
                 .from('trinity_tasks')
                 .select('id')
-                .eq('status', status)
-                .lt('updated_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
-                .limit(batchSize);
+                .eq('status', status);
+
+            if (!isForce) {
+                query = query.lt('updated_at', new Date(Date.now() - 30 * 60 * 1000).toISOString());
+            }
+
+            const { data: batch, error: fetchError } = await query.limit(batchSize);
 
             if (fetchError) {
                 console.error(`Error fetching ${status}:`, fetchError);
@@ -35,26 +47,30 @@ async function resetStuckTasks() {
             // 2. Update these IDs
             const { error: updateError } = await supabaseAdmin
                 .from('trinity_tasks')
-                .update({ status: 'pending', assigned_to: null, updated_at: new Date().toISOString() })
+                .update({
+                    status: 'pending',
+                    assigned_to: null,
+                    claimed_by: null, // Clear claimed_by too
+                    updated_at: new Date().toISOString()
+                })
                 .in('id', ids);
 
             if (updateError) {
                 console.error(`Error updating batch of ${status}:`, updateError);
-                break; // Stop to prevent loop
+                break;
             }
 
             totalReset += ids.length;
             console.log(`   - Reset batch of ${ids.length} (Total: ${totalReset})`);
 
-            // Safety break for huge loops or simple test
             if (totalReset > 50000) break;
         }
         console.log(`✅ Finished resetting '${status}': ${totalReset} tasks.`);
     };
 
-    await processBatch('in_progress');
-    await processBatch('assigned');
-    await processBatch('processing');
+    for (const status of statusesToReset) {
+        await processBatch(status);
+    }
 }
 
 resetStuckTasks();

@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase';
+import { verifyAdminKey, unauthorizedResponse } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
+        // [SECURITY] TRINITY_ADMIN_KEY Verification
+        if (!verifyAdminKey(req)) {
+            return unauthorizedResponse();
+        }
+
         const body = await req.json();
         const { action } = body;
 

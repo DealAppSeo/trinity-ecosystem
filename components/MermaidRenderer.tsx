@@ -16,7 +16,7 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
         mermaid.initialize({
             startOnLoad: false,
             theme: 'dark', // Optimized for the Trinity black/gold/green aesthetic
-            securityLevel: 'loose',
+            securityLevel: 'strict',
             fontFamily: 'Inter, sans-serif',
             themeVariables: {
                 primaryColor: '#10b981', // emerald-500

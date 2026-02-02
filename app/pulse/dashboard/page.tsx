@@ -12,7 +12,7 @@ export default function DashboardPage() {
     const { agents, stats, tasks, logs, loading } = useTrinityController();
 
     // Derived stats if not provided by backend directly
-    const activeAgentsCount = agents.filter(a => ['active', 'online', 'green', 'blue', 'amber'].includes(a.status)).length;
+    const activeAgentsCount = agents.filter(a => ['online', 'blue', 'amber'].includes(a.status)).length;
     const completedTasksCount = stats?.tasks_completed_24h || 0; // Or from tasks array
     const totalTasksCount = tasks.length + completedTasksCount;
     const systemHealth = activeAgentsCount > 0 ? Math.round((activeAgentsCount / agents.length) * 100) : 0;

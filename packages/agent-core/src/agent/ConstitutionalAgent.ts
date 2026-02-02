@@ -65,8 +65,6 @@ export class WebResearchTool implements ResearchTool {
 }
 
 
-
-
 export class ConstitutionalAgent {
     name: string;
     wisdom: WisdomProfile;
@@ -1492,7 +1490,7 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
             // 2. DATABASE INSERT (Using Admin Client to bypass RLS)
 
             // [ANTIGRAVITY] Schema Refresh Retry Logic
-            // Sometimes the supersbase client caches the schema and thinks 'content' col is missing.
+            // Sometimes the supabase client caches the schema and thinks 'content' col is missing.
             // We force a retry with a fresh client if that happens.
             let attempt = 0;
             let success = false;
@@ -1500,7 +1498,6 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
 
             while (attempt < 2 && !success) {
                 try {
-                    // Start with the standard export
                     let clientToUse;
                     if (attempt === 0) {
                         const { supabaseAdmin } = require('../../lib/supabase');
@@ -1509,11 +1506,11 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
                         // FORCE FRESH CLIENT
                         console.log("[ARTIFACT] ⚠️ Retrying with FRESH Supabase Client due to schema error...");
                         const { createClient } = require('@supabase/supabase-js');
-                        // Re-read env vars directly to be safe
                         const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
                         const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
                         clientToUse = createClient(url, key, { auth: { persistSession: false } });
                     }
+
 
                     const payload: any = {
                         task_id: dbTaskId,
@@ -1936,6 +1933,16 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 try {
                     console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey}...`);
                     const result = await this.callSpecificProvider(providerKey, prompt, openAiTools);
+
+                    // [ANTIGRAVITY] POST-PROCESSING: Universal Tool Interception
+                    // Even if the model didn't use native tool calling, we scan for text commands.
+                    if (result.output) {
+                        const artifactCreated = await this.parseTextForArtifacts(result.output);
+                        if (artifactCreated) {
+                            console.log(`[${this.name}] 🛡️ Tool Interceptor: Manually extracted artifact from text.`);
+                        }
+                    }
+
                     return result;
                 } catch (e: any) {
                     console.warn(`[${this.name}] ⚠️ ${providerKey} failed: ${e.message}`);
@@ -1946,6 +1953,63 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             console.error("LLM Call Failed", error);
             return { output: "Error calling LLM" };
         }
+    }
+
+    /**
+     * [ANTIGRAVITY] REFINED TOOL INTERCEPTOR
+     * Scans LLM text output for "faked" tool calls or explicit artifact commands.
+     * Supports: 
+     *  - save_artifact title "content" type
+     *  - [Artifact: title, content, type]
+     *  - ```bash save_artifact ... ```
+     */
+    async parseTextForArtifacts(text: string): Promise<boolean> {
+        let created = false;
+        try {
+            // Pattern 1: save_artifact command (often in code blocks)
+            const saveArtifactRegex = /save_artifact\s+(["'])(.*?)\1\s+(["'])(.*?)\3\s+(["'])(.*?)\5/g;
+            let match;
+            while ((match = saveArtifactRegex.exec(text)) !== null) {
+                const [, , title, , content, , type] = match;
+                const taskId = this.currentTaskId || `ext-${Date.now()}`;
+                await this.saveArtifact(taskId, content, type, title);
+                created = true;
+            }
+
+            // Pattern 2: [Artifact: title] references with content usually preceding it
+            // This is a common hallucination in Claude/Grok where they "annotate" output
+            if (!created && text.includes('[Artifact:')) {
+                const artifactMatch = text.match(/\[Artifact:\s*(.*?)\]/);
+                if (artifactMatch) {
+                    const title = artifactMatch[1];
+                    const taskId = this.currentTaskId || `ext-${Date.now()}`;
+                    // We treat the whole text as content if no specific block found
+                    await this.saveArtifact(taskId, text, 'report', title);
+                    created = true;
+                }
+            }
+
+            // Pattern 3: Explicit bash blocks listing save_artifact (as seen in recent failures)
+            if (!created && text.includes('save_artifact')) {
+                const lines = text.split('\n');
+                for (const line of lines) {
+                    if (line.trim().startsWith('save_artifact')) {
+                        const parts = line.trim().split(/\s+/);
+                        if (parts.length >= 2) {
+                            const filename = parts[1];
+                            const taskId = this.currentTaskId || `ext-${Date.now()}`;
+                            // Use whole text as content for the specific artifact
+                            await this.saveArtifact(taskId, text, 'report', `Artifact: ${filename}`);
+                            created = true;
+                        }
+                    }
+                }
+            }
+
+        } catch (e: any) {
+            console.warn(`[TOOL INTERCEPTOR] Extraction failed: ${e.message}`);
+        }
+        return created;
     }
 
     async callSpecificProvider(provider: string, prompt: string, tools: any[]): Promise<LLMResult> {

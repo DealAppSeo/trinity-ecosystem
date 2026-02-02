@@ -47,7 +47,8 @@ export default function ConductorPage() {
     // No explicit refresh interval needed here.
 
     // Derived stats for UI if API fails or for instant updates
-    const onlineCount = agents.filter(a => ['online', 'active', 'green', 'blue'].includes(a.status)).length;
+    const onlineCount = agents.filter(a => ['online', 'blue', 'amber'].includes(a.status)).length;
+    const busyCount = agents.filter(a => (a as any).current_task_summary && (a as any).current_task_summary !== 'Idle' && (a as any).status !== 'offline').length;
 
     // --- CAPTAIN FEATURES ---
     const [northStar, setNorthStar] = useState('');

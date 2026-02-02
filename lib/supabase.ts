@@ -12,15 +12,13 @@ const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
 const isProduction = process.env.NODE_ENV === 'production';
 
 // ------------------------------------------------------------------
-// PRODUCTION FALLBACKS (Temporary Fix - Step 2026-01-21)
+// ENVIRONMENT VALIDATION
 // ------------------------------------------------------------------
-if (!PUBLIC_URL && isProduction) {
-    console.warn("⚠️ [Supabase] Missing NEXT_PUBLIC_SUPABASE_URL in production. Applying hardcoded fallback.");
-    PUBLIC_URL = 'https://qnnpjhlxljtqyigedwkb.supabase.co';
+if (!PUBLIC_URL && isProduction && !isBuildTime) {
+    console.error("❌ [Supabase] Missing NEXT_PUBLIC_SUPABASE_URL. Swarm requires this for telemetry.");
 }
-if (!PUBLIC_KEY && isProduction) {
-    console.warn("⚠️ [Supabase] Missing NEXT_PUBLIC_SUPABASE_ANON_KEY in production. Applying hardcoded fallback.");
-    PUBLIC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw';
+if (!PUBLIC_KEY && isProduction && !isBuildTime) {
+    console.error("❌ [Supabase] Missing NEXT_PUBLIC_SUPABASE_ANON_KEY. Swarm required this for public view.");
 }
 
 let client: SupabaseClient;

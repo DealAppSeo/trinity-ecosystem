@@ -62,6 +62,39 @@ export class GitHubMCP extends BaseMCP {
             },
             execute: this.getIssue.bind(this)
         });
+
+        this.registerTool({
+            name: 'create_pull_request',
+            description: 'Create a new pull request. Arguments: title, head, base, body.',
+            schema: {
+                type: 'object',
+                properties: {
+                    title: { type: 'string' },
+                    head: { type: 'string', description: 'The name of the branch where your changes are implemented.' },
+                    base: { type: 'string', description: 'The name of the branch you want the changes pulled into.' },
+                    body: { type: 'string' }
+                },
+                required: ['title', 'head', 'base']
+            },
+            execute: this.createPR.bind(this)
+        });
+
+        this.registerTool({
+            name: 'update_file_content',
+            description: 'Create or update a file in the repository. Arguments: path, content, message, branch.',
+            schema: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string' },
+                    content: { type: 'string', description: 'New file content' },
+                    message: { type: 'string', description: 'Commit message' },
+                    branch: { type: 'string' },
+                    sha: { type: 'string', description: 'SHA of the file if updating' }
+                },
+                required: ['path', 'content', 'message']
+            },
+            execute: this.updateFile.bind(this)
+        });
     }
 
     private async searchRepos(args: { query: string }): Promise<string> {
@@ -82,5 +115,32 @@ export class GitHubMCP extends BaseMCP {
             state: res.data.state,
             body: res.data.body?.substring(0, 500) // Truncate
         }, null, 2);
+    }
+
+    private async createPR(args: { title: string, head: string, base: string, body?: string }): Promise<string> {
+        if (!this.octokit) throw new Error('Not connected');
+        const res = await this.octokit.pulls.create({
+            owner: this.owner,
+            repo: this.repo,
+            title: args.title,
+            head: args.head,
+            base: args.base,
+            body: args.body
+        });
+        return `PR Created: ${res.data.html_url}`;
+    }
+
+    private async updateFile(args: { path: string, content: string, message: string, branch?: string, sha?: string }): Promise<string> {
+        if (!this.octokit) throw new Error('Not connected');
+        const res = await this.octokit.repos.createOrUpdateFileContents({
+            owner: this.owner,
+            repo: this.repo,
+            path: args.path,
+            message: args.message,
+            content: Buffer.from(args.content).toString('base64'),
+            branch: args.branch,
+            sha: args.sha
+        });
+        return `File Updated: ${res.data.content?.html_url} (Commit: ${res.data.commit.sha})`;
     }
 }

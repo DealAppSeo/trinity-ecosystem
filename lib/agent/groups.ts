@@ -29,30 +29,30 @@ export const AGENT_GROUPS: Record<GroupId, AgentGroup> = {
     },
     ALPHA: {
         id: 'ALPHA',
-        name: 'Alpha Squad (TRUTH)',
-        focus: 'Grok Optimized - Truth & Verification',
+        name: 'Alpha Squad (SECURITY)',
+        focus: 'GuardRail Core - Firewall & Auditor',
         leadAgent: 'trinity-veritas',
         members: ['trinity-torch', 'trinity-veritas', 'trinity-gcm'],
         survivor: 'trinity-torch',
-        description: 'Focuses on truth, patterns, and long-term vision. Validates strategies before execution.'
+        description: 'The front line of defense. Handles prompt injections, memory auditing, and ethical gating.'
     },
     BETA: {
         id: 'BETA',
-        name: 'Beta Squad (CARE)',
-        focus: 'Claude Optimized - Wellbeing & Experience',
+        name: 'Beta Squad (DESIGN)',
+        focus: 'Visual Trust - Design & Experience',
         leadAgent: 'trinity-mel',
         members: ['trinity-chesed', 'trinity-mel', 'trinity-apm'],
-        survivor: 'trinity-chesed', // User said "Chesed, Mel, and APM" - Chesed is usually heart
-        description: 'Focuses on user experience, prayer, and care. The "heart" of the system.'
+        survivor: 'trinity-chesed',
+        description: 'Focuses on user experience, design analysis, and empathetic restoration.'
     },
     GAMMA: {
         id: 'GAMMA',
         name: 'Gamma Squad (BUILD)',
-        focus: 'Gemini Optimized - Infrastructure & Wisdom',
+        focus: 'Infrastructure & Coding',
         leadAgent: 'trinity-hdm',
         members: ['trinity-sophia', 'trinity-nexus', 'trinity-hdm'],
         survivor: 'trinity-sophia',
-        description: 'Focuses on ethical alignment, infrastructure, and Web3 integration.'
+        description: 'Handles the code generation, network policy enforcement, and technical wisdom.'
     }
 };
 

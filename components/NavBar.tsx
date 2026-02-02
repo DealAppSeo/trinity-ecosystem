@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Mic, Activity, Share2, Sparkles } from 'lucide-react';
+import { Mic, Activity, Share2, Sparkles, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShareModal } from './ui/ShareModal';
@@ -47,7 +47,7 @@ export function NavBar() {
         return 'Trinity Controller';
     };
 
-    const isPulse = pathname?.startsWith('/pulse');
+    const isPulse = pathname?.startsWith('/pulse') || (typeof window !== 'undefined' && window.location.hostname.includes('controller'));
 
     return (
         <>
@@ -64,19 +64,23 @@ export function NavBar() {
                             onClick={triggerHaptic}
                             className="flex items-center gap-3 group"
                         >
-                            <motion.div
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:shadow-cyan-500/40 transition-all duration-500"
-                            >
-                                <Activity className="w-6 h-6 text-white" />
-                            </motion.div>
+                            {!isPulse && (
+                                <motion.div
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:shadow-cyan-500/40 transition-all duration-500"
+                                >
+                                    <Activity className="w-6 h-6 text-white" />
+                                </motion.div>
+                            )}
 
                             <div className="flex flex-col">
-                                <span className="text-[10px] md:text-xs font-black bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent uppercase tracking-[0.2em] leading-none mb-1">
-                                    AI Trinity Symphony
-                                </span>
-                                <h1 className="text-lg md:text-xl font-bold text-white tracking-tight leading-none">
+                                {!isPulse && (
+                                    <span className="text-[10px] md:text-xs font-black bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent uppercase tracking-[0.2em] leading-none mb-1">
+                                        AI Trinity Symphony
+                                    </span>
+                                )}
+                                <h1 className="text-lg md:text-xl font-bold text-white tracking-tight leading-none group-hover:text-cyan-400 transition-colors">
                                     {getPageTitle()}
                                 </h1>
                             </div>
@@ -85,6 +89,21 @@ export function NavBar() {
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-2 sm:gap-4">
+                        {/* Home Button */}
+                        <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            <Link
+                                href="/pulse/directives"
+                                onClick={triggerHaptic}
+                                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all"
+                                title="Home"
+                            >
+                                <Home className="w-5 h-5" />
+                            </Link>
+                        </motion.div>
+
                         {/* Share & Earn */}
                         <motion.button
                             whileHover={{ scale: 1.05 }}
