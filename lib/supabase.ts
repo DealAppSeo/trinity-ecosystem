@@ -124,10 +124,10 @@ const createMockClient = () => ({
 
 if (!PUBLIC_URL || !PUBLIC_KEY) {
     if (isProduction && !isBuildTime) {
-        throw new Error('FATAL: Supabase environment variables missing in production runtime.');
+        console.warn('⚠️ [Supabase] FATAL: Credentials missing in production. Falling back to Mock to prevent UI crash.');
+    } else {
+        console.warn(`⚠️ [Supabase] Missing credentials during ${isBuildTime ? 'BUILD' : 'DEV'}. Fallback to Mock.`);
     }
-
-    console.warn(`⚠️ [Supabase] Missing credentials during ${isBuildTime ? 'BUILD' : 'DEV'}. Fallback to Mock.`);
     client = createMockClient();
 } else {
     try {
