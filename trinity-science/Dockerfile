@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies (Cached layer)
-RUN pip install --no-cache-dir fastapi uvicorn[standard] numpy scipy networkx scikit-fuzzy pydantic python-dotenv requests packaging prometheus_client supabase
+RUN pip install --no-cache-dir fastapi uvicorn[standard] numpy scipy networkx scikit-fuzzy pydantic python-dotenv requests packaging prometheus_client supabase structlog
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
 # Copy all project files

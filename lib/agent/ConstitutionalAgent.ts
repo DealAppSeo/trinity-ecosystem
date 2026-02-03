@@ -2561,8 +2561,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         if (provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools);
         else if (provider === 'anthropic') providerPromise = this.callAnthropic(systemPrompt, prompt, tools);
         else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt, tools);
-        else if (provider === 'grok') providerPromise = this.callOpenAICompatible('https://api.x.ai/v1/chat/completions', process.env.GROK_API_KEY!, 'grok-2-latest', systemPrompt, prompt, tools);
-        else if (provider === 'groq') providerPromise = this.callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', process.env.GROK_API_KEY!, 'llama-3.3-70b-versatile', systemPrompt, prompt, tools);
+        else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt, tools);
+        else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt, tools);
         else if (provider === 'fireworks') providerPromise = this.callOpenAICompatible('https://api.fireworks.ai/inference/v1/chat/completions', process.env.FIREWORKS_API_KEY!, 'accounts/fireworks/models/llama-v3p3-70b-instruct', systemPrompt, prompt, tools);
         else if (provider === 'together') providerPromise = this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', systemPrompt, prompt, tools);
         else if (provider === 'local_4090') providerPromise = this.callOpenAICompatible(`${process.env.LOCAL_INFERENCE_URL}/v1/chat/completions`, 'local', process.env.LOCAL_MODEL || 'llama3.1:8b', systemPrompt, prompt, tools);
