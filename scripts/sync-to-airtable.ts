@@ -1,5 +1,8 @@
+import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
+import Airtable from 'airtable';
 
-dotenv.config({ path: 'c:/Users/Cash4/OneDrive/Desktop/trinity-ecosystem/hyperdag-sandbox/.env.local' });
+dotenv.config(); // Loads from .env or .env.local automatically in the root
 
 console.log('🔑 Checking credentials...');
 console.log('  Supabase URL:', (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) ? '✅ Loaded' : '❌ Missing');
