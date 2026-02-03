@@ -26,16 +26,26 @@ structlog.configure(
 )
 logger = structlog.get_logger()
 
-# Configure Phoenix/OpenTelemetry Tracing
-resource = Resource(attributes={"service.name": "trinity-science"})
-span_exporter = OTLPSpanExporter(endpoint="http://localhost:6006/v1/traces")
-span_processor = BatchSpanProcessor(span_exporter)
-trace_provider = TracerProvider(resource=resource)
-trace_provider.add_span_processor(span_processor)
-trace.set_tracer_provider(trace_provider)
+# Configure Phoenix/OpenTelemetry Tracing (Optional)
+PHOENIX_ENDPOINT = os.getenv("PHOENIX_COLLECTOR_ENDPOINT", "http://localhost:6006/v1/traces")
+ENABLE_TRACING = os.getenv("ENABLE_TRACING", "false").lower() == "true"
 
-# Instrument Pydantic AI
-PydanticAIInstrumentor().instrument()
+if ENABLE_TRACING:
+    try:
+        resource = Resource(attributes={"service.name": "trinity-science"})
+        span_exporter = OTLPSpanExporter(endpoint=PHOENIX_ENDPOINT)
+        span_processor = BatchSpanProcessor(span_exporter)
+        trace_provider = TracerProvider(resource=resource)
+        trace_provider.add_span_processor(span_processor)
+        trace.set_tracer_provider(trace_provider)
+        
+        # Instrument Pydantic AI
+        PydanticAIInstrumentor().instrument()
+        logger.info("Tracing and Pydantic AI instrumentation enabled.", endpoint=PHOENIX_ENDPOINT)
+    except Exception as e:
+        logger.warning("Tracing initialization failed. Proceeding without tracing.", error=str(e))
+else:
+    logger.info("Tracing disabled by environment variable (ENABLE_TRACING=false).")
 
 class DecisionInput(BaseModel):
     latency_ms: float = Field(..., description="Current system latency")

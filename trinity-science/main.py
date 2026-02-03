@@ -7,6 +7,11 @@ import asyncio
 from datetime import datetime
 import structlog
 from supabase import create_client, Client
+from app.anfis_router import router as anfis_router
+from app.pydantic_agents import get_science_decision, DecisionInput as PyDecisionInput
+import rewards as rewards_lib
+import arbitrage as arbitrage_lib
+import router as router_lib
 
 # Configure Structlog
 structlog.configure(
@@ -110,7 +115,6 @@ except ImportError:
     logger.warning("prometheus_client not found. Metrics endpoint disabled.")
 
 # --- ROUTERS ---
-from app.anfis_router import router as anfis_router
 app.include_router(anfis_router, prefix="/anfis/v2", tags=["ANFIS v2"])
 
 # --- Data Models (Mirroring openapi.json) ---
@@ -170,7 +174,7 @@ async def root():
 async def health():
     return {"status": "online", "agent": "trinity-science", "timestamp": datetime.utcnow().isoformat()}
 
-from app.pydantic_agents import get_science_decision, DecisionInput as PyDecisionInput
+
 
 @app.post("/anfis/decide", response_model=AnfisOutput)
 async def decide_anfis(data: AnfisInput):
@@ -202,7 +206,7 @@ async def decide_anfis(data: AnfisInput):
             reason=f"Fallback: {str(e)}"
         )
 
-from rewards import reward_system
+
 
 @app.post("/anfis/reward", response_model=RewardOutput)
 async def calculate_reward(input_data: RewardInput):
@@ -223,7 +227,7 @@ async def calculate_reward(input_data: RewardInput):
     # Apply 'God Mode' config weights if needed (simple scaling for MVP)
     weighted_need = input_data.network_need * current_config.network_need_weight
     
-    multiplier = reward_system.calculate(
+    multiplier = rewards_lib.reward_system.calculate(
         weighted_need, 
         input_data.saturation, 
         input_data.diversity_score
@@ -254,7 +258,7 @@ async def update_config(config: RewardConfig):
     logger.info(f"Updated Reward Config: {current_config}")
     return {"status": "updated", "config": current_config}
 
-from arbitrage import arbitrage_engine, BidRequest as PyBidRequest
+
 
 class MarketBidRequest(BaseModel):
     task_id: str
@@ -287,7 +291,7 @@ async def get_market_bids(data: MarketBidRequest):
     
     # Adapt to Engine Request
     # In Phase 5+, we would pass data.secure_keys to the provider
-    engine_req = PyBidRequest(
+    engine_req = arbitrage_lib.BidRequest(
         task_id=data.task_id,
         required_gpu=data.required_gpu,
         required_ram_gb=data.required_ram_gb,
@@ -295,8 +299,8 @@ async def get_market_bids(data: MarketBidRequest):
     )
     
     # Get Offers
-    offers = arbitrage_engine.get_offers(engine_req)
-    winner = arbitrage_engine.select_winner(offers, data.strategy)
+    offers = arbitrage_lib.arbitrage_engine.get_offers(engine_req)
+    winner = arbitrage_lib.arbitrage_engine.select_winner(offers, data.strategy)
     
     # Form Response
     return MarketBidResponse(
@@ -317,7 +321,7 @@ async def rank_gnn(data: GnnInput):
         scores=[0.9 - (i * 0.1) for i in range(len(data.candidate_node_ids))]
     )
 
-from router import router
+
 
 class RouterInput(BaseModel):
     user_exp: int
@@ -335,7 +339,7 @@ async def optimize_route(data: RouterInput):
     Get optimized routing strategy based on Ubiquitous ANFIS.
     """
     logger.info(f"Received Router Request: {data}")
-    result = router.route(data.user_exp, data.latency_tol, data.task_comp)
+    result = router_lib.router.route(data.user_exp, data.latency_tol, data.task_comp)
     
     return RouterOutput(
         score=result['score'],
