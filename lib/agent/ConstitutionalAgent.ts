@@ -513,9 +513,10 @@ export class ConstitutionalAgent {
                         if (isCurrentlyAutomated) {
                             console.log(`[${this.name}] 🛡️ RECURSION GUARD: Suppressing healing spawn while processing automated task.`);
                         } else {
-                            console.log(`[${this.name}] 🧬 LEARNING LOOP TRIGGERED: ${health.reason}`);
-                            await this.spawnMaintenanceTask(health.reason);
-                            await this.sleep(30000); // Wait before continuing to avoid loop thrashing
+                            // [STABILIZATION] Temporarily disabled to stop loop thrashing
+                            // console.log(`[${this.name}] 🧬 LEARNING LOOP TRIGGERED: ${health.reason}`);
+                            // await this.spawnMaintenanceTask(health.reason);
+                            // await this.sleep(30000); // Wait before continuing to avoid loop thrashing
                         }
                     }
                 } catch (healthError) {

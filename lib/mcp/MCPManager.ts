@@ -12,6 +12,10 @@ import { CreativeMCP } from './servers/CreativeMCP';
 import { ComposioMCP } from './servers/ComposioMCP';
 import { StitchMCP } from './servers/StitchMCP';
 import { SandboxMCP } from './servers/SandboxMCP';
+import { FrameworksMCP } from './servers/FrameworksMCP';
+import { AutomationMCP } from './servers/AutomationMCP';
+import { KnowledgeMCP } from './servers/KnowledgeMCP';
+import { DataMCP } from './servers/DataMCP';
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -33,6 +37,10 @@ export class MCPManager {
         this.registerServer(new ComposioMCP());
         this.registerServer(new StitchMCP());
         this.registerServer(new SandboxMCP());
+        this.registerServer(new FrameworksMCP());
+        this.registerServer(new AutomationMCP());
+        this.registerServer(new KnowledgeMCP());
+        this.registerServer(new DataMCP());
     }
 
     registerServer(server: MCPServer) {
