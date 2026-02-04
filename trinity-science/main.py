@@ -7,10 +7,6 @@ import asyncio
 from datetime import datetime
 import structlog
 from supabase import create_client, Client
-from app.anfis_router import router as anfis_router
-from app.pydantic_agents import get_science_decision, DecisionInput as PyDecisionInput
-import rewards as rewards_lib
-import arbitrage as arbitrage_lib
 import router as router_lib
 
 # Configure Structlog
@@ -79,6 +75,14 @@ app = FastAPI(
 async def startup_event():
     logger.info("Science Brain Starting Up...", version="0.1.0")
     
+    # Deferred router inclusion to prevent top-level import blocks
+    try:
+        from app.anfis_router import router as anfis_router
+        app.include_router(anfis_router, prefix="/anfis/v2", tags=["ANFIS v2"])
+        logger.info("ANFIS Router included successfully.")
+    except Exception as e:
+        logger.error(f"Failed to include ANFIS Router: {str(e)}")
+
     # 1. Start Heartbeat
     asyncio.create_task(run_heartbeat())
     logger.info("Heartbeat task dispatched.")
@@ -105,9 +109,6 @@ async def startup_event():
         logger.error(f"Metrics mount failed: {str(e)}")
 
     logger.info("Science Brain Startup Sequence Complete.")
-
-# --- ROUTERS ---
-app.include_router(anfis_router, prefix="/anfis/v2", tags=["ANFIS v2"])
 
 # --- Data Models (Mirroring openapi.json) ---
 
@@ -191,6 +192,7 @@ async def decide_anfis(data: AnfisInput):
     logger.info(f"Received ANFIS request: {data}")
     
     try:
+        from app.pydantic_agents import get_science_decision, DecisionInput as PyDecisionInput
         # Use the new Pydantic AI Agent for structured decision making
         py_data = PyDecisionInput(
             latency_ms=data.latency_ms,
@@ -233,6 +235,7 @@ async def calculate_reward(input_data: RewardInput):
     }
     base = base_values.get(input_data.action_type.upper(), 1.0)
     
+    import rewards as rewards_lib
     # 2. Calculate Multiplier using Fuzzy Logic
     # Apply 'God Mode' config weights if needed (simple scaling for MVP)
     weighted_need = input_data.network_need * current_config.network_need_weight
@@ -299,6 +302,7 @@ async def get_market_bids(data: MarketBidRequest):
         log_data['secure_keys'] = '***REDACTED***'
     logger.info(f"Received Market Bid Request: {log_data}")
     
+    import arbitrage as arbitrage_lib
     # Adapt to Engine Request
     # In Phase 5+, we would pass data.secure_keys to the provider
     engine_req = arbitrage_lib.BidRequest(
