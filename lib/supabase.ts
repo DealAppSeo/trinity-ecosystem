@@ -2,8 +2,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // 1. Environment Variable Extraction (Strict Differentiation)
-let PUBLIC_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-let PUBLIC_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+let PUBLIC_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+let PUBLIC_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Detect Build vs Runtime

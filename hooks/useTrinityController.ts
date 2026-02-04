@@ -129,8 +129,16 @@ export const useTrinityController = () => {
                 return a.agent_name.localeCompare(b.agent_name);
             });
 
-            if (enrichedAgents.length > 0) setAgents(enrichedAgents as AgentRegistryRecord[]);
-            if (taskData) setTasks(taskData as unknown as TaskRecord[]);
+            if (enrichedAgents.length > 0) {
+                setAgents(enrichedAgents as AgentRegistryRecord[]);
+            } else if (agentData) {
+                // If agentData exists but enrichedAgents is empty (shouldn't happen with 13 agents), still set it
+                setAgents(agentData as unknown as AgentRegistryRecord[]);
+            }
+
+            if (taskData) {
+                setTasks(taskData as unknown as TaskRecord[]);
+            }
             if (logData) setLogs(logData);
             if (heartbeatData) setHeartbeats(heartbeatData);
 
@@ -142,7 +150,7 @@ export const useTrinityController = () => {
             setStats({
                 online_agents: calculatedActiveAgents,
                 tasks_completed_24h: completedCount24h || 0,
-                active_tasks: taskList.filter(t => ['pending', 'in_progress', 'doing', 'running'].includes(t.status)).length
+                active_tasks: (taskList || []).filter(t => ['pending', 'in_progress', 'doing', 'running'].includes(t.status)).length
             });
 
         } catch (error) {
