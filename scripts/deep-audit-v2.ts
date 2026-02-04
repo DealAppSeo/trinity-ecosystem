@@ -89,7 +89,7 @@ async function run() {
 
     await checkKey('DeepSeek', process.env.DEEPSEEK_API_KEY);
     await checkKey('Stability', process.env.STABILITY_API_KEY);
-    await checkKey('Figma Token', process.env.FIGMA_ACCESS_TOKEN);
+    await checkKey('Figma Token', process.env.FIGMA_ACCESS_TOKEN || process.env.FIGMA_TOKEN);
     await checkKey('HuggingFace', process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN);
 
     console.log('\n--- 🧠 Memory & Tools Audit ---');

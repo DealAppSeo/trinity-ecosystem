@@ -65,24 +65,48 @@ async def run_heartbeat():
         
         await asyncio.sleep(30)
 
+from app.anfis_router import router as anfis_router
+
 app = FastAPI(
     title="Trinity Science Division",
     description="Python Microservice for GNN and ANFIS operations",
     version="0.1.0"
 )
 
+# --- Data Models ---
+class AnfisOutput(BaseModel):
+    should_query_user: bool
+    interaction_type: Literal['none', 'shallow_check', 'deep_clarification', 'email_notification', 'sms_notification']
+    score: float
+    reason: str
+
+class RewardInput(BaseModel):
+    action_type: Literal['REFERRAL', 'STAKE', 'COMPUTE', 'FEEDBACK']
+    network_need: float
+    saturation: float
+    diversity_score: float
+
+class RewardOutput(BaseModel):
+    base_value: float
+    multiplier: float
+    final_amount: float
+    reason: str
+
+class RewardConfig(BaseModel):
+    network_need_weight: float = 1.0
+    saturation_weight: float = 1.0
+    diversity_weight: float = 1.0
+
+# Global Config
+current_config = RewardConfig()
+
+# Include router at top level
+app.include_router(anfis_router, prefix="/anfis/v2", tags=["ANFIS v2"])
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Science Brain Starting Up...", version="0.1.0")
     
-    # Deferred router inclusion to prevent top-level import blocks
-    try:
-        from app.anfis_router import router as anfis_router
-        app.include_router(anfis_router, prefix="/anfis/v2", tags=["ANFIS v2"])
-        logger.info("ANFIS Router included successfully.")
-    except Exception as e:
-        logger.error(f"Failed to include ANFIS Router: {str(e)}")
-
     # 1. Start Heartbeat
     asyncio.create_task(run_heartbeat())
     logger.info("Heartbeat task dispatched.")

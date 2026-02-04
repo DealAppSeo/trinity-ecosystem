@@ -10,23 +10,22 @@ from supabase import create_client, Client
 
 router = APIRouter()
 
-import os
+def get_supabase() -> Client:
+    # Initialize Supabase lazily
+    url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
-# Initialize Supabase
-url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
-key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    if not url or not key:
+        # Temporary fallback for immediate restoration during deployment transition
+        url = "https://qnnpjhlxljtqyigedwkb.supabase.co"
+        key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw"
+        print("⚠️ [ANFIS] Missing environment variables. Using hardcoded fallback.")
 
-if not url or not key:
-    # Temporary fallback for immediate restoration during deployment transition
-    url = "https://qnnpjhlxljtqyigedwkb.supabase.co"
-    key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw"
-    print("⚠️ [ANFIS] Missing environment variables. Using hardcoded fallback.")
-
-try:
-    supabase: Client = create_client(url, key)
-except Exception as e:
-    print(f"❌ [ANFIS] Supabase initialization failed: {e}")
-    supabase = None
+    try:
+        return create_client(url, key)
+    except Exception as e:
+        print(f"❌ [ANFIS] Supabase creation failed: {e}")
+        return None
 
 # ==========================================
 # PROMETHEUS METRICS (Visibility)
@@ -156,11 +155,14 @@ async def approve_suggestion(data: ApproveInput):
     # 1. Fetch current suggestion first (optional, but good for validation)
     # For now, just trust the update logic
     
-    # 2. Update DB
+        # 2. Update DB
     try:
-        # We need to get the 'suggested_prompt' to move it to 'system_prompt'.
-        # Or we can do it in two steps.
-        response = supabase.table("trinity_agent_registry").select("suggested_prompt").eq("agent_name", data.agent_id).execute()
+        # Use get_supabase() instead of global
+        sb = get_supabase()
+        if not sb:
+            raise HTTPException(status_code=500, detail="Database connection failed")
+            
+        response = sb.table("trinity_agent_registry").select("suggested_prompt").eq("agent_name", data.agent_id).execute()
         
         if not response.data:
             raise HTTPException(status_code=404, detail="Agent not found")
@@ -179,7 +181,7 @@ async def approve_suggestion(data: ApproveInput):
             # Timestamp handles itself or we can set it
         }
         
-        supabase.table("trinity_agent_registry").update(update_data).eq("agent_name", data.agent_id).execute()
+        sb.table("trinity_agent_registry").update(update_data).eq("agent_name", data.agent_id).execute()
         
         # Log metric
         ANFIS_REWARDS.labels(agent_id=data.agent_id, outcome="approved").inc()
@@ -197,11 +199,15 @@ async def reject_suggestion(data: ApproveInput):
     """
     print(f"⚖️ ANFIS Brain: Rejecting suggestion for {data.agent_id}")
     try:
+        sb = get_supabase()
+        if not sb:
+            raise HTTPException(status_code=500, detail="Database connection failed")
+            
         update_data = {
             "suggested_prompt": None,
             "suggestion_accepted": False
         }
-        supabase.table("trinity_agent_registry").update(update_data).eq("agent_name", data.agent_id).execute()
+        sb.table("trinity_agent_registry").update(update_data).eq("agent_name", data.agent_id).execute()
         return {"status": "success", "message": f"Rejected suggestion for {data.agent_id}"}
     except Exception as e:
         print(f"❌ DB Error: {e}")
