@@ -11,7 +11,8 @@ from supabase import create_client, Client
 router = APIRouter()
 
 import os
-# Initialize Supabase (Use environment variables for security)
+
+# Initialize Supabase
 url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
 key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
@@ -21,7 +22,11 @@ if not url or not key:
     key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw"
     print("⚠️ [ANFIS] Missing environment variables. Using hardcoded fallback.")
 
-supabase: Client = create_client(url, key)
+try:
+    supabase: Client = create_client(url, key)
+except Exception as e:
+    print(f"❌ [ANFIS] Supabase initialization failed: {e}")
+    supabase = None
 
 # ==========================================
 # PROMETHEUS METRICS (Visibility)

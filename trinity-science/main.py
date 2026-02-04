@@ -77,42 +77,34 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_event():
+    logger.info("Science Brain Starting Up...", version="0.1.0")
+    
+    # 1. Start Heartbeat
     asyncio.create_task(run_heartbeat())
-    logger.info("Science Brain Heartbeat Started.")
+    logger.info("Heartbeat task dispatched.")
 
-# --- CORS ---
-from fastapi.middleware.cors import CORSMiddleware
+    # 2. Instrument FastAPI with Arize Phoenix (Deferred)
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        FastAPIInstrumentor.instrument_app(app)
+        logger.info("FastAPI instrumented with OpenTelemetry")
+    except ImportError:
+        logger.warning("FastAPI instrumentation skipped: opentelemetry-instrumentation-fastapi not installed")
+    except Exception as e:
+        logger.error(f"FastAPI instrumentation failed: {str(e)}")
 
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://controller.aitrinitysymphony.com", # Production Vercel
-    "*" # Allow all for now to ensure smooth launch
-]
+    # 3. Mount Prometheus Metrics (Deferred)
+    try:
+        from prometheus_client import make_asgi_app
+        metrics_app = make_asgi_app()
+        app.mount("/metrics", metrics_app)
+        logger.info("Metrics endpoint mounted at /metrics")
+    except ImportError:
+        logger.warning("prometheus_client not found. Metrics skipped.")
+    except Exception as e:
+        logger.error(f"Metrics mount failed: {str(e)}")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Instrument FastAPI with Arize Phoenix (via OpenTelemetry)
-try:
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    FastAPIInstrumentor.instrument_app(app)
-    logger.info("FastAPI instrumented with OpenTelemetry")
-except ImportError:
-    logger.warning("FastAPI instrumentation failed: opentelemetry-instrumentation-fastapi not installed")
-
-# --- PROMETHEUS METRICS ---
-try:
-    from prometheus_client import make_asgi_app
-    metrics_app = make_asgi_app()
-    app.mount("/metrics", metrics_app)
-except ImportError:
-    logger.warning("prometheus_client not found. Metrics endpoint disabled.")
+    logger.info("Science Brain Startup Sequence Complete.")
 
 # --- ROUTERS ---
 app.include_router(anfis_router, prefix="/anfis/v2", tags=["ANFIS v2"])
@@ -164,15 +156,33 @@ current_config = RewardConfig()
 
 # --- Endpoints ---
 
+@app.get("/health")
+@app.head("/health")
+async def health():
+    return {"status": "online", "agent": "trinity-science", "timestamp": datetime.utcnow().isoformat()}
+
 @app.get("/")
 @app.head("/")
 async def root():
     return {"status": "online", "system": "Trinity Science Division"}
 
-@app.get("/health")
-@app.head("/health")
-async def health():
-    return {"status": "online", "agent": "trinity-science", "timestamp": datetime.utcnow().isoformat()}
+# --- CORS ---
+from fastapi.middleware.cors import CORSMiddleware
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://controller.aitrinitysymphony.com", # Production Vercel
+    "*" # Allow all for now to ensure smooth launch
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 
