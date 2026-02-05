@@ -30,6 +30,13 @@ async function syncEnv() {
         console.log(`✅ Synced keys to shared library: ${sharedEnvPath}`);
     }
 
+    // Option 1b: Sync to Hyperdag Sandbox
+    const sandboxEnvPath = path.join(rootDir, '..', 'hyperdag-sandbox', '.env.local');
+    if (fs.existsSync(path.dirname(sandboxEnvPath))) {
+        fs.writeFileSync(sandboxEnvPath, Object.entries(envConfig).map(([k, v]) => `${k}=${v}`).join('\n'));
+        console.log(`✅ Synced keys to hyperdag-sandbox: ${sandboxEnvPath}`);
+    }
+
     // Option 2: Future Railway Pull (Placeholder for Railway CLI integration)
     const railwayToken = envConfig.RAILWAY_API_TOKEN;
     if (railwayToken) {

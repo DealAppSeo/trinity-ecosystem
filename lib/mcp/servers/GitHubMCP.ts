@@ -64,42 +64,120 @@ export class GitHubMCP extends BaseMCP {
         });
 
         this.registerTool({
-            name: 'create_pull_request',
-            description: 'Create a new pull request. Arguments: title, head, base, body.',
+            name: 'create_pr',
+            description: 'Creates a new pull request. Arguments: title (string), head (string), base (string), body (string, optional), owner (string, optional), repo (string, optional).',
             schema: {
                 type: 'object',
                 properties: {
                     title: { type: 'string' },
-                    head: { type: 'string', description: 'The name of the branch where your changes are implemented.' },
-                    base: { type: 'string', description: 'The name of the branch you want the changes pulled into.' },
-                    body: { type: 'string' }
+                    head: { type: 'string' },
+                    base: { type: 'string' },
+                    body: { type: 'string' },
+                    owner: { type: 'string' },
+                    repo: { type: 'string' }
                 },
                 required: ['title', 'head', 'base']
             },
-            execute: this.createPR.bind(this)
-        });
-
-        this.registerTool({
-            name: 'update_file_content',
-            description: 'Create or update a file in the repository. Arguments: path, content, message, branch.',
-            schema: {
-                type: 'object',
-                properties: {
-                    path: { type: 'string' },
-                    content: { type: 'string', description: 'New file content' },
-                    message: { type: 'string', description: 'Commit message' },
-                    branch: { type: 'string' },
-                    sha: { type: 'string', description: 'SHA of the file if updating' }
+            execute: async (args: any) => this.createPR(args)
+        },
+            {
+                name: 'update_file',
+                description: 'Creates or updates a file. Arguments: path (string), content (string), message (string), branch (string, optional), sha (string, optional), owner (string, optional), repo (string, optional).',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        path: { type: 'string' },
+                        content: { type: 'string' },
+                        message: { type: 'string' },
+                        branch: { type: 'string' },
+                        sha: { type: 'string' },
+                        owner: { type: 'string' },
+                        repo: { type: 'string' }
+                    },
+                    required: ['path', 'content', 'message']
                 },
-                required: ['path', 'content', 'message']
+                execute: async (args: any) => this.updateFile(args)
             },
-            execute: this.updateFile.bind(this)
-        });
+            {
+                name: 'create_branch',
+                description: 'Creates a new branch. Arguments: branch (string), base (string), owner (string, optional), repo (string, optional).',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        branch: { type: 'string' },
+                        base: { type: 'string' },
+                        owner: { type: 'string' },
+                        repo: { type: 'string' }
+                    },
+                    required: ['branch', 'base']
+                },
+                execute: async (args: any) => this.createBranch(args)
+            },
+            {
+                name: 'read_repo_file',
+                description: 'Reads the content of a file. Arguments: path (string), branch (string, optional), owner (string, optional), repo (string, optional).',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        path: { type: 'string' },
+                        branch: { type: 'string' },
+                        owner: { type: 'string' },
+                        repo: { type: 'string' }
+                    },
+                    required: ['path']
+                },
+                execute: async (args: any) => this.readFile(args)
+            },
+            {
+                name: 'get_repo_tree',
+                description: 'Lists all files and directories in a repository. Arguments: recursive (boolean, optional), branch (string, optional), owner (string, optional), repo (string, optional).',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        recursive: { type: 'boolean' },
+                        branch: { type: 'string' },
+                        owner: { type: 'string' },
+                        repo: { type: 'string' }
+                    }
+                },
+                execute: async (args: any) => this.getRepoTree(args)
+            },
+            {
+                name: 'list_branches',
+                description: 'Lists all branches in the repository. Arguments: per_page (number, optional), owner (string, optional), repo (string, optional).',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        per_page: { type: 'number' },
+                        owner: { type: 'string' },
+                        repo: { type: 'string' }
+                    }
+                },
+                execute: async (args: any) => this.listBranches(args)
+            },
+            {
+                name: 'submit_pr_review',
+                description: 'Submits a pull request review. Arguments: pull_number (number), event (string: APPROVE, REQUEST_CHANGES, or COMMENT), body (string, optional), owner (string, optional), repo (string, optional).',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        pull_number: { type: 'number' },
+                        event: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'] },
+                        body: { type: 'string' },
+                        owner: { type: 'string' },
+                        repo: { type: 'string' }
+                    },
+                    required: ['pull_number', 'event']
+                },
+                execute: async (args: any) => this.submitPRReview(args)
+            }
+        );
     }
 
-    private async searchRepos(args: { query: string }): Promise<string> {
+    private async searchRepos(args: { query: string, owner?: string }): Promise<string> {
         if (!this.octokit) throw new Error('Not connected');
-        const q = this.owner ? `user:${this.owner} ${args.query}` : args.query;
+        const owner = args.owner || this.owner;
+        const q = owner ? `user:${owner} ${args.query}` : args.query;
         const res = await this.octokit.search.repos({ q, per_page: 5 });
         return JSON.stringify(res.data.items.map(r => ({ full_name: r.full_name, stars: r.stargazers_count, url: r.html_url })), null, 2);
     }
@@ -117,11 +195,14 @@ export class GitHubMCP extends BaseMCP {
         }, null, 2);
     }
 
-    private async createPR(args: { title: string, head: string, base: string, body?: string }): Promise<string> {
+    private async createPR(args: { title: string, head: string, base: string, body?: string, owner?: string, repo?: string }): Promise<string> {
         if (!this.octokit) throw new Error('Not connected');
+        const owner = args.owner || this.owner;
+        const repo = args.repo || this.repo;
+        if (!owner || !repo) throw new Error('Owner or Repo missing');
         const res = await this.octokit.pulls.create({
-            owner: this.owner,
-            repo: this.repo,
+            owner,
+            repo,
             title: args.title,
             head: args.head,
             base: args.base,
@@ -130,11 +211,14 @@ export class GitHubMCP extends BaseMCP {
         return `PR Created: ${res.data.html_url}`;
     }
 
-    private async updateFile(args: { path: string, content: string, message: string, branch?: string, sha?: string }): Promise<string> {
+    private async updateFile(args: { path: string, content: string, message: string, branch?: string, sha?: string, owner?: string, repo?: string }): Promise<string> {
         if (!this.octokit) throw new Error('Not connected');
+        const owner = args.owner || this.owner;
+        const repo = args.repo || this.repo;
+        if (!owner || !repo) throw new Error('Owner or Repo missing');
         const res = await this.octokit.repos.createOrUpdateFileContents({
-            owner: this.owner,
-            repo: this.repo,
+            owner,
+            repo,
             path: args.path,
             message: args.message,
             content: Buffer.from(args.content).toString('base64'),
@@ -142,5 +226,113 @@ export class GitHubMCP extends BaseMCP {
             sha: args.sha
         });
         return `File Updated: ${res.data.content?.html_url} (Commit: ${res.data.commit.sha})`;
+    }
+
+    private async createBranch(args: { branch: string, base: string, owner?: string, repo?: string }): Promise<string> {
+        if (!this.octokit) throw new Error('Not connected');
+        const owner = args.owner || this.owner;
+        const repo = args.repo || this.repo;
+        if (!owner || !repo) throw new Error('Owner or Repo missing');
+
+        // 1. Get SHA of base branch
+        const baseRef = await this.octokit.git.getRef({
+            owner,
+            repo,
+            ref: `heads/${args.base}`
+        });
+        const sha = baseRef.data.object.sha;
+
+        // 2. Create new branch
+        await this.octokit.git.createRef({
+            owner,
+            repo,
+            ref: `refs/heads/${args.branch}`,
+            sha: sha
+        });
+
+        return `Branch '${args.branch}' created successfully from '${args.base}' in ${owner}/${repo}.`;
+    }
+
+    private async readFile(args: { path: string, branch?: string, owner?: string, repo?: string }): Promise<string> {
+        if (!this.octokit) throw new Error('Not connected');
+        const owner = args.owner || this.owner;
+        const repo = args.repo || this.repo;
+        if (!owner || !repo) throw new Error('Owner or Repo missing');
+        const res = await this.octokit.repos.getContent({
+            owner,
+            repo,
+            path: args.path,
+            ref: args.branch
+        });
+
+        if (Array.isArray(res.data)) {
+            return `This path is a directory in ${owner}/${repo}. Entries: ${res.data.map(i => i.name).join(', ')}`;
+        }
+
+        if ('content' in res.data) {
+            return Buffer.from(res.data.content, 'base64').toString('utf-8');
+        }
+
+        return "Error: Could not read file content.";
+    }
+
+    private async getRepoTree(args: { recursive?: boolean, branch?: string, owner?: string, repo?: string }): Promise<string> {
+        if (!this.octokit) throw new Error('Not connected');
+        const owner = args.owner || this.owner;
+        const repo = args.repo || this.repo;
+        if (!owner || !repo) throw new Error('Owner or Repo missing');
+
+        // 1. Get the SHA of the branch head
+        const branch = args.branch || 'main';
+        const ref = await this.octokit.git.getRef({
+            owner,
+            repo,
+            ref: `heads/${branch}`
+        });
+        const sha = ref.data.object.sha;
+
+        // 2. Get the tree
+        const tree = await this.octokit.git.getTree({
+            owner,
+            repo,
+            tree_sha: sha,
+            recursive: args.recursive ? 'true' : undefined
+        });
+
+        return JSON.stringify(tree.data.tree.map(i => ({
+            path: i.path,
+            type: i.type,
+            size: i.size
+        })), null, 2);
+    }
+
+    private async listBranches(args: { per_page?: number, owner?: string, repo?: string }): Promise<string> {
+        if (!this.octokit) throw new Error('Not connected');
+        const owner = args.owner || this.owner;
+        const repo = args.repo || this.repo;
+        if (!owner || !repo) throw new Error('Owner or Repo missing');
+        const res = await this.octokit.repos.listBranches({
+            owner,
+            repo,
+            per_page: args.per_page || 30
+        });
+        return JSON.stringify(res.data.map(b => b.name), null, 2);
+    }
+
+    private async submitPRReview(args: { pull_number: number, event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT', body?: string, owner?: string, repo?: string }): Promise<string> {
+        if (!this.octokit) throw new Error('Not connected');
+        const owner = args.owner || this.owner;
+        const repo = args.repo || this.repo;
+        if (!owner || !repo) throw new Error('Owner or Repo missing');
+
+        const res = await this.octokit.pulls.createReview({
+            owner,
+            repo,
+            pull_number: args.pull_number,
+            event: args.event,
+            body: args.body
+        });
+
+        return `Review submitted: ${res.data.html_url}`;
     }
 }

@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import { supabaseAdmin as supabase } from '../supabase';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
@@ -523,7 +524,8 @@ export class ConstitutionalAgent {
                     console.warn(`[${this.name}] ⚠️ Health check error:`, healthError);
                 }
 
-                // [ANTIGRAVITY] STUCK TASK WATCHDOG: Release tasks stuck in 'doing' for > 15 mins
+                // [ANTIGRAVITY] STUCK TASK WATCHDOG: Release tasks stuck in 'doing' for > 5 mins (Aggressive Recovery v2)
+                const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
                 const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
                 // 1. Monitor MY OWN stuck tasks
@@ -532,7 +534,7 @@ export class ConstitutionalAgent {
                     .select('id, title')
                     .eq('claimed_by', this.name)
                     .in('status', ['doing', 'in_progress', 'running'])
-                    .lt('started_at', fifteenMinsAgo);
+                    .lt('started_at', fiveMinsAgo);
 
                 if (myStuckTasks && myStuckTasks.length > 0) {
                     for (const stuck of myStuckTasks) {
@@ -563,7 +565,7 @@ export class ConstitutionalAgent {
                         .neq('claimed_by', this.name)
                         .not('claimed_by', 'is', null) // Ensure claimed_by is not null
                         .in('status', ['doing', 'in_progress', 'running'])
-                        .lt('started_at', fifteenMinsAgo);
+                        .lt('started_at', fiveMinsAgo);
 
                     if (peerTasks && peerTasks.length > 0) {
                         for (const task of peerTasks) {
@@ -907,11 +909,14 @@ export class ConstitutionalAgent {
         }
 
         // [ANTIGRAVITY] Revised Polling: ensure we check both pending and clarification
-        // We prioritize 'pending_clarification' to ensure stalled tasks are recovered first
+        // [EXPERT-PRIORITY] High-Rep agents prioritize Consultations
+        const isExpert = (this.reputationScore || 0) > 80;
+
         const { data: task, error } = await query
             .in('status', ['pending', 'pending_clarification'])
             .is('claimed_by', null)
-            .order('status', { ascending: false }) // 'pending_clarification' (p) > 'pending' (p) alphabetically? No, use explicit order or just priority
+            // If expert, prioritize clarification tasks (mentorship)
+            .order('status', { ascending: false })
             .order('priority', { ascending: false })
             .order('created_at', { ascending: true })
             .limit(1)
@@ -1140,33 +1145,64 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                 throw new Error("LLM call failed to produce output. Check API keys and connectivity.");
             }
             // [PHASE 10] UNCERTAINTY AS OPPORTUNITY (Logical Escalation)
-            const evaluation = await this.evaluateResult(task, result.output);
-            const lowBelief = evaluation.score < 40; // Now correctly compared (0-100)
-            const explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
+            let evaluation = await this.evaluateResult(task, result.output);
+            let lowBelief = evaluation.score < 40;
+            let explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
 
             if (lowBelief || explicitEscalate) {
-                console.log(`[ANTIGRAVITY] 🚨 UNCERTAINTY DETECTED (Score: ${evaluation.score}). Escalating to Architect...`);
+                // [ANTIGRAVITY] Phase A: Internal Elite Retry (Proactive Recovery)
+                const alreadyElite = (task as any).metadata?.includes('elite_retry');
+                if (!alreadyElite) {
+                    console.log(`[${this.name}] 🚨 UNCERTAINTY DETECTED. Triggering Internal Elite Retry...`);
+                    const escalationModel = this.router.getEscalationModel(task);
 
-                const { error: escalateError } = await this.supabase.from('trinity_tasks').update({
-                    status: 'pending_clarification',
-                    claimed_by: null, // [ANTIGRAVITY] Release claim so agent can do other work while waiting
-                    result: `[ESCALATED] Agent ${this.name} is seeking clarification. \n\nReason: ${lowBelief ? 'Low certainty score' : 'Explicit escalation request'}. \n\nQuery: ${result.output.substring(0, 500)}`,
-                    verification_result: `Searching high-dimension databases... seeking expert consensus.`
-                }).eq('id', task.id);
+                    // Mark metadata to prevent loop
+                    const meta = JSON.parse(task.metadata || '{}');
+                    meta.elite_retry = true;
+                    task.metadata = JSON.stringify(meta);
 
-                if (escalateError) {
-                    console.error(`[${this.name}] ❌ Escalation update failed:`, escalateError.message);
+                    const elitePrompt = `${prompt}\n\n[NOTICE: ELITE ESCALATION]\nYour previous answer was flagged as low-confidence. Please use your full reasoning capability to provide a definitive solution or identify exactly what info is missing.`;
+                    result = await this.callLLM(elitePrompt, { forceModel: escalationModel }, task);
+
+                    // Re-evaluate
+                    evaluation = await this.evaluateResult(task, result.output);
+                    lowBelief = evaluation.score < 50; // Tighter threshold for elite 
+                    explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
+
+                    if (!lowBelief && !explicitEscalate) {
+                        console.log(`[${this.name}] ✅ Elite retry successful (Score: ${evaluation.score}). Proceeding.`);
+                    } else {
+                        console.log(`[${this.name}] ⚠️ Elite retry still low confidence. Escalating to Peers/Admin.`);
+                    }
                 }
 
-                // Spawn "Question for Architect" artifact
-                const questionContent = `# Question for Architect \n\n**Agent**: ${this.name} \n**Task**: ${task.title} \n\n**The Right Question**: \n${result.output} \n\n---\n*The smartest person is not the one with all the answers, but the one asking the right questions.*`;
-                await this.saveArtifact(task.id, questionContent, 'report', `Q: ${task.title}`, 'public');
+                if (lowBelief || explicitEscalate) {
+                    console.log(`[ANTIGRAVITY] 🚨 ESCALATING to Architect/Peers...`);
 
-                // RELEASE CLAIM so others (or a reset) can pick it up once clarified
-                // No need for releaseClaim here, we already set claimed_by: null in the update above
+                    const { error: escalateError } = await this.supabase.from('trinity_tasks').update({
+                        status: 'pending_clarification',
+                        claimed_by: null,
+                        result: `[ESCALATED] Agent ${this.name} is seeking clarification. \n\nReason: ${lowBelief ? 'Low certainty score' : 'Explicit escalation request'}. \n\nQuery: ${result.output.substring(0, 500)}`,
+                        verification_result: `Searching high-dimension databases... seeking expert consensus.`,
+                        metadata: {
+                            ...(JSON.parse(task.metadata || '{}')),
+                            consultation_requested: true,
+                            escalated_by: this.name,
+                            escalation_time: new Date().toISOString()
+                        }
+                    }).eq('id', task.id);
 
-                return { success: true, llm_used: true, escalated: true };
-            }
+                    if (escalateError) {
+                        console.error(`[${this.name}] ❌ Escalation update failed:`, escalateError.message);
+                    }
+
+                    // Spawn "Question for Architect" artifact
+                    const questionContent = `# Question for Architect \n\n**Agent**: ${this.name} \n**Task**: ${task.title} \n\n**The Right Question**: \n${result.output} \n\n---\n*The smartest person is not the one with all the answers, but the one asking the right questions.*`;
+                    await this.saveArtifact(task.id, questionContent, 'report', `Q: ${task.title}`, 'public');
+
+                    return { success: true, llm_used: true, escalated: true };
+                }
+            } // End of outer if (lowBelief || explicitEscalate)
 
             let externalArtifactUrl = result.artifactLinks && result.artifactLinks.length > 0
                 ? result.artifactLinks[0]
@@ -2479,7 +2515,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             });
 
             let sortedProviders = this.router.route(task as any, this.availableProviders);
-            const forcedModel = this.router.detectSpecializedRequest(task as any);
+            const forcedModel = options?.forceModel || this.router.detectSpecializedRequest(task as any);
 
             // [LATENCY AS OPPORTUNITY]
             if (prompt.includes('Slow / Complex') || prompt.includes('Score: 8')) {
@@ -2523,8 +2559,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 } catch (e: any) {
                     const errorMsg = e.message === 'PROVIDER_STALL' ? 'STALLED (120s)' : e.message;
 
-                    // [ANTIFRAGILE] Demote temporarily if it's a structural failure (429, 404, Timeout)
-                    if (errorMsg.includes('429') || errorMsg.includes('404') || errorMsg.includes('Timeout') || errorMsg.includes('STALLED')) {
+                    // [ANTIFRAGILE] Demote temporarily if it's a structural failure (429, 404, 402, Timeout)
+                    if (errorMsg.includes('429') || errorMsg.includes('404') || errorMsg.includes('402') || errorMsg.includes('Timeout') || errorMsg.includes('STALLED')) {
                         this.router.demote(providerKey);
                     }
 
@@ -2604,7 +2640,11 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
                 clearTimeout(timeoutId);
 
-                if (!response.ok) throw new Error(await response.text());
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error(`[${this.name}] ❌ OpenAI Error (${response.status}):`, errText);
+                    throw new Error(`OpenAI Error: ${errText}`);
+                }
                 const data = await response.json();
                 if (data.error) throw new Error(`OpenAI Error: ${JSON.stringify(data.error)}`);
                 if (!data.choices || data.choices.length === 0) throw new Error("OpenAI returned no choices");
@@ -2659,7 +2699,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
         for (let i = 0; i < 5; i++) {
             const body: any = {
-                model: 'claude-3-5-sonnet-latest',
+                model: 'claude-3-5-sonnet-20241022',
                 system: systemPrompt,
                 messages,
                 max_tokens: 4000,
@@ -2677,7 +2717,10 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             });
 
             const data = await response.json();
-            if (data.error) throw new Error(`Anthropic Error: ${JSON.stringify(data.error)}`);
+            if (!response.ok || data.error) {
+                console.error(`[${this.name}] ❌ Anthropic Error (${response.status}):`, JSON.stringify(data.error || data));
+                throw new Error(`Anthropic Error: ${JSON.stringify(data.error || data)}`);
+            }
 
             const message = data;
             messages.push({ role: 'assistant', content: message.content });
@@ -2779,47 +2822,55 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     }
 
     async callGrok(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.x.ai/v1/chat/completions', process.env.GROK_API_KEY!, 'grok-beta', system, prompt, tools);
+        return this.callOpenAICompatible('https://api.x.ai/v1/chat/completions', process.env.GROK_API_KEY!, 'grok-beta', system, prompt, tools, 'grok');
     }
 
     async callGroq(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', process.env.GROQ_API_KEY!, 'llama-3.3-70b-versatile', system, prompt, tools);
+        return this.callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', process.env.GROQ_API_KEY!, 'llama-3.3-70b-versatile', system, prompt, tools, 'groq');
     }
 
     async callCerebras(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.cerebras.ai/v1/chat/completions', process.env.CEREBRAS_API_KEY!, 'llama3.1-70b', system, prompt, tools);
+        return this.callOpenAICompatible('https://api.cerebras.ai/v1/chat/completions', process.env.CEREBRAS_API_KEY!, 'llama3.1-8b', system, prompt, tools, 'cerebras');
     }
 
     async callDeepSeek(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.deepseek.com/chat/completions', process.env.DEEPSEEK_API_KEY!, 'deepseek-chat', system, prompt, tools);
+        return this.callOpenAICompatible('https://api.deepseek.com/chat/completions', process.env.DEEPSEEK_API_KEY!, 'deepseek-chat', system, prompt, tools, 'deepseek');
     }
 
     async callOpenRouter(system: string, prompt: string, tools: any[] = [], modelOverride?: string): Promise<LLMResult> {
         // [PHASE 10] OpenRouter defaults to DeepSeek-V3 for cost-performance arbitrage
         // [PHASE 11] Intelligence Router can override with specialized models (Qwen, Mistral, Llama, etc.)
         const model = modelOverride || process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
-        return this.callOpenAICompatible('https://openrouter.ai/api/v1/chat/completions', process.env.OPENROUTER_API_KEY!, model, system, prompt, tools);
+        return this.callOpenAICompatible('https://openrouter.ai/api/v1/chat/completions', process.env.OPENROUTER_API_KEY!, model, system, prompt, tools, 'openrouter');
     }
 
     async callPerplexity(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.perplexity.ai/chat/completions', process.env.PERPLEXITY_API_KEY!, 'llama-3.1-sonar-large-128k-online', system, prompt, tools);
+        return this.callOpenAICompatible('https://api.perplexity.ai/chat/completions', process.env.PERPLEXITY_API_KEY!, 'sonar', system, prompt, tools, 'perplexity');
     }
 
     async callTogether(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools);
+        return this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools, 'together');
     }
 
     async callDeepInfra(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.deepinfra.com/v1/openai/chat/completions', process.env.DEEPINFRA_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools);
+        return this.callOpenAICompatible('https://api.deepinfra.com/v1/openai/chat/completions', process.env.DEEPINFRA_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools, 'deepinfra');
     }
 
-    async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[]): Promise<LLMResult> {
+    async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[], providerKey?: string): Promise<LLMResult> {
         const messages: any[] = [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
         ];
 
         const artifactLinks: string[] = [];
+        const providerInfo = providerKey ? PROVIDER_REGISTRY[providerKey] : null;
+        let supportsTools = providerInfo ? providerInfo.supportsTools : true;
+
+        // Final Model-Specific Compatibility Check
+        if (supportsTools && !this.router.isModelToolCompatible(model)) {
+            console.log(`[ROUTER] ⚠️ Model ${model} known to be tool-incompatible. Disabling tool inclusion.`);
+            supportsTools = false;
+        }
 
         for (let i = 0; i < 5; i++) {
             const controller = new AbortController();
@@ -2838,12 +2889,20 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     body: JSON.stringify({
                         model,
                         messages,
-                        tools: tools.length > 0 ? tools : undefined,
-                        tool_choice: tools.length > 0 ? 'auto' : undefined
+                        max_tokens: 4096,
+                        tools: (tools.length > 0 && supportsTools) ? tools : undefined,
+                        tool_choice: (tools.length > 0 && supportsTools) ? 'auto' : undefined
                     })
                 });
 
                 clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error(`[${this.name}] [${model}] ❌ API Error (${response.status}):`, errText);
+                    fs.appendFileSync('llm_errors.log', `[${new Date().toISOString()}] [${this.name}] [${model}] ${response.status}: ${errText}\n`);
+                    throw new Error(`API Error (${model}) [${response.status}]: ${errText}`);
+                }
 
                 const data = await response.json();
                 if (data.error) throw new Error(`API Error (${model}): ${JSON.stringify(data.error)}`);

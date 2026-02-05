@@ -8,153 +8,86 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const TASKS = [
-    // ALPHA SQUAD (Research & Logic)
+const SPRINT_TASKS = [
+    // GAMMA SQUAD: PLANNER ROLE (Architecture & Testing)
     {
-        title: "[ALPHA] [EASY] Repository Structure Audit",
-        description: "Explore the root directory and map the primary structure. Identify the purpose of /packages, /lib, and /scripts.",
-        task_type: "research",
-        assigned_to: "ALPHA",
-        priority: 1
-    },
-    {
-        title: "[ALPHA] [MEDIUM] ZK-SNARK Gap Analysis",
-        description: "Research 2026 ZK-SNARK implementations for privacy-preserving reputation. Compare snarkjs and circom performance.",
-        task_type: "research",
-        assigned_to: "ALPHA",
-        priority: 2
-    },
-    {
-        title: "[ALPHA] [EASY] Dependency Conflict Check",
-        description: "List all major dependencies in package.json and flag any potential version mismatches between workspaces.",
-        task_type: "research",
-        assigned_to: "ALPHA",
-        priority: 1
-    },
-    {
-        title: "[ALPHA] [MEDIUM] Artifact MIME-Type Protocol",
-        description: "Propose a standardized MIME-type mapping for trinity artifacts (e.g., .mermaid, .csv, .md).",
-        task_type: "research",
-        assigned_to: "ALPHA",
-        priority: 2
-    },
-
-    // BETA SQUAD (Data & Spreadsheet)
-    {
-        title: "[BETA] [EASY] Agent Latency Table",
-        description: "Audit the trinity_agent_registry and create a CSV-style table of agents with their current last_active latency.",
-        task_type: "code",
-        assigned_to: "BETA",
-        priority: 1
-    },
-    {
-        title: "[BETA] [MEDIUM] Performance Benchmark CSV",
-        description: "Create a structured CSV artifact comparing throughput and latency for the current 4 status database tables.",
-        task_type: "code",
-        assigned_to: "BETA",
-        priority: 2
-    },
-    {
-        title: "[BETA] [EASY] Suppabase Table Definition Audit",
-        description: "List all columns in the 'trinity_tasks' table and identify unused or legacy fields.",
-        task_type: "code",
-        assigned_to: "BETA",
-        priority: 1
-    },
-    {
-        title: "[BETA] [MEDIUM] Data Retention Policy Proprosal",
-        description: "Draft a spreadsheet-style artifact outlining a 30-day automated cleanup policy for old heartbeats and logs.",
-        task_type: "code",
-        assigned_to: "BETA",
-        priority: 2
-    },
-
-    // GAMMA SQUAD (Design & Architecture)
-    {
-        title: "[GAMMA] [EASY] Squad Vision Statement",
-        description: "Draft a concise 1-paragraph mission statement for the Gamma squad's role in the Trinity Symphony.",
+        title: "[GAMMA] [PRO] Infrastructure Planning: Swarm Telemetry",
+        description: "Explore the library structure using GitHub.get_repo_tree. Identify state management in /lib/state. Use PlaywrightExpert.plan_test_scenario to draft a Markdown plan for a 'Global Heartbeat' verification spec.",
         task_type: "research",
         assigned_to: "GAMMA",
-        priority: 1
+        priority: 100,
+        requires_external_artifact: true
     },
     {
-        title: "[GAMMA] [MEDIUM] Task Lifecycle Diagram",
-        description: "Create a Mermaid flowchart diagram showing a task moving from PENDING to DOING to DONE to VERIFIED.",
+        title: "[GAMMA] [EASY] Repo Map Artifact",
+        description: "Output a visual/Markdown map of the /lib and /packages directories using your recursive tree tools.",
         task_type: "research",
         assigned_to: "GAMMA",
-        priority: 2
-    },
-    {
-        title: "[GAMMA] [EASY] Dashboard Component Audit",
-        description: "List all UI components in /components and identify which ones are currently used in the main Dashboard page.",
-        task_type: "research",
-        assigned_to: "GAMMA",
-        priority: 1
-    },
-    {
-        title: "[GAMMA] [MEDIUM] HyperDag Connectivity Mock",
-        description: "Propose a design for a 'Graph Connector' artifact that shows how a task would link to a ZKP proof on-chain.",
-        task_type: "research",
-        assigned_to: "GAMMA",
-        priority: 2
+        priority: 50,
+        requires_external_artifact: true
     },
 
-    // ORCHESTRATION (Coordination & Docs)
+    // BETA SQUAD: GENERATOR ROLE (Creative & UI)
     {
-        title: "[ORCH] [EASY] Swarm Manifesto Init",
-        description: "Kick off the 'Trinity Manifesto' draft with a high-level focus on 'Antifragility and Emergence'.",
-        task_type: "research",
-        assigned_to: "ORCH",
-        priority: 1
+        title: "[BETA] [PRO] Stability AI: Dashboard Vision 2026",
+        description: "Generate a high-fidelity 'glassmorphism' UI mockup for the Trinity Controller. Use Stability.generate_image with these constraints: negative_prompt: 'text, labels, blurry, distorted', seed: 42, style: 'ultra-realistic cyberpunk minimalism'. Save to artifacts/creative.",
+        task_type: "content",
+        assigned_to: "BETA",
+        priority: 100,
+        requires_external_artifact: true
     },
     {
-        title: "[ORCH] [MEDIUM] Cross-Squad Handoff Protocol",
-        description: "Draft a document outlining how Level 1 tasks should hand off to Level 2 tasks across squads.",
-        task_type: "research",
-        assigned_to: "ORCH",
-        priority: 2
-    },
-    {
-        title: "[ORCH] [MEDIUM] Collaboration Test Case: Hidden Key",
-        description: "CLARIFICATION TEST: Find the 'hidden' key description in the codebase. (Purposefully ambiguous task to trigger Clarify).",
-        task_type: "research",
-        assigned_to: "ORCH",
-        status: "pending_clarification",
-        priority: 3
-    },
-    {
-        title: "[ORCH] [MEDIUM] Global Directive Sync Plan",
-        description: "Propose a strategy for ensuring that all 12 agents receive 'Planetary Directives' simultaneously without polling collisions.",
-        task_type: "research",
-        assigned_to: "ORCH",
-        priority: 2
+        title: "[BETA] [MEDIUM] Playwright Generator: UI Spec",
+        description: "Analyze the current /pulse/tasks page using Playwright.browse_page. Use PlaywrightExpert.generate_test_suite to produce a basic .spec.ts checking that the 'Active Agents' count is visible.",
+        task_type: "code",
+        assigned_to: "BETA",
+        priority: 70,
+        requires_external_artifact: true
     },
 
-    // ADDITIONAL FOR VOLUME (24 Total)
-    { title: "[ALPHA] [EASY] FileSystemMCP Tool Audit", description: "List all tools provided by the FileSystemMCP and verify they are correctly registered.", task_type: "research", assigned_to: "ALPHA", priority: 1 },
-    { title: "[ALPHA] [MEDIUM] GitHub MCP Repo Integration", description: "Audit the current GitHubMCP and propose 3 new tools for better PR management.", task_type: "research", assigned_to: "ALPHA", priority: 2 },
-    { title: "[BETA] [EASY] Artifact Scaling Test Doc", description: "Propose a strategy for handling > 10,000 artifacts in the Trinity Dashboard UI.", task_type: "code", assigned_to: "BETA", priority: 1 },
-    { title: "[BETA] [MEDIUM] Log Aggregation Table", description: "Create a pivot-table artifact summarizing the frequency of errors across all 12 agents.", task_type: "code", assigned_to: "BETA", priority: 2 },
-    { title: "[GAMMA] [EASY] Iconography Standard", description: "List the Lucide icons currently used in the Registry Grid and propose any missing metaphors.", task_type: "research", assigned_to: "GAMMA", priority: 1 },
-    { title: "[GAMMA] [MEDIUM] Responsive Grid Design Proprosal", description: "Draft a CSS-focused artifact proposing a layout for a 24-agent mobile grid.", task_type: "research", assigned_to: "GAMMA", priority: 2 },
-    { title: "[ORCH] [EASY] Uptime Pulse Protocol", description: "Summarize the current wake-monitor.ts logic and identify its primary fail-points.", task_type: "research", assigned_to: "ORCH", priority: 1 },
-    { title: "[ORCH] [MEDIUM] Planetary Restart Guide", description: "Create a 1-page technical guide for manually restarting the entire swarm in Railway.", task_type: "research", assigned_to: "ORCH", priority: 2 }
+    // ALPHA SQUAD: HEALER ROLE (Strategy & Audit)
+    {
+        title: "[ALPHA] [PRO] Self-Healing UI Audit",
+        description: "Browse the site sandbox. If you encounter a 404 or a missing element on the login page, use PlaywrightExpert.heal_failing_test to propose a selector fix. Output the 'Healer Patch' as a document.",
+        task_type: "meta",
+        assigned_to: "ALPHA",
+        priority: 100,
+        requires_external_artifact: true
+    },
+    {
+        title: "[ALPHA] [EASY] Truth Alignment Sync",
+        description: "Verify that the agent roles in codebase match reality. Use Playwright.browse_page to check the 'Founders Dashboard' agent list and cross-reference with your memory.",
+        task_type: "research",
+        assigned_to: "ALPHA",
+        priority: 50,
+        requires_external_artifact: true
+    }
 ];
 
-async function seedValidationSprint() {
-    console.log('🌱 SEEDING SWARM VALIDATION SPRINT (24 Tasks)...');
+async function seedSprint() {
+    console.log('🚀 SEEDING PRO TOOL VALIDATION SPRINT...');
+
+    // 1. Clear existing 'pending' tasks to avoid clutter if desired
+    // (Optional: await supabase.from('trinity_tasks').delete().eq('status', 'pending'));
 
     const { error } = await supabase
         .from('trinity_tasks')
-        .insert(TASKS.map(t => ({
+        .insert(SPRINT_TASKS.map(t => ({
             ...t,
-            status: t.status || 'pending',
+            status: 'pending',
             created_at: new Date().toISOString(),
-            metadata: { sprint: 'VALIDATION_V1', complexity: t.priority > 1 ? 'medium' : 'easy' }
+            metadata: {
+                sprint: 'PRO_TOOL_VALIDATION',
+                tools_tested: ['StabilityV2', 'GitHubTree', 'PlaywrightExpert']
+            }
         })));
 
-    if (error) console.error('❌ Seeding failed:', error.message);
-    else console.log('✅ 24 Validation Tasks Seeded Successfully!');
+    if (error) {
+        console.error('❌ Seeding failed:', error.message);
+    } else {
+        console.log('✅ 6 Pro Validation Tasks Seeded Successfully!');
+        console.log('Run "npm run agent" or trigger your Railway swarm to begin.');
+    }
 }
 
-seedValidationSprint();
+seedSprint();

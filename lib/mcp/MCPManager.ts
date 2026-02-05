@@ -8,6 +8,7 @@ import { AlphaVantageMCP } from './servers/AlphaVantageMCP';
 import { GitHubMCP } from './servers/GitHubMCP';
 import { GoogleWorkspaceMCP } from './servers/GoogleWorkspaceMCP';
 import { PlaywrightMCP } from './servers/PlaywrightMCP';
+import { PlaywrightExpertMCP } from './servers/PlaywrightExpertMCP';
 import { CreativeMCP } from './servers/CreativeMCP';
 import { ComposioMCP } from './servers/ComposioMCP';
 import { StitchMCP } from './servers/StitchMCP';
@@ -33,6 +34,7 @@ export class MCPManager {
         this.registerServer(new GitHubMCP());
         this.registerServer(new GoogleWorkspaceMCP());
         this.registerServer(new PlaywrightMCP());
+        this.registerServer(new PlaywrightExpertMCP());
         this.registerServer(new CreativeMCP());
         this.registerServer(new ComposioMCP());
         this.registerServer(new StitchMCP());
@@ -79,33 +81,32 @@ export class MCPManager {
 
         // Define Role-to-Server Mappings
         const accessMap: Record<string, string[]> = {
-            'CMO_SQUAD': ['AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Puppeteer', 'Supabase'],
-            'CDO_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Puppeteer', 'Composio', 'stitch'],
-            'CTO_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio', 'stitch'],
-            'ORCHESTRATOR': ['ALL']
+            'ALPHA_SQUAD': ['TavilySearch', 'AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Playwright', 'Supabase', 'PlaywrightExpert'],
+            'BETA_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Playwright', 'Composio', 'stitch', 'CreativeSuite', 'PlaywrightExpert'],
+            'GAMMA_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio', 'stitch', 'PlaywrightExpert'],
+            'ORCHESTRATION': ['ALL']
         };
 
         // Determine mapped servers based on role substring
         let allowedServers: string[] = [];
 
-        // ALPHA SQUAD (Marketing/Truth) - Grok
-        if (roleUpper.includes('CMO') || roleUpper.includes('GROK') || roleUpper.includes('MARKETING') || roleUpper.includes('VERITAS') || roleUpper.includes('W3C')) {
-            allowedServers = ['TavilySearch', ...accessMap['CMO_SQUAD']];
+        // Match by literal squad name or specific agent name from Railway
+        // ALPHA SQUAD (Truth/Strategy): Torch, Veritas, GCM
+        if (roleUpper.includes('ALPHA') || roleUpper.includes('TORCH') || roleUpper.includes('VERITAS') || roleUpper.includes('GCM')) {
+            allowedServers = accessMap['ALPHA_SQUAD'];
         }
-        // BETA SQUAD (Design/Care) - Claude
-        else if (roleUpper.includes('CDO') || roleUpper.includes('CLAUDE') || roleUpper.includes('DESIGN') || roleUpper.includes('MEL') || roleUpper.includes('LILY')) {
-            allowedServers = [...accessMap['CDO_SQUAD'], 'CreativeSuite'];
+        // BETA SQUAD (Design/Creative): Chesed, Mel, APM
+        else if (roleUpper.includes('BETA') || roleUpper.includes('CHESED') || roleUpper.includes('MEL') || roleUpper.includes('APM')) {
+            allowedServers = accessMap['BETA_SQUAD'];
         }
-        // GAMMA SQUAD (Build/Infra) - Gemini
-        else if (roleUpper.includes('CTO') || roleUpper.includes('GEMINI') || roleUpper.includes('GABRIEL') || roleUpper.includes('HDM') || roleUpper.includes('TORCH')) {
-            allowedServers = accessMap['CTO_SQUAD'];
+        // GAMMA SQUAD (Build/Infra): Sophia, Nexus, HDM
+        else if (roleUpper.includes('GAMMA') || roleUpper.includes('SOPHIA') || roleUpper.includes('NEXUS') || roleUpper.includes('HDM')) {
+            allowedServers = accessMap['GAMMA_SQUAD'];
         }
-        // ORCHESTRATION
-        else if (roleUpper.includes('ORCHESTRATOR') || roleUpper.includes('MANAGER')) {
-            allowedServers = ['ALL'];
+        // ORCHESTRATION: Orch, W3C, Shofet
+        else if (roleUpper.includes('ORCH') || roleUpper.includes('W3C') || roleUpper.includes('SHOFET') || roleUpper.includes('MANAGER')) {
+            allowedServers = accessMap['ORCHESTRATION'];
         } else {
-            // Default: Give them FileSystem at least? No, safe default is empty.
-            // Actually, let's give FileSystem to everyone for now to fix the user issue.
             allowedServers = ['FileSystem'];
         }
 
@@ -128,8 +129,8 @@ export class MCPManager {
         });
 
         // [ANTIGRAVITY] SQUAD-SPECIFIC VISUAL TRUST ENFORCEMENT
-        if (role.includes('CTO_SQUAD') || role.includes('GEMINI')) {
-            instruction += `\n> [!IMPORTANT]\n> **BUILD SQUAD REQUIREMENT**: You MUST provide a Mermaid diagram for all architecture, logic, or code structure tasks to ensure Visual Trust during BFT review.\n`;
+        if (roleUpper.includes('GAMMA') || roleUpper.includes('HDM')) {
+            instruction += `\n> [!IMPORTANT]\n> **GAMMA SQUAD REQUIREMENT**: You MUST provide a Mermaid diagram for all architecture, logic, or code structure tasks to ensure Visual Trust during BFT review.\n`;
         }
 
         return instruction;

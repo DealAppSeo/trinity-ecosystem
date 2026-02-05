@@ -1,28 +1,40 @@
+import * as dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 import { supabase } from '../lib/supabase';
 
 async function findTestTasks() {
-    console.log("🔍 Searching for [TEST] Tasks...");
+    console.log("🔍 Checking status of seeded tasks (118130-118132)...");
+
+    // Dynamic import
+    const { supabase } = await import('../lib/supabase');
 
     const { data: tasks, error } = await supabase
         .from('trinity_tasks')
         .select('*')
-        .ilike('title', '%[TEST%')
-        .order('created_at', { ascending: false });
+        .in('id', [118130, 118131, 118132]);
 
     if (error) {
-        console.error("❌ Error:", error.message);
-        return;
+        console.error("❌ Error fetching tasks:", error.message);
+    } else if (tasks) {
+        tasks.forEach(t => {
+            console.log(`[${t.status.toUpperCase()}] ${t.title} (Claimed by: ${t.claimed_by || 'None'})`);
+        });
     }
 
-    if (!tasks || tasks.length === 0) {
-        console.log("⚠️ No tasks found containing '[TEST' in title.");
-    } else {
-        console.log(`✅ Found ${tasks.length} Test Tasks:\n`);
-        tasks.forEach(t => {
-            console.log(`[${t.status.toUpperCase()}] ${t.title}`);
-            console.log(`   👉 Assigned To: ${t.agent_assigned || t.claimed_by || 'Unassigned'} (Priority: ${t.priority})`);
-            console.log(`   🆔 ID: ${t.id}\n`);
+    console.log("\n🔍 Checking for new artifacts...");
+    const { data: artifacts, error: artifactsError } = await supabase
+        .from('trinity_artifacts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+    if (artifactsError) {
+        console.error("❌ Error fetching artifacts:", artifactsError.message);
+    } else if (artifacts) {
+        artifacts.forEach(a => {
+            console.log(`- [${a.artifact_type}] ${a.title} by ${a.creator_agent}`);
         });
     }
 
