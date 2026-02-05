@@ -16,7 +16,7 @@ export const useTrinityController = () => {
 
     const checkBrain = useCallback(async () => {
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_TRINITY_SCIENCE_URL || 'https://trinity-science-production.up.railway.app';
+            const baseUrl = process.env.NEXT_PUBLIC_TRINITY_SCIENCE_URL || 'https://py-brain-production.up.railway.app';
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
 

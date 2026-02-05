@@ -222,7 +222,7 @@ export default function WisdomPage() {
                             <Activity className="w-6 h-6" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold">{agents.filter(a => ['active', 'green', 'blue'].includes(a.status || '')).length}</div>
+                            <div className="text-2xl font-bold">{agents.filter(a => ['active', 'online', 'green', 'blue', 'amber'].includes(a.status || '')).length}</div>
                             <div className="text-xs text-blue-200">Active Agents</div>
                         </div>
                     </div>
@@ -360,7 +360,7 @@ export default function WisdomPage() {
                                     <div key={agent.agent_name} className="bg-white/5 p-3 rounded border border-white/5 hover:border-blue-400/50 transition-colors relative group">
                                         <div className="flex justify-between items-center mb-2">
                                             <div className="text-sm font-bold truncate flex items-center gap-2">
-                                                <div className={`w-2 h-2 rounded-full ${['active', 'green', 'blue'].includes(agent.status || '') ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-gray-600'}`}></div>
+                                                <div className={`w-2 h-2 rounded-full ${['active', 'online', 'green', 'blue', 'amber'].includes(agent.status || '') ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-gray-600'}`}></div>
                                                 {agent.agent_name.replace('trinity-', '')}
                                             </div>
                                             <div className="text-[10px] text-gray-500">
