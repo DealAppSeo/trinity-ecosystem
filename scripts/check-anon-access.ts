@@ -4,8 +4,14 @@ import path from 'path';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!url || !key) {
+    console.error("❌ SUPABASE_URL or SUPABASE_ANON_KEY missing from environment!");
+    process.exit(1);
+}
+
 const supabase = createClient(url, key);
 
 async function checkAnon() {

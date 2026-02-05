@@ -9,11 +9,13 @@ dotenv.config();
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     console.log("⚠️ Injecting Hardcoded Supabase Credentials...");
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://qnnpjhlxljtqyigedwkb.supabase.co';
+}
+if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Mzk1OTEsImV4cCI6MjA2NzUxNTU5MX0.6oG2DU_BD1uBnBrDoQFauvN1ZnkKo2ywkuwY-tPaQFw';
 }
 // Ensure Service Role Key is available to prevent RLS blocks
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 }
 
 // [ANTIGRAVITY] VALIDATE LLM PROVIDERS
