@@ -1,0 +1,8 @@
+This failure type has occurred 6054 times in 7 days. Root causes: unknown.
+
+# Task ID: 76999
+# Task Title: [ANTIFRAGILE] Investigate repeated failure: task_failed
+
+IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do not just talk about it. EXECUTE.
+
+<!-- RepID: BADF1B41 | Signed by Trinity System -->

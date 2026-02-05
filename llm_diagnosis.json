@@ -1,0 +1,26 @@
+[
+  {
+    "name": "OpenAI",
+    "status": "FAILED (401)",
+    "detail": "{\n  \"error\": {\n    \"message\": \"Incorrect API key provided: sk-proj-********************************************************************************************************************************************************N1QA. You can find your API key at https://platform.openai.com/account/api-keys.\",\n    \"type\": \"invalid_request_error\",\n    \"code\": \"invalid_api_key\",\n    \"param\": null\n  },\n  \"status\": 401\n}",
+    "key_preview": "...mN1QA"
+  },
+  {
+    "name": "Anthropic",
+    "status": "FAILED (404)",
+    "detail": "{\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: claude-3-5-sonnet-20240620\"},\"request_id\":\"req_011CXoZapA6VK9ij51b4VFsf\"}",
+    "key_preview": "...9JwAA"
+  },
+  {
+    "name": "Cerebras",
+    "status": "SUCCESS",
+    "detail": "{\"id\":\"chatcmpl-8d6d9efd-9a56-4292-b48a-89b8024388fb\",\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"content\":\"How can I assist you today?\",\"role\":\"assistant\"}}],\"created\":1770232464,\"model\":\"llama3.1-8b\",\"system_fingerprint\":\"fp_feb5e1faa8274e54bef0\",\"object\":\"chat.completion\",\"usage\":{\"total_tokens\":44,\"completion_tokens\":8,\"completion_tokens_details\":{\"accepted_prediction_tokens\":0,\"rejected_prediction_tokens\":0,\"reasoning_tokens\":0},\"prompt_tokens\":36,\"prompt_tokens_details\":{\"cached_tokens\":0}},\"time_info\":{\"queue_time\":0.44631746,\"prompt_time\":0.002911737,\"completion_time\":0.003247909,\"total_time\":0.45369482040405273,\"created\":1770232464.7596188}}",
+    "key_preview": "...t6p84"
+  },
+  {
+    "name": "DeepSeek",
+    "status": "FAILED (402)",
+    "detail": "{\"error\":{\"message\":\"Insufficient Balance\",\"type\":\"unknown_error\",\"param\":null,\"code\":\"invalid_request_error\"}}",
+    "key_preview": "...415ac"
+  }
+]
