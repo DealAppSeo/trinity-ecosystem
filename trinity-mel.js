@@ -1,1 +1,1 @@
-require('child_process').spawn('npx', ['ts-node', 'scripts/run-agent.ts', 'MEL'], { stdio: 'inherit', shell: true });
+require('child_process').spawn('npx', ['tsx', 'scripts/run-agent.ts', 'MEL'], { stdio: 'inherit', shell: true });
