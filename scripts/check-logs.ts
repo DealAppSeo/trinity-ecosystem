@@ -8,13 +8,19 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-async function checkRecentErrors() {
-    console.log('🔍 Fetching recent error logs from Supabase...');
-    const { data, error } = await supabase
+async function checkRecentErrors(limit = 100, agentName?: string) {
+    console.log(`🔍 Fetching recent logs from Supabase (Limit: ${limit}${agentName ? `, Agent: ${agentName}` : ''})...`);
+    let query = supabase
         .from('trinity_agent_logs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(limit);
+
+    if (agentName) {
+        query = query.eq('agent_name', agentName);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         console.error('❌ Error fetching logs:', error.message);
