@@ -117,6 +117,7 @@ export class MCPManager {
 
     async getToolInstructions(role: string): Promise<string> {
         const tools = await this.getToolsForRole(role);
+        const roleUpper = role.toUpperCase();
         if (tools.length === 0) return "You have no external tools assigned to your role.";
 
         let instruction = `## 🛠️ YOUR TOOLBOX (Role: ${role})\n`;
