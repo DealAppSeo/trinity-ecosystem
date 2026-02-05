@@ -134,7 +134,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 </div>
                                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                             </div>
-                            <p className="text-[10px] text-gray-500 font-mono">Trinity OS v8.1.3</p>
+                            <p className="text-[10px] text-gray-500 font-mono">Trinity OS v8.1.3{versionSuffix}</p>
                         </div>
 
                         <button
