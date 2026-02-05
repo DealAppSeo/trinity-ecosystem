@@ -152,8 +152,30 @@ export class IntelligenceRouter {
             });
         }
 
-        console.log(`[ROUTER] 🚦 Selected priority: ${result.slice(0, 3).join(', ')}`);
+        const toolSuggestions = this.suggestTools(task);
+        console.log(`[ROUTER] 🚦 Selected priority: ${result.slice(0, 3).join(', ')} | Tools: ${toolSuggestions.join(', ')}`);
         return result;
+    }
+
+    /**
+     * Suggests specific MCP tools based on task keywords.
+     */
+    public suggestTools(task: Task): string[] {
+        const text = `${task.title} ${task.description}`.toLowerCase();
+        const suggestions: string[] = [];
+
+        if (text.match(/design|figma|ui|ux|mockup/i)) suggestions.push('Figma');
+        if (text.match(/image|generate|art|draw|creative/i)) suggestions.push('CreativeSuite (generate_image)');
+        if (text.match(/cache|persist|redis|state|blackboard/i)) suggestions.push('Redis');
+        if (text.match(/huggingface|hf|inference|specialized-model/i)) suggestions.push('HuggingFace');
+        if (text.match(/search|lookup|research|latest|current/i)) suggestions.push('TavilySearch');
+        if (text.match(/code|github|pr|repo|git/i)) suggestions.push('GitHub');
+        if (text.match(/automation|workflow|n8n|flowise/i)) suggestions.push('Automation');
+        if (text.match(/browser|scrape|crawl|playwright|puppeteer/i)) suggestions.push('PlaywrightExpert');
+        if (text.match(/spreadsheet|excel|google|docs|sheet/i)) suggestions.push('GoogleWorkspace');
+        if (text.match(/database|table|rls|supabase|storage/i)) suggestions.push('Supabase');
+
+        return suggestions;
     }
 
     demote(provider: string) {

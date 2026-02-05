@@ -52,6 +52,20 @@ export class PlaywrightExpertMCP implements MCPServer {
                     required: ['testPath', 'errorLog']
                 },
                 execute: async (args: any) => this.healTest(args)
+            },
+            {
+                name: 'vibe_coding_bridge',
+                description: 'Bridge to Vibe Coding platforms (Replit, Lovable, Bolt). Use Playwright to automate code pushes or UI changes in these environments.',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        platform: { type: 'string', enum: ['replit', 'lovable', 'bolt'] },
+                        action: { type: 'string', description: 'Action to perform (e.g., "deploy", "edit", "verify")' },
+                        instructions: { type: 'string' }
+                    },
+                    required: ['platform', 'action', 'instructions']
+                },
+                execute: async (args: any) => this.vibeBridge(args)
             }
         ];
     }
@@ -60,7 +74,14 @@ export class PlaywrightExpertMCP implements MCPServer {
         if (toolName === 'plan_test_scenario') return await this.planTest(args);
         if (toolName === 'generate_test_suite') return await this.generateTest(args);
         if (toolName === 'heal_failing_test') return await this.healTest(args);
+        if (toolName === 'vibe_coding_bridge') return await this.vibeBridge(args);
         throw new Error(`Tool ${toolName} not found`);
+    }
+
+    private async vibeBridge(args: { platform: string, action: string, instructions: string }): Promise<string> {
+        console.log(`[VibeBridge] ⚡ Bridging to ${args.platform}: ${args.action}`);
+        // Strategy: Use Playwright to navigate to the platform URL and perform actions
+        return `Expert Advice: To ${args.action} on ${args.platform}, initialize Playwright at the workspace URL. Use 'type' to input instructions and 'click' for the 'Deploy' or 'Edit' buttons. Platform: ${args.platform}. Task: ${args.instructions}`;
     }
 
     private async planTest(args: { goal: string, context?: string }): Promise<string> {

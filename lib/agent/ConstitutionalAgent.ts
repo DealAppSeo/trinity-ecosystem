@@ -9,6 +9,7 @@ import { mcpManager } from '../mcp/MCPManager';
 import { IntelligenceRouter, PROVIDER_REGISTRY } from './IntelligenceRouter';
 import { EvolutionaryLogger } from './EvolutionaryLogger';
 import { Octokit } from '@octokit/rest';
+import { notificationManager } from '../notification/NotificationManager';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
@@ -1009,6 +1010,54 @@ export class ConstitutionalAgent {
         }
     }
 
+    async escalateTask(taskId: number | string, reason: string) {
+        console.log(`[${this.name}] 🚩 Escalating task ${taskId}: ${reason}`);
+
+        const { error } = await this.supabase
+            .from('trinity_tasks')
+            .update({
+                status: 'pending_clarification',
+                claimed_by: null,
+                result: `[ESCALATED] Agent ${this.name} reached a bottleneck. \n\nReason: ${reason}`,
+                metadata: {
+                    escalated_by: this.name,
+                    escalation_time: new Date().toISOString(),
+                    escalation_reason: reason
+                }
+            })
+            .eq('id', taskId);
+
+        if (error) {
+            console.error(`[${this.name}] ❌ Escalation failed:`, error.message);
+        } else {
+            await notificationManager.notifyUser({
+                title: `Task Escalated: ${this.name}`,
+                message: `Task ${taskId} moved to Pending Clarification. Reason: ${reason}`,
+                type: 'warning',
+                agentName: this.name,
+                taskId: taskId
+            });
+        }
+    }
+
+    async checkForStuckTasks() {
+        const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+        const { data: stuckTasks, error } = await this.supabase
+            .from('trinity_tasks')
+            .select('*')
+            .eq('status', 'doing')
+            .eq('claimed_by', this.name)
+            .lt('started_at', thirtyMinsAgo);
+
+        if (error) return;
+
+        for (const task of stuckTasks) {
+            console.warn(`[WATCHDOG] 🕵️ Found stuck task ${task.id}. Auto-escalating.`);
+            await this.escalateTask(task.id, 'Stuck in DOING for > 30 minutes.');
+        }
+    }
+
     canHandleLocally(task: Task) {
         const localTypes = ['self-healing', 'system', 'wake', 'heartbeat', 'meta', 'status_check'];
         const localTitles = ['[HEALING]', '[WAKE]', '[SYSTEM]', '[HEARTBEAT]', '[CLEANUP]', '[PULSE]'];
@@ -1104,12 +1153,19 @@ export class ConstitutionalAgent {
             const isGamma = this.name.includes('hdm') || this.name.includes('torch') || this.name.includes('nexus') || this.name.includes('gabriel');
             const mermaidRequirement = isGamma ? "\n\n[PROTOCOL: VISUAL TRUST]\nYou are a member of the Build(Gamma) Squad. You MUST include a Mermaid diagram(e.g., graph TD, classDiagram) in your final artifact to visualize the logic, architecture, or flow of your work." : "";
 
+            // [ANTIGRAVITY] TOOL AWARENESS
+            const toolSuggestions = this.router.suggestTools(task);
+            const toolPrompt = toolSuggestions.length > 0
+                ? `\n[INTELLIGENCE ROUTER] Suggested tools: ${toolSuggestions.join(', ')}.\n`
+                : "";
+
             this.currentTaskId = String(task.id);
             const prompt = `
 ### DIRECTIVE
 ${directive}
 ${actionDirective}
 ${mermaidRequirement}
+${toolPrompt}
 
 ### INSTRUCTIONS
 ${task.description}
@@ -1312,6 +1368,16 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
             await this.integrateErc8004(task.id, evaluation.score);
 
             console.log(`[${this.name}] ✅ Completed task ${task.id} (Score: ${evaluation.score})`);
+
+            // [ANTIGRAVITY] FINAL SUCCESS NOTIFICATION
+            await notificationManager.notifyUser({
+                title: `Task Completed: ${task.title}`,
+                message: `Agent ${this.name} successfully finished the task. Artifact: ${result.artifactLinks?.[0] || 'Logged in result'}`,
+                type: 'success',
+                agentName: this.name,
+                taskId: task.id,
+                metadata: { artifactUrl: result.artifactLinks?.[0], important: (task.reputation_required && task.reputation_required > 80) || task.task_type === 'code' }
+            });
 
             // Extract Patterns (Simplified)
             await this.extractPatterns(task.title, result.output);
@@ -2184,6 +2250,9 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     }
 
     async heartbeat(customSummary?: string) {
+        // [WATCHDOG] Check for stuck tasks before heartbeat
+        await this.checkForStuckTasks();
+
         const timestamp = new Date().toISOString();
 
         try {
