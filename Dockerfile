@@ -35,6 +35,10 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 COPY --from=builder /app/.next /app/.next
 COPY --from=builder /app/public /app/public
 COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/*.js ./
 
 # Install PROD dependencies only
 RUN npm ci --production
