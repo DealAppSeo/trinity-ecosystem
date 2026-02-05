@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { isMockMode } from '@/lib/supabase';
 import {
     Home,
     Users,
@@ -25,6 +26,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const [role, setRole] = useState<'founder' | 'guest' | 'verified'>('guest');
+    const [versionSuffix, setVersionSuffix] = useState('');
+
+    useEffect(() => {
+        if (isMockMode) {
+            setVersionSuffix(' (M)');
+        }
+    }, []);
 
     useEffect(() => {
         const roleMatch = document.cookie.match(/trinity_role=([^;]+)/);
