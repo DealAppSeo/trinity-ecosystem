@@ -39,6 +39,7 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/*.js ./
+COPY --from=builder /app/tsconfig*.json ./
 
 # Install PROD dependencies only
 RUN npm ci --production
