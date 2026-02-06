@@ -1049,45 +1049,46 @@ ${result.substring(0, 2000)}
         } catch (e: any) {
             console.error(`[HEAL] Failed to heal: ${e.message}`);
         }
+    }
 
     // ============================================
     // TIER 1: LOCAL LOGIC (NO LLM CALLS)
     // ============================================
 
     async processTask(task: Task) {
-            this.currentTaskTitle = task.title;
-            // Check if we already own it (resuming after restart/sleep)
-            const isOwner = task.claimed_by === this.name && ['doing', 'in_progress', 'running', 'pending_clarification'].includes(task.status);
+        this.currentTaskTitle = task.title;
+        // Check if we already own it (resuming after restart/sleep)
+        const isOwner = task.claimed_by === this.name && ['doing', 'in_progress', 'running', 'pending_clarification'].includes(task.status);
 
-            let claimed = isOwner;
-            if (!isOwner) {
-                claimed = await this.claimTask(task.id);
-            }
-
-            if (!claimed) {
-                console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
-                return { success: false, error: 'Already claimed' };
-            }
-
-            try {
-                // TRY LOCAL FIRST
-                if (this.canHandleLocally(task)) {
-                    console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
-                    return await this.handleLocal(task);
-                }
-
-                // ONLY THEN use LLM
-                return await this.processWithLLM(task);
-            } catch (error) {
-                console.error(`[${this.name}] 🚨 Process failed for task ${task.id}:`, error);
-                await this.releaseClaim(task.id);
-                return { success: false, error: error instanceof Error ? error.message : String(error) };
-            }
+        let claimed = isOwner;
+        if (!isOwner) {
+            claimed = await this.claimTask(task.id);
         }
 
-    async claimTask(taskId: number | string): Promise < boolean > {
-            // [ANTIGRAVITY] CONCURRENCY GUARD: Atomic check
-            if(this.currentTaskId) {
+        if (!claimed) {
+            console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
+            return { success: false, error: 'Already claimed' };
+        }
+
+        try {
+            // TRY LOCAL FIRST
+            if (this.canHandleLocally(task)) {
+                console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
+                return await this.handleLocal(task);
+            }
+
+            // ONLY THEN use LLM
+            return await this.processWithLLM(task);
+        } catch (error) {
+            console.error(`[${this.name}] 🚨 Process failed for task ${task.id}:`, error);
+            await this.releaseClaim(task.id);
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    }
+
+    async claimTask(taskId: number | string): Promise<boolean> {
+        // [ANTIGRAVITY] CONCURRENCY GUARD: Atomic check
+        if (this.currentTaskId) {
             console.warn(`[${this.name}] 🛡️ Claim rejected: Agent is already busy with task ${this.currentTaskId}`);
             return false;
         }
