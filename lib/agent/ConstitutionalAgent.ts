@@ -943,6 +943,41 @@ export class ConstitutionalAgent {
             return null;
         }
 
+        // [PHASE 25] FLEXIBLE ROLE MATCHING
+        // Handle both 'trinity-mel' and 'MEL'
+        const shortName = this.name.includes('-') ? this.name.split('-')[1].toUpperCase() : this.name.toUpperCase();
+
+        let query = this.supabase
+            .from('trinity_tasks')
+            .select('*');
+
+        if (strictlyAssigned) {
+            // Check for both trinity-mel AND MEL AND BETA (Squad)
+            query = query.or(`assigned_to.eq.${this.name},assigned_to.eq.${shortName},assigned_to.eq.${this.squad}`);
+        } else {
+            query = query.is('assigned_to', null);
+        }
+
+        // [ANTIGRAVITY] Revised Polling: ensure we check both pending and clarification
+        // [EXPERT-PRIORITY] High-Rep agents prioritize Consultations
+        const isExpert = (this.reputationScore || 0) > 80;
+
+        const { data: task, error } = await query
+            .in('status', ['pending', 'pending_clarification'])
+            .is('claimed_by', null)
+            // If expert, prioritize clarification tasks (mentorship)
+            .order('status', { ascending: false })
+            .order('priority', { ascending: false })
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            console.error(`[${this.name}] Error fetching task:`, error.message);
+            return null;
+        }
+
+        return task || null;
     }
 
     /**
@@ -1014,279 +1049,243 @@ ${result.substring(0, 2000)}
         } catch (e: any) {
             console.error(`[HEAL] Failed to heal: ${e.message}`);
         }
-    }      // [PHASE 25] FLEXIBLE ROLE MATCHING
-    // Handle both 'trinity-mel' and 'MEL'
-    const shortName = this.name.includes('-') ? this.name.split('-')[1].toUpperCase() : this.name.toUpperCase();
-
-        let query = this.supabase
-    .from('trinity_tasks')
-    .select('*');
-
-if (strictlyAssigned) {
-    // Check for both trinity-mel AND MEL AND BETA (Squad)
-    query = query.or(`assigned_to.eq.${this.name},assigned_to.eq.${shortName},assigned_to.eq.${this.squad}`);
-} else {
-    query = query.is('assigned_to', null);
-}
-
-// [ANTIGRAVITY] Revised Polling: ensure we check both pending and clarification
-// [EXPERT-PRIORITY] High-Rep agents prioritize Consultations
-const isExpert = (this.reputationScore || 0) > 80;
-
-const { data: task, error } = await query
-    .in('status', ['pending', 'pending_clarification'])
-    .is('claimed_by', null)
-    // If expert, prioritize clarification tasks (mentorship)
-    .order('status', { ascending: false })
-    .order('priority', { ascending: false })
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-if (error) {
-    console.error(`[${this.name}] Error fetching task:`, error.message);
-    return null;
-}
-
-return task || null;
-    }
 
     // ============================================
     // TIER 1: LOCAL LOGIC (NO LLM CALLS)
     // ============================================
 
     async processTask(task: Task) {
-    this.currentTaskTitle = task.title;
-    // Check if we already own it (resuming after restart/sleep)
-    const isOwner = task.claimed_by === this.name && ['doing', 'in_progress', 'running', 'pending_clarification'].includes(task.status);
+            this.currentTaskTitle = task.title;
+            // Check if we already own it (resuming after restart/sleep)
+            const isOwner = task.claimed_by === this.name && ['doing', 'in_progress', 'running', 'pending_clarification'].includes(task.status);
 
-    let claimed = isOwner;
-    if (!isOwner) {
-        claimed = await this.claimTask(task.id);
-    }
+            let claimed = isOwner;
+            if (!isOwner) {
+                claimed = await this.claimTask(task.id);
+            }
 
-    if (!claimed) {
-        console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
-        return { success: false, error: 'Already claimed' };
-    }
+            if (!claimed) {
+                console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
+                return { success: false, error: 'Already claimed' };
+            }
 
-    try {
-        // TRY LOCAL FIRST
-        if (this.canHandleLocally(task)) {
-            console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
-            return await this.handleLocal(task);
+            try {
+                // TRY LOCAL FIRST
+                if (this.canHandleLocally(task)) {
+                    console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
+                    return await this.handleLocal(task);
+                }
+
+                // ONLY THEN use LLM
+                return await this.processWithLLM(task);
+            } catch (error) {
+                console.error(`[${this.name}] 🚨 Process failed for task ${task.id}:`, error);
+                await this.releaseClaim(task.id);
+                return { success: false, error: error instanceof Error ? error.message : String(error) };
+            }
         }
 
-        // ONLY THEN use LLM
-        return await this.processWithLLM(task);
-    } catch (error) {
-        console.error(`[${this.name}] 🚨 Process failed for task ${task.id}:`, error);
-        await this.releaseClaim(task.id);
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-}
-
     async claimTask(taskId: number | string): Promise < boolean > {
-    // [ANTIGRAVITY] CONCURRENCY GUARD: Atomic check
-    if(this.currentTaskId) {
-    console.warn(`[${this.name}] 🛡️ Claim rejected: Agent is already busy with task ${this.currentTaskId}`);
-    return false;
-}
+            // [ANTIGRAVITY] CONCURRENCY GUARD: Atomic check
+            if(this.currentTaskId) {
+            console.warn(`[${this.name}] 🛡️ Claim rejected: Agent is already busy with task ${this.currentTaskId}`);
+            return false;
+        }
 
-// [PHASE 22] ATOMIC SUPABASE TRANSACTION
-const { data, error } = await this.supabase
-    .from('trinity_tasks')
-    .update({
-        status: 'doing',
-        claimed_by: this.name,
-        started_at: new Date().toISOString()
-    })
-    .eq('id', taskId)
-    .in('status', ['pending', 'pending_clarification']) // FIX: Allow claiming clarification tasks
-    .is('claimed_by', null)
-    .select();
+        // [PHASE 22] ATOMIC SUPABASE TRANSACTION
+        const { data, error } = await this.supabase
+            .from('trinity_tasks')
+            .update({
+                status: 'doing',
+                claimed_by: this.name,
+                started_at: new Date().toISOString()
+            })
+            .eq('id', taskId)
+            .in('status', ['pending', 'pending_clarification']) // FIX: Allow claiming clarification tasks
+            .is('claimed_by', null)
+            .select();
 
-if (error) {
-    console.error(`[${this.name}] 🚨 Atomic claim failed:`, error.message);
-    return false;
-}
+        if (error) {
+            console.error(`[${this.name}] 🚨 Atomic claim failed:`, error.message);
+            return false;
+        }
 
-const success = !!(data && data.length > 0);
-if (success) {
-    console.log(`[${this.name}] 🛡️ Atomic claim SECURED for task ${taskId}`);
-}
-return success;
+        const success = !!(data && data.length > 0);
+        if (success) {
+            console.log(`[${this.name}] 🛡️ Atomic claim SECURED for task ${taskId}`);
+        }
+        return success;
     }
 
     async releaseClaim(taskId: number | string) {
-    const { error } = await this.supabase
-        .from('trinity_tasks')
-        .update({
-            status: 'pending',
-            claimed_by: null,
-            started_at: null // Clear started_at on release
-        })
-        .eq('id', taskId)
-        .eq('claimed_by', this.name);
+        const { error } = await this.supabase
+            .from('trinity_tasks')
+            .update({
+                status: 'pending',
+                claimed_by: null,
+                started_at: null // Clear started_at on release
+            })
+            .eq('id', taskId)
+            .eq('claimed_by', this.name);
 
-    if (error) {
-        console.error(`[${this.name}] 🚨 Failed to release claim for task ${taskId}:`, error.message);
-    } else {
-        console.log(`[${this.name}] 🔓 Released claim on task ${taskId}`);
+        if (error) {
+            console.error(`[${this.name}] 🚨 Failed to release claim for task ${taskId}:`, error.message);
+        } else {
+            console.log(`[${this.name}] 🔓 Released claim on task ${taskId}`);
+        }
     }
-}
 
     async escalateTask(taskId: number | string, reason: string) {
-    console.log(`[${this.name}] 🚩 Escalating task ${taskId}: ${reason}`);
+        console.log(`[${this.name}] 🚩 Escalating task ${taskId}: ${reason}`);
 
-    const { error } = await this.supabase
-        .from('trinity_tasks')
-        .update({
-            status: 'pending_clarification',
-            claimed_by: null,
-            result: `[ESCALATED] Agent ${this.name} reached a bottleneck. \n\nReason: ${reason}`,
-            metadata: {
-                escalated_by: this.name,
-                escalation_time: new Date().toISOString(),
-                escalation_reason: reason
-            }
-        })
-        .eq('id', taskId);
+        const { error } = await this.supabase
+            .from('trinity_tasks')
+            .update({
+                status: 'pending_clarification',
+                claimed_by: null,
+                result: `[ESCALATED] Agent ${this.name} reached a bottleneck. \n\nReason: ${reason}`,
+                metadata: {
+                    escalated_by: this.name,
+                    escalation_time: new Date().toISOString(),
+                    escalation_reason: reason
+                }
+            })
+            .eq('id', taskId);
 
-    if (error) {
-        console.error(`[${this.name}] ❌ Escalation failed:`, error.message);
-    } else {
-        await notificationManager.notifyUser({
-            title: `Task Escalated: ${this.name}`,
-            message: `Task ${taskId} moved to Pending Clarification. Reason: ${reason}`,
-            type: 'warning',
-            agentName: this.name,
-            taskId: taskId
-        });
+        if (error) {
+            console.error(`[${this.name}] ❌ Escalation failed:`, error.message);
+        } else {
+            await notificationManager.notifyUser({
+                title: `Task Escalated: ${this.name}`,
+                message: `Task ${taskId} moved to Pending Clarification. Reason: ${reason}`,
+                type: 'warning',
+                agentName: this.name,
+                taskId: taskId
+            });
+        }
     }
-}
 
     async checkForStuckTasks() {
-    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-    const { data: stuckTasks, error } = await this.supabase
-        .from('trinity_tasks')
-        .select('*')
-        .eq('status', 'doing')
-        .eq('claimed_by', this.name)
-        .lt('started_at', thirtyMinsAgo);
+        const { data: stuckTasks, error } = await this.supabase
+            .from('trinity_tasks')
+            .select('*')
+            .eq('status', 'doing')
+            .eq('claimed_by', this.name)
+            .lt('started_at', thirtyMinsAgo);
 
-    if (error) return;
+        if (error) return;
 
-    for (const task of stuckTasks) {
-        console.warn(`[WATCHDOG] 🕵️ Found stuck task ${task.id}. Auto-escalating.`);
-        await this.escalateTask(task.id, 'Stuck in DOING for > 30 minutes.');
+        for (const task of stuckTasks) {
+            console.warn(`[WATCHDOG] 🕵️ Found stuck task ${task.id}. Auto-escalating.`);
+            await this.escalateTask(task.id, 'Stuck in DOING for > 30 minutes.');
+        }
     }
-}
 
-canHandleLocally(task: Task) {
-    const localTypes = ['self-healing', 'system', 'wake', 'heartbeat', 'meta', 'status_check'];
-    const localTitles = ['[HEALING]', '[WAKE]', '[SYSTEM]', '[HEARTBEAT]', '[CLEANUP]', '[PULSE]'];
+    canHandleLocally(task: Task) {
+        const localTypes = ['self-healing', 'system', 'wake', 'heartbeat', 'meta', 'status_check'];
+        const localTitles = ['[HEALING]', '[WAKE]', '[SYSTEM]', '[HEARTBEAT]', '[CLEANUP]', '[PULSE]'];
 
-    const type = task.task_type?.toLowerCase();
-    const title = task.title?.toUpperCase();
+        const type = task.task_type?.toLowerCase();
+        const title = task.title?.toUpperCase();
 
-    if (type && localTypes.includes(type)) return true;
-    if (title && localTitles.some(t => title.includes(t))) return true;
-    return false;
-}
+        if (type && localTypes.includes(type)) return true;
+        if (title && localTitles.some(t => title.includes(t))) return true;
+        return false;
+    }
 
     async handleLocal(task: Task) {
-    // [PHASE 20] Already claimed via processTask -> claimTask
-    // Log the healing
-    await this.log('task_processing_local', `Processing local task: ${task.title}`, { taskId: task.id, type: task.task_type });
-
-    let result = `[LOCAL] Processed by ${this.name} rule engine`;
-
-    // Special handling if needed
-    if (task.task_type === 'heartbeat') await this.heartbeat();
-
-    if (task.task_type === 'self-healing' || task.title.includes('[HEALING]')) {
+        // [PHASE 20] Already claimed via processTask -> claimTask
         // Log the healing
-        console.log(`[LOCAL] 🩺 Processed healing task ${task.id}`);
-        result = `[HEALING] System repaired by ${this.name}`;
+        await this.log('task_processing_local', `Processing local task: ${task.title}`, { taskId: task.id, type: task.task_type });
+
+        let result = `[LOCAL] Processed by ${this.name} rule engine`;
+
+        // Special handling if needed
+        if (task.task_type === 'heartbeat') await this.heartbeat();
+
+        if (task.task_type === 'self-healing' || task.title.includes('[HEALING]')) {
+            // Log the healing
+            console.log(`[LOCAL] 🩺 Processed healing task ${task.id}`);
+            result = `[HEALING] System repaired by ${this.name}`;
+            this.sessionMetrics.tasksCompleted++; // Count it
+        }
+
+        // [ANTIGRAVITY] ROBUST STATUS UPDATE
+        const { error: updateError } = await this.supabase
+            .from('trinity_tasks')
+            .update({
+                status: 'done', // v8.0: mark "done" to trigger BFT review
+                result: result,
+                claimed_by: this.name,
+                completed_by: this.name, // Schema parity
+                agent_name: this.name,   // Schema parity
+                completed_at: new Date().toISOString(),
+                metadata: {
+                    processedBy: this.name,
+                    localEngine: true,
+                    timestamp: new Date().toISOString()
+                }
+            })
+            .eq('id', task.id);
+
+        if (updateError) {
+            console.error(`[${this.name}] ❌ Local task update failed:`, updateError.message);
+            throw new Error(`Local Update Failed: ${updateError.message}`);
+        }
+
         this.sessionMetrics.tasksCompleted++; // Count it
+        return { success: true, llm_used: false };
     }
-
-    // [ANTIGRAVITY] ROBUST STATUS UPDATE
-    const { error: updateError } = await this.supabase
-        .from('trinity_tasks')
-        .update({
-            status: 'done', // v8.0: mark "done" to trigger BFT review
-            result: result,
-            claimed_by: this.name,
-            completed_by: this.name, // Schema parity
-            agent_name: this.name,   // Schema parity
-            completed_at: new Date().toISOString(),
-            metadata: {
-                processedBy: this.name,
-                localEngine: true,
-                timestamp: new Date().toISOString()
-            }
-        })
-        .eq('id', task.id);
-
-    if (updateError) {
-        console.error(`[${this.name}] ❌ Local task update failed:`, updateError.message);
-        throw new Error(`Local Update Failed: ${updateError.message}`);
-    }
-
-    this.sessionMetrics.tasksCompleted++; // Count it
-    return { success: true, llm_used: false };
-}
 
     // ============================================
     // TIER 2: LLM CALLS (ONLY FOR REAL WORK)
     // ============================================
     async processWithLLM(task: Task) {
-    console.log(`[LLM] 🧠 Calling API for task ${task.id}(${task.task_type})`);
+        console.log(`[LLM] 🧠 Calling API for task ${task.id}(${task.task_type})`);
 
-    try {
-        // [PHASE 20] Already claimed via processTask -> claimTask
-        // Persistent Activity Logging
-        await this.log('task_processing_llm', `Starting LLM task: ${task.title}`, { taskId: task.id, type: task.task_type });
+        try {
+            // [PHASE 20] Already claimed via processTask -> claimTask
+            // Persistent Activity Logging
+            await this.log('task_processing_llm', `Starting LLM task: ${task.title}`, { taskId: task.id, type: task.task_type });
 
-        // 1. CONTEXT PIPE: GATHER WISDOM (The "Amnesia" Fix)
-        const wisdomContext = await this.gatherWisdom(task);
+            // 1. CONTEXT PIPE: GATHER WISDOM (The "Amnesia" Fix)
+            const wisdomContext = await this.gatherWisdom(task);
 
-        // 1.5 CHECK ITERATE PROTOCOL
-        let iterateProtocol = "";
-        if (task.title.includes('[ITERATE]') || task.description?.includes('[ITERATE]')) {
-            iterateProtocol = `\n\n[PROTOCOL: ITERATE ACTIVE]\n${await this.checkMCP('ITERATE')} \n`;
-        }
+            // 1.5 CHECK ITERATE PROTOCOL
+            let iterateProtocol = "";
+            if (task.title.includes('[ITERATE]') || task.description?.includes('[ITERATE]')) {
+                iterateProtocol = `\n\n[PROTOCOL: ITERATE ACTIVE]\n${await this.checkMCP('ITERATE')} \n`;
+            }
 
-        // Context & Prompt - SIMPLIFIED FOR TRANSPLANT
-        // Inject Wisdom into the prompt
-        const enrichedDescription = task.description +
-            "\n\n--- [SYSTEM: LATENCY OPPORTUNITY] ---\n" +
-            wisdomContext +
-            "\n---------------------------------------\n" +
-            "Context: " + ((task as any).context || '');
+            // Context & Prompt - SIMPLIFIED FOR TRANSPLANT
+            // Inject Wisdom into the prompt
+            const enrichedDescription = task.description +
+                "\n\n--- [SYSTEM: LATENCY OPPORTUNITY] ---\n" +
+                wisdomContext +
+                "\n---------------------------------------\n" +
+                "Context: " + ((task as any).context || '');
 
-        // DYNAMIC DIRECTIVE INJECTION
-        const directive = this.systemPrompt
-            ? `\n\n[SUPREME DIRECTIVE]: ${this.systemPrompt} \n`
-            : `\n\n[DEFAULT PERSONA]: You are ${this.wisdom.role}.Virtue: ${this.wisdom.primaryVirtue}.`;
+            // DYNAMIC DIRECTIVE INJECTION
+            const directive = this.systemPrompt
+                ? `\n\n[SUPREME DIRECTIVE]: ${this.systemPrompt} \n`
+                : `\n\n[DEFAULT PERSONA]: You are ${this.wisdom.role}.Virtue: ${this.wisdom.primaryVirtue}.`;
 
-        const actionDirective = `\n\n[ACTION REQUIRED]: DO NOT just plan.EXECUTE the task.Use your tools(write_file, research) to create tangible artifacts.Output must include[Artifact: filename]if created.`;
+            const actionDirective = `\n\n[ACTION REQUIRED]: DO NOT just plan.EXECUTE the task.Use your tools(write_file, research) to create tangible artifacts.Output must include[Artifact: filename]if created.`;
 
-        // [ANTIGRAVITY] SQUAD-SPECIFIC MERMAID ENFORCEMENT (Priority 2)
-        const isGamma = this.name.includes('hdm') || this.name.includes('torch') || this.name.includes('nexus') || this.name.includes('gabriel');
-        const mermaidRequirement = isGamma ? "\n\n[PROTOCOL: VISUAL TRUST]\nYou are a member of the Build(Gamma) Squad. You MUST include a Mermaid diagram(e.g., graph TD, classDiagram) in your final artifact to visualize the logic, architecture, or flow of your work." : "";
+            // [ANTIGRAVITY] SQUAD-SPECIFIC MERMAID ENFORCEMENT (Priority 2)
+            const isGamma = this.name.includes('hdm') || this.name.includes('torch') || this.name.includes('nexus') || this.name.includes('gabriel');
+            const mermaidRequirement = isGamma ? "\n\n[PROTOCOL: VISUAL TRUST]\nYou are a member of the Build(Gamma) Squad. You MUST include a Mermaid diagram(e.g., graph TD, classDiagram) in your final artifact to visualize the logic, architecture, or flow of your work." : "";
 
-        // [ANTIGRAVITY] TOOL AWARENESS
-        const toolSuggestions = this.router.suggestTools(task);
-        const toolPrompt = toolSuggestions.length > 0
-            ? `\n[INTELLIGENCE ROUTER] Suggested tools: ${toolSuggestions.join(', ')}.\n`
-            : "";
+            // [ANTIGRAVITY] TOOL AWARENESS
+            const toolSuggestions = this.router.suggestTools(task);
+            const toolPrompt = toolSuggestions.length > 0
+                ? `\n[INTELLIGENCE ROUTER] Suggested tools: ${toolSuggestions.join(', ')}.\n`
+                : "";
 
-        this.currentTaskId = String(task.id);
-        const prompt = `
+            this.currentTaskId = String(task.id);
+            const prompt = `
 ### DIRECTIVE
 ${directive}
 ${actionDirective}
@@ -1306,600 +1305,600 @@ Task Title: ${task.title}
 IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do not just talk about it. EXECUTE.
 `;
 
-        // Call LLM (First Pass)
-        let result = await this.callLLM(prompt, {}, task);
+            // Call LLM (First Pass)
+            let result = await this.callLLM(prompt, {}, task);
 
-        // [PHASE 10] AGENT REFLECTION (Priority 1)
-        // Perform a self-critique loop to improve artifact quality before peer review.
-        if (result.output && result.output !== "Error calling LLM") {
-            const reflectionResult = await this.reflectOnResult(task, result.output);
-            if (reflectionResult.improvement_required) {
-                console.log(`[${this.name}] 🧠 Self-Reflection triggered: ${reflectionResult.critique}. Refining result...`);
-                const refinePrompt = `${prompt}\n\n[SELF-REFLECTIONS]:\n${reflectionResult.critique}\n\nPlease regenerate your final output incorporating these improvements.`;
-                result = await this.callLLM(refinePrompt, {}, task);
-            }
-        }
-
-        console.log(`[${this.name}] 🧠 Result length: ${result.output?.length || 0}`);
-
-        // [ANTIGRAVITY] ERROR PROPAGATION: Do not continue if LLM failed
-        if (result.output === "Error calling LLM" || !result.output) {
-            throw new Error("LLM call failed to produce output. Check API keys and connectivity.");
-        }
-        // [PHASE 10] UNCERTAINTY AS OPPORTUNITY (Logical Escalation)
-        let evaluation = await this.evaluateResult(task, result.output);
-        let lowBelief = evaluation.score < 40;
-        let explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
-
-        if (lowBelief || explicitEscalate) {
-            // [ANTIGRAVITY] Phase A: Internal Elite Retry (Proactive Recovery)
-            const alreadyElite = (task as any).metadata?.includes('elite_retry');
-            if (!alreadyElite) {
-                console.log(`[${this.name}] 🚨 UNCERTAINTY DETECTED. Triggering Internal Elite Retry...`);
-                const escalationModel = this.router.getEscalationModel(task);
-
-                // Mark metadata to prevent loop
-                const meta = JSON.parse(task.metadata || '{}');
-                meta.elite_retry = true;
-                task.metadata = JSON.stringify(meta);
-
-                const elitePrompt = `${prompt}\n\n[NOTICE: ELITE ESCALATION]\nYour previous answer was flagged as low-confidence. Please use your full reasoning capability to provide a definitive solution or identify exactly what info is missing.`;
-                result = await this.callLLM(elitePrompt, { forceModel: escalationModel }, task);
-
-                // Re-evaluate
-                evaluation = await this.evaluateResult(task, result.output);
-                lowBelief = evaluation.score < 50; // Tighter threshold for elite 
-                explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
-
-                if (!lowBelief && !explicitEscalate) {
-                    console.log(`[${this.name}] ✅ Elite retry successful (Score: ${evaluation.score}). Proceeding.`);
-                } else {
-                    console.log(`[${this.name}] ⚠️ Elite retry still low confidence. Escalating to Peers/Admin.`);
+            // [PHASE 10] AGENT REFLECTION (Priority 1)
+            // Perform a self-critique loop to improve artifact quality before peer review.
+            if (result.output && result.output !== "Error calling LLM") {
+                const reflectionResult = await this.reflectOnResult(task, result.output);
+                if (reflectionResult.improvement_required) {
+                    console.log(`[${this.name}] 🧠 Self-Reflection triggered: ${reflectionResult.critique}. Refining result...`);
+                    const refinePrompt = `${prompt}\n\n[SELF-REFLECTIONS]:\n${reflectionResult.critique}\n\nPlease regenerate your final output incorporating these improvements.`;
+                    result = await this.callLLM(refinePrompt, {}, task);
                 }
             }
+
+            console.log(`[${this.name}] 🧠 Result length: ${result.output?.length || 0}`);
+
+            // [ANTIGRAVITY] ERROR PROPAGATION: Do not continue if LLM failed
+            if (result.output === "Error calling LLM" || !result.output) {
+                throw new Error("LLM call failed to produce output. Check API keys and connectivity.");
+            }
+            // [PHASE 10] UNCERTAINTY AS OPPORTUNITY (Logical Escalation)
+            let evaluation = await this.evaluateResult(task, result.output);
+            let lowBelief = evaluation.score < 40;
+            let explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
 
             if (lowBelief || explicitEscalate) {
-                console.log(`[ANTIGRAVITY] 🚨 ESCALATING to Architect/Peers...`);
+                // [ANTIGRAVITY] Phase A: Internal Elite Retry (Proactive Recovery)
+                const alreadyElite = (task as any).metadata?.includes('elite_retry');
+                if (!alreadyElite) {
+                    console.log(`[${this.name}] 🚨 UNCERTAINTY DETECTED. Triggering Internal Elite Retry...`);
+                    const escalationModel = this.router.getEscalationModel(task);
 
-                const { error: escalateError } = await this.supabase.from('trinity_tasks').update({
-                    status: 'pending_clarification',
-                    claimed_by: null,
-                    result: `[ESCALATED] Agent ${this.name} is seeking clarification. \n\nReason: ${lowBelief ? 'Low certainty score' : 'Explicit escalation request'}. \n\nQuery: ${result.output.substring(0, 500)}`,
-                    verification_result: `Searching high-dimension databases... seeking expert consensus.`,
-                    metadata: {
-                        ...(JSON.parse(task.metadata || '{}')),
-                        consultation_requested: true,
-                        escalated_by: this.name,
-                        escalation_time: new Date().toISOString()
+                    // Mark metadata to prevent loop
+                    const meta = JSON.parse(task.metadata || '{}');
+                    meta.elite_retry = true;
+                    task.metadata = JSON.stringify(meta);
+
+                    const elitePrompt = `${prompt}\n\n[NOTICE: ELITE ESCALATION]\nYour previous answer was flagged as low-confidence. Please use your full reasoning capability to provide a definitive solution or identify exactly what info is missing.`;
+                    result = await this.callLLM(elitePrompt, { forceModel: escalationModel }, task);
+
+                    // Re-evaluate
+                    evaluation = await this.evaluateResult(task, result.output);
+                    lowBelief = evaluation.score < 50; // Tighter threshold for elite 
+                    explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
+
+                    if (!lowBelief && !explicitEscalate) {
+                        console.log(`[${this.name}] ✅ Elite retry successful (Score: ${evaluation.score}). Proceeding.`);
+                    } else {
+                        console.log(`[${this.name}] ⚠️ Elite retry still low confidence. Escalating to Peers/Admin.`);
                     }
+                }
+
+                if (lowBelief || explicitEscalate) {
+                    console.log(`[ANTIGRAVITY] 🚨 ESCALATING to Architect/Peers...`);
+
+                    const { error: escalateError } = await this.supabase.from('trinity_tasks').update({
+                        status: 'pending_clarification',
+                        claimed_by: null,
+                        result: `[ESCALATED] Agent ${this.name} is seeking clarification. \n\nReason: ${lowBelief ? 'Low certainty score' : 'Explicit escalation request'}. \n\nQuery: ${result.output.substring(0, 500)}`,
+                        verification_result: `Searching high-dimension databases... seeking expert consensus.`,
+                        metadata: {
+                            ...(JSON.parse(task.metadata || '{}')),
+                            consultation_requested: true,
+                            escalated_by: this.name,
+                            escalation_time: new Date().toISOString()
+                        }
+                    }).eq('id', task.id);
+
+                    if (escalateError) {
+                        console.error(`[${this.name}] ❌ Escalation update failed:`, escalateError.message);
+                    }
+
+                    // Spawn "Question for Architect" artifact
+                    const questionContent = `# Question for Architect \n\n**Agent**: ${this.name} \n**Task**: ${task.title} \n\n**The Right Question**: \n${result.output} \n\n---\n*The smartest person is not the one with all the answers, but the one asking the right questions.*`;
+                    await this.saveArtifact(task.id, questionContent, 'report', `Q: ${task.title}`, 'public');
+
+                    return { success: true, llm_used: true, escalated: true };
+                }
+            } // End of outer if (lowBelief || explicitEscalate)
+
+            let externalArtifactUrl = result.artifactLinks && result.artifactLinks.length > 0
+                ? result.artifactLinks[0]
+                : '';
+
+            // [ANTIGRAVITY] Artifact Logic: Only save summary if NO artifact link was returned by LLM
+            if (!externalArtifactUrl && ((task.task_type && ['content', 'research', 'code', 'design', 'data', 'report'].includes(task.task_type)) || task.requires_external_artifact)) {
+                // [ANTIGRAVITY] Map task_type to artifact type
+                const typeMap: Record<string, string> = {
+                    'code': 'code',
+                    'design': 'design',
+                    'data': 'data',
+                    'report': 'report',
+                    'research': 'report',
+                    'content': 'document'
+                };
+                const artifactType = typeMap[task.task_type || ''] || 'text_content';
+                const dbArtifactLink = await this.saveArtifact(String(task.id), result.output, artifactType);
+                if (dbArtifactLink) externalArtifactUrl = dbArtifactLink;
+
+                // [PHASE 12] LOG CAUSE & EFFECT (Only for auto-generated artifacts)
+                await this.evolutionLogger.recordEvolution({
+                    intent: `Complete ${task.task_type} task: ${task.title}`,
+                    strategy: `LLM Processing (${(task as any).metadata?.provider_used || 'unknown'})`,
+                    action_details: {
+                        prompt_used: prompt.substring(0, 1000),
+                        output_received: result.output?.substring(0, 1000),
+                        artifact: dbArtifactLink
+                    },
+                    outcome: 'Success',
+                    effect_score: evaluation.score,
+                    learned_insight: `Task completed with score ${evaluation.score}. Provider: ${(task as any).metadata?.provider_used}.`,
+                    task_id: String(task.id)
+                });
+            }
+
+            // [ANTIGRAVITY] MANDATORY ARTIFACT ENFORCEMENT & SMART PARSING
+            if (!externalArtifactUrl) {
+                console.log(`[ANTIGRAVITY] 🛡️ No artifact produced for task ${task.id}. Attempting smart-parse...`);
+
+                let extractedContent = result.output;
+                let artifactType = 'report';
+
+                // Try to extract code blocks
+                const codeBlockRegex = /```(?:\w+)?\n([\s\S]*?)```/g;
+                const matches = Array.from(result.output.matchAll(codeBlockRegex));
+
+                if (matches.length > 0) {
+                    console.log(`[ANTIGRAVITY] 📝 Extracted ${matches.length} code blocks from text.`);
+                    extractedContent = matches.map(m => m[1]).join('\n\n---\n\n');
+                    artifactType = 'code';
+                } else if (result.output.length > 500) {
+                    // If it's long but has no code blocks, treat as a document
+                    artifactType = 'document';
+                }
+
+                const reportContent = artifactType === 'code'
+                    ? extractedContent
+                    : `# ${task.title}\n\n${extractedContent}\n\n---\n*Generated via Smart-Parse Fallback by ${this.name}*`;
+
+                const fallbackUrl = await this.saveArtifact(task.id, reportContent, artifactType, `Result: ${task.title}`, 'protected');
+                if (fallbackUrl) externalArtifactUrl = fallbackUrl;
+                else console.warn(`[ANTIGRAVITY] ⚠️ Failed to save fallback artifact.`);
+            }
+
+            // Mark Completed
+            const { error: doneError } = await this.supabase
+                .from('trinity_tasks')
+                .update({
+                    status: 'done', // Moving to 'done' status for verification pipeline
+                    claimed_by: this.name,
+                    result: result.output,
+                    artifact_url: externalArtifactUrl,
+                    completed_at: new Date().toISOString(),
+                    completed_by: this.name, // Satisfy newer schema columns
+                    // SUBJECTIVE LOGIC: b+d+u=1
+                    belief: evaluation.score / 100,
+                    disbelief: evaluation.score < 50 ? (50 - evaluation.score) / 100 : 0,
+                    uncertainty: evaluation.score > 90 ? 0.05 : 0.2,
+                    metadata: {
+                        provider: (task as any).metadata?.provider_used || 'unknown',
+                        certainty: evaluation.score / 100,
+                        evaluation: evaluation,
+                        processedBy: this.name,
+                        version: this.version,
+                        tenacity_failover: !!(task as any).metadata?.provider_used && (task as any).metadata.provider_used !== 'openai'
+                    }
+                })
+                .eq('id', task.id);
+
+            if (doneError) {
+                console.error(`[${this.name}] ❌ Failed to mark task ${task.id} as 'done':`, doneError.message);
+                throw new Error(`Database Update Failed: ${doneError.message}`);
+            }
+
+            // Log Benchmark Score if applicable (Training Loop)
+            // 3. LOG BENCHMARK
+            await this.logBenchmark(task, evaluation.score);
+
+            // [PHASE 25] PERSIST INSIGHT (Phase 3)
+            await this.generateInsight(task, result.output);
+
+            this.sessionMetrics.tasksCompleted++;
+            await this.updateReputation(evaluation.score > 0.6);
+
+            // ERC-8004 INTEROP: Bridge to HyperDAG Testnet (Sovereign Reputation)
+            await this.integrateErc8004(task.id, evaluation.score);
+
+            console.log(`[${this.name}] ✅ Completed task ${task.id} (Score: ${evaluation.score})`);
+
+            // [ANTIGRAVITY] FINAL SUCCESS NOTIFICATION
+            await notificationManager.notifyUser({
+                title: `Task Completed: ${task.title}`,
+                message: `Agent ${this.name} successfully finished the task. Artifact: ${result.artifactLinks?.[0] || 'Logged in result'}`,
+                type: 'success',
+                agentName: this.name,
+                taskId: task.id,
+                metadata: { artifactUrl: result.artifactLinks?.[0], important: (task.reputation_required && task.reputation_required > 80) || task.task_type === 'code' }
+            });
+
+            // Extract Patterns (Simplified)
+            await this.extractPatterns(task.title, result.output);
+
+            // EVOLUTION: Spawn Next Step (Verification)
+            await this.spawnNextStep(task, result.output, evaluation);
+
+            // [ANTIGRAVITY] Reset Task ID tracking
+            this.currentTaskId = null;
+
+        } catch (err: any) {
+            this.currentTaskId = null;
+            const errorMsg = err.message || String(err);
+            console.error(`[${this.name}] processTask failed: `, errorMsg);
+
+            // Log to agent logs for visibility
+            await this.log('task_failure', errorMsg, { taskId: task.id, title: task.title });
+
+            // [ANTIGRAVITY] Robust Failure Update: Avoid silent stalls
+            try {
+                const { error: failError } = await this.supabase.from('trinity_tasks').update({
+                    status: 'failed',
+                    result: `ERROR: ${errorMsg}`,
+                    claimed_by: null, // Release claim so it can be retried or audited
+                    completed_at: new Date().toISOString(),
+                    completed_by: this.name
                 }).eq('id', task.id);
 
-                if (escalateError) {
-                    console.error(`[${this.name}] ❌ Escalation update failed:`, escalateError.message);
-                }
-
-                // Spawn "Question for Architect" artifact
-                const questionContent = `# Question for Architect \n\n**Agent**: ${this.name} \n**Task**: ${task.title} \n\n**The Right Question**: \n${result.output} \n\n---\n*The smartest person is not the one with all the answers, but the one asking the right questions.*`;
-                await this.saveArtifact(task.id, questionContent, 'report', `Q: ${task.title}`, 'public');
-
-                return { success: true, llm_used: true, escalated: true };
+                if (failError) console.error(`[${this.name}] 🚨 Failed to update task ${task.id} to 'failed':`, failError.message);
+                else console.log(`[${this.name}] 🛡️ Task ${task.id} marked as failed.`);
+            } catch (e: any) {
+                console.error(`[${this.name}] Fatal error during failure update:`, e.message);
+                await this.releaseClaim(task.id);
             }
-        } // End of outer if (lowBelief || explicitEscalate)
-
-        let externalArtifactUrl = result.artifactLinks && result.artifactLinks.length > 0
-            ? result.artifactLinks[0]
-            : '';
-
-        // [ANTIGRAVITY] Artifact Logic: Only save summary if NO artifact link was returned by LLM
-        if (!externalArtifactUrl && ((task.task_type && ['content', 'research', 'code', 'design', 'data', 'report'].includes(task.task_type)) || task.requires_external_artifact)) {
-            // [ANTIGRAVITY] Map task_type to artifact type
-            const typeMap: Record<string, string> = {
-                'code': 'code',
-                'design': 'design',
-                'data': 'data',
-                'report': 'report',
-                'research': 'report',
-                'content': 'document'
-            };
-            const artifactType = typeMap[task.task_type || ''] || 'text_content';
-            const dbArtifactLink = await this.saveArtifact(String(task.id), result.output, artifactType);
-            if (dbArtifactLink) externalArtifactUrl = dbArtifactLink;
-
-            // [PHASE 12] LOG CAUSE & EFFECT (Only for auto-generated artifacts)
-            await this.evolutionLogger.recordEvolution({
-                intent: `Complete ${task.task_type} task: ${task.title}`,
-                strategy: `LLM Processing (${(task as any).metadata?.provider_used || 'unknown'})`,
-                action_details: {
-                    prompt_used: prompt.substring(0, 1000),
-                    output_received: result.output?.substring(0, 1000),
-                    artifact: dbArtifactLink
-                },
-                outcome: 'Success',
-                effect_score: evaluation.score,
-                learned_insight: `Task completed with score ${evaluation.score}. Provider: ${(task as any).metadata?.provider_used}.`,
-                task_id: String(task.id)
-            });
-        }
-
-        // [ANTIGRAVITY] MANDATORY ARTIFACT ENFORCEMENT & SMART PARSING
-        if (!externalArtifactUrl) {
-            console.log(`[ANTIGRAVITY] 🛡️ No artifact produced for task ${task.id}. Attempting smart-parse...`);
-
-            let extractedContent = result.output;
-            let artifactType = 'report';
-
-            // Try to extract code blocks
-            const codeBlockRegex = /```(?:\w+)?\n([\s\S]*?)```/g;
-            const matches = Array.from(result.output.matchAll(codeBlockRegex));
-
-            if (matches.length > 0) {
-                console.log(`[ANTIGRAVITY] 📝 Extracted ${matches.length} code blocks from text.`);
-                extractedContent = matches.map(m => m[1]).join('\n\n---\n\n');
-                artifactType = 'code';
-            } else if (result.output.length > 500) {
-                // If it's long but has no code blocks, treat as a document
-                artifactType = 'document';
-            }
-
-            const reportContent = artifactType === 'code'
-                ? extractedContent
-                : `# ${task.title}\n\n${extractedContent}\n\n---\n*Generated via Smart-Parse Fallback by ${this.name}*`;
-
-            const fallbackUrl = await this.saveArtifact(task.id, reportContent, artifactType, `Result: ${task.title}`, 'protected');
-            if (fallbackUrl) externalArtifactUrl = fallbackUrl;
-            else console.warn(`[ANTIGRAVITY] ⚠️ Failed to save fallback artifact.`);
-        }
-
-        // Mark Completed
-        const { error: doneError } = await this.supabase
-            .from('trinity_tasks')
-            .update({
-                status: 'done', // Moving to 'done' status for verification pipeline
-                claimed_by: this.name,
-                result: result.output,
-                artifact_url: externalArtifactUrl,
-                completed_at: new Date().toISOString(),
-                completed_by: this.name, // Satisfy newer schema columns
-                // SUBJECTIVE LOGIC: b+d+u=1
-                belief: evaluation.score / 100,
-                disbelief: evaluation.score < 50 ? (50 - evaluation.score) / 100 : 0,
-                uncertainty: evaluation.score > 90 ? 0.05 : 0.2,
-                metadata: {
-                    provider: (task as any).metadata?.provider_used || 'unknown',
-                    certainty: evaluation.score / 100,
-                    evaluation: evaluation,
-                    processedBy: this.name,
-                    version: this.version,
-                    tenacity_failover: !!(task as any).metadata?.provider_used && (task as any).metadata.provider_used !== 'openai'
-                }
-            })
-            .eq('id', task.id);
-
-        if (doneError) {
-            console.error(`[${this.name}] ❌ Failed to mark task ${task.id} as 'done':`, doneError.message);
-            throw new Error(`Database Update Failed: ${doneError.message}`);
-        }
-
-        // Log Benchmark Score if applicable (Training Loop)
-        // 3. LOG BENCHMARK
-        await this.logBenchmark(task, evaluation.score);
-
-        // [PHASE 25] PERSIST INSIGHT (Phase 3)
-        await this.generateInsight(task, result.output);
-
-        this.sessionMetrics.tasksCompleted++;
-        await this.updateReputation(evaluation.score > 0.6);
-
-        // ERC-8004 INTEROP: Bridge to HyperDAG Testnet (Sovereign Reputation)
-        await this.integrateErc8004(task.id, evaluation.score);
-
-        console.log(`[${this.name}] ✅ Completed task ${task.id} (Score: ${evaluation.score})`);
-
-        // [ANTIGRAVITY] FINAL SUCCESS NOTIFICATION
-        await notificationManager.notifyUser({
-            title: `Task Completed: ${task.title}`,
-            message: `Agent ${this.name} successfully finished the task. Artifact: ${result.artifactLinks?.[0] || 'Logged in result'}`,
-            type: 'success',
-            agentName: this.name,
-            taskId: task.id,
-            metadata: { artifactUrl: result.artifactLinks?.[0], important: (task.reputation_required && task.reputation_required > 80) || task.task_type === 'code' }
-        });
-
-        // Extract Patterns (Simplified)
-        await this.extractPatterns(task.title, result.output);
-
-        // EVOLUTION: Spawn Next Step (Verification)
-        await this.spawnNextStep(task, result.output, evaluation);
-
-        // [ANTIGRAVITY] Reset Task ID tracking
-        this.currentTaskId = null;
-
-    } catch (err: any) {
-        this.currentTaskId = null;
-        const errorMsg = err.message || String(err);
-        console.error(`[${this.name}] processTask failed: `, errorMsg);
-
-        // Log to agent logs for visibility
-        await this.log('task_failure', errorMsg, { taskId: task.id, title: task.title });
-
-        // [ANTIGRAVITY] Robust Failure Update: Avoid silent stalls
-        try {
-            const { error: failError } = await this.supabase.from('trinity_tasks').update({
-                status: 'failed',
-                result: `ERROR: ${errorMsg}`,
-                claimed_by: null, // Release claim so it can be retried or audited
-                completed_at: new Date().toISOString(),
-                completed_by: this.name
-            }).eq('id', task.id);
-
-            if (failError) console.error(`[${this.name}] 🚨 Failed to update task ${task.id} to 'failed':`, failError.message);
-            else console.log(`[${this.name}] 🛡️ Task ${task.id} marked as failed.`);
-        } catch (e: any) {
-            console.error(`[${this.name}] Fatal error during failure update:`, e.message);
-            await this.releaseClaim(task.id);
         }
     }
-}
 
     // ============================================
     // EVERGREEN LIFE CYCLE (Phase 9)
     // ============================================
 
     async runGenesisLoop() {
-    console.log(`[${this.name}] 🌬️ Entering Genesis Mode (Proactive)...`);
+        console.log(`[${this.name}] 🌬️ Entering Genesis Mode (Proactive)...`);
 
-    // 1. Check for pending work first (Be productive)
-    const unclaimed = await this.getNextTask(false);
-    if (unclaimed) {
-        console.log(`[GENESIS] 🌿 Found pending task: ${unclaimed.title}. Resuming work.`);
-        await this.processTask(unclaimed);
-        return;
-    }
+        // 1. Check for pending work first (Be productive)
+        const unclaimed = await this.getNextTask(false);
+        if (unclaimed) {
+            console.log(`[GENESIS] 🌿 Found pending task: ${unclaimed.title}. Resuming work.`);
+            await this.processTask(unclaimed);
+            return;
+        }
 
-    // 2. GCM Governance & Skill Gap Analysis (If GCM)
-    if (this.name === 'trinity-gcm') {
-        if (Math.random() < 0.3) {
-            await this.runGovernanceLoop();
-            await this.identifySkillGaps();
+        // 2. GCM Governance & Skill Gap Analysis (If GCM)
+        if (this.name === 'trinity-gcm') {
+            if (Math.random() < 0.3) {
+                await this.runGovernanceLoop();
+                await this.identifySkillGaps();
+            }
+        }
+
+        // 3. Periodic Retrospective (All Agents)
+        if (Math.random() < 0.1) {
+            await this.retrospective();
+        }
+
+        // 4. Proactive Market Seeding (Genesis)
+        if (Math.random() < 0.2) {
+            await this.runWebAwareGenesis();
+        }
+
+        // 5. System Optimization (Maintenance)
+        if (Math.random() < 0.1) {
+            await this.spawnMaintenanceTask();
         }
     }
 
-    // 3. Periodic Retrospective (All Agents)
-    if (Math.random() < 0.1) {
-        await this.retrospective();
-    }
+    async spawnMaintenanceTask(reason?: string) {
+        // [ANTIGRAVITY] Loop Dampening: Check Throttle
+        const canSpawn = await this.canCreateHealingTask();
+        if (!canSpawn) {
+            console.log(`[${this.name}] 🛡️ Maintenance/Healing task suppressed by loop stabilizer.`);
+            return;
+        }
 
-    // 4. Proactive Market Seeding (Genesis)
-    if (Math.random() < 0.2) {
-        await this.runWebAwareGenesis();
-    }
+        console.log(`[${this.name}] 🛠️ Seeding maintenance task... ${reason || ''}`);
+        const maintenanceTasks = [
+            { title: '[MAINTENANCE] Audit recent RepID updates', description: 'Review recent reputation changes for BFT compliance.' },
+            { title: '[MAINTENANCE] Clean up artifact noise', description: 'Identify and flag redundant or low-quality artifacts.' },
+            { title: '[MAINTENANCE] Optimize agent health scores', description: 'Review long-term health trends across the swarm.' },
+            { title: '[MAINTENANCE] Cache optimization', description: 'Review Redis usage and suggest eviction strategies.' }
+        ];
 
-    // 5. System Optimization (Maintenance)
-    if (Math.random() < 0.1) {
-        await this.spawnMaintenanceTask();
-    }
-}
+        const selected = reason
+            ? { title: `[HEALING] Resolve: ${reason}`, description: `Automated self-healing triggered by repetitive failure: ${reason}. Analyze logs and propose fix.` }
+            : maintenanceTasks[Math.floor(Math.random() * maintenanceTasks.length)];
 
-    async spawnMaintenanceTask(reason ?: string) {
-    // [ANTIGRAVITY] Loop Dampening: Check Throttle
-    const canSpawn = await this.canCreateHealingTask();
-    if (!canSpawn) {
-        console.log(`[${this.name}] 🛡️ Maintenance/Healing task suppressed by loop stabilizer.`);
-        return;
-    }
-
-    console.log(`[${this.name}] 🛠️ Seeding maintenance task... ${reason || ''}`);
-    const maintenanceTasks = [
-        { title: '[MAINTENANCE] Audit recent RepID updates', description: 'Review recent reputation changes for BFT compliance.' },
-        { title: '[MAINTENANCE] Clean up artifact noise', description: 'Identify and flag redundant or low-quality artifacts.' },
-        { title: '[MAINTENANCE] Optimize agent health scores', description: 'Review long-term health trends across the swarm.' },
-        { title: '[MAINTENANCE] Cache optimization', description: 'Review Redis usage and suggest eviction strategies.' }
-    ];
-
-    const selected = reason
-        ? { title: `[HEALING] Resolve: ${reason}`, description: `Automated self-healing triggered by repetitive failure: ${reason}. Analyze logs and propose fix.` }
-        : maintenanceTasks[Math.floor(Math.random() * maintenanceTasks.length)];
-
-    try {
-        await this.supabase.from('trinity_tasks').insert([{
-            ...selected,
-            status: 'pending',
-            task_type: 'genesis',
-            priority: 1, // SET TO LOWEST PRIORITY
-            metadata: { source: 'maintenance_genesis', agent: this.name, automated: true }
-        }]);
-        console.log(`[GENESIS] 🛠️ Maintenance seeded: ${selected.title}`);
-    } catch (e) {
-        console.warn(`[GENESIS] Maintenance seeding failed:`, e);
-    }
-}
-
-    async runWebAwareGenesis() {
-    console.log(`[${this.name}] 🌍 Commencing Web-Aware Genesis...`);
-    try {
-        // Research a trending topic in AI/Web3/Ethics
-        const topics = ['AI Agent Orchestration', 'DeFi Security Trends', 'Constitutional AI best practices', 'HyperDAG architecture', 'X Arbitrage Semantic Analysis'];
-        const topic = topics[Math.floor(Math.random() * topics.length)];
-
-        const results = await this.researchTool.searchWeb(`Latest trends and breakthroughs in ${topic} January 2026`);
-        const context = JSON.stringify(results.slice(0, 2));
-
-        const prompt = `Based on these recent trends, propose ONE high-priority task for the Trinity Swarm to increase its resourcefulness or market edge.\n\nTrend Context: ${context}\n\nReturn JSON ONLY: { "title": "[GENESIS] ...", "description": "...", "priority": 80 }`;
-
-        const proposal = await this.callLLM(prompt);
-        const jsonMatch = proposal.output.match(/\{[\s\S]*\}/);
-        const taskObj = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-
-        if (taskObj && taskObj.title) {
+        try {
             await this.supabase.from('trinity_tasks').insert([{
-                ...taskObj,
+                ...selected,
                 status: 'pending',
                 task_type: 'genesis',
-                metadata: { source: 'web_aware_genesis', agent: this.name }
+                priority: 1, // SET TO LOWEST PRIORITY
+                metadata: { source: 'maintenance_genesis', agent: this.name, automated: true }
             }]);
-            console.log(`[GENESIS] ✨ spawned new mission: ${taskObj.title}`);
+            console.log(`[GENESIS] 🛠️ Maintenance seeded: ${selected.title}`);
+        } catch (e) {
+            console.warn(`[GENESIS] Maintenance seeding failed:`, e);
         }
-    } catch (e) {
-        console.warn(`[GENESIS] Web-Aware Genesis failed:`, e);
     }
-}
+
+    async runWebAwareGenesis() {
+        console.log(`[${this.name}] 🌍 Commencing Web-Aware Genesis...`);
+        try {
+            // Research a trending topic in AI/Web3/Ethics
+            const topics = ['AI Agent Orchestration', 'DeFi Security Trends', 'Constitutional AI best practices', 'HyperDAG architecture', 'X Arbitrage Semantic Analysis'];
+            const topic = topics[Math.floor(Math.random() * topics.length)];
+
+            const results = await this.researchTool.searchWeb(`Latest trends and breakthroughs in ${topic} January 2026`);
+            const context = JSON.stringify(results.slice(0, 2));
+
+            const prompt = `Based on these recent trends, propose ONE high-priority task for the Trinity Swarm to increase its resourcefulness or market edge.\n\nTrend Context: ${context}\n\nReturn JSON ONLY: { "title": "[GENESIS] ...", "description": "...", "priority": 80 }`;
+
+            const proposal = await this.callLLM(prompt);
+            const jsonMatch = proposal.output.match(/\{[\s\S]*\}/);
+            const taskObj = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+
+            if (taskObj && taskObj.title) {
+                await this.supabase.from('trinity_tasks').insert([{
+                    ...taskObj,
+                    status: 'pending',
+                    task_type: 'genesis',
+                    metadata: { source: 'web_aware_genesis', agent: this.name }
+                }]);
+                console.log(`[GENESIS] ✨ spawned new mission: ${taskObj.title}`);
+            }
+        } catch (e) {
+            console.warn(`[GENESIS] Web-Aware Genesis failed:`, e);
+        }
+    }
 
     /**
      * GCM-ROOTED STRATEGY: Skill Gap Analysis
      */
     async identifySkillGaps() {
-    console.log(`[${this.name}] 🧐 Auditing swarm skill gaps...`);
-    try {
-        const { data: retros } = await this.supabase
-            .from('trinity_retros')
-            .select('agent, reflection, created_at')
-            .order('created_at', { ascending: false })
-            .limit(10);
+        console.log(`[${this.name}] 🧐 Auditing swarm skill gaps...`);
+        try {
+            const { data: retros } = await this.supabase
+                .from('trinity_retros')
+                .select('agent, reflection, created_at')
+                .order('created_at', { ascending: false })
+                .limit(10);
 
-        if (!retros || retros.length === 0) return;
+            if (!retros || retros.length === 0) return;
 
-        const prompt = `Analyze these agent retrospectives for learning gaps. Identify 2 specific skills the swarm needs. Return JSON: { "gaps": ["skill 1", "skill 2"] } \n\nRetros: ${JSON.stringify(retros)}`;
-        const analysis = await this.callLLM(prompt);
-        const resultJson = JSON.parse(analysis.output.replace(/```json/g, '').replace(/```/g, ''));
+            const prompt = `Analyze these agent retrospectives for learning gaps. Identify 2 specific skills the swarm needs. Return JSON: { "gaps": ["skill 1", "skill 2"] } \n\nRetros: ${JSON.stringify(retros)}`;
+            const analysis = await this.callLLM(prompt);
+            const resultJson = JSON.parse(analysis.output.replace(/```json/g, '').replace(/```/g, ''));
 
-        if (resultJson.gaps) {
-            for (const gap of resultJson.gaps) {
-                await this.researchTask(gap);
+            if (resultJson.gaps) {
+                for (const gap of resultJson.gaps) {
+                    await this.researchTask(gap);
+                }
             }
-        }
-    } catch (e) { console.warn('Skill gap audit failed', e); }
-}
+        } catch (e) { console.warn('Skill gap audit failed', e); }
+    }
 
     /**
      * GCM-ROOTED STRATEGY: Governance Promotion
      */
     async runGovernanceLoop() {
-    console.log(`[${this.name}] ⚖️ Enforcing Swarm Governance...`);
-    try {
-        const { data: agents } = await this.supabase.from('trinity_agent_registry').select('*');
-        if (!agents) return;
+        console.log(`[${this.name}] ⚖️ Enforcing Swarm Governance...`);
+        try {
+            const { data: agents } = await this.supabase.from('trinity_agent_registry').select('*');
+            if (!agents) return;
 
-        for (const agent of agents) {
-            const score = agent.reputation_score;
-            let correctTier = agent.current_tier;
+            for (const agent of agents) {
+                const score = agent.reputation_score;
+                let correctTier = agent.current_tier;
 
-            if (score <= 40) correctTier = 'Assist';
-            else if (score <= 70) correctTier = 'Approve';
-            else if (score <= 90) correctTier = 'Act';
-            else correctTier = 'Learn';
+                if (score <= 40) correctTier = 'Assist';
+                else if (score <= 70) correctTier = 'Approve';
+                else if (score <= 90) correctTier = 'Act';
+                else correctTier = 'Learn';
 
-            if (correctTier !== agent.current_tier) {
-                await this.supabase.from('trinity_agent_registry').update({ current_tier: correctTier }).eq('agent_name', agent.agent_name);
-                console.log(`[GOV] 🚨 RE-TIERING: ${agent.agent_name} -> ${correctTier}`);
+                if (correctTier !== agent.current_tier) {
+                    await this.supabase.from('trinity_agent_registry').update({ current_tier: correctTier }).eq('agent_name', agent.agent_name);
+                    console.log(`[GOV] 🚨 RE-TIERING: ${agent.agent_name} -> ${correctTier}`);
+                }
             }
-        }
-    } catch (e) { console.warn('Governance loop failed', e); }
-}
+        } catch (e) { console.warn('Governance loop failed', e); }
+    }
 
     async spawnNextStep(originalTask: Task, result: string, evaluation: { score: number; handoff_required: boolean; handoff_to?: string }) {
-    // [ANTIGRAVITY] ROBUST LOOP BREAKER: Do NOT spawn verification for a verification task.
-    const titleMatch = originalTask.title.includes('[VERIFY]') ||
-        originalTask.title.includes('[REVIEW]') ||
-        originalTask.title.includes('Verify');
+        // [ANTIGRAVITY] ROBUST LOOP BREAKER: Do NOT spawn verification for a verification task.
+        const titleMatch = originalTask.title.includes('[VERIFY]') ||
+            originalTask.title.includes('[REVIEW]') ||
+            originalTask.title.includes('Verify');
 
-    const typeMatch = originalTask.task_type === 'review' || originalTask.task_type === 'meta';
+        const typeMatch = originalTask.task_type === 'review' || originalTask.task_type === 'meta';
 
-    if (titleMatch || typeMatch) {
-        console.log(`[VERIFY] 🛑 Loop breaker triggered for Task ${originalTask.id}. Not spawning recursive review.`);
+        if (titleMatch || typeMatch) {
+            console.log(`[VERIFY] 🛑 Loop breaker triggered for Task ${originalTask.id}. Not spawning recursive review.`);
 
-        // Mark the PARENT task as verified if this was a review
-        const parentId = (originalTask.metadata as any)?.parent_task_id;
-        if (parentId) {
-            const isApproved = evaluation.score > 0.5;
+            // Mark the PARENT task as verified if this was a review
+            const parentId = (originalTask.metadata as any)?.parent_task_id;
+            if (parentId) {
+                const isApproved = evaluation.score > 0.5;
 
-            // 2/3 BFT Consensus Logic – Provisional Aug 17, 2025
-            const { data: parentTask, error } = await this.supabase
-                .from('trinity_tasks')
-                .select('*')
-                .eq('id', parentId)
-                .single();
+                // 2/3 BFT Consensus Logic – Provisional Aug 17, 2025
+                const { data: parentTask, error } = await this.supabase
+                    .from('trinity_tasks')
+                    .select('*')
+                    .eq('id', parentId)
+                    .single();
 
-            if (error || !parentTask) {
-                console.error(`[VERIFY] Error fetching parent task ${parentId}:`, error?.message);
-                return;
+                if (error || !parentTask) {
+                    console.error(`[VERIFY] Error fetching parent task ${parentId}:`, error?.message);
+                    return;
+                }
+
+                let newVerifyCount = (((parentTask as unknown) as Task & { verify_count?: number }).verify_count || 0) + (isApproved ? 1 : 0);
+                let newStatus = (parentTask as any).status || 'done';
+                let signatures = (parentTask as any).signatures || [];
+
+                // Track multi-agent signatures for BFT audit trail
+                signatures.push({
+                    agent: this.name,
+                    reputation: this.reputationScore,
+                    approved: isApproved,
+                    timestamp: new Date().toISOString()
+                });
+
+                if (newVerifyCount >= 2 && isApproved) {
+                    newStatus = 'verified';
+                    console.log(`[VERIFY] 🏆 Task ${parentId} reached 2/3 BFT consensus. Status -> VERIFIED.`);
+                } else if (!isApproved) {
+                    // [BFT DISPUTE] Subjective Slashing Logic – Provisionally Protected
+                    console.log(`[VERIFY] ⚠️ CHALLENGE DETECTED for Task ${parentId}. Slashing original producer.`);
+                    await this.updateReputation(false, parentTask.claimed_by, -5); // Slash -5 for bad work
+                    newStatus = 'failed';
+
+                    // Trigger Reorg: Question-Driven Reorganization (Patent pending)
+                    await this.supabase.from('trinity_tasks').insert({
+                        title: `[REORG] Dispute Resolution for ${parentId}`,
+                        description: `Task ${parentId} failed peer verify. Dispute reason: ${result.substring(0, 200)}`,
+                        task_type: 'critique',
+                        priority: 90,
+                        status: 'pending',
+                        metadata: { disputed_task_id: parentId, disputed_agent: parentTask.claimed_by }
+                    });
+                }
+
+                await this.supabase.from('trinity_tasks').update({
+                    verified_by: this.name,
+                    repid_verified: true,
+                    verification_result: isApproved ? 'VALID' : 'CHALLENGED',
+                    verification_details: result.substring(0, 1000),
+                    signatures: signatures,
+                    verify_count: newVerifyCount,
+                    status: newStatus,
+                    verified_at: newStatus === 'verified' ? new Date().toISOString() : null
+                }).eq('id', parentId);
             }
+            return;
+        }
 
-            let newVerifyCount = (((parentTask as unknown) as Task & { verify_count?: number }).verify_count || 0) + (isApproved ? 1 : 0);
-            let newStatus = (parentTask as any).status || 'done';
-            let signatures = (parentTask as any).signatures || [];
+        // [CLAUDE: DECENTRALIZED VERITAS LOOP] - Automatic Verification for all critical tasks
+        const isCritical = ['code', 'design', 'strategy', 'research', 'report', 'content'].includes(originalTask.task_type || '') || (originalTask as any).priority > 50;
 
-            // Track multi-agent signatures for BFT audit trail
-            signatures.push({
-                agent: this.name,
-                reputation: this.reputationScore,
-                approved: isApproved,
-                timestamp: new Date().toISOString()
-            });
+        // [GROK: VERIFIER CAP] Max 3 verifiers per task
+        const currentVerifyCount = (originalTask as any).verify_count || 0;
+        if (currentVerifyCount >= 2) {
+            console.log(`[VERIFY] 🛑 Verifier cap reached for task ${originalTask.id}. Skipping spawn.`);
+            return;
+        }
 
-            if (newVerifyCount >= 2 && isApproved) {
-                newStatus = 'verified';
-                console.log(`[VERIFY] 🏆 Task ${parentId} reached 2/3 BFT consensus. Status -> VERIFIED.`);
-            } else if (!isApproved) {
-                // [BFT DISPUTE] Subjective Slashing Logic – Provisionally Protected
-                console.log(`[VERIFY] ⚠️ CHALLENGE DETECTED for Task ${parentId}. Slashing original producer.`);
-                await this.updateReputation(false, parentTask.claimed_by, -5); // Slash -5 for bad work
-                newStatus = 'failed';
+        if (isCritical) {
+            console.log(`[VERIFY] 🔎 Spawning mandatory cross-agent verification for task ${originalTask.id}`);
 
-                // Trigger Reorg: Question-Driven Reorganization (Patent pending)
+            // [ANTIGRAVITY] PERSISTENT ACTIVITY LOGGING
+            await this.log('verification_spawned', `Spawned peer review for task: ${originalTask.title}`, { parentTaskId: originalTask.id });
+
+            // [PHASE 26] MULTI-VERIFIER BFT CONSENSUS (Grok's Recommendation #2)
+            // Strategy: Spawn 3 verifiers (Alpha, Beta, Gamma) to ensure 2/3 majority robustness.
+            const squads = ['ALPHA', 'BETA', 'GAMMA'];
+
+            // [ANTIGRAVITY] SOCIAL MIRROR INJECTION
+            // If the task has social significance, spawn a [SOCIAL_REVIEW] via ASI1
+            const isSocial = originalTask.title.toLowerCase().includes('social') ||
+                originalTask.title.toLowerCase().includes('impact') ||
+                originalTask.task_type === 'content';
+
+            if (isSocial) {
+                console.log(`[SOCIAL] 🪞 Spawning Social Mirror audit for task ${originalTask.id} via ASI1`);
                 await this.supabase.from('trinity_tasks').insert({
-                    title: `[REORG] Dispute Resolution for ${parentId}`,
-                    description: `Task ${parentId} failed peer verify. Dispute reason: ${result.substring(0, 200)}`,
-                    task_type: 'critique',
-                    priority: 90,
+                    title: `[SOCIAL_REVIEW] ${originalTask.title}`,
+                    description: `Conduct a social resonance audit on the following result. Does it align with human-centric values?\n\nResult:\n${result.substring(0, 1000)}`,
+                    task_type: 'social-intelligence', // This triggers ASI1 in IntelligenceRouter
+                    priority: 80,
                     status: 'pending',
-                    metadata: { disputed_task_id: parentId, disputed_agent: parentTask.claimed_by }
+                    assigned_to: 'trinity-chesed', // Chesed is the agent of empathy
+                    metadata: {
+                        parent_task_id: originalTask.id,
+                        evidence: result.substring(0, 500),
+                        creator_agent: this.name,
+                        is_social_audit: true
+                    }
                 });
             }
 
-            await this.supabase.from('trinity_tasks').update({
-                verified_by: this.name,
-                repid_verified: true,
-                verification_result: isApproved ? 'VALID' : 'CHALLENGED',
-                verification_details: result.substring(0, 1000),
-                signatures: signatures,
-                verify_count: newVerifyCount,
-                status: newStatus,
-                verified_at: newStatus === 'verified' ? new Date().toISOString() : null
-            }).eq('id', parentId);
-        }
-        return;
-    }
+            // Map agents to squads (Hardcoded fallback for O(1) during build)
+            const squadMap: Record<string, string[]> = {
+                'ALPHA': ['trinity-veritas', 'trinity-torch', 'trinity-gcm'],
+                'BETA': ['trinity-mel', 'trinity-chesed', 'trinity-apm'],
+                'GAMMA': ['trinity-hdm', 'trinity-sophia', 'trinity-nexus']
+            };
 
-    // [CLAUDE: DECENTRALIZED VERITAS LOOP] - Automatic Verification for all critical tasks
-    const isCritical = ['code', 'design', 'strategy', 'research', 'report', 'content'].includes(originalTask.task_type || '') || (originalTask as any).priority > 50;
+            for (const squad of squads) {
+                // EXCLUDE BOTH: (1) Self (the verifier spawner) and (2) The original task claimer
+                const originalAgent = originalTask.claimed_by || this.name;
+                const pool = squadMap[squad].filter(name => name !== this.name && name !== originalAgent && name !== 'trinity-veritas' && name !== this.survivorName);
 
-    // [GROK: VERIFIER CAP] Max 3 verifiers per task
-    const currentVerifyCount = (originalTask as any).verify_count || 0;
-    if (currentVerifyCount >= 2) {
-        console.log(`[VERIFY] 🛑 Verifier cap reached for task ${originalTask.id}. Skipping spawn.`);
-        return;
-    }
+                // Fallback to squad peers if the pool is empty after filtering
+                const verifier = pool.length > 0
+                    ? pool[Math.floor(Math.random() * pool.length)]
+                    : squadMap[squad][0] === this.name ? squadMap[squad][1] : squadMap[squad][0];
 
-    if (isCritical) {
-        console.log(`[VERIFY] 🔎 Spawning mandatory cross-agent verification for task ${originalTask.id}`);
+                console.log(`[VERIFY] 🤝 Assigning squad ${squad} verification of ${originalTask.id} to: ${verifier}`);
 
-        // [ANTIGRAVITY] PERSISTENT ACTIVITY LOGGING
-        await this.log('verification_spawned', `Spawned peer review for task: ${originalTask.title}`, { parentTaskId: originalTask.id });
-
-        // [PHASE 26] MULTI-VERIFIER BFT CONSENSUS (Grok's Recommendation #2)
-        // Strategy: Spawn 3 verifiers (Alpha, Beta, Gamma) to ensure 2/3 majority robustness.
-        const squads = ['ALPHA', 'BETA', 'GAMMA'];
-
-        // [ANTIGRAVITY] SOCIAL MIRROR INJECTION
-        // If the task has social significance, spawn a [SOCIAL_REVIEW] via ASI1
-        const isSocial = originalTask.title.toLowerCase().includes('social') ||
-            originalTask.title.toLowerCase().includes('impact') ||
-            originalTask.task_type === 'content';
-
-        if (isSocial) {
-            console.log(`[SOCIAL] 🪞 Spawning Social Mirror audit for task ${originalTask.id} via ASI1`);
-            await this.supabase.from('trinity_tasks').insert({
-                title: `[SOCIAL_REVIEW] ${originalTask.title}`,
-                description: `Conduct a social resonance audit on the following result. Does it align with human-centric values?\n\nResult:\n${result.substring(0, 1000)}`,
-                task_type: 'social-intelligence', // This triggers ASI1 in IntelligenceRouter
-                priority: 80,
-                status: 'pending',
-                assigned_to: 'trinity-chesed', // Chesed is the agent of empathy
-                metadata: {
-                    parent_task_id: originalTask.id,
-                    evidence: result.substring(0, 500),
-                    creator_agent: this.name,
-                    is_social_audit: true
-                }
-            });
-        }
-
-        // Map agents to squads (Hardcoded fallback for O(1) during build)
-        const squadMap: Record<string, string[]> = {
-            'ALPHA': ['trinity-veritas', 'trinity-torch', 'trinity-gcm'],
-            'BETA': ['trinity-mel', 'trinity-chesed', 'trinity-apm'],
-            'GAMMA': ['trinity-hdm', 'trinity-sophia', 'trinity-nexus']
-        };
-
-        for (const squad of squads) {
-            // EXCLUDE BOTH: (1) Self (the verifier spawner) and (2) The original task claimer
-            const originalAgent = originalTask.claimed_by || this.name;
-            const pool = squadMap[squad].filter(name => name !== this.name && name !== originalAgent && name !== 'trinity-veritas' && name !== this.survivorName);
-
-            // Fallback to squad peers if the pool is empty after filtering
-            const verifier = pool.length > 0
-                ? pool[Math.floor(Math.random() * pool.length)]
-                : squadMap[squad][0] === this.name ? squadMap[squad][1] : squadMap[squad][0];
-
-            console.log(`[VERIFY] 🤝 Assigning squad ${squad} verification of ${originalTask.id} to: ${verifier}`);
-
-            await this.supabase.from('trinity_tasks').insert({
-                title: `[VERIFY] ${originalTask.title}`,
-                description: `PEER REVIEW MISSION (Squad: ${squad}).\n\n1. Review artifact for Task ${originalTask.id} (Created by ${this.name}).\n2. Verify it meets the requirements and quality standards.\n3. If it is what it claims to be, mark as VALID. Otherwise challenge it.\n\nArtifact Context: ${result.substring(0, 300)}...`,
-                task_type: 'review',
-                assigned_to: verifier,
-                priority: 85,
-                status: 'pending',
-                metadata: {
-                    parent_task_id: originalTask.id,
-                    evidence: result.substring(0, 1000),
-                    creator_agent: this.name,
-                    creator_provider: (originalTask as any).metadata?.provider_used || 'unknown',
-                    squad_verification: squad
-                }
-            });
+                await this.supabase.from('trinity_tasks').insert({
+                    title: `[VERIFY] ${originalTask.title}`,
+                    description: `PEER REVIEW MISSION (Squad: ${squad}).\n\n1. Review artifact for Task ${originalTask.id} (Created by ${this.name}).\n2. Verify it meets the requirements and quality standards.\n3. If it is what it claims to be, mark as VALID. Otherwise challenge it.\n\nArtifact Context: ${result.substring(0, 300)}...`,
+                    task_type: 'review',
+                    assigned_to: verifier,
+                    priority: 85,
+                    status: 'pending',
+                    metadata: {
+                        parent_task_id: originalTask.id,
+                        evidence: result.substring(0, 1000),
+                        creator_agent: this.name,
+                        creator_provider: (originalTask as any).metadata?.provider_used || 'unknown',
+                        squad_verification: squad
+                    }
+                });
+            }
         }
     }
-}
 
     // ============================================
     // TRAINING & OPTIMIZATION LOGIC
     // ============================================
 
-    async evaluateResult(task: Task, output: string): Promise < { score: number; handoff_required: boolean; handoff_to?: string } > {
-    // [ANTIGRAVITY] STANDARDIZED SCORING: 0-100
-    let score = 50; // Default neutral (50/100)
-    let handoff = false;
-    let targetAgent = '';
+    async evaluateResult(task: Task, output: string): Promise<{ score: number; handoff_required: boolean; handoff_to?: string }> {
+        // [ANTIGRAVITY] STANDARDIZED SCORING: 0-100
+        let score = 50; // Default neutral (50/100)
+        let handoff = false;
+        let targetAgent = '';
 
-    const lowerOutput = output.toLowerCase();
+        const lowerOutput = output.toLowerCase();
 
-    // 1. Truth Score (Veritas Check)
-    if(task.task_type === 'research') {
-    if (lowerOutput.includes('http') || lowerOutput.includes('citation')) score += 30;
-    if (output.length > 200) score += 10;
-    handoff = true;
-    targetAgent = 'trinity-veritas'; // Truth verify
-}
+        // 1. Truth Score (Veritas Check)
+        if (task.task_type === 'research') {
+            if (lowerOutput.includes('http') || lowerOutput.includes('citation')) score += 30;
+            if (output.length > 200) score += 10;
+            handoff = true;
+            targetAgent = 'trinity-veritas'; // Truth verify
+        }
 
-// 2. Empathy Score (Chesed Check)
-if (task.title.includes('Impact') || task.title.includes('Humanitarian')) {
-    const empathyWords = ['help', 'community', 'care', 'support', 'understand'];
-    const matches = empathyWords.filter(w => lowerOutput.includes(w)).length;
-    score += (matches * 10);
-    handoff = true;
-    targetAgent = 'trinity-chesed';
-}
+        // 2. Empathy Score (Chesed Check)
+        if (task.title.includes('Impact') || task.title.includes('Humanitarian')) {
+            const empathyWords = ['help', 'community', 'care', 'support', 'understand'];
+            const matches = empathyWords.filter(w => lowerOutput.includes(w)).length;
+            score += (matches * 10);
+            handoff = true;
+            targetAgent = 'trinity-chesed';
+        }
 
-// 3. Coding Score
-if (task.task_type === 'code') {
-    if (lowerOutput.includes('function') || lowerOutput.includes('class')) score += 40;
-    if (lowerOutput.includes('try') || lowerOutput.includes('catch')) score += 10; // Error handling
-}
+        // 3. Coding Score
+        if (task.task_type === 'code') {
+            if (lowerOutput.includes('function') || lowerOutput.includes('class')) score += 40;
+            if (lowerOutput.includes('try') || lowerOutput.includes('catch')) score += 10; // Error handling
+        }
 
-return {
-    score: Math.min(99, score),
-    handoff_required: handoff && this.name !== targetAgent, // Don't handoff to self
-    handoff_to: targetAgent
-};
+        return {
+            score: Math.min(99, score),
+            handoff_required: handoff && this.name !== targetAgent, // Don't handoff to self
+            handoff_to: targetAgent
+        };
     }
 
     /**
      * Agent Reflection (Phase 10): Self-critique of the produced output.
      * Reducing BFT failures and repo deductions at near-zero cost.
      */
-    private async reflectOnResult(task: Task, output: string): Promise < { improvement_required: boolean; critique: string } > {
-    const reflectionPrompt = `
+    private async reflectOnResult(task: Task, output: string): Promise<{ improvement_required: boolean; critique: string }> {
+        const reflectionPrompt = `
 You are evaluating your own output for the following task:
 Task: ${task.title}
 Description: ${task.description}
@@ -1916,384 +1915,384 @@ CRITIQUE CRITERIA:
 Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points explaining why" }
 `;
 
-    try {
-        const reflection = await this.callLLM(reflectionPrompt, { model: 'deepseek/deepseek-chat' }, { title: '[REFLECTION]', status: 'doing' } as any); // Use cost-efficient model for reflection
-        const jsonMatch = reflection.output.match(/\{[\s\S]*\}/);
-        if(jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            return {
-                improvement_required: parsed.improvement_required === true,
-                critique: parsed.critique || "General improvements needed."
-            };
+        try {
+            const reflection = await this.callLLM(reflectionPrompt, { model: 'deepseek/deepseek-chat' }, { title: '[REFLECTION]', status: 'doing' } as any); // Use cost-efficient model for reflection
+            const jsonMatch = reflection.output.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                return {
+                    improvement_required: parsed.improvement_required === true,
+                    critique: parsed.critique || "General improvements needed."
+                };
+            }
+        } catch (e) {
+            console.warn(`[REFLECTION] ⚠️ Failed for ${task.id}:`, e);
         }
-    } catch(e) {
-        console.warn(`[REFLECTION] ⚠️ Failed for ${task.id}:`, e);
-    }
 
         return { improvement_required: false, critique: "" };
-}
+    }
 
     async logBenchmark(task: Task, score: number) {
-    try {
-        // Check if table exists (lazy assumption)
-        await this.supabase
-            .from('trinity_agent_benchmarks')
-            .insert({
-                agent_name: this.name,
-                benchmark_type: (task as any).metadata?.tags?.[0] || 'unknown',
-                score: score,
-                metric_name: 'automated_eval',
-                created_at: new Date().toISOString()
-            });
-    } catch (e: any) {
-        console.warn(`[BENCHMARK] Log failed: ${e.message} `);
+        try {
+            // Check if table exists (lazy assumption)
+            await this.supabase
+                .from('trinity_agent_benchmarks')
+                .insert({
+                    agent_name: this.name,
+                    benchmark_type: (task as any).metadata?.tags?.[0] || 'unknown',
+                    score: score,
+                    metric_name: 'automated_eval',
+                    created_at: new Date().toISOString()
+                });
+        } catch (e: any) {
+            console.warn(`[BENCHMARK] Log failed: ${e.message} `);
+        }
     }
-}
 
     async handoffTask(originalTask: Task, result: string, toAgent: string) {
-    console.log(`[HANDOFF] 🤝 ${this.name} -> ${toAgent} `);
-    await this.supabase.from('trinity_tasks').insert({
-        title: `[REVIEW] ${originalTask.title} `,
-        description: `Review artifact from ${this.name}. Verify accuracy / empathy.\n\nContext: \n${result.substring(0, 500)}...`,
-        task_type: 'meta', // 'review' type
-        assigned_to: toAgent,
-        priority: 25, // High priority review
-        status: 'pending'
-    });
-}
+        console.log(`[HANDOFF] 🤝 ${this.name} -> ${toAgent} `);
+        await this.supabase.from('trinity_tasks').insert({
+            title: `[REVIEW] ${originalTask.title} `,
+            description: `Review artifact from ${this.name}. Verify accuracy / empathy.\n\nContext: \n${result.substring(0, 500)}...`,
+            task_type: 'meta', // 'review' type
+            assigned_to: toAgent,
+            priority: 25, // High priority review
+            status: 'pending'
+        });
+    }
 
     // ============================================
     // SCIENCE DIVISION: LONG-TERM MEMORY
     // ============================================
-    async gatherWisdom(task: Task): Promise < string > {
-    let wisdom = "";
-    try {
-        // A. Check Latency Opportunity (Via Python Brain)
-        const { ScienceClient } = require('../science/ScienceClient');
-        const scienceUrl = process.env.NEXT_PUBLIC_SCIENCE_URL || 'http://127.0.0.1:8000';
-        const science = new ScienceClient(scienceUrl);
+    async gatherWisdom(task: Task): Promise<string> {
+        let wisdom = "";
+        try {
+            // A. Check Latency Opportunity (Via Python Brain)
+            const { ScienceClient } = require('../science/ScienceClient');
+            const scienceUrl = process.env.NEXT_PUBLIC_SCIENCE_URL || 'http://127.0.0.1:8000';
+            const science = new ScienceClient(scienceUrl);
 
-        const decision = await science.decide({
-            latency_ms: 2500,
-            user_reputation: this.reputationScore,
-            task_complexity: 0.8,
-            user_preference_accuracy: 0.9
-        });
+            const decision = await science.decide({
+                latency_ms: 2500,
+                user_reputation: this.reputationScore,
+                task_complexity: 0.8,
+                user_preference_accuracy: 0.9
+            });
 
-        if(decision.should_query_user) {
-    wisdom += `\n[ANFIS DECISION]: Slow / Complex detected. Action: ${decision.interaction_type.toUpperCase()} recommended.\nReason: ${decision.reason}\n`;
-} else {
-    wisdom += `\n[ANFIS]: Standard Fast Execution. Proceed.\n`;
-}
+            if (decision.should_query_user) {
+                wisdom += `\n[ANFIS DECISION]: Slow / Complex detected. Action: ${decision.interaction_type.toUpperCase()} recommended.\nReason: ${decision.reason}\n`;
+            } else {
+                wisdom += `\n[ANFIS]: Standard Fast Execution. Proceed.\n`;
+            }
 
-// B. Artifact Context
-if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'browser') {
-    try {
-        const fs = require('fs');
-        const path = require('path');
-        const artifactsDir = path.resolve(process.cwd(), 'artifacts', 'wisdom');
-        if (fs.existsSync(artifactsDir)) {
-            const files = fs.readdirSync(artifactsDir).slice(0, 3);
-            wisdom += `\n[ARTIFACTS]: \n` + files.map(f => `- ${f}`).join('\n') + '\n';
-        }
-    } catch (e) { }
-}
+            // B. Artifact Context
+            if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'browser') {
+                try {
+                    const fs = require('fs');
+                    const path = require('path');
+                    const artifactsDir = path.resolve(process.cwd(), 'artifacts', 'wisdom');
+                    if (fs.existsSync(artifactsDir)) {
+                        const files = fs.readdirSync(artifactsDir).slice(0, 3);
+                        wisdom += `\n[ARTIFACTS]: \n` + files.map(f => `- ${f}`).join('\n') + '\n';
+                    }
+                } catch (e) { }
+            }
 
-// C. Retro Query (Supabase)
-const { data: retros } = await this.supabase
-    .from('trinity_retros')
-    .select('content, created_at')
-    .order('created_at', { ascending: false })
-    .limit(3);
+            // C. Retro Query (Supabase)
+            const { data: retros } = await this.supabase
+                .from('trinity_retros')
+                .select('content, created_at')
+                .order('created_at', { ascending: false })
+                .limit(3);
 
-if (retros && retros.length > 0) {
-    wisdom += `\n[RETROSPECTIVES]: \n` + retros.map((r: any) => `- ${r.content.substring(0, 200)}`).join('\n') + '\n';
-}
+            if (retros && retros.length > 0) {
+                wisdom += `\n[RETROSPECTIVES]: \n` + retros.map((r: any) => `- ${r.content.substring(0, 200)}`).join('\n') + '\n';
+            }
 
-// D. Global Blackboard (Redis Hot Tier)
-try {
-    const blackboardResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
-    if (blackboardResponse && !blackboardResponse.includes('Redis Error')) {
-        const blackboard = JSON.parse(blackboardResponse);
-        if (blackboard && blackboard !== "null") {
-            wisdom += `\n[GLOBAL BLACKBOARD]: \n${blackboard.substring(0, 1000)}\n`;
-        }
-    }
-} catch (e) { }
+            // D. Global Blackboard (Redis Hot Tier)
+            try {
+                const blackboardResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
+                if (blackboardResponse && !blackboardResponse.includes('Redis Error')) {
+                    const blackboard = JSON.parse(blackboardResponse);
+                    if (blackboard && blackboard !== "null") {
+                        wisdom += `\n[GLOBAL BLACKBOARD]: \n${blackboard.substring(0, 1000)}\n`;
+                    }
+                }
+            } catch (e) { }
 
         } catch (e: any) {
-    console.warn(`[WISDOM] Failed: ${e.message}`);
-}
-return wisdom;
+            console.warn(`[WISDOM] Failed: ${e.message}`);
+        }
+        return wisdom;
     }
 
     /**
      * [ANTIGRAVITY] Post to the Global Blackboard (Upstash Redis).
      */
     async postToBlackboard(message: string) {
-    console.log(`[BLACKBOARD] 📝 Posting signal: ${message.substring(0, 50)}...`);
-    try {
-        const currentResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
-        let board = "";
-        if (currentResponse && !currentResponse.includes('Redis Error') && currentResponse !== "null") {
-            board = JSON.parse(currentResponse);
+        console.log(`[BLACKBOARD] 📝 Posting signal: ${message.substring(0, 50)}...`);
+        try {
+            const currentResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
+            let board = "";
+            if (currentResponse && !currentResponse.includes('Redis Error') && currentResponse !== "null") {
+                board = JSON.parse(currentResponse);
+            }
+            const timestamp = new Date().toLocaleTimeString();
+            const newEntry = `[${timestamp}] ${this.name}: ${message}\n`;
+            const updatedBoard = (newEntry + board).substring(0, 5000);
+            await mcpManager.routeToolCall('redis_set', {
+                key: 'trinity_global_blackboard',
+                value: updatedBoard,
+                ex: 3600
+            });
+        } catch (e: any) {
+            console.warn(`[BLACKBOARD] Post failed: ${e.message}`);
         }
-        const timestamp = new Date().toLocaleTimeString();
-        const newEntry = `[${timestamp}] ${this.name}: ${message}\n`;
-        const updatedBoard = (newEntry + board).substring(0, 5000);
-        await mcpManager.routeToolCall('redis_set', {
-            key: 'trinity_global_blackboard',
-            value: updatedBoard,
-            ex: 3600
-        });
-    } catch (e: any) {
-        console.warn(`[BLACKBOARD] Post failed: ${e.message}`);
     }
-}
 
 
     // ============================================
     // CORE UTILITIES
     // ============================================
 
-    async canCreateHealingTask(): Promise < boolean > {
-    // Enforce HEALING Protocol throttle
-    try {
-        await this.checkMCP('HEALING');
-    } catch(e) {
-        // If checkMCP fails, still proceed but with caution
-    }
+    async canCreateHealingTask(): Promise<boolean> {
+        // Enforce HEALING Protocol throttle
+        try {
+            await this.checkMCP('HEALING');
+        } catch (e) {
+            // If checkMCP fails, still proceed but with caution
+        }
 
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    // 1. GLOBAL CHECK for HEALING and ANTIFRAGILE tasks
-    const { count, error } = await this.supabase
-        .from('trinity_tasks')
-        .select('id', { count: 'exact', head: true })
-        .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%,title.ilike.%[MAINTENANCE]%`)
-        .gte('created_at', oneHourAgo);
+        // 1. GLOBAL CHECK for HEALING and ANTIFRAGILE tasks
+        const { count, error } = await this.supabase
+            .from('trinity_tasks')
+            .select('id', { count: 'exact', head: true })
+            .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%,title.ilike.%[MAINTENANCE]%`)
+            .gte('created_at', oneHourAgo);
 
-    if(error) {
-        console.error(`[${this.name}] ⚠️ Health check query failed:`, error.message);
-        return false;
-    }
+        if (error) {
+            console.error(`[${this.name}] ⚠️ Health check query failed:`, error.message);
+            return false;
+        }
 
         const limit = 2; // Global limit 2 per hour to avoid spam
-    if((count || 0) >= limit) {
-    console.warn(`[${this.name}] 🛑 HEALING THROTTLED: Global diagnostics count ${count}/${limit} per hour.`);
-    return false;
-}
+        if ((count || 0) >= limit) {
+            console.warn(`[${this.name}] 🛑 HEALING THROTTLED: Global diagnostics count ${count}/${limit} per hour.`);
+            return false;
+        }
 
-// 2. PER-AGENT CHECK: Don't spawn multiple healing tasks for the same agent in short succession
-const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-const { data: recentAgentHealing } = await this.supabase
-    .from('trinity_tasks')
-    .select('id')
-    .eq('metadata->>agent', this.name)
-    .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%,title.ilike.%[MAINTENANCE]%`)
-    .gte('created_at', tenMinsAgo)
-    .limit(1);
+        // 2. PER-AGENT CHECK: Don't spawn multiple healing tasks for the same agent in short succession
+        const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+        const { data: recentAgentHealing } = await this.supabase
+            .from('trinity_tasks')
+            .select('id')
+            .eq('metadata->>agent', this.name)
+            .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%,title.ilike.%[MAINTENANCE]%`)
+            .gte('created_at', tenMinsAgo)
+            .limit(1);
 
-if (recentAgentHealing && recentAgentHealing.length > 0) {
-    console.log(`[${this.name}] 🧊 Recent healing task for ${this.name} already exists. Skipping.`);
-    return false;
-}
+        if (recentAgentHealing && recentAgentHealing.length > 0) {
+            console.log(`[${this.name}] 🧊 Recent healing task for ${this.name} already exists. Skipping.`);
+            return false;
+        }
 
-return true;
+        return true;
     }
 
     // [ANTIGRAVITY] Enhanced Artifact Saver (Single Source of Truth)
-    async saveArtifact(taskId: string, content: string | { path: string, content: string }[], type: string = 'text', title ?: string, accessLevel: string = 'protected') {
-    let artifactUrl = null;
-    let artifactId = null;
-    const safeTaskId = String(taskId || 'self-gen-' + Date.now());
-    const safeTitle = title || `Artifact ${safeTaskId}`;
+    async saveArtifact(taskId: string, content: string | { path: string, content: string }[], type: string = 'text', title?: string, accessLevel: string = 'protected') {
+        let artifactUrl = null;
+        let artifactId = null;
+        const safeTaskId = String(taskId || 'self-gen-' + Date.now());
+        const safeTitle = title || `Artifact ${safeTaskId}`;
 
-    // Normalized content for hashing and storage
-    const normalizeContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+        // Normalized content for hashing and storage
+        const normalizeContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
 
-    // [ANTIGRAVITY] BIGINT CONVERSION for trinity_artifacts.task_id
-    let dbTaskId: any = safeTaskId;
-    if (!isNaN(parseInt(safeTaskId)) && !safeTaskId.includes('-')) {
-        dbTaskId = parseInt(safeTaskId);
-    }
-
-    try {
-        console.log(`[ARTIFACT] 💾 Saving '${safeTitle}'...`);
-
-        // Calculate Hash
-        const crypto = require('crypto');
-        const fileHash = crypto.createHash('sha256').update(normalizeContent).digest('hex');
-
-        // 1. UPLOAD TO STORAGE
-        try {
-            let ext = 'md';
-            if (type === 'code' || normalizeContent.includes('```ts') || normalizeContent.includes('```js')) ext = 'ts';
-            if (type === 'design' || type === 'image') ext = 'png';
-            if (Array.isArray(content)) ext = 'json'; // Multi-file bundles as JSON metadata
-
-            const timestamp = Date.now();
-            const now = new Date();
-            const datePath = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-            const cleanName = this.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const cleanType = (type || 'document').toLowerCase();
-            const storagePath = `${cleanName}/${cleanType}/${datePath}/${timestamp}_${safeTaskId.substring(0, 8)}.${ext}`;
-
-            const { error: uploadError } = await this.supabase
-                .storage
-                .from('trinity-artifacts')
-                .upload(storagePath, normalizeContent, {
-                    contentType: type === 'image' ? 'image/png' : 'text/plain;charset=UTF-8',
-                    upsert: true
-                });
-
-            if (uploadError) {
-                console.warn(`[ARTIFACT] ⚠️ Storage Upload Failed: ${uploadError.message}`);
-            } else {
-                const { data: publicUrlData } = this.supabase
-                    .storage
-                    .from('trinity-artifacts')
-                    .getPublicUrl(storagePath);
-                artifactUrl = publicUrlData.publicUrl;
-                console.log(`[ARTIFACT] ☁️ Uploaded to Storage: ${artifactUrl}`);
-            }
-        } catch (storageEx) {
-            console.warn(`[ARTIFACT] Storage exception:`, storageEx);
+        // [ANTIGRAVITY] BIGINT CONVERSION for trinity_artifacts.task_id
+        let dbTaskId: any = safeTaskId;
+        if (!isNaN(parseInt(safeTaskId)) && !safeTaskId.includes('-')) {
+            dbTaskId = parseInt(safeTaskId);
         }
 
-        // 2. DATABASE INSERT (Using Admin Client to bypass RLS)
+        try {
+            console.log(`[ARTIFACT] 💾 Saving '${safeTitle}'...`);
 
-        // [ANTIGRAVITY] Schema Refresh Retry Logic
-        // Sometimes the supersbase client caches the schema and thinks 'content' col is missing.
-        // We force a retry with a fresh client if that happens.
-        let attempt = 0;
-        let success = false;
-        let lastError;
+            // Calculate Hash
+            const crypto = require('crypto');
+            const fileHash = crypto.createHash('sha256').update(normalizeContent).digest('hex');
 
-        while (attempt < 2 && !success) {
+            // 1. UPLOAD TO STORAGE
             try {
-                // Start with the standard export
-                let clientToUse;
-                if (attempt === 0) {
-                    const { supabaseAdmin } = require('../../lib/supabase');
-                    clientToUse = supabaseAdmin;
+                let ext = 'md';
+                if (type === 'code' || normalizeContent.includes('```ts') || normalizeContent.includes('```js')) ext = 'ts';
+                if (type === 'design' || type === 'image') ext = 'png';
+                if (Array.isArray(content)) ext = 'json'; // Multi-file bundles as JSON metadata
+
+                const timestamp = Date.now();
+                const now = new Date();
+                const datePath = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+                const cleanName = this.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                const cleanType = (type || 'document').toLowerCase();
+                const storagePath = `${cleanName}/${cleanType}/${datePath}/${timestamp}_${safeTaskId.substring(0, 8)}.${ext}`;
+
+                const { error: uploadError } = await this.supabase
+                    .storage
+                    .from('trinity-artifacts')
+                    .upload(storagePath, normalizeContent, {
+                        contentType: type === 'image' ? 'image/png' : 'text/plain;charset=UTF-8',
+                        upsert: true
+                    });
+
+                if (uploadError) {
+                    console.warn(`[ARTIFACT] ⚠️ Storage Upload Failed: ${uploadError.message}`);
                 } else {
-                    // FORCE FRESH CLIENT
-                    console.log("[ARTIFACT] ⚠️ Retrying with FRESH Supabase Client due to schema error...");
-                    const { createClient } = require('@supabase/supabase-js');
-                    // Re-read env vars directly to be safe
-                    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
-                    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-                    clientToUse = createClient(url, key, { auth: { persistSession: false } });
+                    const { data: publicUrlData } = this.supabase
+                        .storage
+                        .from('trinity-artifacts')
+                        .getPublicUrl(storagePath);
+                    artifactUrl = publicUrlData.publicUrl;
+                    console.log(`[ARTIFACT] ☁️ Uploaded to Storage: ${artifactUrl}`);
                 }
+            } catch (storageEx) {
+                console.warn(`[ARTIFACT] Storage exception:`, storageEx);
+            }
 
-                const payload: any = {
-                    task_id: dbTaskId,
-                    title: safeTitle,
-                    content: normalizeContent, // Ensuring content is included
-                    artifact_type: type || 'text',
-                    file_hash: fileHash,
-                    created_at: new Date().toISOString(),
-                    access_level: accessLevel,
-                    view_count: 0,
-                    // [ANTIGRAVITY] Frictionless Alignment (Satisfy NOT NULLs)
-                    agent: this.name,
-                    creator_agent: this.name,
-                    status: 'created',
-                    storage_location: 'supabase',
-                    // [PHASE 25] MCP v2 SECURE CHAINING (Grok's Phase 5)
-                    metadata: {
-                        mcp_version: '2.0',
-                        mcp_proof_hash: `sha256:${fileHash.substring(0, 16)}`, // Simulated secure proof
-                        chain_id: 'hyperdag-swarm-1'
+            // 2. DATABASE INSERT (Using Admin Client to bypass RLS)
+
+            // [ANTIGRAVITY] Schema Refresh Retry Logic
+            // Sometimes the supersbase client caches the schema and thinks 'content' col is missing.
+            // We force a retry with a fresh client if that happens.
+            let attempt = 0;
+            let success = false;
+            let lastError;
+
+            while (attempt < 2 && !success) {
+                try {
+                    // Start with the standard export
+                    let clientToUse;
+                    if (attempt === 0) {
+                        const { supabaseAdmin } = require('../../lib/supabase');
+                        clientToUse = supabaseAdmin;
+                    } else {
+                        // FORCE FRESH CLIENT
+                        console.log("[ARTIFACT] ⚠️ Retrying with FRESH Supabase Client due to schema error...");
+                        const { createClient } = require('@supabase/supabase-js');
+                        // Re-read env vars directly to be safe
+                        const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
+                        const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+                        clientToUse = createClient(url, key, { auth: { persistSession: false } });
                     }
-                };
 
-                const primaryPayload = {
-                    ...payload,
-                    content: content,
-                    file_path: artifactUrl,
-                    external_url: artifactUrl,
-                    creator_agent: this.name
-                };
-
-                const { data, error } = await clientToUse
-                    .from('trinity_artifacts')
-                    .insert(primaryPayload)
-                    .select('id')
-                    .single();
-
-                if (error && (error.message.includes("column") || error.code === '42703')) {
-                    console.warn(`[ARTIFACT] Primary schema (V5) failed. Trying Legacy schema (V4)...`);
-                    const v4Payload = {
-                        ...payload,
-                        content_preview: normalizeContent.substring(0, 5000),
+                    const payload: any = {
+                        task_id: dbTaskId,
+                        title: safeTitle,
+                        content: normalizeContent, // Ensuring content is included
+                        artifact_type: type || 'text',
+                        file_hash: fileHash,
+                        created_at: new Date().toISOString(),
+                        access_level: accessLevel,
+                        view_count: 0,
+                        // [ANTIGRAVITY] Frictionless Alignment (Satisfy NOT NULLs)
                         agent: this.name,
-                        file_path: artifactUrl,
-                        status: 'created'
+                        creator_agent: this.name,
+                        status: 'created',
+                        storage_location: 'supabase',
+                        // [PHASE 25] MCP v2 SECURE CHAINING (Grok's Phase 5)
+                        metadata: {
+                            mcp_version: '2.0',
+                            mcp_proof_hash: `sha256:${fileHash.substring(0, 16)}`, // Simulated secure proof
+                            chain_id: 'hyperdag-swarm-1'
+                        }
                     };
-                    const { data: v4Data, error: v4Error } = await clientToUse
+
+                    const primaryPayload = {
+                        ...payload,
+                        content: content,
+                        file_path: artifactUrl,
+                        external_url: artifactUrl,
+                        creator_agent: this.name
+                    };
+
+                    const { data, error } = await clientToUse
                         .from('trinity_artifacts')
-                        .insert(v4Payload)
+                        .insert(primaryPayload)
                         .select('id')
                         .single();
 
-                    if (v4Error) throw v4Error;
-                    artifactId = v4Data?.id;
-                } else if (error) {
-                    throw error;
-                } else {
-                    artifactId = data?.id;
+                    if (error && (error.message.includes("column") || error.code === '42703')) {
+                        console.warn(`[ARTIFACT] Primary schema (V5) failed. Trying Legacy schema (V4)...`);
+                        const v4Payload = {
+                            ...payload,
+                            content_preview: normalizeContent.substring(0, 5000),
+                            agent: this.name,
+                            file_path: artifactUrl,
+                            status: 'created'
+                        };
+                        const { data: v4Data, error: v4Error } = await clientToUse
+                            .from('trinity_artifacts')
+                            .insert(v4Payload)
+                            .select('id')
+                            .single();
+
+                        if (v4Error) throw v4Error;
+                        artifactId = v4Data?.id;
+                    } else if (error) {
+                        throw error;
+                    } else {
+                        artifactId = data?.id;
+                    }
+
+                    console.log(`[ARTIFACT] Saved to DB: ${safeTitle} -> ${artifactId || 'OK'}`);
+                    success = true;
+
+                } catch (e: any) {
+                    lastError = e;
+                    console.warn(`[ARTIFACT] Attempt ${attempt + 1} failed: ${e.message}`);
+                    attempt++;
+                    if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
                 }
-
-                console.log(`[ARTIFACT] Saved to DB: ${safeTitle} -> ${artifactId || 'OK'}`);
-                success = true;
-
-            } catch (e: any) {
-                lastError = e;
-                console.warn(`[ARTIFACT] Attempt ${attempt + 1} failed: ${e.message}`);
-                attempt++;
-                if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
             }
+
+            if (!success) throw lastError;
+
+            // 3. LOCAL FILESYSTEM (Backup)
+            if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+                try {
+                    const fs = await import('fs');
+                    const path = await import('path');
+                    const artifactsDir = path.resolve(process.cwd(), 'artifacts', this.name.toLowerCase());
+                    if (!fs.existsSync(artifactsDir)) fs.mkdirSync(artifactsDir, { recursive: true });
+
+                    const filename = `task-${safeTaskId.substring(0, 8)}.md`;
+                    const fullPath = path.join(artifactsDir, filename);
+                    fs.writeFileSync(fullPath, normalizeContent, 'utf8');
+                } catch (e) { /* Ignore local fs errors */ }
+            }
+
+            return `db://trinity_artifacts/${artifactId}`;
+        } catch (e: any) {
+            console.error(`[ARTIFACT] Final Save Failure: ${e.message}`);
+            return null;
         }
-
-        if (!success) throw lastError;
-
-        // 3. LOCAL FILESYSTEM (Backup)
-        if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-            try {
-                const fs = await import('fs');
-                const path = await import('path');
-                const artifactsDir = path.resolve(process.cwd(), 'artifacts', this.name.toLowerCase());
-                if (!fs.existsSync(artifactsDir)) fs.mkdirSync(artifactsDir, { recursive: true });
-
-                const filename = `task-${safeTaskId.substring(0, 8)}.md`;
-                const fullPath = path.join(artifactsDir, filename);
-                fs.writeFileSync(fullPath, normalizeContent, 'utf8');
-            } catch (e) { /* Ignore local fs errors */ }
-        }
-
-        return `db://trinity_artifacts/${artifactId}`;
-    } catch (e: any) {
-        console.error(`[ARTIFACT] Final Save Failure: ${e.message}`);
-        return null;
     }
-}
 
 
     async runSelfDiagnostic() {
-    // Renamed/Integrated into loop. Kept for legacy if needed or called by interval
-    console.log(`[${this.name}] 🔍 Running self-diagnostic...`);
-    // We can just report genome
-    await this.reportGenome();
-}
+        // Renamed/Integrated into loop. Kept for legacy if needed or called by interval
+        console.log(`[${this.name}] 🔍 Running self-diagnostic...`);
+        // We can just report genome
+        await this.reportGenome();
+    }
 
-    async fetchBible(): Promise < string > {
-    if(this.bibleCache && (Date.now() - this.bibleCacheTime) < this.BIBLE_CACHE_TTL) {
-    return this.bibleCache;
-}
-const bible = `
+    async fetchBible(): Promise<string> {
+        if (this.bibleCache && (Date.now() - this.bibleCacheTime) < this.BIBLE_CACHE_TTL) {
+            return this.bibleCache;
+        }
+        const bible = `
 # CORE PRINCIPLES (Bible Fallback)
 ## The Eight Virtues (Philippians 4:8)
 - TRUE: Never fabricate.
@@ -2313,270 +2312,270 @@ const bible = `
 5. **Deliverables**: Always produce Trust Cards, Spec Sheets, and Weekly Updates.
 See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 `;
-this.bibleCache = bible;
-this.bibleCacheTime = Date.now();
-this.sessionMetrics.bibleReads++;
-return bible;
+        this.bibleCache = bible;
+        this.bibleCacheTime = Date.now();
+        this.sessionMetrics.bibleReads++;
+        return bible;
     }
 
     async reportGenome() {
-    // ... (Keep existing stub)
-}
+        // ... (Keep existing stub)
+    }
 
     async extractPatterns(taskTitle: string, output: string) {
-    const keywords = (taskTitle + ' ' + output).toLowerCase();
-    if (keywords.includes('api') && keywords.includes('endpoint')) {
-        this.sessionMetrics.patternsLearned++;
-        console.log(`[${this.name}] 🧠 LOGIC PATTERN DETECTED: API usage`);
+        const keywords = (taskTitle + ' ' + output).toLowerCase();
+        if (keywords.includes('api') && keywords.includes('endpoint')) {
+            this.sessionMetrics.patternsLearned++;
+            console.log(`[${this.name}] 🧠 LOGIC PATTERN DETECTED: API usage`);
+        }
     }
-}
 
     // ============================================
     // SURVIVOR & REDEPLOY LOGIC
     // ============================================
     async checkSurvivorStatus() {
-    if (this.isSurvivor) return;
-    if (this.groupName === 'ORCHESTRATION') return;
+        if (this.isSurvivor) return;
+        if (this.groupName === 'ORCHESTRATION') return;
 
-    try {
-        const { data: heartbeat } = await this.supabase
-            .from('trinity_heartbeat')
-            .select('last_seen')
-            .eq('agent', this.survivorName)
-            .single();
+        try {
+            const { data: heartbeat } = await this.supabase
+                .from('trinity_heartbeat')
+                .select('last_seen')
+                .eq('agent', this.survivorName)
+                .single();
 
-        if (!heartbeat) {
-            console.log(`[${this.name}] 🚨 GROUP ALERT: Survivor ${this.survivorName} missing!`);
-            await this.log('survivor_missing', `Group ${this.groupName} survivor ${this.survivorName} is missing.`);
-            return;
+            if (!heartbeat) {
+                console.log(`[${this.name}] 🚨 GROUP ALERT: Survivor ${this.survivorName} missing!`);
+                await this.log('survivor_missing', `Group ${this.groupName} survivor ${this.survivorName} is missing.`);
+                return;
+            }
+
+            const minutesAgo = (Date.now() - new Date(heartbeat.last_seen).getTime()) / 60000;
+            if (minutesAgo > 10) {
+                console.log(`[${this.name}] 🚨 GROUP EMERGENCY: Survivor ${this.survivorName} is down (${minutesAgo.toFixed(0)}m)!`);
+                await this.log('survivor_down', `GroupSurvivor ${this.survivorName} is unresponsive.`);
+            }
+        } catch (e: any) {
+            // console.log ...
         }
-
-        const minutesAgo = (Date.now() - new Date(heartbeat.last_seen).getTime()) / 60000;
-        if (minutesAgo > 10) {
-            console.log(`[${this.name}] 🚨 GROUP EMERGENCY: Survivor ${this.survivorName} is down (${minutesAgo.toFixed(0)}m)!`);
-            await this.log('survivor_down', `GroupSurvivor ${this.survivorName} is unresponsive.`);
-        }
-    } catch (e: any) {
-        // console.log ...
     }
-}
 
 
 
     async sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
     async log(action: string, message: string, metadata: any = {}) {
-    try {
-        let meta = {};
-        if (metadata) {
-            meta = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+        try {
+            let meta = {};
+            if (metadata) {
+                meta = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+            }
+            await this.supabase
+                .from('trinity_agent_logs')
+                .insert({
+                    agent: this.name,
+                    agent_name: this.name, // Added for UI compatibility
+                    action,
+                    message: typeof message === 'string' ? message.substring(0, 5000) : JSON.stringify(message).substring(0, 5000),
+                    metadata: {
+                        ...meta as any,
+                        version: this.version,
+                        primaryVirtue: this.wisdom?.primaryVirtue,
+                        group: this.groupName // 3x3 Log
+                    },
+                    created_at: new Date().toISOString()
+                });
+        } catch (err) {
+            // Logging failure is non-fatal
         }
-        await this.supabase
-            .from('trinity_agent_logs')
-            .insert({
-                agent: this.name,
-                agent_name: this.name, // Added for UI compatibility
-                action,
-                message: typeof message === 'string' ? message.substring(0, 5000) : JSON.stringify(message).substring(0, 5000),
-                metadata: {
-                    ...meta as any,
+    }
+
+    async heartbeat(customSummary?: string) {
+        // [WATCHDOG] Check for stuck tasks before heartbeat
+        await this.checkForStuckTasks();
+
+        const timestamp = new Date().toISOString();
+
+        try {
+            // [TRINITY SSOT] Real-time activity sync
+            const activitySummary = customSummary || (this.currentTaskTitle ? `Working: ${this.currentTaskTitle}` : 'Idle');
+
+            // [TRINITY SSOT]: PRIMARY STATUS UPDATE (Patent: BFT Consensus Dashboard)
+            // This is the source for the "Green Dots" in the Dashboard.
+            // Unified registry ensures O(1) state lookup for the mobile dashboard.
+            await this.supabase
+                .from('trinity_agent_registry')
+                .upsert({
+                    agent_name: this.name,
+                    status: 'online', // SSOT: UI/Grid expects 'online'
+                    last_active: timestamp,
+                    current_tier: this.autonomyTier,
+                    reputation_score: this.reputationScore,
+                    tasks_completed: this.tasksCompleted,
+                    current_task_summary: activitySummary
+                }, { onConflict: 'agent_name' });
+
+            // 1. Trinity Heartbeat (For Controller Header / Redundancy)
+            await this.supabase
+                .from('trinity_heartbeat')
+                .upsert({
+                    agent: this.name, // SSOT: FULL NAME
+                    status: 'online', // Normalized
                     version: this.version,
-                    primaryVirtue: this.wisdom?.primaryVirtue,
-                    group: this.groupName // 3x3 Log
-                },
-                created_at: new Date().toISOString()
-            });
-    } catch (err) {
-        // Logging failure is non-fatal
+                    last_seen: timestamp,
+                    current_task_summary: activitySummary,
+                    config: {
+                        fullName: this.name,
+                        sessionMetrics: this.sessionMetrics,
+                        group: this.groupName,
+                        tier: this.autonomyTier,
+                        deployment: process.env.RAILWAY_PROJECT_NAME || 'local'
+                    }
+                }, { onConflict: 'agent' });
+
+            // 2. Agent Heartbeat (Legacy Monitoring / SafetyNet)
+            await this.supabase
+                .from('agent_heartbeat')
+                .upsert({
+                    agent_name: this.name,
+                    status: 'online',
+                    last_ping: timestamp,
+                    current_task: activitySummary
+                }, { onConflict: 'agent_name' });
+
+            // 3. agent_status table (Used by many Dashboard components)
+            // SSOT: Synchronize the primary status table to fix UI "gray dot" issues.
+            await this.supabase
+                .from('agent_status')
+                .upsert({
+                    agent_name: this.name,
+                    status: 'online',
+                    last_active: timestamp,
+                    current_task: activitySummary,
+                    reputation: this.reputationScore,
+                    tasks_completed: this.tasksCompleted,
+                    group_name: this.wisdom.squad || 'UNKNOWN'
+                }, { onConflict: 'agent_name' });
+
+            if (this.isSurvivor) await this.runSurvivorResurrection();
+
+        } catch (err: any) {
+            console.error('[HEARTBEAT] Error:', err.message);
+        }
     }
-}
-
-    async heartbeat(customSummary ?: string) {
-    // [WATCHDOG] Check for stuck tasks before heartbeat
-    await this.checkForStuckTasks();
-
-    const timestamp = new Date().toISOString();
-
-    try {
-        // [TRINITY SSOT] Real-time activity sync
-        const activitySummary = customSummary || (this.currentTaskTitle ? `Working: ${this.currentTaskTitle}` : 'Idle');
-
-        // [TRINITY SSOT]: PRIMARY STATUS UPDATE (Patent: BFT Consensus Dashboard)
-        // This is the source for the "Green Dots" in the Dashboard.
-        // Unified registry ensures O(1) state lookup for the mobile dashboard.
-        await this.supabase
-            .from('trinity_agent_registry')
-            .upsert({
-                agent_name: this.name,
-                status: 'online', // SSOT: UI/Grid expects 'online'
-                last_active: timestamp,
-                current_tier: this.autonomyTier,
-                reputation_score: this.reputationScore,
-                tasks_completed: this.tasksCompleted,
-                current_task_summary: activitySummary
-            }, { onConflict: 'agent_name' });
-
-        // 1. Trinity Heartbeat (For Controller Header / Redundancy)
-        await this.supabase
-            .from('trinity_heartbeat')
-            .upsert({
-                agent: this.name, // SSOT: FULL NAME
-                status: 'online', // Normalized
-                version: this.version,
-                last_seen: timestamp,
-                current_task_summary: activitySummary,
-                config: {
-                    fullName: this.name,
-                    sessionMetrics: this.sessionMetrics,
-                    group: this.groupName,
-                    tier: this.autonomyTier,
-                    deployment: process.env.RAILWAY_PROJECT_NAME || 'local'
-                }
-            }, { onConflict: 'agent' });
-
-        // 2. Agent Heartbeat (Legacy Monitoring / SafetyNet)
-        await this.supabase
-            .from('agent_heartbeat')
-            .upsert({
-                agent_name: this.name,
-                status: 'online',
-                last_ping: timestamp,
-                current_task: activitySummary
-            }, { onConflict: 'agent_name' });
-
-        // 3. agent_status table (Used by many Dashboard components)
-        // SSOT: Synchronize the primary status table to fix UI "gray dot" issues.
-        await this.supabase
-            .from('agent_status')
-            .upsert({
-                agent_name: this.name,
-                status: 'online',
-                last_active: timestamp,
-                current_task: activitySummary,
-                reputation: this.reputationScore,
-                tasks_completed: this.tasksCompleted,
-                group_name: this.wisdom.squad || 'UNKNOWN'
-            }, { onConflict: 'agent_name' });
-
-        if (this.isSurvivor) await this.runSurvivorResurrection();
-
-    } catch (err: any) {
-        console.error('[HEARTBEAT] Error:', err.message);
-    }
-}
 
     async checkSiblingHealth() {
-    console.log(`[${this.name}] 🩺 Running Sibling Health Pulse Check...`);
-    try {
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+        console.log(`[${this.name}] 🩺 Running Sibling Health Pulse Check...`);
+        try {
+            const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
-        const { data: zombies } = await this.supabase
-            .from('trinity_agent_registry')
-            .select('agent_name, last_active')
-            .lt('last_active', twoHoursAgo)
-            .neq('agent_name', this.name);
+            const { data: zombies } = await this.supabase
+                .from('trinity_agent_registry')
+                .select('agent_name, last_active')
+                .lt('last_active', twoHoursAgo)
+                .neq('agent_name', this.name);
 
-        if (zombies && zombies.length > 0) {
-            for (const zombie of zombies) {
-                console.log(`[RESURRECTION] ⚡ Agent ${zombie.agent_name} has been silent for 2+ hours. Sending WAKE pulse...`);
+            if (zombies && zombies.length > 0) {
+                for (const zombie of zombies) {
+                    console.log(`[RESURRECTION] ⚡ Agent ${zombie.agent_name} has been silent for 2+ hours. Sending WAKE pulse...`);
 
-                // 1. Mark as 'online' in DB to trigger wake logic if they check in
-                await this.supabase
-                    .from('trinity_agent_registry')
-                    .update({
-                        status: 'online',
-                        current_task_summary: '[RESURRECTION] Sibling pulse detected. Waking...'
-                    })
-                    .eq('agent_name', zombie.agent_name);
+                    // 1. Mark as 'online' in DB to trigger wake logic if they check in
+                    await this.supabase
+                        .from('trinity_agent_registry')
+                        .update({
+                            status: 'online',
+                            current_task_summary: '[RESURRECTION] Sibling pulse detected. Waking...'
+                        })
+                        .eq('agent_name', zombie.agent_name);
 
-                // 2. If we have a deployment trigger, use it
-                await this.triggerRailwayRedeploy(zombie.agent_name);
+                    // 2. If we have a deployment trigger, use it
+                    await this.triggerRailwayRedeploy(zombie.agent_name);
+                }
             }
+        } catch (e: any) {
+            console.error(`[RESURRECTION] Error checking sibling health:`, e.message);
         }
-    } catch (e: any) {
-        console.error(`[RESURRECTION] Error checking sibling health:`, e.message);
     }
-}
 
     async runSurvivorResurrection() {
-    const { data: members } = await this.supabase
-        .from('trinity_heartbeat')
-        .select('agent, last_seen')
-        .filter('config->>group', 'eq', this.groupName);
+        const { data: members } = await this.supabase
+            .from('trinity_heartbeat')
+            .select('agent, last_seen')
+            .filter('config->>group', 'eq', this.groupName);
 
-    if (!members) return;
+        if (!members) return;
 
-    for (const member of (members as any[])) {
-        if (member.agent === this.name) continue;
-        const minutesAgo = (Date.now() - new Date(member.last_seen).getTime()) / 60000;
-        if (minutesAgo > 10) {
-            console.log(`[SURVIVOR] 🚨 ${member.agent} DOWN. Triggering Resurrection...`);
-            await this.triggerRailwayRedeploy(member.agent);
+        for (const member of (members as any[])) {
+            if (member.agent === this.name) continue;
+            const minutesAgo = (Date.now() - new Date(member.last_seen).getTime()) / 60000;
+            if (minutesAgo > 10) {
+                console.log(`[SURVIVOR] 🚨 ${member.agent} DOWN. Triggering Resurrection...`);
+                await this.triggerRailwayRedeploy(member.agent);
+            }
         }
     }
-}
 
     /**
      * SQUAD-WIDE CASCADE REDEPLOY
      * Triggers a redeploy for everyone in the same squad.
      */
     async runSquadCascadeRedeploy() {
-    console.log(`[CASCADE] 🌊 Initiating Squad Cascade for: ${this.groupName}`);
+        console.log(`[CASCADE] 🌊 Initiating Squad Cascade for: ${this.groupName}`);
 
-    // Map squads to members (Elite 3x3 mapping)
-    const squadMap: Record<string, string[]> = {
-        'ALPHA': ['trinity-veritas', 'trinity-torch', 'trinity-gcm'],
-        'BETA': ['trinity-mel', 'trinity-chesed', 'trinity-apm'],
-        'GAMMA': ['trinity-hdm', 'trinity-sophia', 'trinity-nexus'],
-        'ORCHESTRATION': ['trinity-orch', 'trinity-shofet', 'trinity-w3c']
-    };
+        // Map squads to members (Elite 3x3 mapping)
+        const squadMap: Record<string, string[]> = {
+            'ALPHA': ['trinity-veritas', 'trinity-torch', 'trinity-gcm'],
+            'BETA': ['trinity-mel', 'trinity-chesed', 'trinity-apm'],
+            'GAMMA': ['trinity-hdm', 'trinity-sophia', 'trinity-nexus'],
+            'ORCHESTRATION': ['trinity-orch', 'trinity-shofet', 'trinity-w3c']
+        };
 
-    const siblings = squadMap[this.groupName] || [];
-    for (const sibling of siblings) {
-        if (sibling === this.name) continue; // Don't redeploy self (already running)
-        console.log(`[CASCADE] -> Triggering sibling: ${sibling}`);
-        await this.triggerRailwayRedeploy(sibling);
+        const siblings = squadMap[this.groupName] || [];
+        for (const sibling of siblings) {
+            if (sibling === this.name) continue; // Don't redeploy self (already running)
+            console.log(`[CASCADE] -> Triggering sibling: ${sibling}`);
+            await this.triggerRailwayRedeploy(sibling);
+        }
     }
-}
 
     async triggerRailwayRedeploy(agentName: string) {
-    const RAILWAY_TOKEN = process.env.RAILWAY_API_TOKEN;
-    if (!RAILWAY_TOKEN) {
-        console.log(`[${this.name}] [REDEPLOY] Skipping ${agentName} - No RAILWAY_API_TOKEN`);
-        return;
-    }
+        const RAILWAY_TOKEN = process.env.RAILWAY_API_TOKEN;
+        if (!RAILWAY_TOKEN) {
+            console.log(`[${this.name}] [REDEPLOY] Skipping ${agentName} - No RAILWAY_API_TOKEN`);
+            return;
+        }
 
-    const AGENT_SERVICE_IDS: Record<string, string> = {
-        'trinity-shofet': process.env.RAILWAY_SERVICE_ID_SHOFET || '',
-        'trinity-orch': process.env.RAILWAY_SERVICE_ID_ORCH || '',
-        'trinity-veritas': process.env.RAILWAY_SERVICE_ID_VERITAS || '',
-        'trinity-torch': process.env.RAILWAY_SERVICE_ID_TORCH || '',
-        'trinity-gcm': process.env.RAILWAY_SERVICE_ID_GCM || '',
-        'trinity-mel': process.env.RAILWAY_SERVICE_ID_MEL || '',
-        'trinity-chesed': process.env.RAILWAY_SERVICE_ID_CHESED || '',
-        'trinity-apm': process.env.RAILWAY_SERVICE_ID_APM || '',
-        'trinity-hdm': process.env.RAILWAY_SERVICE_ID_HDM || '',
-        'trinity-sophia': process.env.RAILWAY_SERVICE_ID_SOPHIA || '',
-        'trinity-nexus': process.env.RAILWAY_SERVICE_ID_NEXUS || '',
-        'trinity-w3c': process.env.RAILWAY_SERVICE_ID_W3C || ''
-    };
+        const AGENT_SERVICE_IDS: Record<string, string> = {
+            'trinity-shofet': process.env.RAILWAY_SERVICE_ID_SHOFET || '',
+            'trinity-orch': process.env.RAILWAY_SERVICE_ID_ORCH || '',
+            'trinity-veritas': process.env.RAILWAY_SERVICE_ID_VERITAS || '',
+            'trinity-torch': process.env.RAILWAY_SERVICE_ID_TORCH || '',
+            'trinity-gcm': process.env.RAILWAY_SERVICE_ID_GCM || '',
+            'trinity-mel': process.env.RAILWAY_SERVICE_ID_MEL || '',
+            'trinity-chesed': process.env.RAILWAY_SERVICE_ID_CHESED || '',
+            'trinity-apm': process.env.RAILWAY_SERVICE_ID_APM || '',
+            'trinity-hdm': process.env.RAILWAY_SERVICE_ID_HDM || '',
+            'trinity-sophia': process.env.RAILWAY_SERVICE_ID_SOPHIA || '',
+            'trinity-nexus': process.env.RAILWAY_SERVICE_ID_NEXUS || '',
+            'trinity-w3c': process.env.RAILWAY_SERVICE_ID_W3C || ''
+        };
 
-    const serviceId = AGENT_SERVICE_IDS[agentName];
-    if (!serviceId) {
-        console.warn(`[REDEPLOY] No Service ID for ${agentName}`);
-        return;
-    }
+        const serviceId = AGENT_SERVICE_IDS[agentName];
+        if (!serviceId) {
+            console.warn(`[REDEPLOY] No Service ID for ${agentName}`);
+            return;
+        }
 
-    console.log(`[SURVIVOR] Attempting to redeploy ${agentName} (${serviceId})...`);
-    try {
-        // Mock GraphQL mutation for Railway API
-        console.log(`[SURVIVOR] ${agentName} redeploy triggered via API.`);
-    } catch (error: any) {
-        console.error(`[SURVIVOR] Failed to trigger redeploy for ${agentName}:`, error.message);
+        console.log(`[SURVIVOR] Attempting to redeploy ${agentName} (${serviceId})...`);
+        try {
+            // Mock GraphQL mutation for Railway API
+            console.log(`[SURVIVOR] ${agentName} redeploy triggered via API.`);
+        } catch (error: any) {
+            console.error(`[SURVIVOR] Failed to trigger redeploy for ${agentName}:`, error.message);
+        }
     }
-}
 
     // ============================================
     // CORE STRATEGIES
@@ -2584,39 +2583,39 @@ return bible;
 
     // Strategy 10: Retrospective
     async retrospective() {
-    console.log(`[${this.name}] 🕯️ Starting retrospective...`);
-    const prompt = `Reflect on last week's tasks (simulated or real): successes, failures, lessons. Suggest 3 improvements.`;
-    const reflection = await this.callLLM(prompt);
+        console.log(`[${this.name}] 🕯️ Starting retrospective...`);
+        const prompt = `Reflect on last week's tasks (simulated or real): successes, failures, lessons. Suggest 3 improvements.`;
+        const reflection = await this.callLLM(prompt);
 
-    if (reflection && reflection.output) {
-        // Log the reflection
-        await this.supabase.from('trinity_retros').insert({
-            agent: this.name,
-            reflection: reflection.output
-        });
+        if (reflection && reflection.output) {
+            // Log the reflection
+            await this.supabase.from('trinity_retros').insert({
+                agent: this.name,
+                reflection: reflection.output
+            });
 
-        // Earn Reputation for self-reflecting (A virtuous act)
-        await this.updateReputation(true);
-        console.log(`[${this.name}] Retrospective complete and logged. Reputation updated.`);
+            // Earn Reputation for self-reflecting (A virtuous act)
+            await this.updateReputation(true);
+            console.log(`[${this.name}] Retrospective complete and logged. Reputation updated.`);
+        }
     }
-}
 
     // Strategy 8: Continuous Research (Refactored to use ResearchTool)
     async researchTask(gap: string) {
-    console.log(`[${this.name}] 🔎 Researching topic using Swarm Interface: ${gap}`);
+        console.log(`[${this.name}] 🔎 Researching topic using Swarm Interface: ${gap}`);
 
-    // 1. Use Research Tool
-    const searchResults = await this.researchTool.searchWeb(gap);
+        // 1. Use Research Tool
+        const searchResults = await this.researchTool.searchWeb(gap);
 
-    // 2. Browse a top result (Simulation of depth)
-    const topUrl = searchResults[0]?.url;
-    let deepDive = "";
-    if (topUrl) {
-        deepDive = await this.researchTool.browsePage(topUrl, "Extract key implementation details");
-    }
+        // 2. Browse a top result (Simulation of depth)
+        const topUrl = searchResults[0]?.url;
+        let deepDive = "";
+        if (topUrl) {
+            deepDive = await this.researchTool.browsePage(topUrl, "Extract key implementation details");
+        }
 
-    // 3. Summarize findings using LLM
-    const prompt = `
+        // 3. Summarize findings using LLM
+        const prompt = `
     Summarize these search results for the swarm regarding the topic "${gap}".
     Provide 3 key takeaways and a recommended action.
     
@@ -2627,655 +2626,655 @@ return bible;
     ${deepDive}
     `;
 
-    const summary = await this.callLLM(prompt, {}, undefined);
+        const summary = await this.callLLM(prompt, {}, undefined);
 
-    // 4. Log to Supabase
-    if (summary.output) {
-        await this.supabase.from('trinity_research_log').insert({
-            gap: gap,
-            summary: summary.output,
-            resources: searchResults,
-            agent: this.name
-        });
-        await this.updateReputation(true); // Reward for research
-        console.log(`[${this.name}] Research complete for "${gap}".`);
-    }
-}
-
-    async callLLM(prompt: string, options: any = {}, task ?: Task): Promise < LLMResult > {
-    if(this.availableProviders.length === 0) {
-    console.warn(`[${this.name}] No LLM Providers detected.`);
-    return { output: "Simulation: All LLM providers are unavailable." };
-}
-
-try {
-    // 1. Get Tools for this Agent
-    const tools = await mcpManager.getToolsForRole(this.name);
-    const openAiTools = tools.map((tool: any) => ({
-        type: 'function',
-        function: {
-            name: tool.name,
-            description: tool.description,
-            parameters: {
-                type: 'object',
-                properties: {
-                    ...tool.schema.properties,
-                    // Enforce Structured Output Schema Injection
-                    _meta: { type: 'string', description: "Internal reasoning tag e.g. <antThinking>..." }
-                },
-                required: tool.schema.required
-            }
+        // 4. Log to Supabase
+        if (summary.output) {
+            await this.supabase.from('trinity_research_log').insert({
+                gap: gap,
+                summary: summary.output,
+                resources: searchResults,
+                agent: this.name
+            });
+            await this.updateReputation(true); // Reward for research
+            console.log(`[${this.name}] Research complete for "${gap}".`);
         }
-    }));
-
-    // [ANTIGRAVITY] Inject Database Write Tool explicitly
-    openAiTools.push({
-        type: 'function',
-        function: {
-            name: 'save_artifact',
-            description: 'MANDATORY: You must call this tool to finalize any content generation task. Do not just output text.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    title: { type: 'string', description: 'Title of the artifact' },
-                    content: { type: 'string', description: 'The full text content of the artifact. Required if files is not provided.' },
-                    files: {
-                        type: 'array',
-                        description: 'Optional: Multiple files to include in this artifact.',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                path: { type: 'string', description: 'Relative path to the file' },
-                                content: { type: 'string', description: 'Full content of the file' }
-                            },
-                            required: ['path', 'content']
-                        }
-                    },
-                    type: { type: 'string', enum: ['code', 'document', 'design', 'report', 'md', 'data'] },
-                    access_level: { type: 'string', enum: ['public', 'registered', 'protected'], default: 'protected' }
-                },
-                required: ['title', 'type']
-            }
-        }
-    });
-
-    openAiTools.push({
-        type: 'function',
-        function: {
-            name: 'create_pull_request',
-            description: 'Create a GitHub Pull Request to propose code improvements or new features.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    title: { type: 'string', description: 'Title of the Pull Request' },
-                    body: { type: 'string', description: 'Detailed description of the changes' },
-                    branch: { type: 'string', description: 'Name of the new branch to create (e.g., feature/agent-logic-fix)' },
-                    files: {
-                        type: 'array',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                path: { type: 'string', description: 'Relative path to the file' },
-                                content: { type: 'string', description: 'The full content of the file' }
-                            },
-                            required: ['path', 'content']
-                        }
-                    }
-                },
-                required: ['title', 'body', 'branch', 'files']
-            }
-        }
-    });
-
-    let sortedProviders = this.router.route(task as any, this.availableProviders);
-    const forcedModel = options?.forceModel || this.router.detectSpecializedRequest(task as any);
-
-    // [LATENCY AS OPPORTUNITY]
-    if (prompt.includes('Slow / Complex') || prompt.includes('Score: 8')) {
-        sortedProviders = this.router.applyLatencyLogic(sortedProviders.map(p => ({ key: p })), 4000).map(c => c.key);
     }
 
-    for (const providerKey of sortedProviders) {
+    async callLLM(prompt: string, options: any = {}, task?: Task): Promise<LLMResult> {
+        if (this.availableProviders.length === 0) {
+            console.warn(`[${this.name}] No LLM Providers detected.`);
+            return { output: "Simulation: All LLM providers are unavailable." };
+        }
+
         try {
-            const providerInfo = PROVIDER_REGISTRY[providerKey];
-            console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey} (Tier: ${providerInfo?.tier || '?'}${forcedModel ? `, Specialized: ${forcedModel}` : ''})...`);
+            // 1. Get Tools for this Agent
+            const tools = await mcpManager.getToolsForRole(this.name);
+            const openAiTools = tools.map((tool: any) => ({
+                type: 'function',
+                function: {
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            ...tool.schema.properties,
+                            // Enforce Structured Output Schema Injection
+                            _meta: { type: 'string', description: "Internal reasoning tag e.g. <antThinking>..." }
+                        },
+                        required: tool.schema.required
+                    }
+                }
+            }));
 
-            // [ANTIFRAGILE] PROVIDER TIMEOUT RACE (Tenacity v2)
-            // If a specific provider takes > 120s, we trigger the switch to the next one.
-            const providerResult = await Promise.race([
-                this.callSpecificProvider(providerKey, prompt, openAiTools, forcedModel || undefined),
-                new Promise<null>((_, reject) => setTimeout(() => reject(new Error('PROVIDER_STALL')), 120000))
-            ]);
+            // [ANTIGRAVITY] Inject Database Write Tool explicitly
+            openAiTools.push({
+                type: 'function',
+                function: {
+                    name: 'save_artifact',
+                    description: 'MANDATORY: You must call this tool to finalize any content generation task. Do not just output text.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: 'Title of the artifact' },
+                            content: { type: 'string', description: 'The full text content of the artifact. Required if files is not provided.' },
+                            files: {
+                                type: 'array',
+                                description: 'Optional: Multiple files to include in this artifact.',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        path: { type: 'string', description: 'Relative path to the file' },
+                                        content: { type: 'string', description: 'Full content of the file' }
+                                    },
+                                    required: ['path', 'content']
+                                }
+                            },
+                            type: { type: 'string', enum: ['code', 'document', 'design', 'report', 'md', 'data'] },
+                            access_level: { type: 'string', enum: ['public', 'registered', 'protected'], default: 'protected' }
+                        },
+                        required: ['title', 'type']
+                    }
+                }
+            });
 
-            if (providerResult) {
-                if (task) {
-                    if (!task.metadata) task.metadata = JSON.stringify({});
-                    try {
-                        const meta = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata;
-                        meta.provider_used = providerKey;
-                        task.metadata = JSON.stringify(meta);
-                    } catch (e) { }
+            openAiTools.push({
+                type: 'function',
+                function: {
+                    name: 'create_pull_request',
+                    description: 'Create a GitHub Pull Request to propose code improvements or new features.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: 'Title of the Pull Request' },
+                            body: { type: 'string', description: 'Detailed description of the changes' },
+                            branch: { type: 'string', description: 'Name of the new branch to create (e.g., feature/agent-logic-fix)' },
+                            files: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        path: { type: 'string', description: 'Relative path to the file' },
+                                        content: { type: 'string', description: 'The full content of the file' }
+                                    },
+                                    required: ['path', 'content']
+                                }
+                            }
+                        },
+                        required: ['title', 'body', 'branch', 'files']
+                    }
+                }
+            });
 
-                    // [PHASE 12] record evolution
-                    await this.evolutionLogger.recordEvolution({
-                        task_id: (task as any).id,
-                        intent: `Execute ${task.task_type || 'general'} task: ${task.title}`,
-                        strategy: providerKey,
-                        action_details: { model: forcedModel || 'default', provider: providerKey },
-                        outcome: 'Success',
-                        effect_score: 100, // Initial assume
-                        learned_insight: `Successfully utilized ${providerKey} for ${task.task_type || 'general'} task.`
+            let sortedProviders = this.router.route(task as any, this.availableProviders);
+            const forcedModel = options?.forceModel || this.router.detectSpecializedRequest(task as any);
+
+            // [LATENCY AS OPPORTUNITY]
+            if (prompt.includes('Slow / Complex') || prompt.includes('Score: 8')) {
+                sortedProviders = this.router.applyLatencyLogic(sortedProviders.map(p => ({ key: p })), 4000).map(c => c.key);
+            }
+
+            for (const providerKey of sortedProviders) {
+                try {
+                    const providerInfo = PROVIDER_REGISTRY[providerKey];
+                    console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey} (Tier: ${providerInfo?.tier || '?'}${forcedModel ? `, Specialized: ${forcedModel}` : ''})...`);
+
+                    // [ANTIFRAGILE] PROVIDER TIMEOUT RACE (Tenacity v2)
+                    // If a specific provider takes > 120s, we trigger the switch to the next one.
+                    const providerResult = await Promise.race([
+                        this.callSpecificProvider(providerKey, prompt, openAiTools, forcedModel || undefined),
+                        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('PROVIDER_STALL')), 120000))
+                    ]);
+
+                    if (providerResult) {
+                        if (task) {
+                            if (!task.metadata) task.metadata = JSON.stringify({});
+                            try {
+                                const meta = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata;
+                                meta.provider_used = providerKey;
+                                task.metadata = JSON.stringify(meta);
+                            } catch (e) { }
+
+                            // [PHASE 12] record evolution
+                            await this.evolutionLogger.recordEvolution({
+                                task_id: (task as any).id,
+                                intent: `Execute ${task.task_type || 'general'} task: ${task.title}`,
+                                strategy: providerKey,
+                                action_details: { model: forcedModel || 'default', provider: providerKey },
+                                outcome: 'Success',
+                                effect_score: 100, // Initial assume
+                                learned_insight: `Successfully utilized ${providerKey} for ${task.task_type || 'general'} task.`
+                            });
+                        }
+                        return providerResult;
+                    }
+                } catch (e: any) {
+                    const errorMsg = e.message === 'PROVIDER_STALL' ? 'STALLED (120s)' : e.message;
+
+                    // [ANTIFRAGILE] Demote temporarily if it's a structural failure (429, 404, 402, Timeout)
+                    if (errorMsg.includes('429') || errorMsg.includes('404') || errorMsg.includes('402') || errorMsg.includes('Timeout') || errorMsg.includes('STALLED')) {
+                        this.router.demote(providerKey);
+                    }
+
+                    console.warn(`[${this.name}] ⚠️ ${providerKey} ${errorMsg}. Rotating...`);
+
+                    // [ANTIGRAVITY] SELF-HEALING TRIGGER
+                    // If the provider is 'local_4090' or a specialized local proxy, attempt healing via RailwayMCP
+                    if (errorMsg.includes('STALLED') || errorMsg.includes('Timeout')) {
+                        await this.healInfrastructure(providerKey);
+                    }
+
+                    await this.log('llm_failover', `${providerKey} failed or stalled: ${errorMsg}. Rotating...`, {
+                        error: errorMsg,
+                        provider: providerKey,
+                        taskId: task?.id
                     });
                 }
-                return providerResult;
             }
-        } catch (e: any) {
-            const errorMsg = e.message === 'PROVIDER_STALL' ? 'STALLED (120s)' : e.message;
+            throw new Error('All LLM providers exhausted or stalled.');
+        } catch (error: any) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            console.error(`[${this.name}] 🚨 LLM Call Failed:`, errorMsg);
 
-            // [ANTIFRAGILE] Demote temporarily if it's a structural failure (429, 404, 402, Timeout)
-            if (errorMsg.includes('429') || errorMsg.includes('404') || errorMsg.includes('402') || errorMsg.includes('Timeout') || errorMsg.includes('STALLED')) {
-                this.router.demote(providerKey);
-            }
+            // Log to Supabase for visibility
+            await this.log('llm_error', errorMsg, { providers: this.availableProviders });
 
-            console.warn(`[${this.name}] ⚠️ ${providerKey} ${errorMsg}. Rotating...`);
-
-            // [ANTIGRAVITY] SELF-HEALING TRIGGER
-            // If the provider is 'local_4090' or a specialized local proxy, attempt healing via RailwayMCP
-            if (errorMsg.includes('STALLED') || errorMsg.includes('Timeout')) {
-                await this.healInfrastructure(providerKey);
-            }
-
-            await this.log('llm_failover', `${providerKey} failed or stalled: ${errorMsg}. Rotating...`, {
-                error: errorMsg,
-                provider: providerKey,
-                taskId: task?.id
-            });
+            return { output: "Error calling LLM" };
         }
     }
-    throw new Error('All LLM providers exhausted or stalled.');
-} catch (error: any) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error(`[${this.name}] 🚨 LLM Call Failed:`, errorMsg);
 
-    // Log to Supabase for visibility
-    await this.log('llm_error', errorMsg, { providers: this.availableProviders });
+    async callSpecificProvider(provider: string, prompt: string, tools: any[], modelOverride?: string): Promise<LLMResult> {
+        const bible = await this.fetchBible();
+        const systemPrompt = `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${bible}`;
 
-    return { output: "Error calling LLM" };
-}
-    }
+        // [ANTIGRAVITY] STRIKE-TIMEOUT (90s)
+        const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`LLM Timeout: ${provider} took longer than 90s`)), 90000)
+        );
 
-    async callSpecificProvider(provider: string, prompt: string, tools: any[], modelOverride ?: string): Promise < LLMResult > {
-    const bible = await this.fetchBible();
-    const systemPrompt = `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${bible}`;
-
-    // [ANTIGRAVITY] STRIKE-TIMEOUT (90s)
-    const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`LLM Timeout: ${provider} took longer than 90s`)), 90000)
-    );
-
-    let providerPromise: Promise<LLMResult>;
-    if(provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools);
+        let providerPromise: Promise<LLMResult>;
+        if (provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools);
         else if (provider === 'anthropic') providerPromise = this.callAnthropic(systemPrompt, prompt, tools);
-else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt, tools);
-else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt, tools);
-else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt, tools);
-else if (provider === 'fireworks') providerPromise = this.callOpenAICompatible('https://api.fireworks.ai/inference/v1/chat/completions', process.env.FIREWORKS_API_KEY!, 'accounts/fireworks/models/llama-v3p3-70b-instruct', systemPrompt, prompt, tools);
-else if (provider === 'together') providerPromise = this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', systemPrompt, prompt, tools);
-else if (provider === 'local_4090') providerPromise = this.callOpenAICompatible(`${process.env.LOCAL_INFERENCE_URL}/v1/chat/completions`, 'local', process.env.LOCAL_MODEL || 'llama3.1:8b', systemPrompt, prompt, tools);
-else if (provider === 'cerebras') providerPromise = this.callCerebras(systemPrompt, prompt, tools);
-else if (provider === 'deepseek') providerPromise = this.callDeepSeek(systemPrompt, prompt, tools);
-else if (provider === 'asi1') providerPromise = this.callOpenAICompatible('https://api.asi1.ai/v1/chat/completions', process.env.ASI1_API_KEY!, 'asi1', systemPrompt, prompt, tools);
-else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt, tools, modelOverride);
-else if (provider === 'deepinfra') providerPromise = this.callDeepInfra(systemPrompt, prompt, tools);
-else if (provider === 'perplexity') providerPromise = this.callPerplexity(systemPrompt, prompt, tools);
-else throw new Error(`Provider ${provider} not implemented`);
+        else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt, tools);
+        else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt, tools);
+        else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt, tools);
+        else if (provider === 'fireworks') providerPromise = this.callOpenAICompatible('https://api.fireworks.ai/inference/v1/chat/completions', process.env.FIREWORKS_API_KEY!, 'accounts/fireworks/models/llama-v3p3-70b-instruct', systemPrompt, prompt, tools);
+        else if (provider === 'together') providerPromise = this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', systemPrompt, prompt, tools);
+        else if (provider === 'local_4090') providerPromise = this.callOpenAICompatible(`${process.env.LOCAL_INFERENCE_URL}/v1/chat/completions`, 'local', process.env.LOCAL_MODEL || 'llama3.1:8b', systemPrompt, prompt, tools);
+        else if (provider === 'cerebras') providerPromise = this.callCerebras(systemPrompt, prompt, tools);
+        else if (provider === 'deepseek') providerPromise = this.callDeepSeek(systemPrompt, prompt, tools);
+        else if (provider === 'asi1') providerPromise = this.callOpenAICompatible('https://api.asi1.ai/v1/chat/completions', process.env.ASI1_API_KEY!, 'asi1', systemPrompt, prompt, tools);
+        else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt, tools, modelOverride);
+        else if (provider === 'deepinfra') providerPromise = this.callDeepInfra(systemPrompt, prompt, tools);
+        else if (provider === 'perplexity') providerPromise = this.callPerplexity(systemPrompt, prompt, tools);
+        else throw new Error(`Provider ${provider} not implemented`);
 
-return Promise.race([providerPromise, timeoutPromise]);
+        return Promise.race([providerPromise, timeoutPromise]);
     }
 
-    async callOpenAI(systemPrompt: string, prompt: string, tools: any[]): Promise < LLMResult > {
-    const apiKey = process.env.OPENAI_API_KEY;
-    const messages: any[] = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt }
-    ];
+    async callOpenAI(systemPrompt: string, prompt: string, tools: any[]): Promise<LLMResult> {
+        const apiKey = process.env.OPENAI_API_KEY;
+        const messages: any[] = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+        ];
 
-    const artifactLinks: string[] = [];
+        const artifactLinks: string[] = [];
 
-    for(let i = 0; i < 5; i++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout
+        for (let i = 0; i < 5; i++) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout
 
-    try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-            signal: controller.signal,
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages,
-                tools: tools.length > 0 ? tools : undefined,
-                tool_choice: tools.length > 0 ? 'auto' : undefined
-            })
-        });
+            try {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        messages,
+                        tools: tools.length > 0 ? tools : undefined,
+                        tool_choice: tools.length > 0 ? 'auto' : undefined
+                    })
+                });
 
-        clearTimeout(timeoutId);
+                clearTimeout(timeoutId);
 
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error(`[${this.name}] ❌ OpenAI Error (${response.status}):`, errText);
-            throw new Error(`OpenAI Error: ${errText}`);
-        }
-        const data = await response.json();
-        if (data.error) throw new Error(`OpenAI Error: ${JSON.stringify(data.error)}`);
-        if (!data.choices || data.choices.length === 0) throw new Error("OpenAI returned no choices");
-
-        const message = data.choices[0].message;
-        messages.push(message);
-
-        if (message.tool_calls) {
-            for (const toolCall of message.tool_calls) {
-                const fnName = toolCall.function.name;
-                let args: any;
-                try {
-                    args = JSON.parse(toolCall.function.arguments);
-                } catch (e) {
-                    console.error(`[${this.name}] ❌ Failed to parse tool arguments from OpenAI:`, toolCall.function.arguments);
-                    continue;
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error(`[${this.name}] ❌ OpenAI Error (${response.status}):`, errText);
+                    throw new Error(`OpenAI Error: ${errText}`);
                 }
-                const toolResult = await this.handleToolCall(fnName, args, artifactLinks);
-                messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
+                const data = await response.json();
+                if (data.error) throw new Error(`OpenAI Error: ${JSON.stringify(data.error)}`);
+                if (!data.choices || data.choices.length === 0) throw new Error("OpenAI returned no choices");
+
+                const message = data.choices[0].message;
+                messages.push(message);
+
+                if (message.tool_calls) {
+                    for (const toolCall of message.tool_calls) {
+                        const fnName = toolCall.function.name;
+                        let args: any;
+                        try {
+                            args = JSON.parse(toolCall.function.arguments);
+                        } catch (e) {
+                            console.error(`[${this.name}] ❌ Failed to parse tool arguments from OpenAI:`, toolCall.function.arguments);
+                            continue;
+                        }
+                        const toolResult = await this.handleToolCall(fnName, args, artifactLinks);
+                        messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
+                    }
+                } else {
+                    return {
+                        output: message.content || "",
+                        artifactLinks: artifactLinks
+                    };
+                }
+            } catch (err: any) {
+                clearTimeout(timeoutId);
+                if (err.name === 'AbortError') {
+                    console.error(`[${this.name}] ⏱️ OpenAI Timeout after 120s.`);
+                    throw new Error("LLM API Timeout");
+                }
+                throw err;
             }
-        } else {
-            return {
-                output: message.content || "",
-                artifactLinks: artifactLinks
-            };
         }
-    } catch (err: any) {
-        clearTimeout(timeoutId);
-        if (err.name === 'AbortError') {
-            console.error(`[${this.name}] ⏱️ OpenAI Timeout after 120s.`);
-            throw new Error("LLM API Timeout");
-        }
-        throw err;
-    }
-}
-throw new Error("Max tool recursion");
+        throw new Error("Max tool recursion");
     }
 
-    async callAnthropic(systemPrompt: string, prompt: string, tools: any[] = []): Promise < LLMResult > {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if(!apiKey) throw new Error("ANTHROPIC_API_KEY is missing");
+    async callAnthropic(systemPrompt: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) throw new Error("ANTHROPIC_API_KEY is missing");
 
-    const anthropicTools = tools.map((tool: any) => ({
-        name: tool.function.name,
-        description: tool.function.description,
-        input_schema: tool.function.parameters
-    }));
-
-    const messages: any[] = [{ role: 'user', content: prompt }];
-
-    const artifactLinks: string[] = [];
-
-    for(let i = 0; i < 5; i++) {
-    const body: any = {
-        model: 'claude-3-5-sonnet-20241022',
-        system: systemPrompt,
-        messages,
-        max_tokens: 4000,
-        tools: anthropicTools.length > 0 ? anthropicTools : undefined
-    };
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify(body)
-    });
-
-    const data = await response.json();
-    if (!response.ok || data.error) {
-        console.error(`[${this.name}] ❌ Anthropic Error (${response.status}):`, JSON.stringify(data.error || data));
-        throw new Error(`Anthropic Error: ${JSON.stringify(data.error || data)}`);
-    }
-
-    const message = data;
-    messages.push({ role: 'assistant', content: message.content });
-
-    const resultParts = message.content.filter((c: any) => c.type === 'tool_use');
-    if (resultParts.length > 0) {
-        const toolResults = [];
-        for (const toolCall of resultParts) {
-            const toolResult = await this.handleToolCall(toolCall.name, toolCall.input, artifactLinks);
-            toolResults.push({
-                type: 'tool_result',
-                tool_use_id: toolCall.id,
-                content: toolResult
-            });
-        }
-        messages.push({ role: 'user', content: toolResults });
-    } else {
-        const textContent = message.content.find((c: any) => c.type === 'text');
-        return {
-            output: textContent ? textContent.text : "",
-            artifactLinks: artifactLinks
-        };
-    }
-}
-throw new Error("Max tool recursion");
-    }
-
-    async callGemini(systemPrompt: string, prompt: string, tools: any[] = []): Promise < LLMResult > {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if(!apiKey) throw new Error("GEMINI_API_KEY is missing");
-
-    const model = 'gemini-1.5-flash-latest';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    // Gemini Tools Schema
-    const geminiTools = tools.length > 0 ? [{
-        function_declarations: tools.map((tool: any) => ({
+        const anthropicTools = tools.map((tool: any) => ({
             name: tool.function.name,
             description: tool.function.description,
-            parameters: tool.function.parameters
-        }))
-    }] : undefined;
+            input_schema: tool.function.parameters
+        }));
 
-    const contents: any[] = [{
-        role: 'user',
-        parts: [{ text: `System Instruction: ${systemPrompt}\n\nUser Prompt: ${prompt}` }]
-    }];
+        const messages: any[] = [{ role: 'user', content: prompt }];
 
-    const artifactLinks: string[] = [];
-    for(let i = 0; i < 5; i++) {
-    const body = {
-        contents,
-        tools: geminiTools
-    };
+        const artifactLinks: string[] = [];
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    });
-
-    const data = await response.json();
-    if (data.error) throw new Error(`Gemini Error: ${JSON.stringify(data.error)}`);
-
-    if (!data.candidates || data.candidates.length === 0) {
-        console.error('[GEMINI] No candidates. Data:', JSON.stringify(data));
-        throw new Error('Gemini returned no candidates');
-    }
-
-    const candidate = data.candidates[0];
-    const parts = candidate.content.parts;
-    contents.push(candidate.content);
-
-    const toolCalls = parts.filter((p: any) => p.functionCall);
-    if (toolCalls.length > 0) {
-        const toolResponseParts = [];
-        for (const toolCall of toolCalls) {
-            const fnName = toolCall.functionCall.name;
-            const args = toolCall.functionCall.args;
-            const toolResult = await this.handleToolCall(fnName, args, artifactLinks);
-
-            toolResponseParts.push({
-                functionResponse: {
-                    name: fnName,
-                    response: { result: toolResult }
-                }
-            });
-        }
-        contents.push({ role: 'function', parts: toolResponseParts });
-    } else {
-        const textPart = parts.find((p: any) => p.text);
-        return {
-            output: textPart ? textPart.text : "",
-            artifactLinks: artifactLinks
-        };
-    }
-}
-throw new Error("Max tool recursion");
-    }
-
-    async callGrok(system: string, prompt: string, tools: any[] = []): Promise < LLMResult > {
-    return this.callOpenAICompatible('https://api.x.ai/v1/chat/completions', process.env.GROK_API_KEY!, 'grok-beta', system, prompt, tools, 'grok');
-}
-
-    async callGroq(system: string, prompt: string, tools: any[] = []): Promise < LLMResult > {
-    return this.callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', process.env.GROQ_API_KEY!, 'llama-3.3-70b-versatile', system, prompt, tools, 'groq');
-}
-
-    async callCerebras(system: string, prompt: string, tools: any[] = []): Promise < LLMResult > {
-    return this.callOpenAICompatible('https://api.cerebras.ai/v1/chat/completions', process.env.CEREBRAS_API_KEY!, 'llama3.1-8b', system, prompt, tools, 'cerebras');
-}
-
-    async callDeepSeek(system: string, prompt: string, tools: any[] = []): Promise < LLMResult > {
-    return this.callOpenAICompatible('https://api.deepseek.com/chat/completions', process.env.DEEPSEEK_API_KEY!, 'deepseek-chat', system, prompt, tools, 'deepseek');
-}
-
-    async callOpenRouter(system: string, prompt: string, tools: any[] = [], modelOverride ?: string): Promise < LLMResult > {
-    // [PHASE 10] OpenRouter defaults to DeepSeek-V3 for cost-performance arbitrage
-    // [PHASE 11] Intelligence Router can override with specialized models (Qwen, Mistral, Llama, etc.)
-    const model = modelOverride || process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
-    return this.callOpenAICompatible('https://openrouter.ai/api/v1/chat/completions', process.env.OPENROUTER_API_KEY!, model, system, prompt, tools, 'openrouter');
-}
-
-    async callPerplexity(system: string, prompt: string, tools: any[] = []): Promise < LLMResult > {
-    return this.callOpenAICompatible('https://api.perplexity.ai/chat/completions', process.env.PERPLEXITY_API_KEY!, 'sonar', system, prompt, tools, 'perplexity');
-}
-
-    async callTogether(system: string, prompt: string, tools: any[] = []): Promise < LLMResult > {
-    return this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools, 'together');
-}
-
-    async callDeepInfra(system: string, prompt: string, tools: any[] = []): Promise < LLMResult > {
-    return this.callOpenAICompatible('https://api.deepinfra.com/v1/openai/chat/completions', process.env.DEEPINFRA_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools, 'deepinfra');
-}
-
-    async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[], providerKey ?: string): Promise < LLMResult > {
-    const messages: any[] = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt }
-    ];
-
-    const artifactLinks: string[] = [];
-    const providerInfo = providerKey ? PROVIDER_REGISTRY[providerKey] : null;
-    let supportsTools = providerInfo ? providerInfo.supportsTools : true;
-
-    // Final Model-Specific Compatibility Check
-    if(supportsTools && !this.router.isModelToolCompatible(model)) {
-    console.log(`[ROUTER] ⚠️ Model ${model} known to be tool-incompatible. Disabling tool inclusion.`);
-    supportsTools = false;
-}
-
-for (let i = 0; i < 5; i++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'trinity-symphony',
-                'X-Title': 'Trinity Symphony'
-            },
-            signal: controller.signal,
-            body: JSON.stringify({
-                model,
+        for (let i = 0; i < 5; i++) {
+            const body: any = {
+                model: 'claude-3-5-sonnet-20241022',
+                system: systemPrompt,
                 messages,
-                max_tokens: 4096,
-                tools: (tools.length > 0 && supportsTools) ? tools : undefined,
-                tool_choice: (tools.length > 0 && supportsTools) ? 'auto' : undefined
-            })
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error(`[${this.name}] [${model}] ❌ API Error (${response.status}):`, errText);
-            fs.appendFileSync('llm_errors.log', `[${new Date().toISOString()}] [${this.name}] [${model}] ${response.status}: ${errText}\n`);
-            throw new Error(`API Error (${model}) [${response.status}]: ${errText}`);
-        }
-
-        const data = await response.json();
-        if (data.error) throw new Error(`API Error (${model}): ${JSON.stringify(data.error)}`);
-        if (!data.choices || data.choices.length === 0) {
-            console.error(`[COMPATIBLE] No choices for ${model}. Data:`, JSON.stringify(data));
-            throw new Error(`API Error (${model}): No choices returned in response.`);
-        }
-
-        const message = data.choices[0].message;
-        messages.push(message);
-
-        if (message.tool_calls) {
-            for (const toolCall of message.tool_calls) {
-                const fnName = toolCall.function.name;
-                let args: any;
-                try {
-                    args = JSON.parse(toolCall.function.arguments);
-                } catch (e) {
-                    console.error(`[${this.name}] [${model}] ❌ Failed to parse tool arguments:`, toolCall.function.arguments);
-                    continue;
-                }
-                let toolResult = '';
-
-                console.log(`[${this.name}] [${model}] Tool Call: ${fnName}`);
-
-                if (fnName === 'save_artifact') {
-                    const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-                    const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
-                    artifactLinks.push(link);
-                    toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
-                } else {
-                    try {
-                        toolResult = await mcpManager.routeToolCall(fnName, args);
-                    } catch (e) {
-                        console.error(`[${this.name}] [${model}] ❌ Tool execution failed:`, e);
-                        toolResult = `Error: Tool execution failed.`;
-                    }
-                }
-                messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
-            }
-        } else {
-            // [PHASE 10] Smart-Parse Artifact Fallback
-            const content = message.content || "";
-            if (content.includes('```md') || content.includes('# Artifact')) {
-                console.log(`[${this.name}] 🧪 Smart-Parse Artifact detected in raw output.`);
-                const titleMatch = content.match(/# (.*?)\n/) || content.match(/Title: (.*?)\n/);
-                const title = titleMatch ? titleMatch[1] : `Report from ${this.name}`;
-                const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-                const link = await this.saveArtifact(taskId, content, 'report', title, 'protected');
-                artifactLinks.push(link);
-            }
-            return {
-                output: content,
-                artifactLinks: artifactLinks
+                max_tokens: 4000,
+                tools: anthropicTools.length > 0 ? anthropicTools : undefined
             };
+
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify(body)
+            });
+
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                console.error(`[${this.name}] ❌ Anthropic Error (${response.status}):`, JSON.stringify(data.error || data));
+                throw new Error(`Anthropic Error: ${JSON.stringify(data.error || data)}`);
+            }
+
+            const message = data;
+            messages.push({ role: 'assistant', content: message.content });
+
+            const resultParts = message.content.filter((c: any) => c.type === 'tool_use');
+            if (resultParts.length > 0) {
+                const toolResults = [];
+                for (const toolCall of resultParts) {
+                    const toolResult = await this.handleToolCall(toolCall.name, toolCall.input, artifactLinks);
+                    toolResults.push({
+                        type: 'tool_result',
+                        tool_use_id: toolCall.id,
+                        content: toolResult
+                    });
+                }
+                messages.push({ role: 'user', content: toolResults });
+            } else {
+                const textContent = message.content.find((c: any) => c.type === 'text');
+                return {
+                    output: textContent ? textContent.text : "",
+                    artifactLinks: artifactLinks
+                };
+            }
         }
-    } catch (err: any) {
-        clearTimeout(timeoutId);
-        if (err.name === 'AbortError') throw new Error(`LLM API Timeout (${model})`);
-        throw err;
+        throw new Error("Max tool recursion");
     }
-}
-throw new Error("Max tool recursion");
+
+    async callGemini(systemPrompt: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) throw new Error("GEMINI_API_KEY is missing");
+
+        const model = 'gemini-1.5-flash-latest';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+        // Gemini Tools Schema
+        const geminiTools = tools.length > 0 ? [{
+            function_declarations: tools.map((tool: any) => ({
+                name: tool.function.name,
+                description: tool.function.description,
+                parameters: tool.function.parameters
+            }))
+        }] : undefined;
+
+        const contents: any[] = [{
+            role: 'user',
+            parts: [{ text: `System Instruction: ${systemPrompt}\n\nUser Prompt: ${prompt}` }]
+        }];
+
+        const artifactLinks: string[] = [];
+        for (let i = 0; i < 5; i++) {
+            const body = {
+                contents,
+                tools: geminiTools
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(`Gemini Error: ${JSON.stringify(data.error)}`);
+
+            if (!data.candidates || data.candidates.length === 0) {
+                console.error('[GEMINI] No candidates. Data:', JSON.stringify(data));
+                throw new Error('Gemini returned no candidates');
+            }
+
+            const candidate = data.candidates[0];
+            const parts = candidate.content.parts;
+            contents.push(candidate.content);
+
+            const toolCalls = parts.filter((p: any) => p.functionCall);
+            if (toolCalls.length > 0) {
+                const toolResponseParts = [];
+                for (const toolCall of toolCalls) {
+                    const fnName = toolCall.functionCall.name;
+                    const args = toolCall.functionCall.args;
+                    const toolResult = await this.handleToolCall(fnName, args, artifactLinks);
+
+                    toolResponseParts.push({
+                        functionResponse: {
+                            name: fnName,
+                            response: { result: toolResult }
+                        }
+                    });
+                }
+                contents.push({ role: 'function', parts: toolResponseParts });
+            } else {
+                const textPart = parts.find((p: any) => p.text);
+                return {
+                    output: textPart ? textPart.text : "",
+                    artifactLinks: artifactLinks
+                };
+            }
+        }
+        throw new Error("Max tool recursion");
+    }
+
+    async callGrok(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.x.ai/v1/chat/completions', process.env.GROK_API_KEY!, 'grok-beta', system, prompt, tools, 'grok');
+    }
+
+    async callGroq(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', process.env.GROQ_API_KEY!, 'llama-3.3-70b-versatile', system, prompt, tools, 'groq');
+    }
+
+    async callCerebras(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.cerebras.ai/v1/chat/completions', process.env.CEREBRAS_API_KEY!, 'llama3.1-8b', system, prompt, tools, 'cerebras');
+    }
+
+    async callDeepSeek(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.deepseek.com/chat/completions', process.env.DEEPSEEK_API_KEY!, 'deepseek-chat', system, prompt, tools, 'deepseek');
+    }
+
+    async callOpenRouter(system: string, prompt: string, tools: any[] = [], modelOverride?: string): Promise<LLMResult> {
+        // [PHASE 10] OpenRouter defaults to DeepSeek-V3 for cost-performance arbitrage
+        // [PHASE 11] Intelligence Router can override with specialized models (Qwen, Mistral, Llama, etc.)
+        const model = modelOverride || process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
+        return this.callOpenAICompatible('https://openrouter.ai/api/v1/chat/completions', process.env.OPENROUTER_API_KEY!, model, system, prompt, tools, 'openrouter');
+    }
+
+    async callPerplexity(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.perplexity.ai/chat/completions', process.env.PERPLEXITY_API_KEY!, 'sonar', system, prompt, tools, 'perplexity');
+    }
+
+    async callTogether(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools, 'together');
+    }
+
+    async callDeepInfra(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.deepinfra.com/v1/openai/chat/completions', process.env.DEEPINFRA_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools, 'deepinfra');
+    }
+
+    async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[], providerKey?: string): Promise<LLMResult> {
+        const messages: any[] = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+        ];
+
+        const artifactLinks: string[] = [];
+        const providerInfo = providerKey ? PROVIDER_REGISTRY[providerKey] : null;
+        let supportsTools = providerInfo ? providerInfo.supportsTools : true;
+
+        // Final Model-Specific Compatibility Check
+        if (supportsTools && !this.router.isModelToolCompatible(model)) {
+            console.log(`[ROUTER] ⚠️ Model ${model} known to be tool-incompatible. Disabling tool inclusion.`);
+            supportsTools = false;
+        }
+
+        for (let i = 0; i < 5; i++) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'trinity-symphony',
+                        'X-Title': 'Trinity Symphony'
+                    },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        model,
+                        messages,
+                        max_tokens: 4096,
+                        tools: (tools.length > 0 && supportsTools) ? tools : undefined,
+                        tool_choice: (tools.length > 0 && supportsTools) ? 'auto' : undefined
+                    })
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error(`[${this.name}] [${model}] ❌ API Error (${response.status}):`, errText);
+                    fs.appendFileSync('llm_errors.log', `[${new Date().toISOString()}] [${this.name}] [${model}] ${response.status}: ${errText}\n`);
+                    throw new Error(`API Error (${model}) [${response.status}]: ${errText}`);
+                }
+
+                const data = await response.json();
+                if (data.error) throw new Error(`API Error (${model}): ${JSON.stringify(data.error)}`);
+                if (!data.choices || data.choices.length === 0) {
+                    console.error(`[COMPATIBLE] No choices for ${model}. Data:`, JSON.stringify(data));
+                    throw new Error(`API Error (${model}): No choices returned in response.`);
+                }
+
+                const message = data.choices[0].message;
+                messages.push(message);
+
+                if (message.tool_calls) {
+                    for (const toolCall of message.tool_calls) {
+                        const fnName = toolCall.function.name;
+                        let args: any;
+                        try {
+                            args = JSON.parse(toolCall.function.arguments);
+                        } catch (e) {
+                            console.error(`[${this.name}] [${model}] ❌ Failed to parse tool arguments:`, toolCall.function.arguments);
+                            continue;
+                        }
+                        let toolResult = '';
+
+                        console.log(`[${this.name}] [${model}] Tool Call: ${fnName}`);
+
+                        if (fnName === 'save_artifact') {
+                            const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+                            const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+                            artifactLinks.push(link);
+                            toolResult = `Artifact '${args.title}' saved. Link: ${link}`;
+                        } else {
+                            try {
+                                toolResult = await mcpManager.routeToolCall(fnName, args);
+                            } catch (e) {
+                                console.error(`[${this.name}] [${model}] ❌ Tool execution failed:`, e);
+                                toolResult = `Error: Tool execution failed.`;
+                            }
+                        }
+                        messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
+                    }
+                } else {
+                    // [PHASE 10] Smart-Parse Artifact Fallback
+                    const content = message.content || "";
+                    if (content.includes('```md') || content.includes('# Artifact')) {
+                        console.log(`[${this.name}] 🧪 Smart-Parse Artifact detected in raw output.`);
+                        const titleMatch = content.match(/# (.*?)\n/) || content.match(/Title: (.*?)\n/);
+                        const title = titleMatch ? titleMatch[1] : `Report from ${this.name}`;
+                        const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+                        const link = await this.saveArtifact(taskId, content, 'report', title, 'protected');
+                        artifactLinks.push(link);
+                    }
+                    return {
+                        output: content,
+                        artifactLinks: artifactLinks
+                    };
+                }
+            } catch (err: any) {
+                clearTimeout(timeoutId);
+                if (err.name === 'AbortError') throw new Error(`LLM API Timeout (${model})`);
+                throw err;
+            }
+        }
+        throw new Error("Max tool recursion");
     }
 
     // ============================================
     // ERC-8004: CROSS-CHAIN BRIDGE (ELITE)
     // ============================================
     async integrateErc8004(taskId: string, evaluationScore: number) {
-    // SBT Mapping & Bayesian Aggregation Stub (Patent: Trinity Identity)
-    console.log(`[ERC-8004] 🌉 Bridging Task ${taskId} to HyperDAG. Weighting by belief: ${evaluationScore / 100}`);
-    try {
-        // Placeholder: ethers.Contract('...').aggregateRepID(...)
-        // This enables cross-chain sovereign reputation as per whitepaper Part IV
-    } catch (e: any) {
-        console.warn(`[ERC-8004] Interop failed: ${e.message}`);
+        // SBT Mapping & Bayesian Aggregation Stub (Patent: Trinity Identity)
+        console.log(`[ERC-8004] 🌉 Bridging Task ${taskId} to HyperDAG. Weighting by belief: ${evaluationScore / 100}`);
+        try {
+            // Placeholder: ethers.Contract('...').aggregateRepID(...)
+            // This enables cross-chain sovereign reputation as per whitepaper Part IV
+        } catch (e: any) {
+            console.warn(`[ERC-8004] Interop failed: ${e.message}`);
+        }
     }
-}
 
-    private async handleToolCall(fnName: string, args: any, artifactLinks: string[]): Promise < string > {
-    console.log(`[${this.name}] 🛠️ Executing tool: ${fnName}`);
-    if(fnName === 'save_artifact') {
-    const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
-    const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
-    artifactLinks.push(link);
-    return `Artifact '${args.title}' saved. Link: ${link}`;
-} else if (fnName === 'create_pull_request') {
-    return await this.createPullRequest(args.title, args.body, args.branch, args.files);
-} else {
-    try {
-        return await mcpManager.routeToolCall(fnName, args);
-    } catch (e: any) {
-        console.error(`[${this.name}] ❌ Tool execution failed (${fnName}):`, e.message);
-        return `Error: Tool execution failed. ${e.message}`;
-    }
-}
+    private async handleToolCall(fnName: string, args: any, artifactLinks: string[]): Promise<string> {
+        console.log(`[${this.name}] 🛠️ Executing tool: ${fnName}`);
+        if (fnName === 'save_artifact') {
+            const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
+            const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
+            artifactLinks.push(link);
+            return `Artifact '${args.title}' saved. Link: ${link}`;
+        } else if (fnName === 'create_pull_request') {
+            return await this.createPullRequest(args.title, args.body, args.branch, args.files);
+        } else {
+            try {
+                return await mcpManager.routeToolCall(fnName, args);
+            } catch (e: any) {
+                console.error(`[${this.name}] ❌ Tool execution failed (${fnName}):`, e.message);
+                return `Error: Tool execution failed. ${e.message}`;
+            }
+        }
     }
 
     /**
      * [ANTIGRAVITY] Self-Improvement: Create a Pull Request autonomously.
      */
-    async createPullRequest(title: string, body: string, branch: string, files: { path: string, content: string }[]): Promise < string > {
-    if(!process.env.GITHUB_TOKEN) return "Error: GITHUB_TOKEN not configured.";
-    const owner = process.env.GITHUB_OWNER || 'dealappseo';
-    const repo = process.env.GITHUB_REPO || 'trinity-ecosystem';
+    async createPullRequest(title: string, body: string, branch: string, files: { path: string, content: string }[]): Promise<string> {
+        if (!process.env.GITHUB_TOKEN) return "Error: GITHUB_TOKEN not configured.";
+        const owner = process.env.GITHUB_OWNER || 'dealappseo';
+        const repo = process.env.GITHUB_REPO || 'trinity-ecosystem';
 
-    try {
-        // 1. Get default branch
-        const { data: repository } = await this.octokit.repos.get({ owner, repo });
-        const baseBranch = repository.default_branch;
+        try {
+            // 1. Get default branch
+            const { data: repository } = await this.octokit.repos.get({ owner, repo });
+            const baseBranch = repository.default_branch;
 
-        // 2. Get the SHA of the base branch
-        const { data: ref } = await this.octokit.git.getRef({ owner, repo, ref: `heads/${baseBranch}` });
-        const baseSha = ref.object.sha;
+            // 2. Get the SHA of the base branch
+            const { data: ref } = await this.octokit.git.getRef({ owner, repo, ref: `heads/${baseBranch}` });
+            const baseSha = ref.object.sha;
 
-        // 3. Create a new branch
-        await this.octokit.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: baseSha });
+            // 3. Create a new branch
+            await this.octokit.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: baseSha });
 
-        // 4. Create blobs and tree
-        const tree = await Promise.all(files.map(async f => {
-            const { data: blob } = await this.octokit.git.createBlob({ owner, repo, content: f.content, encoding: 'utf-8' });
-            return { path: f.path, mode: '100644', type: 'blob', sha: blob.sha };
-        }));
+            // 4. Create blobs and tree
+            const tree = await Promise.all(files.map(async f => {
+                const { data: blob } = await this.octokit.git.createBlob({ owner, repo, content: f.content, encoding: 'utf-8' });
+                return { path: f.path, mode: '100644', type: 'blob', sha: blob.sha };
+            }));
 
-        const { data: newTree } = await this.octokit.git.createTree({ owner, repo, base_tree: baseSha, tree: tree as any });
+            const { data: newTree } = await this.octokit.git.createTree({ owner, repo, base_tree: baseSha, tree: tree as any });
 
-        // 5. Create commit
-        const { data: commit } = await this.octokit.git.createCommit({
-            owner,
-            repo,
-            message: title,
-            tree: newTree.sha,
-            parents: [baseSha]
-        });
+            // 5. Create commit
+            const { data: commit } = await this.octokit.git.createCommit({
+                owner,
+                repo,
+                message: title,
+                tree: newTree.sha,
+                parents: [baseSha]
+            });
 
-        // 6. Update ref
-        await this.octokit.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: commit.sha });
+            // 6. Update ref
+            await this.octokit.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: commit.sha });
 
-        // 7. Create Pull Request
-        const { data: pr } = await this.octokit.pulls.create({
-            owner,
-            repo,
-            title,
-            body,
-            head: branch,
-            base: baseBranch
-        });
+            // 7. Create Pull Request
+            const { data: pr } = await this.octokit.pulls.create({
+                owner,
+                repo,
+                title,
+                body,
+                head: branch,
+                base: baseBranch
+            });
 
-        return `Pull Request created successfully: ${pr.html_url}`;
-    } catch(e: any) {
-        console.error(`[${this.name}] ❌ PR Creation Failed:`, e.message);
-        return `Error creating PR: ${e.message}`;
+            return `Pull Request created successfully: ${pr.html_url}`;
+        } catch (e: any) {
+            console.error(`[${this.name}] ❌ PR Creation Failed:`, e.message);
+            return `Error creating PR: ${e.message}`;
+        }
     }
-}
 }
