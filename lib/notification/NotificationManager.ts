@@ -1,5 +1,5 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../supabase';
 
 export interface NotificationPayload {
     title: string;
@@ -11,13 +11,10 @@ export interface NotificationPayload {
 }
 
 export class NotificationManager {
-    private supabase;
+    private supabase = supabase;
 
     constructor() {
-        this.supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        // Use centralized client from ../supabase
     }
 
     /**
