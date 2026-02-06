@@ -60,7 +60,7 @@ export function NavBar() {
                     {/* Left: Brand + Title */}
                     <div className="flex items-center gap-4">
                         <Link
-                            href="/pulse/directives"
+                            href="/pulse/conductor"
                             onClick={triggerHaptic}
                             className="flex items-center gap-3 group"
                         >
@@ -95,7 +95,7 @@ export function NavBar() {
                             whileTap={{ scale: 0.95 }}
                         >
                             <Link
-                                href="/pulse/directives"
+                                href="/pulse/conductor"
                                 onClick={triggerHaptic}
                                 className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all"
                                 title="Home"

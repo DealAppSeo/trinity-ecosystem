@@ -13,7 +13,8 @@ export default function DashboardPage() {
 
     // Derived stats if not provided by backend directly
     const activeAgentsCount = agents.filter(a => ['online', 'blue', 'amber'].includes(a.status)).length;
-    const completedTasksCount = stats?.tasks_completed_24h || 0; // Or from tasks array
+    const completedTasksCount = stats?.total_tasks_completed || 0; // Show all-time completed tasks
+    const completed24h = stats?.tasks_completed_24h || 0;
     const totalTasksCount = tasks.length + completedTasksCount;
     const systemHealth = activeAgentsCount > 0 ? Math.round((activeAgentsCount / agents.length) * 100) : 0;
 

@@ -150,6 +150,7 @@ export const useTrinityController = () => {
             setStats({
                 online_agents: calculatedActiveAgents,
                 tasks_completed_24h: completedCount24h || 0,
+                total_tasks_completed: calculatedCompleted,
                 active_tasks: (taskList || []).filter(t => ['pending', 'in_progress', 'doing', 'running'].includes(t.status)).length
             });
 

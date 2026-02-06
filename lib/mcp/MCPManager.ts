@@ -19,6 +19,9 @@ import { KnowledgeMCP } from './servers/KnowledgeMCP';
 import { DataMCP } from './servers/DataMCP';
 import { RedisMCP } from './servers/RedisMCP';
 import { HuggingFaceMCP } from './servers/HuggingFaceMCP';
+import { RailwayMCP } from './servers/RailwayMCP';
+import { YouDotComMCP } from './servers/YouDotComMCP';
+import { CohereMCP } from './servers/CohereMCP';
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -47,6 +50,9 @@ export class MCPManager {
         this.registerServer(new DataMCP());
         this.registerServer(new RedisMCP());
         this.registerServer(new HuggingFaceMCP());
+        this.registerServer(new RailwayMCP());
+        this.registerServer(new YouDotComMCP());
+        this.registerServer(new CohereMCP());
     }
 
     registerServer(server: MCPServer) {
@@ -85,9 +91,9 @@ export class MCPManager {
 
         // Define Role-to-Server Mappings
         const accessMap: Record<string, string[]> = {
-            'ALPHA_SQUAD': ['TavilySearch', 'AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Playwright', 'Supabase', 'PlaywrightExpert'],
+            'ALPHA_SQUAD': ['TavilySearch', 'AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Playwright', 'Supabase', 'PlaywrightExpert', 'YouDotCom'],
             'BETA_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Playwright', 'Composio', 'stitch', 'CreativeSuite', 'PlaywrightExpert', 'HuggingFace'],
-            'GAMMA_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio', 'stitch', 'PlaywrightExpert', 'Redis'],
+            'GAMMA_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio', 'stitch', 'PlaywrightExpert', 'Redis', 'Railway', 'Cohere'],
             'ORCHESTRATION': ['ALL']
         };
 

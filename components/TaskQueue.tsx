@@ -46,6 +46,10 @@ export function TaskQueue({ tasks, onAddTask }: TaskQueueProps) {
                                             <>
                                                 <span className="text-accent-blue">●</span> {task.claimed_by}
                                             </>
+                                        ) : task.assigned_to ? (
+                                            <>
+                                                <span className="text-zinc-500">○</span> Assigned: {task.assigned_to}
+                                            </>
                                         ) : (
                                             <span className="italic">Unclaimed</span>
                                         )}
@@ -57,10 +61,10 @@ export function TaskQueue({ tasks, onAddTask }: TaskQueueProps) {
                                     )}
                                 </div>
                                 <span className={`w-1.5 h-1.5 rounded-full ${task.status === 'verified' ? 'bg-accent-green shadow-[0_0_8px_#22c55e]' :
-                                        task.status === 'in_progress' || task.status === 'doing' ? 'bg-status-working animate-pulse' :
-                                            task.status === 'pending_clarification' ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_#fbbf24]' :
-                                                task.status === 'done' || task.status === 'completed' ? 'bg-cyan-500 shadow-[0_0_8px_#06b6d4]' :
-                                                    'bg-obsidian-border'
+                                    task.status === 'in_progress' || task.status === 'doing' ? 'bg-status-working animate-pulse' :
+                                        task.status === 'pending_clarification' ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_#fbbf24]' :
+                                            task.status === 'done' || task.status === 'completed' ? 'bg-cyan-500 shadow-[0_0_8px_#06b6d4]' :
+                                                'bg-obsidian-border'
                                     }`} />
                             </div>
                         </div>

@@ -27,7 +27,10 @@ export function AddTaskModal({ isOpen, onClose, availableAgents }: AddTaskModalP
         try {
             const res = await fetch('/api/tasks', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-trinity-admin-key': localStorage.getItem('trinity_access') || ''
+                },
                 body: JSON.stringify({
                     title,
                     description,

@@ -16,26 +16,28 @@ export interface ProviderDetails {
     costPerMillion: number; // USD
     reasoning: number; // 1-10
     isFree: boolean;
-    family: 'transformer' | 'moe' | 'distilled' | 'specialized' | 'diffusion';
+    family: 'transformer' | 'moe' | 'distilled' | 'specialized' | 'diffusion' | 'aggregator';
     specialties: string[];
     isLocal?: boolean;
     quantization?: 'AWQ' | 'GGUF' | 'FP8' | 'none';
     supportsTools: boolean;
+    reputation?: number; // 0-100 (Provider RepID)
 }
 
 export const PROVIDER_REGISTRY: Record<string, ProviderDetails> = {
-    'openai': { key: 'openai', tier: ProviderTier.ELITE, speed: 80, latency: 200, costPerMillion: 15.00, reasoning: 10, isFree: false, family: 'transformer', specialties: ['code', 'logic', 'json'], supportsTools: true },
-    'anthropic': { key: 'anthropic', tier: ProviderTier.ELITE, speed: 70, latency: 250, costPerMillion: 15.00, reasoning: 10, isFree: false, family: 'transformer', specialties: ['writing', 'complex-logic', 'coding'], supportsTools: true },
-    'grok': { key: 'grok', tier: ProviderTier.ELITE, speed: 100, latency: 150, costPerMillion: 5.00, reasoning: 9, isFree: false, family: 'transformer', specialties: ['real-time', 'logic', 'truth-seeking'], supportsTools: true },
-    'deepseek': { key: 'deepseek', tier: ProviderTier.ECONOMY, speed: 120, latency: 100, costPerMillion: 0.27, reasoning: 10, isFree: false, family: 'moe', specialties: ['code', 'math', 'reasoning', 'r1'], supportsTools: true },
-    'gemini': { key: 'gemini', tier: ProviderTier.BALANCED, speed: 90, latency: 180, costPerMillion: 1.25, reasoning: 8, isFree: false, family: 'transformer', specialties: ['multimodal', 'long-context'], supportsTools: true },
-    'groq': { key: 'groq', tier: ProviderTier.ECONOMY, speed: 500, latency: 10, costPerMillion: 0.14, reasoning: 6, isFree: true, family: 'distilled', specialties: ['speed', 'tool-calling', 'interactive'], supportsTools: true },
-    'fireworks': { key: 'fireworks', tier: ProviderTier.ECONOMY, speed: 150, latency: 30, costPerMillion: 0.15, reasoning: 8, isFree: false, family: 'transformer', specialties: ['speed', 'api', 'vision'], supportsTools: true },
-    'together': { key: 'together', tier: ProviderTier.ECONOMY, speed: 180, latency: 50, costPerMillion: 0.10, reasoning: 8, isFree: false, family: 'transformer', specialties: ['batch', 'speed', 'code'], supportsTools: true },
-    'local_4090': { key: 'local_4090', tier: ProviderTier.ECONOMY, speed: 60, latency: 50, costPerMillion: 0.02, reasoning: 7, isFree: true, isLocal: true, quantization: 'GGUF', family: 'transformer', specialties: ['privacy', 'edge', 'constant-flow'], supportsTools: false },
-    'cerebras': { key: 'cerebras', tier: ProviderTier.ECONOMY, speed: 450, latency: 15, costPerMillion: 0.10, reasoning: 6, isFree: true, family: 'distilled', specialties: ['ultra-fast', 'inference'], supportsTools: true },
-    'openrouter': { key: 'openrouter', tier: ProviderTier.ECONOMY, speed: 70, latency: 120, costPerMillion: 0.40, reasoning: 9, isFree: false, family: 'moe', specialties: ['diversity', 'arbitrage', 'specialized'], supportsTools: true },
-    'perplexity': { key: 'perplexity', tier: ProviderTier.ECONOMY, speed: 50, latency: 150, costPerMillion: 5.00, reasoning: 7, isFree: false, family: 'transformer', specialties: ['real-time', 'search'], supportsTools: false }
+    'openai': { key: 'openai', tier: ProviderTier.ELITE, speed: 80, latency: 200, costPerMillion: 15.00, reasoning: 10, isFree: false, family: 'transformer', specialties: ['code', 'logic', 'json'], supportsTools: true, reputation: 95 },
+    'anthropic': { key: 'anthropic', tier: ProviderTier.ELITE, speed: 70, latency: 250, costPerMillion: 15.00, reasoning: 10, isFree: false, family: 'transformer', specialties: ['writing', 'complex-logic', 'coding'], supportsTools: true, reputation: 98 },
+    'grok': { key: 'grok', tier: ProviderTier.ELITE, speed: 100, latency: 150, costPerMillion: 5.00, reasoning: 9, isFree: false, family: 'transformer', specialties: ['real-time', 'logic', 'truth-seeking'], supportsTools: true, reputation: 90 },
+    'deepseek': { key: 'deepseek', tier: ProviderTier.ECONOMY, speed: 120, latency: 100, costPerMillion: 0.27, reasoning: 10, isFree: false, family: 'moe', specialties: ['code', 'math', 'reasoning', 'r1'], supportsTools: true, reputation: 96 },
+    'gemini': { key: 'gemini', tier: ProviderTier.BALANCED, speed: 90, latency: 180, costPerMillion: 1.25, reasoning: 8, isFree: false, family: 'transformer', specialties: ['multimodal', 'long-context'], supportsTools: true, reputation: 88 },
+    'groq': { key: 'groq', tier: ProviderTier.ECONOMY, speed: 500, latency: 10, costPerMillion: 0.14, reasoning: 6, isFree: true, family: 'distilled', specialties: ['speed', 'tool-calling', 'interactive'], supportsTools: true, reputation: 92 },
+    'fireworks': { key: 'fireworks', tier: ProviderTier.ECONOMY, speed: 150, latency: 30, costPerMillion: 0.15, reasoning: 8, isFree: false, family: 'transformer', specialties: ['speed', 'api', 'vision'], supportsTools: true, reputation: 85 },
+    'together': { key: 'together', tier: ProviderTier.ECONOMY, speed: 180, latency: 50, costPerMillion: 0.10, reasoning: 8, isFree: false, family: 'transformer', specialties: ['batch', 'speed', 'code'], supportsTools: true, reputation: 85 },
+    'local_4090': { key: 'local_4090', tier: ProviderTier.ECONOMY, speed: 60, latency: 50, costPerMillion: 0.02, reasoning: 7, isFree: true, isLocal: true, quantization: 'GGUF', family: 'transformer', specialties: ['privacy', 'edge', 'constant-flow'], supportsTools: false, reputation: 99 },
+    'cerebras': { key: 'cerebras', tier: ProviderTier.ECONOMY, speed: 450, latency: 15, costPerMillion: 0.10, reasoning: 6, isFree: true, family: 'distilled', specialties: ['ultra-fast', 'inference'], supportsTools: true, reputation: 90 },
+    'openrouter': { key: 'openrouter', tier: ProviderTier.ECONOMY, speed: 70, latency: 120, costPerMillion: 0.40, reasoning: 9, isFree: false, family: 'aggregator', specialties: ['diversity', 'arbitrage', 'specialized'], supportsTools: true, reputation: 94 },
+    'asi1': { key: 'asi1', tier: ProviderTier.ELITE, speed: 85, latency: 180, costPerMillion: 10.00, reasoning: 10, isFree: false, family: 'aggregator', specialties: ['social-intelligence', 'chaos', 'multi-step'], supportsTools: true, reputation: 95 },
+    'perplexity': { key: 'perplexity', tier: ProviderTier.ECONOMY, speed: 50, latency: 150, costPerMillion: 5.00, reasoning: 7, isFree: false, family: 'transformer', specialties: ['real-time', 'search'], supportsTools: false, reputation: 80 }
 };
 
 // [PHASE 11] INTELLIGENCE ROUTER
@@ -86,15 +88,21 @@ export class IntelligenceRouter {
         const candidates = activeProviders
             .filter(p => p !== excludeProvider)
             .map(p => {
-                const info = PROVIDER_REGISTRY[p] || { key: p, tier: ProviderTier.ECONOMY, speed: 50, latency: 100, costPerMillion: 0.5, reasoning: 5, family: 'transformer', specialties: [], supportsTools: true };
+                const info = PROVIDER_REGISTRY[p] || { key: p, tier: ProviderTier.ECONOMY, speed: 50, latency: 100, costPerMillion: 0.5, reasoning: 5, family: 'transformer', specialties: [], supportsTools: true, reputation: 50 };
                 let score = 0;
 
-                // A. Base Reasoning Score
-                score += info.reasoning * 10;
+                // A. Base Reasoning Score (Weighted by Provider RepID)
+                const repWeight = (info.reputation || 50) / 100;
+                score += info.reasoning * 10 * repWeight;
 
                 // B. Cost-per-Quality-Adjusted-Token Arbitrage
                 const costWeight = 1.0 / (info.costPerMillion + 0.01);
                 score += Math.min(costWeight * 2, 50);
+
+                // [ANTIGRAVITY] Tier-0 Arbitration (Free Tier Boost)
+                if (info.isFree && !isFirstImpression) {
+                    score += 150; // Massively boost free tiers for ongoing work
+                }
 
                 // C. Latency Awareness
                 if (taskType === 'interactive' || taskType === 'chat') {
@@ -108,19 +116,20 @@ export class IntelligenceRouter {
                     if (info.tier === ProviderTier.ECONOMY) score += 20;
                 }
 
-                // [TEMPORARY] Provider Reliability Bias
-                if (['openai', 'anthropic', 'openrouter', 'deepseek'].includes(p)) score -= 200;
-                if (p === 'groq') score += 150;
-                if (p === 'cerebras') score += 150;
-                if (p === 'gemini') score += 150;
-
                 // Specialty Match
                 if (info.specialties.includes(taskType)) score += 30;
+
+                // [ANTIGRAVITY] Aggregator Governance
+                if (info.family === 'aggregator') {
+                    // Aggregators (ASI1, OpenRouter) are used as fallback or for "Diversity"
+                    score -= 50;
+                    if (taskType === 'social-intelligence') score += 200; // ASI1 Specialty
+                }
 
                 // Verification Diversity
                 if (isVerification && excludeProvider) {
                     const executorInfo = PROVIDER_REGISTRY[excludeProvider];
-                    if (executorInfo && executorInfo.family !== info.family) {
+                    if (executorInfo && (executorInfo.family !== info.family || executorInfo.key !== info.key)) {
                         const diversityBonus = 40 * ((task as any).user_reputation || 50) / 50;
                         score += diversityBonus;
                     }
