@@ -67,6 +67,9 @@ export interface Task {
     requires_consensus?: boolean;
     consensus_group?: string;
     signatures?: any[];
+    // [ANTIGRAVITY] Loop Dampening
+    attempt_count?: number;
+    max_attempts?: number;
 }
 
 export type TaskRecord = Task;

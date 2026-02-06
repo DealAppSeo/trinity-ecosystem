@@ -267,6 +267,12 @@ export class ConstitutionalAgent {
                 this.tasksCompleted = record.tasks_completed;
                 this.systemPrompt = record.system_prompt || null;
 
+                // [ANTIGRAVITY] Sync Squad (Crucial for Watchdog & Health)
+                if (record.squad) {
+                    this.squad = record.squad as any;
+                    this.groupName = record.squad;
+                }
+
                 // ANTI-FRAGILE TELEMETRY
                 const source = this.systemPrompt ? 'DB_DIRECTIVE' : 'FALLBACK_PERSONA';
                 console.log(`[${this.name}] Synced State: Tier [${this.autonomyTier}] | Rep [${this.reputationScore}] | Source [${source}]`);
@@ -555,8 +561,9 @@ export class ConstitutionalAgent {
                 }
 
                 // 2. [ANTIGRAVITY] GLOBAL SQUAD WATCHDOG: Release tasks orphaned by STALE PEERS
-                // Only HDM and APM take on the "Inspector" role to avoid collision
-                if (['HDM', 'APM', 'ORCH'].includes(this.squad)) {
+                // Updated to check squad names correctly: ALPHA, BETA, GAMMA, ORCHESTRATION
+                const isInspector = ['GAMMA', 'BETA', 'ORCHESTRATION'].includes(this.squad);
+                if (isInspector) {
                     const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
                     // Find tasks claimed by others that are "doing"
@@ -1533,7 +1540,25 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                 }).eq('id', task.id);
 
                 if (failError) console.error(`[${this.name}] 🚨 Failed to update task ${task.id} to 'failed':`, failError.message);
-                else console.log(`[${this.name}] 🛡️ Task ${task.id} marked as failed.`);
+                else {
+                    const attempts = (task.attempt_count || 0) + 1;
+                    const maxAttempts = task.max_attempts || 3;
+
+                    console.log(`[${this.name}] 🛡️ Task ${task.id} attempt ${attempts}/${maxAttempts}. Marking as failed.`);
+
+                    // Update attempt count in DB
+                    await this.supabase.from('trinity_tasks').update({
+                        attempt_count: attempts
+                    }).eq('id', task.id);
+
+                    if (attempts >= maxAttempts) {
+                        console.warn(`[LOOP DAMPENER] 🛑 Task ${task.id} exceeded max attempts. Escalating for manual review.`);
+                        await this.escalateTask(task.id, `Exceeded max attempts (${maxAttempts}). Last Error: ${errorMsg}`);
+                    } else {
+                        console.log(`[${this.name}] Spawning Surgical Analysis...`);
+                        await this.spawnMaintenanceTask(`Analysis: ${task.title}. Error: ${errorMsg.substring(0, 500)}`);
+                    }
+                }
             } catch (e: any) {
                 console.error(`[${this.name}] Fatal error during failure update:`, e.message);
                 await this.releaseClaim(task.id);
@@ -1597,7 +1622,11 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
         ];
 
         const selected = reason
-            ? { title: `[HEALING] Resolve: ${reason}`, description: `Automated self-healing triggered by repetitive failure: ${reason}. Analyze logs and propose fix.` }
+            ? {
+                title: `[SURGERY] ${reason.split('.')[0]}`,
+                description: `Surgical diagnostic triggered for failed task. \n\nCONTEXT: ${reason}\n\n1. Analyze why the previous attempt failed.\n2. Use FileSystem or Research tools to find missing dependencies or logic gaps.\n3. Implement a fix or provide a detailed architecture blueprint to prevent recurrence.`,
+                priority: 100 // HIGH PRIORITY for repairs
+            }
             : maintenanceTasks[Math.floor(Math.random() * maintenanceTasks.length)];
 
         try {
@@ -2260,6 +2289,27 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
 
             if (!success) throw lastError;
 
+            // [ANTIGRAVITY] AUTOMATIC TASK COMPLETION (Constitutional Requirement)
+            // When an artifact is saved, the associated task MUST move to 'done' 
+            // so peer verification can be triggered autonomously.
+            if (dbTaskId && !isNaN(dbTaskId)) {
+                console.log(`[ARTIFACT] ✅ Marking task ${dbTaskId} as DONE (Awaiting Peer Verification)`);
+                await this.supabase
+                    .from('trinity_tasks')
+                    .update({
+                        status: 'done',
+                        completed_at: new Date().toISOString(),
+                        completed_by: this.name,
+                        artifact_url: artifactUrl || 'saved_in_db',
+                        result: `Task generated artifact: ${safeTitle}. Reference ID: ${artifactId || 'OK'}`,
+                        verify_count: 0 // Reset for peer review
+                    })
+                    .eq('id', dbTaskId);
+
+                // [TRINITY SSOT] Update agent stats
+                this.tasksCompleted++;
+            }
+
             // 3. LOCAL FILESYSTEM (Backup)
             if (typeof process !== 'undefined' && process.versions && process.versions.node) {
                 try {
@@ -2824,7 +2874,21 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         else if (provider === 'local_4090') providerPromise = this.callOpenAICompatible(`${process.env.LOCAL_INFERENCE_URL}/v1/chat/completions`, 'local', process.env.LOCAL_MODEL || 'llama3.1:8b', systemPrompt, prompt, tools);
         else if (provider === 'cerebras') providerPromise = this.callCerebras(systemPrompt, prompt, tools);
         else if (provider === 'deepseek') providerPromise = this.callDeepSeek(systemPrompt, prompt, tools);
-        else if (provider === 'asi1') providerPromise = this.callOpenAICompatible('https://api.asi1.ai/v1/chat/completions', process.env.ASI1_API_KEY!, 'asi1', systemPrompt, prompt, tools);
+        else if (provider === 'asi1') {
+            // [ANTIGRAVITY] ULTIMATE DECENTRALIZED FALLBACK (ASI:Cloud)
+            providerPromise = (async () => {
+                const result = await mcpManager.routeToolCall('asi_chat_inference', {
+                    prompt: `${systemPrompt}\n\nUSER TASK: ${prompt}`,
+                    model: modelOverride || 'asi-1-mini'
+                });
+                try {
+                    const parsed = JSON.parse(result);
+                    return { output: parsed.choices?.[0]?.message?.content || parsed.message || result };
+                } catch (e) {
+                    return { output: result };
+                }
+            })();
+        }
         else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt, tools, modelOverride);
         else if (provider === 'deepinfra') providerPromise = this.callDeepInfra(systemPrompt, prompt, tools);
         else if (provider === 'perplexity') providerPromise = this.callPerplexity(systemPrompt, prompt, tools);

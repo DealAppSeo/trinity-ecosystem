@@ -46,9 +46,12 @@ export function AgentCard({ agent, isConductor = false, onAssignTask }: AgentCar
                 </div>
 
                 {/* Task Preview */}
-                <p className="text-xs text-text-muted truncate">
-                    {(agent as any).current_task_summary || agent.currentTask?.title || 'Awaiting assignment'}
-                </p>
+                <div className="mt-1 flex flex-col gap-0.5">
+                    <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-tighter">Active Priority:</span>
+                    <p className="text-xs text-text-muted truncate font-medium">
+                        {(agent as any).current_task_summary || agent.currentTask?.title || 'Awaiting assignment'}
+                    </p>
+                </div>
             </div>
 
             {/* Expanded View - Conditional */}

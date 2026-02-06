@@ -38,7 +38,10 @@ export async function DELETE(
         const id = params.id;
         const { error } = await supabase
             .from('trinity_tasks')
-            .delete()
+            .update({
+                status: 'archived',
+                result: '[ARCHIVE] Soft-purged by User/Admin Request.'
+            })
             .eq('id', id);
 
         if (error) throw error;

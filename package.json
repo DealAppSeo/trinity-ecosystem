@@ -27,8 +27,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",
+    "@e2b/code-interpreter": "^2.3.3",
     "@langchain/langgraph": "^1.1.3",
-    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@octokit/rest": "^22.0.1",
     "@supabase/mcp-server-postgrest": "^0.1.0",
     "@supabase/supabase-js": "^2.45.0",
@@ -61,12 +62,13 @@
     "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "replicate": "^1.4.0",
     "retry": "^0.13.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.5.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.4",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.4"
   },
   "devDependencies": {
     "@modelcontextprotocol/server-github": "^2025.4.8",

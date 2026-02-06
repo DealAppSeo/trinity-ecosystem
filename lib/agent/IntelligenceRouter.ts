@@ -177,12 +177,16 @@ export class IntelligenceRouter {
         if (text.match(/image|generate|art|draw|creative/i)) suggestions.push('CreativeSuite (generate_image)');
         if (text.match(/cache|persist|redis|state|blackboard/i)) suggestions.push('Redis');
         if (text.match(/huggingface|hf|inference|specialized-model/i)) suggestions.push('HuggingFace');
-        if (text.match(/search|lookup|research|latest|current/i)) suggestions.push('TavilySearch');
-        if (text.match(/code|github|pr|repo|git/i)) suggestions.push('GitHub');
-        if (text.match(/automation|workflow|n8n|flowise/i)) suggestions.push('Automation');
-        if (text.match(/browser|scrape|crawl|playwright|puppeteer/i)) suggestions.push('PlaywrightExpert');
-        if (text.match(/spreadsheet|excel|google|docs|sheet/i)) suggestions.push('GoogleWorkspace');
-        if (text.match(/database|table|rls|supabase|storage/i)) suggestions.push('Supabase');
+        if (text.match(/search|lookup|research|latest|current/i)) suggestions.push('TavilySearch', 'YouDotCom', 'Cohere');
+        if (text.match(/academic|paper|arxiv|scholar|peer-review|technical-doc/i)) suggestions.push('ResearchSuite');
+        if (text.match(/video|audio|music|voice|multimodal| specialized-ai|replicate/i)) suggestions.push('Replicate');
+        if (text.match(/stock|market|ticker|fundamental|balance-sheet|income-statement|cash-flow/i)) suggestions.push('AlphaVantage');
+        if (text.match(/code|github|pr|repo|git/i)) suggestions.push('GitHub', 'FileSystem', 'Sandbox');
+        if (text.match(/automation|workflow|n8n|flowise/i)) suggestions.push('Automation', 'Stitch');
+        if (text.match(/browser|scrape|crawl|playwright|puppeteer/i)) suggestions.push('PlaywrightExpert', 'Puppeteer', 'YouDotCom');
+        if (text.match(/spreadsheet|excel|google|docs|sheet|performa|business-plan/i)) suggestions.push('GoogleWorkspace', 'Supabase');
+        if (text.match(/database|table|rls|supabase|storage/i)) suggestions.push('Supabase', 'FileSystem', 'DataMCP');
+        if (text.match(/infra|server|railway|restart|restart|stalled/i)) suggestions.push('Railway', 'GitHub', 'FileSystem');
 
         return suggestions;
     }

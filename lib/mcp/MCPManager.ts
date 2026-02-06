@@ -22,6 +22,11 @@ import { HuggingFaceMCP } from './servers/HuggingFaceMCP';
 import { RailwayMCP } from './servers/RailwayMCP';
 import { YouDotComMCP } from './servers/YouDotComMCP';
 import { CohereMCP } from './servers/CohereMCP';
+import { ASICloudMCP } from './servers/ASICloudMCP';
+import { ReplicateMCP } from './servers/ReplicateMCP';
+import { ResearchMCP } from './servers/ResearchMCP';
+import { E2BMCP } from './servers/E2BMCP';
+import { HumanMCP } from './servers/HumanMCP';
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -53,6 +58,11 @@ export class MCPManager {
         this.registerServer(new RailwayMCP());
         this.registerServer(new YouDotComMCP());
         this.registerServer(new CohereMCP());
+        this.registerServer(new ASICloudMCP());
+        this.registerServer(new ReplicateMCP());
+        this.registerServer(new ResearchMCP());
+        this.registerServer(new E2BMCP());
+        this.registerServer(new HumanMCP());
     }
 
     registerServer(server: MCPServer) {
@@ -89,11 +99,11 @@ export class MCPManager {
         const allTools = await this.listTools();
         const roleUpper = role.toUpperCase();
 
-        // Define Role-to-Server Mappings
+        // Define Role-to-Server Mappings (Hardened for Redundancy)
         const accessMap: Record<string, string[]> = {
-            'ALPHA_SQUAD': ['TavilySearch', 'AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Playwright', 'Supabase', 'PlaywrightExpert', 'YouDotCom'],
-            'BETA_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Playwright', 'Composio', 'stitch', 'CreativeSuite', 'PlaywrightExpert', 'HuggingFace'],
-            'GAMMA_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio', 'stitch', 'PlaywrightExpert', 'Redis', 'Railway', 'Cohere'],
+            'ALPHA_SQUAD': ['TavilySearch', 'AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Playwright', 'Supabase', 'PlaywrightExpert', 'YouDotCom', 'Cohere', 'Replicate', 'ResearchSuite', 'CloudSandbox', 'HumanPilot'],
+            'BETA_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Playwright', 'Composio', 'stitch', 'CreativeSuite', 'PlaywrightExpert', 'HuggingFace', 'TavilySearch', 'YouDotCom', 'Replicate', 'ResearchSuite', 'CloudSandbox', 'HumanPilot'],
+            'GAMMA_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio', 'stitch', 'PlaywrightExpert', 'Redis', 'Railway', 'Cohere', 'ASICloud', 'TavilySearch', 'Playwright', 'YouDotCom', 'Replicate', 'ResearchSuite', 'CloudSandbox', 'HumanPilot'],
             'ORCHESTRATION': ['ALL']
         };
 

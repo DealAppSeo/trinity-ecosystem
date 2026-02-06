@@ -42,6 +42,32 @@ export class AlphaVantageMCP extends BaseMCP {
             },
             execute: this.getSentiment.bind(this)
         });
+
+        this.registerTool({
+            name: 'get_company_fundamentals',
+            description: 'Get income statement, balance sheet, or cash flow for a symbol.',
+            schema: {
+                type: 'object',
+                properties: {
+                    symbol: { type: 'string' },
+                    function: {
+                        type: 'string',
+                        enum: ['INCOME_STATEMENT', 'BALANCE_SHEET', 'CASH_FLOW', 'EARNINGS'],
+                        default: 'INCOME_STATEMENT'
+                    }
+                },
+                required: ['symbol']
+            },
+            execute: this.getFundamentals.bind(this)
+        });
+    }
+
+    private async getFundamentals(args: { symbol: string, function?: string }): Promise<string> {
+        const func = args.function || 'INCOME_STATEMENT';
+        const url = `${this.baseUrl}?function=${func}&symbol=${args.symbol}&apikey=${this.apiKey}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        return JSON.stringify(data, null, 2);
     }
 
     private async getStockQuote(args: { symbol: string }): Promise<string> {

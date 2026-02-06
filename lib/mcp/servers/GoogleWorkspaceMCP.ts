@@ -60,6 +60,39 @@ export class GoogleWorkspaceMCP extends BaseMCP {
             },
             execute: this.createSpreadsheet.bind(this)
         });
+
+        this.registerTool({
+            name: 'read_spreadsheet',
+            description: 'Read data from a Google Spreadsheet range.',
+            schema: {
+                type: 'object',
+                properties: {
+                    spreadsheetId: { type: 'string' },
+                    range: { type: 'string', description: 'Sheet range e.g. "Sheet1!A1:Z100"' }
+                },
+                required: ['spreadsheetId', 'range']
+            },
+            execute: this.readSpreadsheet.bind(this)
+        });
+
+        this.registerTool({
+            name: 'update_spreadsheet_values',
+            description: 'Update or append values to a Google Spreadsheet.',
+            schema: {
+                type: 'object',
+                properties: {
+                    spreadsheetId: { type: 'string' },
+                    range: { type: 'string', description: 'Starting cell e.g. "Sheet1!A1"' },
+                    rows: {
+                        type: 'array',
+                        items: { type: 'array', items: { type: 'string' } },
+                        description: '2D array of strings'
+                    }
+                },
+                required: ['spreadsheetId', 'range', 'rows']
+            },
+            execute: this.updateSpreadsheet.bind(this)
+        });
     }
 
     private async listEvents(args: any): Promise<string> {
@@ -110,9 +143,39 @@ export class GoogleWorkspaceMCP extends BaseMCP {
                 });
             }
 
-            return `Spreadsheet created: ${spreadsheet.data.spreadsheetUrl}`;
+            return `Spreadsheet created: ${spreadsheet.data.spreadsheetUrl}. ID: ${spreadsheetId}`;
         } catch (e: any) {
             return `Failed to create spreadsheet: ${e.message}`;
+        }
+    }
+
+    private async readSpreadsheet(args: { spreadsheetId: string, range: string }): Promise<string> {
+        if (!this.auth) throw new Error('Not authenticated');
+        const sheets = google.sheets({ version: 'v4', auth: this.auth });
+        try {
+            const res = await sheets.spreadsheets.values.get({
+                spreadsheetId: args.spreadsheetId,
+                range: args.range
+            });
+            return JSON.stringify(res.data.values, null, 2);
+        } catch (e: any) {
+            return `Error reading spreadsheet: ${e.message}`;
+        }
+    }
+
+    private async updateSpreadsheet(args: { spreadsheetId: string, range: string, rows: string[][] }): Promise<string> {
+        if (!this.auth) throw new Error('Not authenticated');
+        const sheets = google.sheets({ version: 'v4', auth: this.auth });
+        try {
+            await sheets.spreadsheets.values.update({
+                spreadsheetId: args.spreadsheetId,
+                range: args.range,
+                valueInputOption: 'RAW',
+                requestBody: { values: args.rows }
+            });
+            return `Successfully updated spreadsheet ${args.spreadsheetId} at ${args.range}`;
+        } catch (e: any) {
+            return `Error updating spreadsheet: ${e.message}`;
         }
     }
 }

@@ -57,77 +57,79 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
                     </p>
 
                     {/* Current Activity Display */}
-                    {(agent as any).current_task_summary || agent.currentTask ? (
-                        <div className="flex items-center gap-2 mt-auto animate-in fade-in slide-in-from-left-2 duration-500">
-                            <div className={cn(
-                                "w-1.5 h-1.5 rounded-full animate-pulse",
-                                ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('clarification')
-                                    ? "bg-amber-500 shadow-[0_0_8px_#fbbf24]"
-                                    : (((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('verifying') ||
-                                        ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('reviewing'))
-                                        ? "bg-cyan-500 shadow-[0_0_8px_#06b6d4]"
-                                        : "bg-green-500 shadow-[0_0_8px_#22c55e]"
-                            )} />
-                            <p className={cn(
-                                "text-[10px] font-mono line-clamp-2 leading-tight",
-                                ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('clarification')
-                                    ? "text-amber-400"
-                                    : (((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('verifying') ||
-                                        ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('reviewing'))
-                                        ? "text-cyan-400"
-                                        : "text-green-400"
-                            )} title={(agent as any).current_task_summary || agent.currentTask?.title}>
-                                {(agent as any).current_task_summary || agent.currentTask?.title}
-                            </p>
+                    <div className="mt-auto">
+                        <span className="text-[8px] text-zinc-600 font-bold uppercase tracking-wider mb-1 block">Current Work</span>
+                        {(agent as any).current_task_summary || agent.currentTask ? (
+                            <div className="flex items-center gap-2 mt-auto animate-in fade-in slide-in-from-left-2 duration-500">
+                                <div className={cn(
+                                    "w-1.5 h-1.5 rounded-full animate-pulse",
+                                    ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('clarification')
+                                        ? "bg-amber-500 shadow-[0_0_8px_#fbbf24]"
+                                        : (((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('verifying') ||
+                                            ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('reviewing'))
+                                            ? "bg-cyan-500 shadow-[0_0_8px_#06b6d4]"
+                                            : "bg-green-500 shadow-[0_0_8px_#22c55e]"
+                                )} />
+                                <p className={cn(
+                                    "text-[10px] font-mono line-clamp-2 leading-tight",
+                                    ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('clarification')
+                                        ? "text-amber-400"
+                                        : (((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('verifying') ||
+                                            ((agent as any).current_task_summary || agent.currentTask?.title)?.toLowerCase().includes('reviewing'))
+                                            ? "text-cyan-400"
+                                            : "text-green-400"
+                                )} title={(agent as any).current_task_summary || agent.currentTask?.title}>
+                                    {(agent as any).current_task_summary || agent.currentTask?.title}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 mt-auto opacity-50">
+                                <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+                                <p className="text-[10px] text-zinc-600 font-mono">Idle</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right: Metrics Stack (Right Aligned) */}
+                    <div className="flex flex-col items-end space-y-1">
+                        <div className={cn(
+                            "w-2.5 h-2.5 rounded-full mb-3 shadow-[0_0_8px_currentColor] transition-all duration-500",
+                            agent.status === 'amber' ? "bg-amber-500 text-amber-500" :
+                                agent.status === 'blue' ? "bg-blue-500 text-blue-500" :
+                                    (isOnline || agent.status === 'online' || agent.status === 'active' || agent.status === 'green') ? "bg-green-500 text-green-500" :
+                                        "bg-zinc-800 text-zinc-800"
+                        )} />
+
+                        <div className="flex items-center gap-3 text-right">
+                            <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Rep</span>
+                            <span className={cn("text-lg font-bold leading-none", roleColor)}>
+                                {typeof agent.reputation_score === 'number' ? agent.reputation_score.toFixed(1) : agent.reputation_score || 0}
+                            </span>
                         </div>
-                    ) : (
-                        <div className="flex items-center gap-2 mt-auto opacity-50">
-                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
-                            <p className="text-[10px] text-zinc-600 font-mono">Idle</p>
+                        <div className="flex items-center gap-3 text-right">
+                            <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Tasks</span>
+                            <span className="text-sm font-bold text-zinc-400 leading-none">{agent.tasks_completed || 0}</span>
                         </div>
-                    )}
+                        <div className="flex items-center gap-3 text-right">
+                            <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Uptime</span>
+                            <span className="text-sm font-bold text-zinc-400 leading-none">{uptimeDisplay}</span>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Right: Metrics Stack (Right Aligned) */}
-                <div className="flex flex-col items-end space-y-1">
-                    <div className={cn(
-                        "w-2.5 h-2.5 rounded-full mb-3 shadow-[0_0_8px_currentColor] transition-all duration-500",
-                        agent.status === 'amber' ? "bg-amber-500 text-amber-500" :
-                            agent.status === 'blue' ? "bg-blue-500 text-blue-500" :
-                                (isOnline || agent.status === 'online' || agent.status === 'active' || agent.status === 'green') ? "bg-green-500 text-green-500" :
-                                    "bg-zinc-800 text-zinc-800"
-                    )} />
-
-                    <div className="flex items-center gap-3 text-right">
-                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Rep</span>
-                        <span className={cn("text-lg font-bold leading-none", roleColor)}>
-                            {typeof agent.reputation_score === 'number' ? agent.reputation_score.toFixed(1) : agent.reputation_score || 0}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-right">
-                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Tasks</span>
-                        <span className="text-sm font-bold text-zinc-400 leading-none">{agent.tasks_completed || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-right">
-                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Uptime</span>
-                        <span className="text-sm font-bold text-zinc-400 leading-none">{uptimeDisplay}</span>
-                    </div>
+                {/* Bottom Progress Bar (Slim, Figma Style) */}
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900/50">
+                    <div
+                        className={cn("h-full transition-all duration-1000 ease-out shadow-[0_0_10px_currentColor]", barColor)}
+                        style={{ width: `${Math.min((agent.reputation_score || 0), 100)}%` }}
+                    />
                 </div>
-            </div>
 
-            {/* Bottom Progress Bar (Slim, Figma Style) */}
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900/50">
-                <div
-                    className={cn("h-full transition-all duration-1000 ease-out shadow-[0_0_10px_currentColor]", barColor)}
-                    style={{ width: `${Math.min((agent.reputation_score || 0), 100)}%` }}
-                />
-            </div>
-
-            {/* Subtle Gradient Glow */}
-            <div className={cn(
-                "absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-[50px] opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none",
-                barColor
-            )} />
+                {/* Subtle Gradient Glow */}
+                <div className={cn(
+                    "absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-[50px] opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none",
+                    barColor
+                )} />
         </Link>
     );
 }

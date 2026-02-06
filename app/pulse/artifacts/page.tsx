@@ -45,14 +45,37 @@ export default function ArtifactsPage() {
     const [showUnlockModal, setShowUnlockModal] = useState(false);
     const [pendingArtifact, setPendingArtifact] = useState<Artifact | null>(null);
 
-    // Initial Fetch (Public Data Only - Counts)
     useEffect(() => {
         fetchArtifacts(true);
         fetchTotalCounts();
         if (localStorage.getItem('trinity_registration')) {
             setHasRegistered(true);
         }
+
+        // DEEP LINKING SUPPORT
+        const params = new URLSearchParams(window.location.search);
+        const artId = params.get('id');
+        if (artId) {
+            fetchSingleArtifact(artId);
+        }
     }, []);
+
+    const fetchSingleArtifact = async (id: string) => {
+        const { data, error } = await supabase.from('trinity_artifacts').select('*').eq('id', id).single();
+        if (!error && data) {
+            handleArtifactClick({
+                id: data.id,
+                title: data.title || 'Untitled',
+                type: data.artifact_type || 'document',
+                content: data.content || '',
+                createdAt: data.created_at,
+                shareCount: 0,
+                accessLevel: data.access_level || 'protected',
+                url: data.external_url || data.file_path,
+                creator_agent: data.creator_agent || data.agent
+            });
+        }
+    };
 
     const fetchTotalCounts = async () => {
         try {
@@ -142,6 +165,23 @@ export default function ArtifactsPage() {
 
     const handleArtifactClick = (artifact: Artifact) => {
         setSelectedArtifact(artifact);
+        // Update URL for deep linking
+        const url = new URL(window.location.href);
+        url.searchParams.set('id', artifact.id);
+        window.history.pushState({}, '', url.toString());
+    };
+
+    const handleCloseModal = () => {
+        setSelectedArtifact(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('id');
+        window.history.pushState({}, '', url.toString());
+    };
+
+    const handleShare = (artifact: Artifact) => {
+        const shareUrl = `${window.location.origin}/pulse/artifacts?id=${artifact.id}`;
+        navigator.clipboard.writeText(shareUrl);
+        toast.info('Link copied to clipboard!');
     };
 
     const getTypeIcon = (type: string) => {
@@ -188,7 +228,7 @@ export default function ArtifactsPage() {
                     <button
                         onClick={() => setActiveCategory('all')}
                         className={cn(
-                            "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 border",
+                            "px-8 py-4 rounded-xl text-lg font-bold transition-all duration-300 border uppercase tracking-wider",
                             activeCategory === 'all'
                                 ? "bg-violet-500/20 border-violet-500/50 text-violet-400 shadow-glow-violet"
                                 : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10"
@@ -207,15 +247,15 @@ export default function ArtifactsPage() {
                             key={cat.id}
                             onClick={() => setActiveCategory(cat.id)}
                             className={cn(
-                                "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 border flex items-center gap-2",
+                                "px-8 py-4 rounded-xl text-lg font-bold transition-all duration-300 border flex items-center gap-4 uppercase tracking-wider",
                                 activeCategory === cat.id
-                                    ? "bg-white/10 border-white/20 shadow-lg"
+                                    ? "bg-white/10 border-white/20 shadow-lg text-white"
                                     : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10"
                             )}
                         >
-                            <cat.icon className={cn("w-4 h-4", activeCategory === cat.id ? cat.color : "text-gray-500")} />
-                            <span className={activeCategory === cat.id ? "text-white" : ""}>{cat.label}</span>
-                            <span className="text-[10px] opacity-50 bg-white/5 px-1.5 rounded">{counts[cat.id] || 0}</span>
+                            <cat.icon className={cn("w-6 h-6", activeCategory === cat.id ? cat.color : "text-gray-500")} />
+                            <span>{cat.label}</span>
+                            <span className="text-sm opacity-60 bg-white/5 px-3 py-1 rounded-full">{counts[cat.id] || 0}</span>
                         </button>
                     ))}
                 </div>
@@ -227,9 +267,9 @@ export default function ArtifactsPage() {
                             placeholder="Search artifacts..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-4 text-sm text-white focus:outline-none focus:border-violet-500 transition-all pl-10"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-6 text-base text-white focus:outline-none focus:border-violet-500 transition-all pl-12"
                         />
-                        <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+                        <FileText className="absolute left-4 top-3.5 w-5 h-5 text-gray-500" />
                     </div>
                 </div>
             </div>
@@ -262,19 +302,29 @@ export default function ArtifactsPage() {
                                         <span className="text-xs text-gray-500 capitalize">{artifact.type}</span>
                                     </div>
                                 </div>
-                                <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                        <div className="w-4 h-4 rounded-full bg-violet-500 flex items-center justify-center text-[8px] font-bold text-white">
-                                            {(artifact.creator_agent || 'A')[0].toUpperCase()}
+                                <div className="mt-4 pt-3 border-t border-white/5 flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <div className="w-4 h-4 rounded-full bg-violet-500 flex items-center justify-center text-[8px] font-bold text-white">
+                                                {(artifact.creator_agent || 'A')[0].toUpperCase()}
+                                            </div>
+                                            <span className="text-[10px] text-zinc-400 font-mono truncate uppercase">
+                                                BY: {artifact.creator_agent?.replace('trinity-', '') || 'AGENT'}
+                                            </span>
                                         </div>
-                                        <span className="text-[10px] text-zinc-500 font-mono truncate uppercase">
-                                            {artifact.creator_agent?.replace('trinity-', '') || 'AGENT'}
-                                        </span>
+                                        <div className="flex items-center gap-1 opacity-50">
+                                            <Clock className="w-3 h-3 text-zinc-600" />
+                                            <span className="text-[8px] text-zinc-600 font-bold uppercase tracking-tighter">Completed</span>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-1 opacity-50">
-                                        <Clock className="w-3 h-3 text-zinc-600" />
-                                        <span className="text-[8px] text-zinc-600 font-bold uppercase tracking-tighter">Completed</span>
-                                    </div>
+                                    {artifact.verified_by && artifact.verified_by.length > 0 && (
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <ShieldAlert className="w-3 h-3 text-green-500/50" />
+                                            <span className="text-[8px] text-zinc-500 font-mono truncate uppercase">
+                                                VERIFIED BY: {artifact.verified_by.join(', ').replace(/trinity-/g, '')}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -299,18 +349,53 @@ export default function ArtifactsPage() {
             {/* Artifact Viewer Modal */}
             {selectedArtifact && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setSelectedArtifact(null)} />
-                    <div className="relative glass rounded-2xl p-6 w-full max-w-4xl border border-white/20 glow-violet max-h-[90vh] overflow-y-auto flex flex-col">
-                        <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-2xl font-bold text-white">{selectedArtifact.title}</h3>
-                            <button onClick={() => setSelectedArtifact(null)} className="text-gray-400 hover:text-white p-2">✕</button>
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={handleCloseModal} />
+                    <div className="relative glass rounded-2xl p-6 w-full max-w-4xl border border-white/20 glow-violet max-h-[90vh] overflow-y-auto flex flex-col scale-in-center">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h3 className="text-2xl font-bold text-white mb-1">{selectedArtifact.title}</h3>
+                                <div className="flex items-center gap-4 text-xs text-gray-400">
+                                    <span className="flex items-center gap-1 uppercase font-mono tracking-widest text-violet-400">
+                                        {selectedArtifact.creator_agent?.replace('trinity-', '')}
+                                    </span>
+                                    <span>•</span>
+                                    <span>{new Date(selectedArtifact.createdAt).toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleShare(selectedArtifact)}
+                                    className="p-2.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg border border-white/10 transition-all flex items-center gap-2 text-sm font-bold"
+                                    title="Copy Deep Link"
+                                >
+                                    <Share2 className="w-5 h-5" />
+                                    <span>Share</span>
+                                </button>
+                                {selectedArtifact.url && (
+                                    <a
+                                        href={selectedArtifact.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-2.5 bg-violet-600/20 hover:bg-violet-600/40 text-violet-400 rounded-lg border border-violet-500/30 transition-all flex items-center gap-2 text-sm font-bold"
+                                        title="View Source File"
+                                    >
+                                        <Eye className="w-5 h-5" />
+                                        <span>Source</span>
+                                    </a>
+                                )}
+                                <button onClick={handleCloseModal} className="text-gray-400 hover:text-white p-2 text-xl ml-2">✕</button>
+                            </div>
                         </div>
-                        <div className="bg-[#0B0B0F] p-6 rounded-lg font-mono text-sm text-gray-300 whitespace-pre-wrap overflow-auto flex-1 border border-white/5">
+                        <div className="bg-[#0B0B0F] p-6 rounded-lg font-mono text-sm text-gray-300 whitespace-pre-wrap overflow-auto flex-1 border border-white/5 shadow-inner">
                             <ArtifactContent content={selectedArtifact.content} type={selectedArtifact.type} />
                         </div>
                     </div>
                 </div>
             )}
+            {/* Storage Info Footnote */}
+            <div className="mt-12 text-center text-[10px] text-gray-600 font-mono uppercase tracking-widest opacity-40">
+                Artifacts are stored in Supabase Trinity Registry & Mirrored to /artifacts/ for persistence
+            </div>
         </div>
     );
 }
