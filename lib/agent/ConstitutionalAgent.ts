@@ -10,6 +10,7 @@ import { IntelligenceRouter, PROVIDER_REGISTRY } from './IntelligenceRouter';
 import { EvolutionaryLogger } from './EvolutionaryLogger';
 import { Octokit } from '@octokit/rest';
 import { notificationManager } from '../notification/NotificationManager';
+import { DETERMINISTIC_WORKFLOWS } from './deterministicWorkflows';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
@@ -1292,6 +1293,23 @@ ${result.substring(0, 2000)}
                 ? `\n[INTELLIGENCE ROUTER] Suggested tools: ${toolSuggestions.join(', ')}.\n`
                 : "";
 
+            // [ANTIGRAVITY] DETERMINISTIC WORKFLOW INJECTION
+            let workflowDirective = "";
+            const activeWorkflow = DETERMINISTIC_WORKFLOWS.find(w =>
+                (w.agent_name === this.name || this.name.includes(w.agent_name)) &&
+                (task.title.includes(w.task_pattern) || task.description?.includes(w.task_pattern))
+            );
+
+            if (activeWorkflow) {
+                console.log(`[${this.name}] 🤖 DETERMINISTIC WORKFLOW ACTIVE: ${activeWorkflow.task_pattern}`);
+                workflowDirective = `\n\n[MANDATORY EXECUTION PROTOCOL: DETERMINISTIC WORKFLOW]\n`;
+                workflowDirective += `You MUST follow these specific steps in order:\n`;
+                activeWorkflow.steps.forEach((step, idx) => {
+                    workflowDirective += `${idx + 1}. ${step.instruction} (Suggested Tools: ${step.tool_suggestions?.join(', ') || 'N/A'})\n`;
+                });
+                workflowDirective += `\nDo NOT deviate from this sequence. Each step must be explicitly addressed in your execution log.\n`;
+            }
+
             this.currentTaskId = String(task.id);
             const prompt = `
 ### DIRECTIVE
@@ -1299,6 +1317,7 @@ ${directive}
 ${actionDirective}
 ${mermaidRequirement}
 ${toolPrompt}
+${workflowDirective}
 
 ### INSTRUCTIONS
 ${task.description}

@@ -393,7 +393,10 @@ export default function TasksPage() {
                                     columnTasks.map((task) => (
                                         <div
                                             key={task.id}
-                                            onClick={() => setSelectedTask(task)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedTask(task);
+                                            }}
                                             className={`glass-light rounded-lg p-4 border ${getTaskPriorityColorV2(task.priority)} hover:scale-[1.02] transition-all duration-200 cursor-pointer shadow-lg`}
                                             draggable
                                             onDragStart={(e) => {

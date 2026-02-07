@@ -47,7 +47,10 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
     return (
         <>
             <div
-                onClick={() => setIsDetailOpen(true)}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsDetailOpen(true);
+                }}
                 className="group relative bg-[#0B0B0F]/80 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-violet-500/50 hover:shadow-[0_0_30px_rgba(139,92,246,0.15)] transition-all duration-500 overflow-hidden cursor-pointer"
             >
                 <div className="flex justify-between items-start z-10 w-full">
