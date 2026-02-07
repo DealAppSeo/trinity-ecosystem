@@ -385,7 +385,7 @@ export default function ArtifactsPage() {
                                         <span className="text-[10px] text-violet-400 font-black uppercase tracking-[0.3em] block mb-1">Knowledge Artifact / v1.0</span>
                                         <h3 className="text-3xl font-black text-white tracking-tight">{selectedArtifact.title}</h3>
                                         <div className="flex items-center gap-3 mt-2">
-                                            <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-500 uppercase tracking-widest">UID: {selectedArtifact.id.slice(0, 12)}</div>
+                                            <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-500 uppercase tracking-widest">UID: {String(selectedArtifact.id).slice(0, 12)}</div>
                                             <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-500 tracking-widest">{new Date(selectedArtifact.createdAt).toLocaleString()}</div>
                                         </div>
                                     </div>
