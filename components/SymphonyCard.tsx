@@ -6,6 +6,7 @@ import { AgentRegistryRecord } from '@/lib/agent/types';
 import { Activity, Clock, Award, Layers } from 'lucide-react';
 import { RepIdBadge } from '@/components/ui/RepIdBadge';
 import { getGroupForAgent } from '@/lib/agent/groups';
+import { AGENT_WISDOM } from '@/lib/agent/wisdom';
 import { cn } from '@/lib/utils';
 import { AgentDetailModal } from './modals/AgentDetailModal';
 
@@ -20,6 +21,7 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
     const isRecentlyActive = lastHeartbeat && (Date.now() - lastHeartbeat.getTime() < 5 * 60 * 1000);
     const isOnline = isRecentlyActive && ['online', 'active', 'green', 'blue', 'amber', 'working', 'idle'].includes(agent.status);
     const group = getGroupForAgent(agent.agent_name);
+    const wisdom = AGENT_WISDOM[agent.agent_name];
 
     // Derive visual role from Group
     const role = group?.focus.split(' - ')[0] || 'Autonomous Agent';
