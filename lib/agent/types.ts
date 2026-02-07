@@ -88,6 +88,12 @@ export interface AgentRegistryRecord {
     system_prompt?: string; // Dynamic Directive from Control Plane
     currentTask?: Task | null;
     lastHeartbeat?: string | null;
+    // UI ENRICHMENT
+    group_name?: string;
+    current_task_summary?: string;
+    uptime?: string;
+    identity?: string;
+    mission?: string;
     // GOVERNANCE ENRICHMENT
     soulbound_token_hash?: string;
     belief_score?: number;

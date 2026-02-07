@@ -11,6 +11,7 @@ import { TaskRecord } from '@/lib/agent/types';
 import { useToast } from '@/components/ui/Toast';
 import { UnlockModal, RegistrationModal } from '@/components/AccessModals';
 import ArtifactContent from '@/components/ArtifactContent';
+import { TaskDetailModal } from '@/components/modals/TaskDetailModal';
 
 export default function TasksPage() {
     const { tasks: initialTasks, refresh } = useTrinityController();
@@ -18,6 +19,7 @@ export default function TasksPage() {
     const [tasks, setTasks] = useState<TaskRecord[]>([]);
     const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' });
     const [showNewTaskForm, setShowNewTaskForm] = useState(false);
+    const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
 
     // Artifact Viewer States
     const [selectedArtifact, setSelectedArtifact] = useState<{ title: string; content: string } | null>(null);
@@ -261,11 +263,11 @@ export default function TasksPage() {
     };
 
     const columns = [
-        { id: 'todo', title: 'To Do', icon: Clock, color: 'violet' },
-        { id: 'doing', title: 'Doing', icon: AlertCircle, color: 'cyan' },
-        { id: 'pending_clarification', title: 'Clarify', icon: HelpCircle, color: 'amber' },
-        { id: 'done', title: 'Done', icon: CheckCircle, color: 'orange' },
-        { id: 'verified', title: 'Verified', icon: CheckCircle, color: 'green' },
+        { id: 'todo', title: 'To Do Missions', icon: Clock, color: 'violet' },
+        { id: 'doing', title: 'Active Missions', icon: AlertCircle, color: 'cyan' },
+        { id: 'pending_clarification', title: 'Clarification Needed', icon: HelpCircle, color: 'amber' },
+        { id: 'done', title: 'Done Missions', icon: CheckCircle, color: 'orange' },
+        { id: 'verified', title: 'Verified Missions', icon: CheckCircle, color: 'green' },
     ];
 
     return (
@@ -391,9 +393,13 @@ export default function TasksPage() {
                                     columnTasks.map((task) => (
                                         <div
                                             key={task.id}
-                                            className={`glass-light rounded-lg p-4 border ${getTaskPriorityColorV2(task.priority)} hover:scale-[1.02] transition-all duration-200 cursor-grab active:cursor-grabbing shadow-lg`}
+                                            onClick={() => setSelectedTask(task)}
+                                            className={`glass-light rounded-lg p-4 border ${getTaskPriorityColorV2(task.priority)} hover:scale-[1.02] transition-all duration-200 cursor-pointer shadow-lg`}
                                             draggable
-                                            onDragStart={(e) => e.dataTransfer.setData('taskId', task.id)}
+                                            onDragStart={(e) => {
+                                                e.stopPropagation();
+                                                e.dataTransfer.setData('taskId', task.id);
+                                            }}
                                         >
                                             <div className="mb-3">
                                                 <h4 className="font-bold text-sm mb-1 text-white leading-tight">{task.title}</h4>
@@ -688,6 +694,17 @@ export default function TasksPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Task Detail Modal */}
+            {selectedTask && (
+                <TaskDetailModal
+                    task={selectedTask}
+                    isOpen={!!selectedTask}
+                    onClose={() => setSelectedTask(null)}
+                    onViewArtifact={handleViewArtifact}
+                    onArchive={archiveTask}
+                />
             )}
         </div>
     );

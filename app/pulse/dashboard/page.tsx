@@ -48,15 +48,21 @@ export default function DashboardPage() {
                         <Zap className="w-5 h-5 text-cyan-400" />
                     </div>
                     <div className="text-3xl font-bold mb-1 text-white">{completedTasksCount}</div>
-                    <div className="text-sm text-gray-400">Tasks Completed</div>
+                    <div className="text-sm text-gray-400 flex items-center gap-1.5">
+                        Tasks Completed
+                        <span className="text-[10px] text-zinc-500 font-mono border border-white/10 px-1 rounded">LIFETIME</span>
+                    </div>
                 </div>
 
-                <div className="bg-[#0B0B0F]/80 backdrop-blur-md rounded-xl p-6 border border-green-500/30">
+                <div className="bg-[#0B0B0F]/80 backdrop-blur-md rounded-xl p-6 border border-violet-500/30">
                     <div className="flex items-center justify-between mb-4">
-                        <Activity className="w-8 h-8 text-green-400" />
+                        <Activity className="w-8 h-8 text-violet-400" />
                     </div>
-                    <div className="text-3xl font-bold mb-1 text-white">{systemHealth}%</div>
-                    <div className="text-sm text-gray-400">System Health</div>
+                    <div className="text-3xl font-bold mb-1 text-white">{stats?.active_tasks || 0}</div>
+                    <div className="text-sm text-gray-400 flex items-center gap-1.5">
+                        Active Mission Tasks
+                        <span className="text-[10px] text-zinc-500 font-mono border border-white/10 px-1 rounded uppercase">In Flight</span>
+                    </div>
                 </div>
 
                 <div className="bg-[#0B0B0F]/80 backdrop-blur-md rounded-xl p-6 border border-yellow-500/30">
@@ -64,7 +70,10 @@ export default function DashboardPage() {
                         <Clock className="w-8 h-8 text-yellow-400" />
                     </div>
                     <div className="text-3xl font-bold mb-1 text-white">{totalTasksCount}</div>
-                    <div className="text-sm text-gray-400">Total Tasks</div>
+                    <div className="text-sm text-gray-400 flex items-center gap-1.5">
+                        Current Mission Capacity
+                        <span className="text-[10px] text-zinc-500 font-mono border border-white/10 px-1 rounded uppercase">Active</span>
+                    </div>
                 </div>
             </div>
 

@@ -6,6 +6,7 @@ import { StatusDot } from '@/components/ui/StatusDot';
 import { RepIdBadge } from '@/components/ui/RepIdBadge';
 import { cn } from '@/lib/utils';
 import { AgentRegistryRecord } from '@/lib/agent/types';
+import { AgentDetailModal } from './modals/AgentDetailModal';
 
 interface AgentCardProps {
     agent: AgentRegistryRecord;
@@ -15,87 +16,95 @@ interface AgentCardProps {
 
 export function AgentCard({ agent, isConductor = false, onAssignTask }: AgentCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
 
     const isLocal = agent.agent_name === 'ANTIGRAV';
 
     return (
-        <Card
-            hoverable
-            className={cn(
-                'overflow-hidden',
-                isExpanded && 'ring-1 ring-accent-violet/50'
-            )}
-            onClick={() => setIsExpanded(!isExpanded)}
-        >
-            {/* Collapsed View - Always Visible */}
-            <div className="p-4">
-                {/* Header Row */}
-                <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-text-primary">
-                        {agent.agent_name}
-                    </span>
-                    {isLocal && (
-                        <span className="text-xs text-gold font-medium">★ Local</span>
-                    )}
-                </div>
-
-                {/* Unified Status from Controller SSOT */}
-                <div className="flex items-center gap-3 mb-2">
-                    <StatusDot status={agent.status as any} />
-                    <RepIdBadge score={agent.reputation_score} />
-                </div>
-
-                {/* Task Preview */}
-                <div className="mt-1 flex flex-col gap-0.5">
-                    <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-tighter">Active Priority:</span>
-                    <p className="text-xs text-text-muted truncate font-medium">
-                        {(agent as any).current_task_summary || agent.currentTask?.title || 'Awaiting assignment'}
-                    </p>
-                </div>
-            </div>
-
-            {/* Expanded View - Conditional */}
-            <div
+        <>
+            <Card
+                onClick={() => setIsDetailOpen(true)}
                 className={cn(
-                    'border-t border-obsidian-border bg-obsidian-elevated overflow-hidden transition-all duration-250',
-                    isExpanded ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'
+                    "relative overflow-hidden group cursor-pointer transition-all duration-300",
+                    isExpanded ? "scale-[1.02] shadow-glow-violet" : "hover:border-violet-500/30"
                 )}
             >
-                <div className="p-4 bg-obsidian-elevated">
-                    <h4 className="text-sm font-medium text-text-primary mb-2">
-                        Current Activity
-                    </h4>
-                    <p className="text-sm text-text-secondary mb-4">
-                        {(agent as any).current_task_summary || agent.currentTask?.title || 'No active task'}
-                    </p>
-
-                    {/* Tags */}
-                    <div className="flex flex-wrap gap-2 mb-4">
-                        <span className="text-xs px-2 py-1 bg-obsidian-base rounded text-text-muted">
-                            {agent.current_tier}
+                {/* Collapsed View - Always Visible */}
+                <div className="p-4">
+                    {/* Header Row */}
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold text-text-primary">
+                            {agent.agent_name}
                         </span>
-                        <span className="text-xs px-2 py-1 bg-obsidian-base rounded font-mono text-text-muted">
-                            RepID: {agent.reputation_score}
-                        </span>
-                        <span className="text-xs px-2 py-1 bg-obsidian-base rounded text-text-muted">
-                            Registry SSOT
-                        </span>
+                        {isLocal && (
+                            <span className="text-xs text-gold font-medium">★ Local</span>
+                        )}
                     </div>
 
-                    {/* Conductor Actions */}
-                    {isConductor && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAssignTask?.(agent.agent_name);
-                            }}
-                            className="w-full py-2 bg-accent-violet hover:bg-accent-violet-hover rounded text-sm font-medium text-white transition-colors"
-                        >
-                            Assign Task
-                        </button>
-                    )}
+                    {/* Unified Status from Controller SSOT */}
+                    <div className="flex items-center gap-3 mb-2">
+                        <StatusDot status={agent.status as any} />
+                        <RepIdBadge score={agent.reputation_score} />
+                    </div>
+
+                    {/* Task Preview */}
+                    <div className="mt-1 flex flex-col gap-0.5">
+                        <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-tighter">Active Priority:</span>
+                        <p className="text-xs text-text-muted truncate font-medium">
+                            {(agent as any).current_task_summary || agent.currentTask?.title || 'Awaiting assignment'}
+                        </p>
+                    </div>
                 </div>
-            </div>
-        </Card>
+
+                {/* Expanded View - Conditional */}
+                <div
+                    className={cn(
+                        'border-t border-obsidian-border bg-obsidian-elevated overflow-hidden transition-all duration-250',
+                        isExpanded ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'
+                    )}
+                >
+                    <div className="p-4 bg-obsidian-elevated">
+                        <h4 className="text-sm font-medium text-text-primary mb-2">
+                            Current Activity
+                        </h4>
+                        <p className="text-sm text-text-secondary mb-4">
+                            {(agent as any).current_task_summary || agent.currentTask?.title || 'No active task'}
+                        </p>
+
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            <span className="text-xs px-2 py-1 bg-obsidian-base rounded text-text-muted">
+                                {agent.current_tier}
+                            </span>
+                            <span className="text-xs px-2 py-1 bg-obsidian-base rounded font-mono text-text-muted">
+                                RepID: {agent.reputation_score}
+                            </span>
+                            <span className="text-xs px-2 py-1 bg-obsidian-base rounded text-text-muted">
+                                Registry SSOT
+                            </span>
+                        </div>
+
+                        {/* Conductor Actions */}
+                        {isConductor && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onAssignTask?.(agent.agent_name);
+                                }}
+                                className="w-full py-2 bg-accent-violet hover:bg-accent-violet-hover rounded text-sm font-medium text-white transition-colors"
+                            >
+                                Assign Task
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </Card>
+
+            <AgentDetailModal
+                agent={agent}
+                isOpen={isDetailOpen}
+                onClose={() => setIsDetailOpen(false)}
+            />
+        </>
     );
 }
