@@ -73,7 +73,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onViewArtifact, onArchi
                             Status: {task.status.toUpperCase()}
                         </div>
                         <div className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                            ID: #{task.id.slice(0, 8)}
+                            ID: #{String(task.id).slice(0, 8)}
                         </div>
                     </div>
 
