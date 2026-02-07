@@ -11,10 +11,34 @@ interface AgentGridProps {
 }
 
 const GROUP_CONFIG: Record<string, any> = {
-    'ORCHESTRATION': { color: 'text-violet-400', border: 'border-violet-500/30', bg: 'bg-violet-500/5', label: 'Orchestration Core' },
-    'ALPHA': { color: 'text-blue-400', border: 'border-blue-500/30', bg: 'bg-blue-500/5', label: 'Alpha Squad (Truth)' },
-    'BETA': { color: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/5', label: 'Beta Squad (Care)' },
-    'GAMMA': { color: 'text-amber-400', border: 'border-amber-500/30', bg: 'bg-amber-500/5', label: 'Gamma Squad (Build)' },
+    'ORCHESTRATION': {
+        color: 'text-violet-400',
+        border: 'border-violet-500/30',
+        bg: 'bg-violet-500/5',
+        label: 'Orchestration Core',
+        description: 'The central nervous system. Handles global routing, disputes, and system governance.'
+    },
+    'ALPHA': {
+        color: 'text-blue-400',
+        border: 'border-blue-500/30',
+        bg: 'bg-blue-500/5',
+        label: 'Alpha Squad (Security)',
+        description: 'The front line of defense. Specialized in prompt firewalls, memory auditing, and ethical gating.'
+    },
+    'BETA': {
+        color: 'text-emerald-400',
+        border: 'border-emerald-500/30',
+        bg: 'bg-emerald-500/5',
+        label: 'Beta Squad (Design)',
+        description: 'Focuses on user experience, design analysis, and empathetic system restoration.'
+    },
+    'GAMMA': {
+        color: 'text-amber-400',
+        border: 'border-amber-500/30',
+        bg: 'bg-amber-500/5',
+        label: 'Gamma Squad (Build)',
+        description: 'The engine room. Handles code generation, infrastructure policy, and technical implementation.'
+    },
 };
 
 export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGridProps) {
@@ -64,9 +88,14 @@ export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGr
 
                 return (
                     <div key={groupName} className={`rounded-2xl border ${style.border} ${style.bg} p-6 mb-8`}>
-                        <div className="flex items-center gap-3 mb-6">
-                            <Network className={`w-5 h-5 ${style.color}`} />
-                            <h3 className={`text-sm font-bold uppercase tracking-widest ${style.color}`}>{style.label}</h3>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                            <div className="flex items-center gap-3">
+                                <Network className={`w-5 h-5 ${style.color}`} />
+                                <h3 className={`text-sm font-bold uppercase tracking-widest ${style.color}`}>{style.label}</h3>
+                            </div>
+                            <p className="text-[10px] text-zinc-500 font-medium italic max-w-md">
+                                {style.description || 'Specialized task force dedicated to system optimization.'}
+                            </p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

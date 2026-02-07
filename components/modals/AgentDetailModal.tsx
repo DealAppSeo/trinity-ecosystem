@@ -6,6 +6,8 @@ import { AgentRegistryRecord } from '@/lib/agent/types';
 import { cn } from '@/lib/utils';
 import { StatusDot } from '../ui/StatusDot';
 import { RepIdBadge } from '../ui/RepIdBadge';
+import { AGENT_WISDOM } from '@/lib/agent/wisdom';
+import { getGroupForAgent } from '@/lib/agent/groups';
 
 interface AgentDetailModalProps {
     agent: AgentRegistryRecord & { logs?: any[] };
@@ -22,9 +24,15 @@ export function AgentDetailModal({ agent, isOpen, onClose }: AgentDetailModalPro
             case 'CODE': return <Layout className="w-6 h-6" />;
             case 'INFRA': return <Database className="w-6 h-6" />;
             case 'TRUST': return <Shield className="w-6 h-6" />;
+            case 'ALPHA': return <Shield className="w-6 h-6 text-blue-400" />;
+            case 'BETA': return <Layout className="w-6 h-6 text-emerald-400" />;
+            case 'GAMMA': return <Database className="w-6 h-6 text-amber-400" />;
             default: return <Activity className="w-6 h-6" />;
         }
     };
+
+    const wisdom = AGENT_WISDOM[agent.agent_name];
+    const group = getGroupForAgent(agent.agent_name);
 
     const stats = [
         { label: 'Reputation', value: agent.reputation_score?.toFixed(1) || '0.0', icon: Award, color: 'text-yellow-400' },
@@ -47,7 +55,7 @@ export function AgentDetailModal({ agent, isOpen, onClose }: AgentDetailModalPro
                         <div className="relative">
                             <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-violet-600 to-indigo-700 p-[2px] shadow-2xl">
                                 <div className="w-full h-full rounded-[1.4rem] bg-[#0B0B0F] flex items-center justify-center text-white">
-                                    {getAgentIcon(agent.group_name)}
+                                    {getAgentIcon(agent.group_name || group?.id || 'ALPHA')}
                                 </div>
                             </div>
                             <div className="absolute -bottom-1 -right-1 ring-4 ring-[#0B0B0F] rounded-full overflow-hidden">
@@ -56,11 +64,11 @@ export function AgentDetailModal({ agent, isOpen, onClose }: AgentDetailModalPro
                         </div>
                         <div className="mb-2">
                             <div className="flex items-center gap-3 mb-1">
-                                <h3 className="text-3xl font-black text-white tracking-tight uppercase">{agent.agent_name}</h3>
+                                <h3 className="text-3xl font-black text-white tracking-tight uppercase">{agent.agent_name.replace('trinity-', '')}</h3>
                                 <RepIdBadge score={agent.reputation_score} />
                             </div>
                             <p className="text-violet-400 font-mono text-xs font-bold tracking-[0.3em] uppercase opacity-70">
-                                {agent.group_name} // NODE v2.4
+                                {agent.group_name || group?.name} // NODE v2.4
                             </p>
                         </div>
                     </div>
@@ -98,12 +106,14 @@ export function AgentDetailModal({ agent, isOpen, onClose }: AgentDetailModalPro
                             <div className="flex items-start gap-4">
                                 <div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse mt-1.5 shrink-0" />
                                 <div>
-                                    <h5 className="font-bold text-lg text-white mb-2">{agent.current_task_summary || "Observing Environment"}</h5>
+                                    <h5 className="font-bold text-lg text-white mb-2">{agent.current_task_summary || (agent as any).currentTask?.title || "Observing Environment"}</h5>
                                     <p className="text-sm text-zinc-400 leading-relaxed mb-4">
                                         {agent.currentTask?.description || "Agent is currently processing telemetry and awaiting decentralized mission assignments."}
                                     </p>
                                     <div className="flex gap-2">
-                                        <span className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-500">TASK_ID: {agent.currentTask?.id?.slice(0, 8) || 'N/A'}</span>
+                                        <span className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-500">
+                                            TASK_ID: {agent.currentTask?.id ? String(agent.currentTask.id).slice(0, 8) : 'N/A'}
+                                        </span>
                                         <span className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-500">MEMORY_LOAD: 2.4 GB</span>
                                     </div>
                                 </div>
@@ -117,15 +127,35 @@ export function AgentDetailModal({ agent, isOpen, onClose }: AgentDetailModalPro
                             <Cpu className="w-3 h-3 text-cyan-400" /> Identity Matrix
                         </h4>
                         <div className="p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs text-zinc-400">Core Identity:</span>
-                                <span className="text-xs text-white font-bold">{agent.identity || "Autonomous Swarm Intelligent"}</span>
+                            <div className="flex justify-between items-start gap-4">
+                                <span className="text-xs text-zinc-400 shrink-0 mt-1">Core Identity:</span>
+                                <div className="text-right">
+                                    <div className="text-xs text-white font-bold">{wisdom?.role?.toUpperCase() || agent.identity || "Autonomous Swarm Intelligent"}</div>
+                                    <p className="text-[10px] text-zinc-500 mt-1 max-w-xs">{agent.mission || "System Integrity & Optimization"}</p>
+                                </div>
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs text-zinc-400">Primary Mission:</span>
-                                <span className="text-xs text-white font-bold">{agent.mission || "System Integrity & Optimization"}</span>
-                            </div>
+
                             <div className="h-px bg-white/5 w-full" />
+
+                            <div className="flex justify-between items-start gap-4">
+                                <span className="text-xs text-zinc-400 shrink-0">Squad Focus:</span>
+                                <div className="text-right">
+                                    <span className="text-[10px] text-violet-400 font-bold uppercase tracking-wider bg-violet-400/10 px-2 py-0.5 rounded border border-violet-400/20">{agent.group_name || group?.id}</span>
+                                    <p className="text-[10px] text-zinc-500 mt-1 max-w-xs">{group?.description || "Specialized functional unit within the Trinity Ecosystem."}</p>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 pt-2">
+                                <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-tighter">Specialties:</span>
+                                {(wisdom?.specialties || ['Autonomous Operations', 'Truth Verification', 'System Resilience']).map((spec, i) => (
+                                    <span key={i} className="text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400 font-medium">
+                                        {spec}
+                                    </span>
+                                ))}
+                            </div>
+
+                            <div className="h-px bg-white/5 w-full" />
+
                             <div className="flex justify-between items-center">
                                 <span className="text-xs text-zinc-400">Last Telemetry:</span>
                                 <span className="text-xs text-zinc-500 font-mono">{new Date(agent.last_active || 0).toLocaleString()}</span>

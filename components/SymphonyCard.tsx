@@ -53,12 +53,17 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
                 }}
                 className="group relative bg-[#0B0B0F]/80 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-violet-500/50 hover:shadow-[0_0_30px_rgba(139,92,246,0.15)] transition-all duration-500 overflow-hidden cursor-pointer"
             >
-                <div className="flex justify-between items-start z-10 w-full">
+                <div className="flex justify-between items-start z-10 w-full mb-4">
                     {/* Left: Identity */}
-                    <div className="flex flex-col flex-1 min-w-[80px] pr-2">
-                        <h3 className="text-lg font-bold text-white tracking-tight group-hover:text-white/90 transition-colors line-clamp-1 break-all" title={agent.agent_name}>
-                            {agent.agent_name.replace('trinity-', '').toUpperCase()}
+                    <div className="flex flex-col gap-1 flex-1 min-w-[80px] pr-2">
+                        <h3 className="text-lg font-black text-white tracking-tight uppercase group-hover:text-violet-400 transition-colors uppercase truncate max-w-[120px]">
+                            {agent.agent_name.replace('trinity-', '')}
                         </h3>
+                        {wisdom?.specialties?.[0] && (
+                            <span className="text-[8px] font-bold text-violet-400/80 uppercase tracking-widest bg-violet-400/5 px-2 py-0.5 rounded border border-violet-400/10 self-start">
+                                {wisdom.specialties[0]}
+                            </span>
+                        )}
                         <p className="text-[10px] font-semibold text-zinc-500 mt-1 mb-2 truncate">
                             {role}
                         </p>
