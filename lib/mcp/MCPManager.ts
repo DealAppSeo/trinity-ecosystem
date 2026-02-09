@@ -27,6 +27,8 @@ import { ReplicateMCP } from './servers/ReplicateMCP';
 import { ResearchMCP } from './servers/ResearchMCP';
 import { E2BMCP } from './servers/E2BMCP';
 import { HumanMCP } from './servers/HumanMCP';
+import { NotionMCP } from './servers/NotionMCP';
+import { BraveMCP } from './servers/BraveMCP';
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -63,6 +65,8 @@ export class MCPManager {
         this.registerServer(new ResearchMCP());
         this.registerServer(new E2BMCP());
         this.registerServer(new HumanMCP());
+        this.registerServer(new NotionMCP());
+        this.registerServer(new BraveMCP());
     }
 
     registerServer(server: MCPServer) {
@@ -101,9 +105,9 @@ export class MCPManager {
 
         // Define Role-to-Server Mappings (Hardened for Redundancy)
         const accessMap: Record<string, string[]> = {
-            'ALPHA_SQUAD': ['TavilySearch', 'AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Playwright', 'Supabase', 'PlaywrightExpert', 'YouDotCom', 'Cohere', 'Replicate', 'ResearchSuite', 'CloudSandbox', 'HumanPilot'],
-            'BETA_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Playwright', 'Composio', 'stitch', 'CreativeSuite', 'PlaywrightExpert', 'HuggingFace', 'TavilySearch', 'YouDotCom', 'Replicate', 'ResearchSuite', 'CloudSandbox', 'HumanPilot'],
-            'GAMMA_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio', 'stitch', 'PlaywrightExpert', 'Redis', 'Railway', 'Cohere', 'ASICloud', 'TavilySearch', 'Playwright', 'YouDotCom', 'Replicate', 'ResearchSuite', 'CloudSandbox', 'HumanPilot'],
+            'ALPHA_SQUAD': ['TavilySearch', 'BraveSearch', 'AlphaVantage', 'GoogleWorkspace', 'FileSystem', 'Playwright', 'Supabase', 'PlaywrightExpert', 'YouDotCom', 'Cohere', 'Replicate', 'ResearchSuite', 'CloudSandbox', 'HumanPilot', 'Notion'],
+            'BETA_SQUAD': ['Figma', 'GitHub', 'FileSystem', 'Playwright', 'Composio', 'stitch', 'CreativeSuite', 'PlaywrightExpert', 'HuggingFace', 'TavilySearch', 'BraveSearch', 'YouDotCom', 'Replicate', 'ResearchSuite', 'CloudSandbox', 'HumanPilot'],
+            'GAMMA_SQUAD': ['GitHub', 'Supabase', 'GoogleWorkspace', 'FileSystem', 'Composio', 'stitch', 'PlaywrightExpert', 'Redis', 'Railway', 'Cohere', 'ASICloud', 'TavilySearch', 'BraveSearch', 'Playwright', 'YouDotCom', 'Replicate', 'ResearchSuite', 'CloudSandbox', 'HumanPilot'],
             'ORCHESTRATION': ['ALL']
         };
 

@@ -48,6 +48,34 @@ export class RailwayMCP extends BaseMCP {
                     required: ['service_id', 'environment_id']
                 },
                 execute: async (args: any) => this.callTool('restart_railway_service', args)
+            },
+            {
+                name: 'list_railway_variables',
+                description: 'List all environment variables for a specific service and environment.',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        service_id: { type: 'string' },
+                        environment_id: { type: 'string' }
+                    },
+                    required: ['service_id', 'environment_id']
+                },
+                execute: async (args: any) => this.callTool('list_railway_variables', args)
+            },
+            {
+                name: 'upsert_railway_variable',
+                description: 'Upsert (create or update) an environment variable for a service.',
+                schema: {
+                    type: 'object',
+                    properties: {
+                        service_id: { type: 'string' },
+                        environment_id: { type: 'string' },
+                        name: { type: 'string', description: 'The name of the variable (e.g. API_KEY)' },
+                        value: { type: 'string', description: 'The value to set' }
+                    },
+                    required: ['service_id', 'environment_id', 'name', 'value']
+                },
+                execute: async (args: any) => this.callTool('upsert_railway_variable', args)
             }
         ];
     }
@@ -91,6 +119,28 @@ export class RailwayMCP extends BaseMCP {
             `;
             const data = await this.fetchRailway(mutation, { serviceId: service_id, environmentId: environment_id });
             return JSON.stringify({ success: !!data, result: data });
+        }
+
+        if (toolName === 'list_railway_variables') {
+            const { service_id, environment_id } = args;
+            const query = `
+                query variables($serviceId: String!, $environmentId: String!) {
+                  variables(serviceId: $serviceId, environmentId: $environmentId)
+                }
+            `;
+            const data = await this.fetchRailway(query, { serviceId: service_id, environmentId: environment_id });
+            return JSON.stringify(data, null, 2);
+        }
+
+        if (toolName === 'upsert_railway_variable') {
+            const { service_id, environment_id, name, value } = args;
+            const mutation = `
+                mutation variableUpsert($serviceId: String!, $environmentId: String!, $name: String!, $value: String!) {
+                  variableUpsert(input: { serviceId: $serviceId, environmentId: $environmentId, name: $name, value: $value })
+                }
+            `;
+            const data = await this.fetchRailway(mutation, { serviceId: service_id, environmentId: environment_id, name, value });
+            return JSON.stringify({ success: !!data });
         }
 
         throw new Error(`Tool ${toolName} not supported.`);

@@ -25,7 +25,10 @@ export class KnowledgeMCP extends BaseMCP {
                 required: ['query']
             },
             execute: async (args: any) => {
-                if (!apiKey) return "Error: DOCUMENT360_API_KEY is not configured.";
+                if (!apiKey) {
+                    console.warn(`[Knowledge] ⚠️ DOCUMENT360_API_KEY missing. Falling back to TavilySearch.`);
+                    return `Note: Primary DB offline. FALLBACK SEARCH: No internal articles found, please use search_web instead.`;
+                }
 
                 console.log(`[Knowledge] 📚 Searching Document360: ${args.query}`);
                 try {
@@ -40,10 +43,20 @@ export class KnowledgeMCP extends BaseMCP {
                             ProjectVersionId: args.projectVersionID
                         })
                     });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
                     const result = await response.json();
+                    if (result.Data?.length === 0) {
+                        console.warn(`[Knowledge] ⚠️ No internal matches. Recommending web search.`);
+                        return "No internal matches found. FALLBACK RECOMMENDED: Please use 'search_web' (Tavily) or 'brave_web_search' for broader context.";
+                    }
                     return JSON.stringify(result, null, 2);
                 } catch (e: any) {
-                    return `Document360 Error: ${e.message}`;
+                    console.error(`[Knowledge] ⚠️ Doc360 Error: ${e.message}. Triggering redundancy logic.`);
+                    return `INTERNAL_DB_ERROR: ${e.message}. FALLBACK RECOMMENDED: Use 'search_web' or 'brave_web_search'.`;
                 }
             }
         });

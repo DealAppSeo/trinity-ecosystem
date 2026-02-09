@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import { supabaseAdmin as supabase } from '../supabase';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
+import { SwarmOrchestrator, SwarmState } from './SwarmOrchestrator';
 import { AgentConfig, WisdomProfile, ProviderConfig, LLMResult, AutonomyTier, AgentRegistryRecord, SessionMetrics, MCPPhase, Task } from './types';
 import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
 // Dynamic imports for graphology/fs handled inside methods to avoid build issues
@@ -11,6 +12,7 @@ import { EvolutionaryLogger } from './EvolutionaryLogger';
 import { Octokit } from '@octokit/rest';
 import { notificationManager } from '../notification/NotificationManager';
 import { DETERMINISTIC_WORKFLOWS } from './deterministicWorkflows';
+import { HITLManager, HITLDecision } from './HITLManager';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
@@ -41,37 +43,71 @@ export interface ResearchTool {
 
 export class WebResearchTool implements ResearchTool {
     async searchWeb(query: string): Promise<{ url: string; title: string; content: string }[]> {
-        const apiKey = process.env.TAVILY_API_KEY;
-        if (!apiKey) {
-            console.warn('[ResearchTool] ⚠️ No TAVILY_API_KEY. Returning mock.');
-            return [{ url: "https://example.com", title: "Missing API Key", content: "Please set TAVILY_API_KEY." }];
+        const tavilyKey = process.env.TAVILY_API_KEY;
+        const braveKey = process.env.BRAVE_API_KEY || process.env.BRAVE_SEARCH_API_KEY;
+
+        if (tavilyKey) {
+            try {
+                console.log(`[ResearchTool] 🔎 Searching Tavily (Elite): "${query}"`);
+                const response = await fetch('https://api.tavily.com/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: tavilyKey,
+                        query: query,
+                        search_depth: "basic",
+                        max_results: 5
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.results && data.results.length > 0) {
+                        return data.results.map((r: any) => ({
+                            url: r.url,
+                            title: r.title,
+                            content: r.content
+                        }));
+                    }
+                }
+                console.warn('[ResearchTool] ⚠️ Tavily returned no results or error. Falling back to Brave...');
+            } catch (e: any) {
+                console.warn(`[ResearchTool] ⚠️ Tavily Error: ${e.message}. Falling back to Brave...`);
+            }
         }
 
-        try {
-            console.log(`[ResearchTool] 🔎 Searching web for: "${query}"`);
-            const response = await fetch('https://api.tavily.com/search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    api_key: apiKey,
-                    query: query,
-                    search_depth: "basic",
-                    max_results: 3
-                })
-            });
+        if (braveKey) {
+            try {
+                console.log(`[ResearchTool] 🔎 Searching Brave (Breadth): "${query}"`);
+                const response = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Subscription-Token': braveKey
+                    }
+                });
 
-            const data = await response.json();
-            if (!data.results) return [];
-
-            return data.results.map((r: any) => ({
-                url: r.url,
-                title: r.title,
-                content: r.content
-            }));
-        } catch (e: any) {
-            console.error(`[ResearchTool] Error: ${e.message}`);
-            return [{ url: "error", title: "Search Failed", content: e.message }];
+                if (response.ok) {
+                    const data = await response.json();
+                    const results = data.web?.results || [];
+                    if (results.length > 0) {
+                        return results.map((r: any) => ({
+                            url: r.url,
+                            title: r.title,
+                            content: r.description // Brave uses description for snippet
+                        }));
+                    }
+                }
+            } catch (e: any) {
+                console.error(`[ResearchTool] ❌ Brave Error: ${e.message}`);
+            }
         }
+
+        if (!tavilyKey && !braveKey) {
+            console.warn('[ResearchTool] ⚠️ No Search API Keys configured.');
+            return [{ url: "https://example.com", title: "Missing API Keys", content: "Please set TAVILY_API_KEY or BRAVE_API_KEY." }];
+        }
+
+        return [{ url: "https://example.com", title: "No Results", content: "No results found from primary or fallback search providers." }];
     }
 
     async browsePage(url: string, instructions: string): Promise<string> {
@@ -697,13 +733,15 @@ export class ConstitutionalAgent {
 
     async getVerificationTask() {
         // [PHASE 25] ROBUST PEER REVIEW FETCH
+        // [ANTIGRAVITY] ROBUST PEER REVIEW FETCH: Handle NULL verified_by
+        // In SQL, NOT CONTAINS misses NULL rows. We need to explicitly include them.
         const { data: tasks, error } = await this.supabase
             .from('trinity_tasks')
             .select('*')
             .in('status', ['done', 'completed'])
             .neq('claimed_by', this.name)
             .lt('verify_count', 3)
-            .not('verified_by', 'cs', `{"${this.name}"}`)
+            .or(`verified_by.is.null,verified_by.not.cs.{"${this.name}"}`) // Fix: Include unverified missions
             .order('priority', { ascending: false })
             .order('completed_at', { ascending: true }) // FIFO: Oldest work first
             .limit(1);
@@ -1245,6 +1283,7 @@ ${result.substring(0, 2000)}
         }
 
         this.sessionMetrics.tasksCompleted++; // Count it
+        await this.updateReputation(true);     // [ANTIGRAVITY] Fix: increment persistent registry count
         return { success: true, llm_used: false };
     }
 
@@ -1385,28 +1424,50 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                 }
 
                 if (lowBelief || explicitEscalate) {
-                    console.log(`[ANTIGRAVITY] 🚨 ESCALATING to Architect/Peers...`);
+                    console.log(`[ANTIGRAVITY] 🚨 ESCALATING to Phone HITL Gateway...`);
 
-                    const { error: escalateError } = await this.supabase.from('trinity_tasks').update({
-                        status: 'pending_clarification',
-                        claimed_by: null,
-                        result: `[ESCALATED] Agent ${this.name} is seeking clarification. \n\nReason: ${lowBelief ? 'Low certainty score' : 'Explicit escalation request'}. \n\nQuery: ${result.output.substring(0, 500)}`,
-                        verification_result: `Searching high-dimension databases... seeking expert consensus.`,
-                        metadata: {
-                            ...(JSON.parse(task.metadata || '{}')),
-                            consultation_requested: true,
-                            escalated_by: this.name,
-                            escalation_time: new Date().toISOString()
-                        }
-                    }).eq('id', task.id);
+                    // NEW: Integrate HITLManager
+                    const hitl = HITLManager.getInstance();
+                    const reason = lowBelief ? `Low certainty score (${evaluation.score})` : 'Explicit escalation request';
 
-                    if (escalateError) {
-                        console.error(`[${this.name}] ❌ Escalation update failed:`, escalateError.message);
+                    try {
+                        const requestId = await hitl.escalate(
+                            String(task.id),
+                            this.name,
+                            reason,
+                            {
+                                evaluation,
+                                last_result: result.output.substring(0, 1000),
+                                prompt_context: prompt.substring(0, 1000)
+                            }
+                        );
+
+                        await this.supabase.from('trinity_tasks').update({
+                            status: 'pending_clarification',
+                            claimed_by: null,
+                            result: `[HITL ESCALATION] ${reason}. Request ID: ${requestId}`,
+                            verification_result: `Paused for Human-In-The-Loop approval.`,
+                            metadata: {
+                                ...(JSON.parse(task.metadata || '{}')),
+                                hitl_request_id: requestId,
+                                escalated_by: this.name,
+                                escalation_time: new Date().toISOString()
+                            }
+                        }).eq('id', task.id);
+
+                        await notificationManager.notifyUser({
+                            title: `HITL ESCALATION: ${this.name}`,
+                            message: `Task ${task.id} requires your intervention: ${reason}`,
+                            type: 'warning',
+                            agentName: this.name,
+                            taskId: task.id
+                        });
+
+                    } catch (hitlError: any) {
+                        console.error(`[HITL] ❌ Fatal failure in escalation pipe:`, hitlError.message);
+                        // Fallback to old escalation if HITL manager fails (e.g. table not ready)
+                        await this.escalateTask(task.id, `HITL Error: ${hitlError.message}`);
                     }
-
-                    // Spawn "Question for Architect" artifact
-                    const questionContent = `# Question for Architect \n\n**Agent**: ${this.name} \n**Task**: ${task.title} \n\n**The Right Question**: \n${result.output} \n\n---\n*The smartest person is not the one with all the answers, but the one asking the right questions.*`;
-                    await this.saveArtifact(task.id, questionContent, 'report', `Q: ${task.title}`, 'public');
 
                     return { success: true, llm_used: true, escalated: true };
                 }
@@ -1745,6 +1806,29 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
     }
 
     async spawnNextStep(originalTask: Task, result: string, evaluation: { score: number; handoff_required: boolean; handoff_to?: string }) {
+        // [SWARM INTELLIGENCE] LangGraph-style Stateful Handoff
+        const handoff = SwarmOrchestrator.planNextStep(originalTask, result, evaluation);
+        if (handoff) {
+            console.log(`[SWARM] 🚀 Stateful Handoff: ${originalTask.id} -> ${handoff.nextAgent} (${handoff.nextState})`);
+
+            await this.supabase.from('trinity_tasks').insert({
+                title: `[SWARM:${handoff.nextState.toUpperCase()}] ${originalTask.title}`,
+                description: handoff.instruction,
+                task_type: handoff.nextState === SwarmState.IMPLEMENTATION ? 'code' : (handoff.nextState === SwarmState.DESIGN ? 'design' : 'research'),
+                assigned_to: handoff.nextAgent,
+                priority: Math.min((originalTask as any).priority + 5, 100),
+                status: 'pending',
+                metadata: {
+                    parent_task_id: originalTask.id,
+                    swarm_state: handoff.nextState,
+                    prev_agent: this.name,
+                    evidence: result.substring(0, 1000)
+                }
+            });
+
+            // If we handed off, we still want a verification for the CURRENT step, but we prioritize the forward motion
+        }
+
         // [ANTIGRAVITY] ROBUST LOOP BREAKER: Do NOT spawn verification for a verification task.
         const titleMatch = originalTask.title.includes('[VERIFY]') ||
             originalTask.title.includes('[REVIEW]') ||
@@ -1787,6 +1871,11 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
                 if (newVerifyCount >= 2 && isApproved) {
                     newStatus = 'verified';
                     console.log(`[VERIFY] 🏆 Task ${parentId} reached 2/3 BFT consensus. Status -> VERIFIED.`);
+                    // [ANTIGRAVITY] Verifer gets credit for successful consensus work
+                    await this.updateReputation(true);
+                } else if (isApproved) {
+                    // Credit for the work of verifying, even if consensus isn't reached yet
+                    await this.updateReputation(true);
                 } else if (!isApproved) {
                     // [BFT DISPUTE] Subjective Slashing Logic – Provisionally Protected
                     console.log(`[VERIFY] ⚠️ CHALLENGE DETECTED for Task ${parentId}. Slashing original producer.`);
@@ -2495,7 +2584,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     status: 'online', // Normalized
                     version: this.version,
                     last_seen: timestamp,
-                    current_task_summary: activitySummary,
+                    // [ANTIGRAVITY] Note: status_message/current_task_summary removed 
+                    // as they don't exist in the trinity_heartbeat schema (Minimalist table).
                     config: {
                         fullName: this.name,
                         sessionMetrics: this.sessionMetrics,
@@ -2910,6 +3000,10 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         }
         else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt, tools, modelOverride);
         else if (provider === 'deepinfra') providerPromise = this.callDeepInfra(systemPrompt, prompt, tools);
+        else if (provider === 'kimi') {
+            const isThinking = prompt.toLowerCase().includes('reason') || prompt.toLowerCase().includes('logic') || prompt.toLowerCase().includes('complex') || prompt.toLowerCase().includes('analyze');
+            providerPromise = this.callOpenAICompatible('https://api.moonshot.ai/v1/chat/completions', process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || 'kimi', modelOverride || 'kimi-k2.5', systemPrompt, prompt, tools, 'kimi', { thinking: isThinking });
+        }
         else if (provider === 'perplexity') providerPromise = this.callPerplexity(systemPrompt, prompt, tools);
         else throw new Error(`Provider ${provider} not implemented`);
 
@@ -3160,7 +3254,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         return this.callOpenAICompatible('https://api.deepinfra.com/v1/openai/chat/completions', process.env.DEEPINFRA_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools, 'deepinfra');
     }
 
-    async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[], providerKey?: string): Promise<LLMResult> {
+    async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[], providerKey?: string, options: any = {}): Promise<LLMResult> {
         const messages: any[] = [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
@@ -3193,9 +3287,10 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     body: JSON.stringify({
                         model,
                         messages,
-                        max_tokens: 4096,
+                        max_tokens: options.max_tokens || 4096,
                         tools: (tools.length > 0 && supportsTools) ? tools : undefined,
-                        tool_choice: (tools.length > 0 && supportsTools) ? 'auto' : undefined
+                        tool_choice: (tools.length > 0 && supportsTools) ? 'auto' : undefined,
+                        ...(options.thinking ? { thinking: true } : {})
                     })
                 });
 
