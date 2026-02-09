@@ -37,6 +37,11 @@ export interface LLMResult {
     fromCache?: boolean;
     latency?: number;
     artifactLinks?: string[]; // track tool-generated artifacts
+    usage?: {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+    };
 }
 
 

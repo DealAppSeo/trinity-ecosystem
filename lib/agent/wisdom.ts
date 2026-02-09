@@ -42,7 +42,7 @@ export const AGENT_WISDOM: Record<string, WisdomProfile> = {
     'trinity-chesed': { name: 'CHESED', role: 'mercy', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['empathy', 'restoration'], squad: 'BETA' },
     'trinity-mel': { name: 'MEL', role: 'designer_agent', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['screenshot-analysis', 'ui-drafting', 'component-design'], squad: 'BETA' },
     'trinity-apm': { name: 'APM', role: 'spiritual_backbone', primaryVirtue: 'LOVELY', tier: 'conductor', specialties: ['prayer', 'vision'], squad: 'BETA' },
-    'trinity-sophia': { name: 'SOPHIA', role: 'wisdom_research', primaryVirtue: 'TRUE', tier: 'specialist', specialties: ['deep-thought', 'research'], squad: 'GAMMA' },
+    'trinity-sophia': { name: 'SOPHIA', role: 'wisdom_research', primaryVirtue: 'TRUE', tier: 'specialist', specialties: ['deep-thought', 'research', 'resource-optimization', 'tool-scouting'], squad: 'GAMMA' },
     'trinity-nexus': { name: 'NEXUS', role: 'network_policy', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['network-security', 'mtls', 'allowlisting'], squad: 'GAMMA' },
     'trinity-hdm': { name: 'HDM', role: 'coder_agent', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['langgraph', 'repl-execution', 'github-ops'], squad: 'GAMMA' }
 };

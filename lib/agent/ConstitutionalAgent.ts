@@ -2907,6 +2907,11 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     ]);
 
                     if (providerResult) {
+                        // [RESOURCEFUL] Record Spend
+                        if (providerResult.usage) {
+                            await this.router.recordSpend(providerKey, providerResult.usage.total_tokens);
+                        }
+
                         if (task) {
                             if (!task.metadata) task.metadata = JSON.stringify({});
                             try {
@@ -3066,7 +3071,12 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 } else {
                     return {
                         output: message.content || "",
-                        artifactLinks: artifactLinks
+                        artifactLinks: artifactLinks,
+                        usage: data.usage ? {
+                            prompt_tokens: data.usage.prompt_tokens,
+                            completion_tokens: data.usage.completion_tokens,
+                            total_tokens: data.usage.total_tokens
+                        } : undefined
                     };
                 }
             } catch (err: any) {
@@ -3139,7 +3149,12 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 const textContent = message.content.find((c: any) => c.type === 'text');
                 return {
                     output: textContent ? textContent.text : "",
-                    artifactLinks: artifactLinks
+                    artifactLinks: artifactLinks,
+                    usage: data.usage ? {
+                        prompt_tokens: data.usage.input_tokens,
+                        completion_tokens: data.usage.output_tokens,
+                        total_tokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0)
+                    } : undefined
                 };
             }
         }
@@ -3212,7 +3227,12 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 const textPart = parts.find((p: any) => p.text);
                 return {
                     output: textPart ? textPart.text : "",
-                    artifactLinks: artifactLinks
+                    artifactLinks: artifactLinks,
+                    usage: data.usageMetadata ? {
+                        prompt_tokens: data.usageMetadata.promptTokenCount,
+                        completion_tokens: data.usageMetadata.candidatesTokenCount,
+                        total_tokens: data.usageMetadata.totalTokenCount
+                    } : undefined
                 };
             }
         }
@@ -3355,7 +3375,12 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     }
                     return {
                         output: content,
-                        artifactLinks: artifactLinks
+                        artifactLinks: artifactLinks,
+                        usage: data.usage ? {
+                            prompt_tokens: data.usage.prompt_tokens,
+                            completion_tokens: data.usage.completion_tokens,
+                            total_tokens: data.usage.total_tokens
+                        } : undefined
                     };
                 }
             } catch (err: any) {

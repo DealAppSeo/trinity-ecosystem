@@ -2,6 +2,7 @@
 import { Task, ProviderConfig, WisdomProfile } from './types';
 import { AGENT_WISDOM } from './wisdom';
 import { UnifiedServiceRegistry, ServiceDefinition, ServiceTier } from './UnifiedServiceRegistry';
+import { RedisAdapter } from './RedisAdapter';
 
 export interface RoutingWeights {
     speed: number;   // 0-100
@@ -14,11 +15,14 @@ export class IntelligenceRouter {
     private sessionTasksCompleted: number = 0;
     private demotedProviders: Set<string> = new Set();
     private registry: UnifiedServiceRegistry;
+    private redis: RedisAdapter;
     private weights: RoutingWeights = { speed: 50, quality: 50, cost: 50 };
+    private GLOBAL_DAILY_BUDGET = parseFloat(process.env.GLOBAL_DAILY_BUDGET || '5.0');
 
     constructor(agentName: string, weights?: RoutingWeights) {
         this.agentName = agentName;
         this.registry = UnifiedServiceRegistry.getInstance();
+        this.redis = RedisAdapter.getInstance();
         if (weights) this.weights = weights;
     }
 
@@ -62,6 +66,16 @@ export class IntelligenceRouter {
         // Sync registry
         await this.registry.sync();
 
+        // 3.5 [ECONOMY MODE Check]
+        const todayKey = `spend:${new Date().toISOString().split('T')[0]}`;
+        const currentSpendStr = await this.redis.get(todayKey);
+        const currentSpend = parseFloat(currentSpendStr || '0');
+        const isEconomyMode = currentSpend >= this.GLOBAL_DAILY_BUDGET;
+
+        if (isEconomyMode) {
+            console.warn(`[ROUTER] 🚨 GLOBAL BUDGET EXCEEDED ($${currentSpend.toFixed(2)} / $${this.GLOBAL_DAILY_BUDGET}). Activating Economy Mode.`);
+        }
+
         // 4. FILTER & SCORE (ANFIS 2.0 Arbitrage)
         const candidates = await Promise.all(activeProviders
             .filter(p => p !== excludeProvider)
@@ -95,9 +109,10 @@ export class IntelligenceRouter {
                 else if (isFirstImpression) {
                     if (info.tier === ServiceTier.ELITE) score += 150;
                 }
-                // [ECONOMY THROTTLE] - Long sessions for free accounts get throttled to economy
-                else if (userTier === 'free' && this.sessionTasksCompleted > 20) {
-                    if (info.tier === ServiceTier.ECONOMY) score += 100;
+                // [ECONOMY THROTTLE] - Long sessions or Global Budget Hit
+                else if ((userTier === 'free' && this.sessionTasksCompleted > 20) || isEconomyMode) {
+                    if (info.tier === ServiceTier.ECONOMY) score += 200; // Hard boost to economy
+                    else if (info.tier === ServiceTier.ELITE) score -= 150; // Hard nerf to elite
                     else score -= 50;
                 }
 
@@ -176,5 +191,25 @@ export class IntelligenceRouter {
         if (text.includes('gemini')) return 'gemini-1.5-pro';
 
         return null;
+    }
+
+    /**
+     * Records the estimated cost of a task execution.
+     */
+    async recordSpend(providerKey: string, tokensUsed: number) {
+        const info = this.registry.getServiceByKey(providerKey);
+        if (!info || !info.cost_per_m_tokens) return;
+
+        const cost = (tokensUsed / 1000000) * info.cost_per_m_tokens;
+        const todayKey = `spend:${new Date().toISOString().split('T')[0]}`;
+
+        try {
+            const currentSpendStr = await this.redis.get(todayKey);
+            const currentSpend = parseFloat(currentSpendStr || '0');
+            await this.redis.set(todayKey, (currentSpend + cost).toString(), 86400); // 1 day expiry
+            console.log(`[ROUTER] 💸 Recorded spend for ${providerKey}: $${cost.toFixed(4)}. Total today: $${(currentSpend + cost).toFixed(4)}`);
+        } catch (e) {
+            console.error('[ROUTER] Failed to record spend:', e);
+        }
     }
 }
