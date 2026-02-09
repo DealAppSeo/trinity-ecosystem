@@ -22,6 +22,7 @@ import { HuggingFaceMCP } from './servers/HuggingFaceMCP';
 import { RailwayMCP } from './servers/RailwayMCP';
 import { YouDotComMCP } from './servers/YouDotComMCP';
 import { EfficiencyMCP } from './servers/EfficiencyMCP';
+import { N8NMCP } from './servers/N8NMCP';
 import { CohereMCP } from './servers/CohereMCP';
 import { ASICloudMCP } from './servers/ASICloudMCP';
 import { ReplicateMCP } from './servers/ReplicateMCP';
@@ -50,6 +51,7 @@ export class MCPManager {
         this.registerServer(new PlaywrightExpertMCP());
         this.registerServer(new CreativeMCP());
         this.registerServer(new EfficiencyMCP());
+        this.registerServer(new N8NMCP());
         this.registerServer(new ComposioMCP());
         this.registerServer(new StitchMCP());
         this.registerServer(new SandboxMCP());
