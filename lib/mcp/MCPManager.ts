@@ -23,6 +23,8 @@ import { RailwayMCP } from './servers/RailwayMCP';
 import { YouDotComMCP } from './servers/YouDotComMCP';
 import { EfficiencyMCP } from './servers/EfficiencyMCP';
 import { N8NMCP } from './servers/N8NMCP';
+import { GuardrailsMCP } from './servers/GuardrailsMCP';
+import { SovereignMemoryMCP } from './servers/SovereignMemoryMCP';
 import { CohereMCP } from './servers/CohereMCP';
 import { ASICloudMCP } from './servers/ASICloudMCP';
 import { ReplicateMCP } from './servers/ReplicateMCP';
@@ -52,6 +54,8 @@ export class MCPManager {
         this.registerServer(new CreativeMCP());
         this.registerServer(new EfficiencyMCP());
         this.registerServer(new N8NMCP());
+        this.registerServer(new GuardrailsMCP());
+        this.registerServer(new SovereignMemoryMCP());
         this.registerServer(new ComposioMCP());
         this.registerServer(new StitchMCP());
         this.registerServer(new SandboxMCP());
