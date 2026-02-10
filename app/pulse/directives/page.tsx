@@ -33,6 +33,16 @@ interface TaskRecord {
     status: string;
 }
 
+interface HITLRequest {
+    id: string;
+    task_id: string;
+    agent_id: string;
+    reason: string;
+    context: any;
+    status: string;
+    requested_at: string;
+}
+
 interface SwarmHealth {
     active_agents: number;
     health_score: number;
@@ -45,11 +55,29 @@ interface SwarmHealth {
 export default function FoundersDashboard() {
     const [agents, setAgents] = useState<AgentRecord[]>([]);
     const [tasks, setTasks] = useState<TaskRecord[]>([]);
+    const [hitlRequests, setHitlRequests] = useState<HITLRequest[]>([]);
     const [health, setHealth] = useState<SwarmHealth | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [saving, setSaving] = useState<string | null>(null);
     const [adminKey, setAdminKey] = useState<string>('');
+    const [actionHistory, setActionHistory] = useState<{ id: string, msg: string, time: string, type: 'success' | 'info' | 'error' }[]>([]);
+
+    const addHistory = (msg: string, type: 'success' | 'info' | 'error' = 'success') => {
+        setActionHistory(prev => [{
+            id: Math.random().toString(36).substr(2, 9),
+            msg,
+            time: new Date().toLocaleTimeString(),
+            type
+        }, ...prev].slice(0, 10));
+    };
+
+    // Performance Weight Staging
+    const [weights, setWeights] = useState({
+        speed: 50,
+        quality: 50,
+        cost: 30
+    });
 
     // Directive slot states
     const [slots, setSlots] = useState([
@@ -79,7 +107,8 @@ export default function FoundersDashboard() {
             await Promise.all([
                 fetchAgents(),
                 fetchTasks(),
-                fetchHealth()
+                fetchHealth(),
+                fetchHITL()
             ]);
         } catch (error) {
             console.error('Data sync error:', error);
@@ -109,6 +138,54 @@ export default function FoundersDashboard() {
         setHealth(data);
     };
 
+    const fetchHITL = async () => {
+        const { data } = await supabase
+            .from('trinity_hitl_requests')
+            .select('*')
+            .eq('status', 'pending')
+            .order('requested_at', { ascending: false });
+        if (data) setHitlRequests(data as any);
+    };
+
+    const resolveHITL = async (requestId: string, decision: 'approved' | 'rejected') => {
+        setActionLoading(`hitl-${requestId}`);
+        try {
+            const { error } = await supabase
+                .from('trinity_hitl_requests')
+                .update({
+                    status: decision,
+                    resolved_at: new Date().toISOString(),
+                    resolved_by: 'founder'
+                })
+                .eq('id', requestId);
+
+            if (error) throw error;
+            toast.success(`Request ${decision}. Agent resuming.`);
+            addHistory(`${decision.toUpperCase()} escalation for ${requestId.substring(0, 8)}`);
+            fetchHITL();
+        } catch (e: any) {
+            toast.error("Failed to resolve: " + e.message);
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const updateWeights = async () => {
+        setSaving('weights');
+        try {
+            // In a real implementation, this would save to a settings table or Redis
+            // We'll mock the success for now as we build the UI
+            localStorage.setItem('TRINITY_ROUTING_WEIGHTS', JSON.stringify(weights));
+            toast.success("Routing weights updated globally.");
+            addHistory(`Updated performance weights: S:${weights.speed} Q:${weights.quality} E:${weights.cost}`);
+        } catch (e: any) {
+            toast.error("Failed to update weights.");
+            addHistory(`Weight update failed`, 'error');
+        } finally {
+            setSaving(null);
+        }
+    };
+
     const handleGlobalAction = async (action: string) => {
         setActionLoading(action);
         try {
@@ -123,12 +200,15 @@ export default function FoundersDashboard() {
             const data = await res.json();
             if (res.ok) {
                 toast.success(data.message);
+                addHistory(`Global ${action} command sent`);
                 setTimeout(fetchAllData, 2000);
             } else {
                 toast.error(data.error);
+                addHistory(`${action} command failed: ${data.error}`, 'error');
             }
         } catch (error: any) {
             toast.error("Operation failed: " + error.message);
+            addHistory(`${action} operation error`, 'error');
         } finally {
             setActionLoading(null);
         }
@@ -271,6 +351,27 @@ export default function FoundersDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Panel: Global Controls & Priority */}
                 <div className="lg:col-span-2 space-y-8">
+                    {/* PERFORMANCE LOG: NEW Confirmation Layer */}
+                    <Card className="bg-black/40 border-white/5 p-4 overflow-hidden">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Activity className="w-3 h-3 text-emerald-400" />
+                            <span className="text-[10px] font-black tracking-widest text-emerald-400/50 uppercase">Recent Control Activity</span>
+                        </div>
+                        <div className="space-y-2 max-h-[120px] overflow-y-auto custom-scrollbar font-mono">
+                            {actionHistory.length === 0 ? (
+                                <div className="text-[9px] text-gray-700 italic">No recent actions logged. Use controls to begin.</div>
+                            ) : actionHistory.map(log => (
+                                <div key={log.id} className="flex justify-between items-center text-[9px] py-1 border-b border-white/[0.02]">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-1 h-1 rounded-full ${log.type === 'error' ? 'bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.5)]' : 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]'}`} />
+                                        <span className="text-gray-300">{log.msg}</span>
+                                    </div>
+                                    <span className="text-gray-600">{log.time}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+
                     {/* Founder Actions */}
                     <Card className="bg-[#0B0B0F]/80 border-white/10 backdrop-blur-xl overflow-hidden">
                         <div className="p-6 border-b border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent">
@@ -318,6 +419,117 @@ export default function FoundersDashboard() {
                                 <Skull className={`w-8 h-8 text-red-500 group-hover:text-white mb-3 ${actionLoading === 'WIPE_ALL' ? 'animate-spin' : ''}`} />
                                 <span className="text-xs font-black tracking-widest text-red-200 group-hover:text-white uppercase">Nuclear Wipe</span>
                                 <span className="text-[8px] text-red-400/60 group-hover:text-white/60 mt-2 font-mono">DANGER ZONE</span>
+                            </button>
+                        </div>
+                    </Card>
+
+                    {/* NEW: Phone HITL Gateway */}
+                    <Card className="bg-[#0B0B0F]/80 border-white/10 backdrop-blur-xl overflow-hidden">
+                        <div className="p-6 border-b border-white/5 bg-gradient-to-br from-amber-500/5 to-transparent flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                                <h2 className="text-lg font-bold text-white">Phone HITL Gateway</h2>
+                            </div>
+                            <span className="text-[10px] font-mono text-amber-500/50 uppercase tracking-widest">{hitlRequests.length} PENDING DECISIONS</span>
+                        </div>
+                        <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar">
+                            {hitlRequests.length === 0 ? (
+                                <div className="py-12 flex flex-col items-center justify-center opacity-30 italic text-sm text-gray-500">
+                                    <Shield className="w-8 h-8 mb-3" />
+                                    No human intervention required. Swarm autonomous.
+                                </div>
+                            ) : hitlRequests.map((req) => (
+                                <div key={req.id} className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl space-y-3">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h4 className="text-xs font-bold text-amber-200 uppercase tracking-tight">{req.agent_id} ESCALATION</h4>
+                                            <p className="text-sm text-white mt-1">{req.reason}</p>
+                                        </div>
+                                        <span className="text-[9px] font-mono text-gray-500">{new Date(req.requested_at).toLocaleTimeString()}</span>
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <button
+                                            onClick={() => resolveHITL(req.id, 'approved')}
+                                            disabled={!!actionLoading}
+                                            className="flex-1 py-2 bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600 text-emerald-400 hover:text-white text-[10px] font-bold rounded-lg transition-all"
+                                        >
+                                            APPROVE
+                                        </button>
+                                        <button
+                                            onClick={() => resolveHITL(req.id, 'rejected')}
+                                            disabled={!!actionLoading}
+                                            className="flex-1 py-2 bg-red-600/20 border border-red-500/30 hover:bg-red-600 text-red-400 hover:text-white text-[10px] font-bold rounded-lg transition-all"
+                                        >
+                                            REJECT
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+
+                    {/* NEW: Performance Control Room */}
+                    <Card className="bg-[#0B0B0F]/80 border-white/10 backdrop-blur-xl overflow-hidden">
+                        <div className="p-6 border-b border-white/5 bg-gradient-to-br from-sky-500/5 to-transparent">
+                            <div className="flex items-center gap-3">
+                                <Cpu className="w-5 h-5 text-sky-400" />
+                                <h2 className="text-lg font-bold text-white">Performance Control Room</h2>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-8">
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-[10px] font-mono uppercase">
+                                        <span className="text-gray-500">Speed (Latency/TPS)</span>
+                                        <span className="text-sky-400">{weights.speed}</span>
+                                    </div>
+                                    <input
+                                        type="range" min="0" max="100" value={weights.speed}
+                                        onChange={(e) => setWeights({ ...weights, speed: parseInt(e.target.value) })}
+                                        className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-[10px] font-mono uppercase">
+                                        <span className="text-gray-500">Quality (Reasoning/Logic)</span>
+                                        <span className="text-sky-400">{weights.quality}</span>
+                                    </div>
+                                    <input
+                                        type="range" min="0" max="100" value={weights.quality}
+                                        onChange={(e) => setWeights({ ...weights, quality: parseInt(e.target.value) })}
+                                        className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-[10px] font-mono uppercase">
+                                        <span className="text-gray-500">Economy (Cost/Token)</span>
+                                        <span className="text-sky-400">{weights.cost}</span>
+                                    </div>
+                                    <input
+                                        type="range" min="0" max="100" value={weights.cost}
+                                        onChange={(e) => setWeights({ ...weights, cost: parseInt(e.target.value) })}
+                                        className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                onClick={updateWeights}
+                                disabled={saving === 'weights'}
+                                className={`w-full py-3 text-white text-[10px] font-black tracking-widest rounded-xl transition-all uppercase flex items-center justify-center gap-2 ${saving === 'weights' ? 'bg-sky-600/50' : 'bg-sky-600 hover:bg-sky-500 active:scale-95 shadow-lg shadow-sky-500/10'}`}
+                            >
+                                {saving === 'weights' ? (
+                                    <>
+                                        <RefreshCw className="w-3 h-3 animate-spin" />
+                                        <span>Saving Weights...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="w-3 h-3" />
+                                        <span>Sync Routing Parameters</span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     </Card>

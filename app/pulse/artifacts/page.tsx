@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'sonner';
-import { FileCode, FileText, Image, FileSpreadsheet, Share2, Download, Eye, Lock, ShieldAlert, RefreshCw, Clock } from 'lucide-react';
+import { FileCode, FileText, Image, FileSpreadsheet, Share2, Download, Eye, Lock, ShieldAlert, RefreshCw, Clock, X, Award } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { RegistrationModal, UnlockModal } from '@/components/AccessModals';
@@ -376,10 +376,13 @@ export default function ArtifactsPage() {
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                                 <div className="flex items-center gap-6">
                                     <div className="p-5 rounded-3xl bg-white/[0.03] border border-white/10 flex items-center justify-center shadow-inner">
-                                        {React.createElement(getTypeIcon(selectedArtifact.type), {
-                                            className: "w-8 h-8",
-                                            style: { color: getTypeColor(selectedArtifact.type) === 'violet' ? '#a78bfa' : getTypeColor(selectedArtifact.type) === 'cyan' ? '#22d3ee' : '#f472b6' }
-                                        })}
+                                        {(() => {
+                                            const Icon = getTypeIcon(selectedArtifact.type);
+                                            return <Icon
+                                                className="w-8 h-8"
+                                                style={{ color: getTypeColor(selectedArtifact.type) === 'violet' ? '#a78bfa' : getTypeColor(selectedArtifact.type) === 'cyan' ? '#22d3ee' : '#f472b6' }}
+                                            />;
+                                        })()}
                                     </div>
                                     <div>
                                         <span className="text-[10px] text-violet-400 font-black uppercase tracking-[0.3em] block mb-1">Knowledge Artifact / v1.0</span>
@@ -438,7 +441,7 @@ export default function ArtifactsPage() {
                                             {(selectedArtifact.creator_agent || 'A')[0].toUpperCase()}
                                         </div>
                                         <div>
-                                            <p className="font-bold text-white uppercase tracking-tight">{selectedArtifact.creator_agent?.replace('trinity-', '') || 'AGENT_X'}</p>
+                                            <p className="font-bold text-white uppercase tracking-tight">{selectedArtifact.creator_agent ? selectedArtifact.creator_agent.replace('trinity-', '') : 'AGENT_X'}</p>
                                             <p className="text-[10px] text-violet-400 font-mono">MISSION_OWNER_ID</p>
                                         </div>
                                     </div>

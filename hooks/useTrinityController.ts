@@ -48,7 +48,8 @@ export const useTrinityController = () => {
             const [
                 { data: agentData },
                 { data: activeTasks }, // Doing / Clarify (No Limit)
-                { data: queueTasks },  // Pending / Done (150 Limit)
+                { data: pendingTasks }, // Pending
+                { data: completedTasks }, // Done / Verified
                 { data: logData },
                 { data: heartbeatData },
                 { count: completedCount24h }
@@ -58,9 +59,13 @@ export const useTrinityController = () => {
                     .in('status', ['doing', 'in_progress', 'running', 'pending_clarification'])
                     .order('created_at', { ascending: false }),
                 supabase.from('trinity_tasks').select('*')
-                    .in('status', ['pending', 'done', 'completed'])
+                    .in('status', ['pending'])
                     .order('created_at', { ascending: false })
-                    .limit(150),
+                    .limit(50),
+                supabase.from('trinity_tasks').select('*')
+                    .in('status', ['done', 'completed', 'verified', 'success'])
+                    .order('updated_at', { ascending: false })
+                    .limit(50),
                 supabase.from('trinity_agent_logs').select('*').order('created_at', { ascending: false }).limit(100),
                 supabase.from('trinity_heartbeat').select('*'),
                 supabase.from('trinity_tasks')
@@ -69,7 +74,7 @@ export const useTrinityController = () => {
                     .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
             ]);
 
-            const taskData = [...(activeTasks || []), ...(queueTasks || [])];
+            const taskData = [...(activeTasks || []), ...(pendingTasks || []), ...(completedTasks || [])];
 
             // Enrich Agent Data with Group and Status
             const taskList = taskData || [];

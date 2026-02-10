@@ -228,6 +228,14 @@ export default function TasksPage() {
                 .maybeSingle();
 
             if (error || !data) {
+                // FALLBACK: If no record in trinity_artifacts, show the task result if it exists
+                if (task.result) {
+                    setSelectedArtifact({
+                        title: `Result for ${task.title}`,
+                        content: task.result
+                    });
+                    return;
+                }
                 showToast('No artifact found for this task yet.', 'info');
                 return;
             }

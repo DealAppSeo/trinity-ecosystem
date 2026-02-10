@@ -41,7 +41,7 @@ async function logRuntimeError(message: string, file?: string, line?: number, st
             line_number: line,
             stack_trace: stack,
             status: 'pending',
-            created_at: new Date().toISOString()
+            timestamp: new Date().toISOString()
         });
     } catch (e) {
         // Fail silently if logger fails to avoid infinite loops
