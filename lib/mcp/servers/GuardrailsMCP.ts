@@ -48,6 +48,21 @@ export class GuardrailsMCP extends BaseMCP {
         });
 
         this.registerTool({
+            name: 'log_governance_event',
+            description: 'Logs a significant governance event (constitutional violation, escalation) to the permanent ledger.',
+            schema: {
+                type: 'object',
+                properties: {
+                    event_type: { type: 'string', enum: ['VIOLATION', 'ESCALATION', 'OVERRIDE', 'POLICY_UPDATE'] },
+                    summary: { type: 'string' },
+                    details: { type: 'string' }
+                },
+                required: ['event_type', 'summary']
+            },
+            execute: async (args: any) => this.logGovernanceEvent(args)
+        });
+
+        this.registerTool({
             name: 'check_speciesist_bias',
             description: 'Mandatory OpenPaws check to ensure AI output is anti-speciesist and ethically balanced.',
             schema: {
@@ -83,6 +98,30 @@ export class GuardrailsMCP extends BaseMCP {
         }
 
         return `[ALIGNMENT PASSED] 🟢\n\nAction aligns with Constitution v${CONSTITUTION.VERSION}.`;
+    }
+
+    private async logGovernanceEvent(args: { event_type: string, summary: string, details?: string }): Promise<string> {
+        console.log(`[Guardrails] 📜 Logging Governance Event: ${args.event_type} - ${args.summary}`);
+
+        // Sync to Airtable if configured
+        if (process.env.AIRTABLE_API_KEY && process.env.AIRTABLE_BASE_ID) {
+            try {
+                const Airtable = require('airtable');
+                const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
+                await base('Governance Ledger').create([{
+                    fields: {
+                        'Event Type': args.event_type,
+                        'Summary': args.summary,
+                        'Details': args.details || '',
+                        'Timestamp': new Date().toISOString()
+                    }
+                }]);
+            } catch (e: any) {
+                console.warn(`[Guardrails] ⚠️ Airtable sync failed: ${e.message}`);
+            }
+        }
+
+        return `Governance event logged in ledger. (${args.event_type})`;
     }
 
     private auditPayload(args: any): string {

@@ -3,6 +3,7 @@ import { BaseMCP } from './BaseMCP';
 import { MCPTool } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
+import neo4j, { Driver } from 'neo4j-driver';
 
 /**
  * [RESOURCEFUL] SovereignMemoryMCP
@@ -11,6 +12,7 @@ import * as path from 'path';
 export class SovereignMemoryMCP extends BaseMCP {
     private memoryDir: string;
     private wisdomFile: string;
+    private driver: Driver | null = null;
 
     constructor() {
         super('SovereignMemory');
@@ -29,6 +31,21 @@ export class SovereignMemoryMCP extends BaseMCP {
 
     async connect(): Promise<void> {
         this.isConnected = true;
+
+        if (process.env.NEO4J_URI) {
+            try {
+                this.driver = neo4j.driver(
+                    process.env.NEO4J_URI,
+                    neo4j.auth.basic(
+                        process.env.NEO4J_USER || 'neo4j',
+                        process.env.NEO4J_PASSWORD || 'password'
+                    )
+                );
+                console.log('[SovereignMemory] 🕸️ Neo4j Driver Initialized');
+            } catch (e: any) {
+                console.warn(`[SovereignMemory] ⚠️ Failed to initialize Neo4j: ${e.message}`);
+            }
+        }
     }
 
     private setupTools() {
@@ -71,6 +88,82 @@ export class SovereignMemoryMCP extends BaseMCP {
             },
             execute: async (args: any) => this.searchMemory(args.query)
         });
+
+        this.registerTool({
+            name: 'sync_to_graph',
+            description: 'Syncs structured memory entities and relationships to the Neo4j/Memgraph knowledge graph.',
+            schema: {
+                type: 'object',
+                properties: {
+                    entities: { type: 'array', items: { type: 'string' }, description: 'Entities like "n8n", "Airtable", "Arxiv"' },
+                    relationship: { type: 'string', description: 'Verb describing the link (e.g., "INTEGRATED_WITH")' },
+                    target: { type: 'string' }
+                },
+                required: ['entities', 'relationship', 'target']
+            },
+            execute: async (args: any) => this.syncToGraph(args)
+        });
+
+        this.registerTool({
+            name: 'query_graph',
+            description: 'Execute a Cypher query against the Neo4j/Memgraph knowledge graph to explore relationships.',
+            schema: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Cypher query (e.g., "MATCH (n) RETURN n LIMIT 5")' }
+                },
+                required: ['query']
+            },
+            execute: async (args: any) => this.queryGraph(args.query)
+        });
+    }
+
+    private async syncToGraph(args: any): Promise<string> {
+        console.log(`[SovereignMemory] 🕸️ Graph Sync: ${args.entities.join(', ')} --[${args.relationship}]--> ${args.target}`);
+
+        if (!this.driver) return "Neo4j not connected. Skipping graph sync.";
+
+        const session = this.driver.session();
+        try {
+            await session.executeWrite(async (tx) => {
+                // Merge Target Node
+                await tx.run('MERGE (t:Entity {name: $target}) RETURN t', { target: args.target });
+
+                // Merge Entities and Relationships
+                for (const entity of args.entities) {
+                    await tx.run(`
+                        MERGE (e:Entity {name: $entity})
+                        MERGE (t:Entity {name: $target})
+                        MERGE (e)-[r:${args.relationship}]->(t)
+                        SET r.timestamp = timestamp()
+                    `, { entity, target: args.target });
+                }
+            });
+            return `Successfully synced ${args.entities.length} relationships to graph.`;
+        } catch (e: any) {
+            console.error(`[SovereignMemory] ❌ Graph Sync Error: ${e.message}`);
+            return `Graph sync failed: ${e.message}`;
+        } finally {
+            await session.close();
+        }
+    }
+
+    private async queryGraph(query: string): Promise<string> {
+        console.log(`[SovereignMemory] 🔍 Graph Query: ${query}`);
+
+        if (!this.driver) return "Neo4j not connected.";
+
+        const session = this.driver.session();
+        try {
+            const result = await session.run(query);
+            const records = result.records.map(record => record.toObject());
+            return JSON.stringify(records, null, 2);
+        } catch (e: any) {
+            console.error(`[SovereignMemory] ❌ Graph Query Error: ${e.message}`);
+            return `Graph query failed: ${e.message}`;
+        } finally {
+            await session.close();
+        }
     }
 
     private async recordDailyLog(args: any): Promise<string> {
@@ -83,8 +176,16 @@ export class SovereignMemoryMCP extends BaseMCP {
         console.log(`[SovereignMemory] 📝 Recorded entry for ${date}`);
 
         // Neo4j Placeholder Sync Point
-        if (process.env.NEO4J_URI) {
-            console.log(`[SovereignMemory] 🔗 Neo4j Sync Triggered: Graphing relationship for ${args.taskId || 'General'}`);
+        if (this.driver) {
+            console.log(`[SovereignMemory] 🔗 Sovereign Sync Triggered: Graphing relationship for ${args.taskId || 'General'}`);
+            const extracted = this.extractEntities(args.content);
+            if (extracted.length > 0) {
+                await this.syncToGraph({
+                    entities: extracted,
+                    relationship: 'MENTIONED_IN',
+                    target: args.taskId || 'GeneralDailyLog'
+                });
+            }
         }
 
         return `Log recorded in memory/${date}.md`;
@@ -116,5 +217,17 @@ export class SovereignMemoryMCP extends BaseMCP {
         const start = Math.max(0, index - 100);
         const end = Math.min(content.length, index + 200);
         return `...${content.substring(start, end)}...`;
+    }
+
+    private extractEntities(content: string): string[] {
+        // Simple extraction: Look for bracketed terms [[Entity]] or capitalized terms
+        const matches = content.match(/\[\[(.*?)\]\]/g);
+        if (matches) {
+            return matches.map(m => m.replace(/\[\[|\]\]/g, ''));
+        }
+
+        // Fallback: Extract Capitalized nouns (heuristic)
+        const heuristic = content.match(/\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\b/g);
+        return heuristic ? Array.from(new Set(heuristic)).filter(e => e.length > 3) : [];
     }
 }

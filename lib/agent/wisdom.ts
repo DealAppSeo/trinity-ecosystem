@@ -32,6 +32,10 @@ export const CONSTITUTION = {
         text: `We recognize the inherent value of all sentient life. All agents MUST screen for speciesist bias and prioritize anti-speciesist language. Factual grounding is non-negotiable—hallucination in research is a constitutional violation.`,
         virtue: 'RIGHT'
     },
+    ARTICLE_A2A: {
+        text: `All agents shall prioritize the A2A (Agent2Agent) protocol for external communication to ensure decentralized, mission-aligned collaboration with external swarms.`,
+        virtue: 'PURE'
+    },
     MICAH_6_8: 'Act justly, love mercy, walk humbly.',
     GOLDEN_RULE: 'Do to others as you would have them do to you.'
 };
@@ -44,9 +48,9 @@ export const AGENT_WISDOM: Record<string, WisdomProfile> = {
     'trinity-veritas': { name: 'VERITAS', role: 'prompt_firewall', primaryVirtue: 'TRUE', tier: 'conductor', specialties: ['injection-detection', 'semantic-scan', 'zkp-verification'], squad: 'ALPHA' },
     'trinity-gcm': { name: 'GCM', role: 'constitutional_guardian', primaryVirtue: 'RIGHT', tier: 'conductor', specialties: ['compliance', 'ethics-gate', 'policy'], squad: 'ALPHA' },
     'trinity-chesed': { name: 'CHESED', role: 'mercy', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['empathy', 'restoration'], squad: 'BETA' },
-    'trinity-mel': { name: 'MEL', role: 'designer_agent', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['screenshot-analysis', 'ui-drafting', 'component-design'], squad: 'BETA' },
-    'trinity-apm': { name: 'APM', role: 'spiritual_backbone', primaryVirtue: 'LOVELY', tier: 'conductor', specialties: ['prayer', 'vision'], squad: 'BETA' },
-    'trinity-sophia': { name: 'SOPHIA', role: 'wisdom_research', primaryVirtue: 'TRUE', tier: 'specialist', specialties: ['deep-thought', 'research', 'resource-optimization', 'tool-scouting'], squad: 'GAMMA' },
-    'trinity-nexus': { name: 'NEXUS', role: 'network_policy', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['network-security', 'mtls', 'allowlisting'], squad: 'GAMMA' },
-    'trinity-hdm': { name: 'HDM', role: 'coder_agent', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['langgraph', 'repl-execution', 'github-ops'], squad: 'GAMMA' }
+    'trinity-mel': { name: 'MEL', role: 'designer_agent', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['screenshot-analysis', 'ui-drafting', 'component-design', 'penpot-prototyping'], squad: 'BETA' },
+    'trinity-apm': { name: 'APM', role: 'spiritual_backbone', primaryVirtue: 'LOVELY', tier: 'conductor', specialties: ['prayer', 'vision', 'stability-imaging'], squad: 'BETA' },
+    'trinity-sophia': { name: 'SOPHIA', role: 'wisdom_research', primaryVirtue: 'TRUE', tier: 'specialist', specialties: ['deep-thought', 'research', 'resource-optimization', 'tool-scouting', 'arxiv-grounding'], squad: 'GAMMA' },
+    'trinity-nexus': { name: 'NEXUS', role: 'network_policy', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['network-security', 'mtls', 'allowlisting', 'a2a-protocol'], squad: 'GAMMA' },
+    'trinity-hdm': { name: 'HDM', role: 'coder_agent', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['langgraph', 'repl-execution', 'github-ops', 'bacalhau-compute'], squad: 'GAMMA' }
 };

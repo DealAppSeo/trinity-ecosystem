@@ -32,6 +32,9 @@ import { ResearchMCP } from './servers/ResearchMCP';
 import { E2BMCP } from './servers/E2BMCP';
 import { HumanMCP } from './servers/HumanMCP';
 import { NotionMCP } from './servers/NotionMCP';
+import { ArxivMCP } from './servers/ArxivMCP';
+import { BacalhauMCP } from './servers/BacalhauMCP';
+import { PenpotMCP } from './servers/PenpotMCP';
 import { BraveMCP } from './servers/BraveMCP';
 
 export class MCPManager {
@@ -59,6 +62,9 @@ export class MCPManager {
         this.registerServer(new ComposioMCP());
         this.registerServer(new StitchMCP());
         this.registerServer(new SandboxMCP());
+        this.registerServer(new ArxivMCP());
+        this.registerServer(new BacalhauMCP());
+        this.registerServer(new PenpotMCP());
         this.registerServer(new FrameworksMCP());
         this.registerServer(new AutomationMCP());
         this.registerServer(new KnowledgeMCP());

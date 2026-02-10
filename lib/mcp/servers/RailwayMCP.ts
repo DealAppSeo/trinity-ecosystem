@@ -76,6 +76,15 @@ export class RailwayMCP extends BaseMCP {
                     required: ['service_id', 'environment_id', 'name', 'value']
                 },
                 execute: async (args: any) => this.callTool('upsert_railway_variable', args)
+            },
+            {
+                name: 'get_infrastructure_health',
+                description: 'Returns a summary of all Trinity services and their health on Railway.',
+                schema: {
+                    type: 'object',
+                    properties: {}
+                },
+                execute: async () => this.callTool('get_infrastructure_health', {})
             }
         ];
     }
@@ -141,6 +150,31 @@ export class RailwayMCP extends BaseMCP {
             `;
             const data = await this.fetchRailway(mutation, { serviceId: service_id, environmentId: environment_id, name, value });
             return JSON.stringify({ success: !!data });
+        }
+
+        if (toolName === 'get_infrastructure_health') {
+            const query = `
+                query projects {
+                  projects {
+                    nodes {
+                      id
+                      name
+                      services {
+                        nodes {
+                          id
+                          name
+                          status
+                        }
+                      }
+                    }
+                  }
+                }
+            `;
+            const data = await this.fetchRailway(query);
+            const services = data.projects.nodes.flatMap((p: any) =>
+                p.services.nodes.map((s: any) => ({ project: p.name, service: s.name, status: s.status }))
+            );
+            return JSON.stringify({ health: 'OK', services });
         }
 
         throw new Error(`Tool ${toolName} not supported.`);
