@@ -20,10 +20,17 @@ import { toast } from 'sonner';
 import { AGENT_GROUPS } from '@/lib/agent/groups';
 import { RewardTuner } from '@/components/RewardTuner';
 import { cn } from '@/lib/utils';
+import { ConstitutionalHeartbeat } from '@/components/ConstitutionalHeartbeat';
+import { InfraHealthCard } from '@/components/InfraHealthCard';
+import { HITLActionCenter } from '@/components/HITLActionCenter';
+import { SovereignMemoryExplorer } from '@/components/SovereignMemoryExplorer';
 
 export default function ConductorPage() {
     // consolidated logic via hook
-    const { agents, tasks, logs, heartbeats, stats, loading, createTask, refresh, killRandomAgent, triggerChaosEvent } = useTrinityController();
+    const {
+        agents, tasks, logs, heartbeats, stats, sovereignData,
+        loading, createTask, refresh, killRandomAgent, triggerChaosEvent
+    } = useTrinityController();
 
     // Stats are now fetched via Realtime hook
     const [showAddTask, setShowAddTask] = useState(false);
@@ -47,8 +54,12 @@ export default function ConductorPage() {
     // No explicit refresh interval needed here.
 
     // Derived stats for UI if API fails or for instant updates
-    const onlineCount = agents.filter(a => ['online', 'blue', 'amber'].includes(a.status)).length;
-    const busyCount = agents.filter(a => (a as any).current_task_summary && (a as any).current_task_summary !== 'Idle' && (a as any).status !== 'offline').length;
+    const filteredAgents = agents.filter(a => a.agent_name !== 'trinity-ecosystem' && a.agent_name !== 'trinity-science');
+    const onlineCount = filteredAgents.filter(a => ['online', 'blue', 'amber'].includes(a.status)).length;
+    const busyCount = filteredAgents.filter(a => (a as any).current_task_summary && (a as any).current_task_summary !== 'Idle' && (a as any).status !== 'offline').length;
+
+    // Ecosystem/Network Entities
+    const ecosystemAgents = agents.filter(a => a.agent_name === 'trinity-ecosystem' || a.agent_name === 'trinity-science');
 
     // --- CAPTAIN FEATURES ---
     const [northStar, setNorthStar] = useState('');
@@ -101,6 +112,28 @@ export default function ConductorPage() {
 
         await promise;
         setTimeout(refresh, 1000);
+    };
+
+    const handleHITLApprove = async (id: string) => {
+        toast.promise(
+            supabase.from('trinity_tasks').update({ status: 'doing', metadata: { approved_by: 'FOUNDER' } }).eq('id', id),
+            {
+                loading: 'Approving task...',
+                success: 'Task approved and released!',
+                error: 'Failed to approve task'
+            }
+        );
+    };
+
+    const handleHITLReject = async (id: string) => {
+        toast.promise(
+            supabase.from('trinity_tasks').update({ status: 'cancelled', metadata: { rejected_by: 'FOUNDER' } }).eq('id', id),
+            {
+                loading: 'Rejecting task...',
+                success: 'Task rejected and stalled.',
+                error: 'Failed to reject task'
+            }
+        );
     };
 
     // --- SHARE FEATURE ---
@@ -183,6 +216,7 @@ export default function ConductorPage() {
                                 </Link>
                             </div>
                         )}
+
                         {/* Mobile Tab Switcher */}
                         <div className="lg:hidden flex border-b border-white/5 bg-obsidian-surface/50 rounded-t-xl overflow-hidden shrink-0">
                             {(['grid', 'tasks', 'logs'] as const).map((tab) => (
@@ -207,26 +241,37 @@ export default function ConductorPage() {
                             activeTab !== 'grid' && 'hidden lg:flex'
                         )}>
 
-                            {/* Chaos & Squad Panel */}
+                            {/* Sovereign Dashboard Row 1 */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
+                                <ConstitutionalHeartbeat
+                                    status={sovereignData?.governance?.recent_events?.some((e: any) => e.message?.includes('VIOLATION')) ? 'violating' : 'aligned'}
+                                    recentEvents={sovereignData?.governance?.recent_events}
+                                />
+                                <InfraHealthCard
+                                    services={sovereignData?.infra?.services || []}
+                                    status={sovereignData?.infra?.status || 'healthy'}
+                                />
+                                <SovereignMemoryExplorer
+                                    nodeCount={sovereignData?.graph?.nodes || 0}
+                                    relationCount={sovereignData?.graph?.relationships || 0}
+                                    lastSync={sovereignData?.graph?.last_sync}
+                                />
+                            </div>
+
+                            {/* Chaos & Triad Row */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
-                                {/* System Status Hero */}
-                                <div className="md:col-span-3 bg-gradient-to-r from-emerald-500/10 to-emerald-900/10 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between">
+                                {/* System Status Summary */}
+                                <div className="md:col-span-1 bg-gradient-to-r from-emerald-500/10 to-emerald-900/10 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                                            <Activity className="w-6 h-6 text-emerald-400" />
+                                        <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                                            <Activity className="w-5 h-5 text-emerald-400" />
                                         </div>
                                         <div>
-                                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                                System Online
-                                                <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">v1.0.2</span>
+                                            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                                                Active
+                                                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">v1.0.2</span>
                                             </h2>
-                                            <p className="text-sm text-zinc-400">Swarm is active and processing tasks. {onlineCount} agents deployed.</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-4 pr-4">
-                                        <div className="text-right">
-                                            <div className="text-2xl font-bold text-emerald-400">{onlineCount}</div>
-                                            <div className="text-[10px] text-emerald-500/70 uppercase tracking-wider">Agents</div>
+                                            <p className="text-[10px] text-zinc-400">{onlineCount} agents / {stats?.active_tasks || 0} tasks</p>
                                         </div>
                                     </div>
                                 </div>
@@ -242,133 +287,88 @@ export default function ConductorPage() {
                                             <Skull className="w-5 h-5 text-red-500" />
                                             <div>
                                                 <h2 className="text-sm font-bold text-zinc-100">Chaos Testing</h2>
-                                                <p className="text-zinc-500 text-[10px]">Anti-fragility simulation</p>
                                             </div>
                                         </div>
                                         {isFounder && (
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={wakeTrinity}
-                                                    className="px-3 py-1 bg-emerald-950/50 border border-emerald-900/30 text-emerald-300 text-xs rounded hover:bg-emerald-900/80 transition-colors flex items-center gap-1"
-                                                    title="Send Keep-Alive Pings"
+                                                    className="px-2 py-1 bg-emerald-950/50 border border-emerald-900/30 text-emerald-300 text-[10px] rounded hover:bg-emerald-900/80 transition-colors"
                                                 >
-                                                    <Activity className="w-3 h-3" /> Wake Swarm
+                                                    Wake
                                                 </button>
                                                 <button
                                                     onClick={resetTrinity}
-                                                    className="px-3 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-xs rounded hover:bg-red-900/80 transition-colors flex items-center gap-1"
-                                                    title="Emergency Board Reset"
+                                                    className="px-2 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-[10px] rounded hover:bg-red-900/80 transition-colors"
                                                 >
-                                                    <AlertTriangle className="w-3 h-3" /> Kill All
+                                                    Kill All
                                                 </button>
                                             </div>
                                         )}
                                     </div>
-                                    <div className="mt-3 grid grid-cols-2 gap-2">
-                                        <button
-                                            onClick={() => confirm('Kill Random Agent?') && killRandomAgent()}
-                                            disabled={!isFounder}
-                                            className="px-3 py-1 bg-zinc-900/50 border border-white/5 text-zinc-500 text-[10px] rounded hover:bg-red-950/30 hover:text-red-400 transition-all flex items-center justify-center gap-1"
-                                        >
-                                            <Skull className="w-3 h-3" /> Kill Random
-                                        </button>
-                                        <button
-                                            onClick={() => triggerChaosEvent('SIMULATED_FAILURE')}
-                                            disabled={!isFounder}
-                                            className="px-3 py-1 bg-zinc-900/50 border border-white/5 text-zinc-500 text-[10px] rounded hover:bg-amber-950/30 hover:text-amber-400 transition-all flex items-center justify-center gap-1"
-                                        >
-                                            <ServerCrash className="w-3 h-3" /> Trip Circuit
-                                        </button>
-                                    </div>
                                 </div>
 
-                                {/* Squad Status Summary (3x3 Grid - Antigravity Refinement) */}
+                                {/* Squad Status Summary */}
                                 <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-2">
-                                            <Share2 className="w-4 h-4 text-accent-blue" />
-                                            <h2 className="text-sm font-bold text-zinc-100">Swarm Triad Pulse</h2>
-                                        </div>
-                                        <span className="text-[10px] text-zinc-600 font-mono uppercase tracking-tighter">BFT Ready</span>
-                                    </div>
-                                    <div className="grid grid-cols-4 gap-2"> {/* Orchestration + 3 Squads */}
+                                    <div className="grid grid-cols-4 gap-2">
                                         {Object.values(AGENT_GROUPS).map(group => {
                                             const groupAgents = agents.filter(a => group.members.includes(a.agent_name));
                                             const onlineCount = groupAgents.filter(a => ['online', 'active', 'green', 'blue'].includes(a.status)).length;
                                             const busyCount = groupAgents.filter(a => (a as any).current_task_summary && (a as any).current_task_summary !== 'Idle').length;
                                             const total = group.members.length;
-
-                                            // Heat Logic: Busy = Hot (Violet/Green), Idle = Cool (Zinc)
-                                            // Only if online
-                                            const isHot = busyCount > 0;
-
                                             return (
                                                 <div key={group.id} className={cn(
-                                                    "relative bg-black/40 py-2 px-1 rounded border transition-all duration-500",
-                                                    isHot ? "border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "border-zinc-800/50"
+                                                    "relative bg-black/40 py-2 px-1 rounded border",
+                                                    busyCount > 0 ? "border-emerald-500/40" : "border-zinc-800/50"
                                                 )}>
                                                     <div className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 truncate text-center">
                                                         {group.name.split(' ')[0]}
                                                     </div>
-                                                    <div className="flex items-center justify-center gap-1.5">
-                                                        <div className={cn(
-                                                            "w-1 h-1 rounded-full",
-                                                            onlineCount === total ? "bg-emerald-500" : onlineCount > 0 ? "bg-amber-500" : "bg-red-500"
-                                                        )} />
-                                                        <div className={cn(
-                                                            "text-[10px] font-mono font-bold",
-                                                            onlineCount === total ? 'text-zinc-200' : 'text-zinc-400'
-                                                        )}>
-                                                            {onlineCount}/{total}
-                                                        </div>
+                                                    <div className="text-[10px] font-mono font-bold text-center">
+                                                        {onlineCount}/{total}
                                                     </div>
-                                                    {isHot && (
-                                                        <div className="absolute top-0 right-0 p-1">
-                                                            <div className="w-1 h-1 bg-emerald-400 rounded-full animate-ping" />
-                                                        </div>
-                                                    )}
                                                 </div>
                                             );
                                         })}
                                     </div>
                                 </div>
-
-                                {/* Reward Tuner (ANFIS Control) */}
-                                <div className={cn(!isFounder && "opacity-50 grayscale pointer-events-none")}>
-                                    <RewardTuner />
-                                </div>
                             </div>
 
-                            {/* Agents Grid */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar min-h-[300px]">
-                                <div className="mb-4 flex items-center justify-between">
-                                    <h2 className="text-xl font-semibold text-text-primary">Symphony Grid</h2>
-                                    <div className="flex gap-2">
-                                        {loading && agents.length === 0 ? (
-                                            <Skeleton className="w-24 h-6" />
-                                        ) : (
-                                            <span className="text-xs text-status-online bg-status-online/10 px-2 py-1 rounded border border-status-online/20 flex items-center gap-2">
-                                                <span className={`w-2 h-2 rounded-full ${onlineCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                                                {onlineCount}/12 Systems Active
-                                            </span>
-                                        )}
-                                    </div>
+                            {/* Reward Tuner & Grid */}
+                            <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+                                <div className={cn(!isFounder && "opacity-50 grayscale pointer-events-none shrink-0")}>
+                                    <RewardTuner />
                                 </div>
 
-                                {loading && agents.length === 0 ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
+                                <div className="flex-1 overflow-y-auto custom-scrollbar min-h-[300px]">
+                                    <div className="mb-4 flex items-center justify-between">
+                                        <h2 className="text-xl font-semibold text-text-primary">Symphony Grid</h2>
+                                        <div className="flex gap-2">
+                                            {loading && agents.length === 0 ? (
+                                                <Skeleton className="w-24 h-6" />
+                                            ) : (
+                                                <span className="text-xs text-status-online bg-status-online/10 px-2 py-1 rounded border border-status-online/20 flex items-center gap-2">
+                                                    <span className={`w-2 h-2 rounded-full ${onlineCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                                                    {onlineCount}/12 Systems Active
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                ) : (
-                                    <AgentGrid
-                                        agents={agents}
-                                        isConductor={true}
-                                        onAssignTask={(agentName) => {
-                                            /* Handle assignment in next iteration if UI supported */
-                                            console.log('Assign to', agentName);
-                                        }}
-                                    />
-                                )}
+
+                                    {loading && agents.length === 0 ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
+                                        </div>
+                                    ) : (
+                                        <AgentGrid
+                                            agents={filteredAgents}
+                                            isConductor={true}
+                                            onAssignTask={(agentName) => {
+                                                console.log('Assign to', agentName);
+                                            }}
+                                        />
+                                    )}
+                                </div>
                             </div>
 
                             {/* Activity Feed (Bottom) */}
@@ -377,11 +377,23 @@ export default function ConductorPage() {
                             </div>
                         </div>
 
-                        {/* RIGHT COLUMN: Tasks & Stats */}
+                        {/* RIGHT COLUMN: Tasks & HITL */}
                         <div className={cn(
                             "lg:col-span-1 flex flex-col gap-6 h-full",
                             activeTab !== 'tasks' && 'hidden lg:flex'
                         )}>
+                            {/* HITL Action Center */}
+                            <HITLActionCenter
+                                pendingEvents={tasks.filter(t => t.status === 'pending_clarification').map(t => ({
+                                    id: t.id,
+                                    title: t.title,
+                                    type: (t as any).task_type === 'phone_validation' ? 'phone' : 'clarification',
+                                    agent: t.claimed_by || 'Unknown',
+                                    timestamp: t.created_at
+                                }))}
+                                onApprove={handleHITLApprove}
+                                onReject={handleHITLReject}
+                            />
 
                             {/* Invite Manager */}
                             <div className="shrink-0">
@@ -418,18 +430,86 @@ export default function ConductorPage() {
                     </>
                 )}
 
-            </main >
+            </main>
 
-            <CostTicker traditional={847.00} trinity={0.47} googleStitch={0.00} /> {/* Added Google Stitch to plan */}
+            {/* Networks & Infrastructure Row */}
+            <div className="container mx-auto px-4 py-8 border-t border-white/5 mt-8">
+                <div className="flex items-center gap-2 mb-6">
+                    <Share2 className="w-5 h-5 text-accent-blue" />
+                    <h2 className="text-lg font-bold text-white uppercase tracking-widest">Ecosystem Infrastructure</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Ecosystem Special View */}
+                    {ecosystemAgents.map(entity => (
+                        <div key={entity.agent_name} className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={cn(
+                                    "w-3 h-3 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]",
+                                    entity.status === 'online' ? 'bg-emerald-500' : 'bg-red-500'
+                                )} />
+                                <div>
+                                    <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">{entity.agent_name}</h3>
+                                    <p className="text-[10px] text-zinc-500">{entity.current_task_summary || 'System Ready'}</p>
+                                </div>
+                            </div>
+                            <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded border border-white/5 uppercase">Network</span>
+                        </div>
+                    ))}
+
+                    {/* System Status Indicators */}
+                    <div className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
+                            <div>
+                                <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">n8n Bridge</h3>
+                                <p className="text-[10px] text-zinc-500">Automation Active</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
+                            <div>
+                                <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">Flowise</h3>
+                                <p className="text-[10px] text-zinc-500">Reasoning Nodes Online</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
+                            <div>
+                                <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">PostgreSQL</h3>
+                                <p className="text-[10px] text-zinc-500">State Store Online</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
+                            <div>
+                                <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">Memory Graph</h3>
+                                <p className="text-[10px] text-zinc-500">Neo4j/Memgraph Ready</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <main className="min-h-[100px]" /> {/* Spacer */}
+
+            <CostTicker traditional={847.00} trinity={0.47} googleStitch={0.0} />
 
             <AddTaskModal
                 isOpen={showAddTask}
                 onClose={() => {
                     setShowAddTask(false);
-                    refresh(); // Refresh after add
+                    refresh();
                 }}
                 availableAgents={agents}
             />
-        </div >
+        </div>
     );
 }
