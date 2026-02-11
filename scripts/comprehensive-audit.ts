@@ -1,7 +1,17 @@
 
 const fs = require('fs');
 const path = require('path');
-const fetch = require('node-fetch');
+
+// Node 18+ has global fetch, so we don't need node-fetch if running on Node 18+
+// However, to be safe, we can polyfill or just assume it's there.
+if (typeof fetch === 'undefined') {
+    try {
+        global.fetch = require('node-fetch');
+    } catch (e) {
+        console.error('fetch is not defined. Please use Node 18+ or install node-fetch.');
+    }
+}
+
 
 console.log('\n--- 🕵️ Trinity Comprehensive API Key Audit ---\n');
 
