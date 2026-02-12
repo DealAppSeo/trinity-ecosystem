@@ -318,11 +318,11 @@ export default function ConductorPage() {
                                             const total = group.members.length;
                                             return (
                                                 <div key={group.id} className={cn(
-                                                    "relative bg-black/40 py-2 px-1 rounded border",
+                                                    "relative bg-black/40 py-2 px-1 rounded border min-w-0 transition-all",
                                                     busyCount > 0 ? "border-emerald-500/40" : "border-zinc-800/50"
                                                 )}>
-                                                    <div className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 truncate text-center">
-                                                        {group.name.split(' ')[0]}
+                                                    <div className="text-[7px] text-zinc-500 uppercase tracking-tighter mb-1 truncate text-center px-1">
+                                                        {group.id === 'ORCHESTRATION' ? 'ORCH' : group.name.split(' ')[0]}
                                                     </div>
                                                     <div className="text-[10px] font-mono font-bold text-center">
                                                         {onlineCount}/{total}

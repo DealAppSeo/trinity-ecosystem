@@ -10,6 +10,7 @@ const nextConfig = {
         return config;
     },
     transpilePackages: ['@trinity/agent-core'],
+    outputFileTracingRoot: process.cwd(),
     experimental: {},
 };
 

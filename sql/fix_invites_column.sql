@@ -26,4 +26,7 @@ BEGIN
     DROP POLICY IF EXISTS "Enable insert for all" ON trinity_access_invites;
     CREATE POLICY "Enable insert for all" ON trinity_access_invites FOR INSERT WITH CHECK (true);
 
+    -- 4. Reload PostgREST Schema Cache
+    NOTIFY pgrst, 'reload schema';
+
 END $$;

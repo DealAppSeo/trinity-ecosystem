@@ -13,6 +13,8 @@ import { Octokit } from '@octokit/rest';
 import { notificationManager } from '../notification/NotificationManager';
 import { DETERMINISTIC_WORKFLOWS } from './deterministicWorkflows';
 import { HITLManager, HITLDecision } from './HITLManager';
+import { ERC8004Bridge } from '../web3/erc8004';
+import { HyperDAG } from './HyperDAG';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
@@ -614,14 +616,14 @@ export class ConstitutionalAgent {
 
                     if (peerTasks && peerTasks.length > 0) {
                         for (const task of peerTasks) {
-                            // Check if the owner is stale
+                            // [STABILIZATION] Check if the owner is stale - Use SSOT (trinity_agent_registry) instead of heartbeat table
                             const { data: ownerHb } = await this.supabase
-                                .from('trinity_heartbeat')
-                                .select('last_seen')
-                                .eq('agent', task.claimed_by)
+                                .from('trinity_agent_registry')
+                                .select('last_active')
+                                .eq('agent_name', task.claimed_by)
                                 .maybeSingle();
 
-                            if (ownerHb && new Date(ownerHb.last_seen) < new Date(Date.now() - 10 * 60 * 1000)) {
+                            if (ownerHb && new Date(ownerHb.last_active) < new Date(Date.now() - 10 * 60 * 1000)) {
                                 console.log(`[${this.name}] 🕵️ SQUAD WATCHDOG: Task ${task.id} owned by STALE peer ${task.claimed_by}. FORCING RELEASE.`);
                                 await this.log('squad_watchdog_hijack', `Releasing task ${task.id} from stale peer ${task.claimed_by}`, { taskId: task.id, peer: task.claimed_by });
 
@@ -866,7 +868,8 @@ export class ConstitutionalAgent {
             .eq('task_id', task.id);
 
         const artifactCount = artifacts?.length || 0;
-        const hasResult = task.result && task.result.length > 50;
+        // [STABILIZATION] Lower threshold from 50 to 20 to prevent false negatives for simple research tasks.
+        const hasResult = task.result && task.result.length > 20;
         console.log(`[BFT] Found ${artifactCount} artifacts. Result present: ${!!hasResult}`);
 
         // 2. SUBJECTIVE LOGIC & PHI-WEIGHTED CONSISTENCY
@@ -1062,7 +1065,8 @@ ${result.substring(0, 2000)}
             const serviceMap: Record<string, string> = {
                 'local_4090': 'trinity-inference-proxy',
                 'ollama': 'trinity-ollama-bridge',
-                'creative': 'trinity-creative-mcp'
+                'creative': 'trinity-creative-mcp',
+                'py-brain': 'py-brain'
             };
 
             const serviceName = serviceMap[provider];
@@ -1114,6 +1118,14 @@ ${result.substring(0, 2000)}
         if (!claimed) {
             console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
             return { success: false, error: 'Already claimed' };
+        }
+
+        // [PHASE 13] OPENCLAW SAFETY CHECK
+        const isSafe = await this.checkOpenClawSafe(task);
+        if (!isSafe) {
+            console.warn(`[${this.name}] 🛑 OpenClaw Safety Violation: Task ${task.id} rejected due to high risk / lack of verify/HITL.`);
+            await this.releaseClaim(task.id);
+            return { success: false, error: 'OpenClaw Safety Violation' };
         }
 
         try {
@@ -1368,7 +1380,7 @@ ${iterateProtocol}
 Task ID: ${task.id}
 Task Title: ${task.title}
 
-IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do not just talk about it. EXECUTE.
+IMPORTANT: Your response will be automatically parsed for artifacts. If you produce code, research, or documents, they will be persisted as official artifacts. Use your tools for external actions.
 `;
 
             // Call LLM (First Pass)
@@ -1577,8 +1589,8 @@ IMPORTANT: You MUST use the 'save_artifact' tool to store your final output. Do 
             this.sessionMetrics.tasksCompleted++;
             await this.updateReputation(evaluation.score > 0.6);
 
-            // ERC-8004 INTEROP: Bridge to HyperDAG Testnet (Sovereign Reputation)
-            await this.integrateErc8004(task.id, evaluation.score);
+            // ERC-8004 & HyperDAG INTEROP: Bridge to Sovereign Audit Trail
+            await this.integrateErc8004(task.id, result.output, evaluation.score);
 
             console.log(`[${this.name}] ✅ Completed task ${task.id} (Score: ${evaluation.score})`);
 
@@ -2577,23 +2589,27 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 }, { onConflict: 'agent_name' });
 
             // 1. Trinity Heartbeat (For Controller Header / Redundancy)
-            await this.supabase
-                .from('trinity_heartbeat')
-                .upsert({
-                    agent: this.name, // SSOT: FULL NAME
-                    status: 'online', // Normalized
-                    version: this.version,
-                    last_seen: timestamp,
-                    // [ANTIGRAVITY] Note: status_message/current_task_summary removed 
-                    // as they don't exist in the trinity_heartbeat schema (Minimalist table).
-                    config: {
-                        fullName: this.name,
-                        sessionMetrics: this.sessionMetrics,
-                        group: this.groupName,
-                        tier: this.autonomyTier,
-                        deployment: process.env.RAILWAY_PROJECT_NAME || 'local'
-                    }
-                }, { onConflict: 'agent' });
+            try {
+                await this.supabase
+                    .from('trinity_heartbeat')
+                    .upsert({
+                        agent: this.name, // SSOT: FULL NAME
+                        status: 'online', // Normalized
+                        version: this.version,
+                        last_seen: timestamp,
+                        // [ANTIGRAVITY] Note: status_message/current_task_summary removed 
+                        // as they don't exist in the trinity_heartbeat schema (Minimalist table).
+                        config: {
+                            fullName: this.name,
+                            sessionMetrics: this.sessionMetrics,
+                            group: this.groupName,
+                            tier: this.autonomyTier,
+                            deployment: process.env.RAILWAY_PROJECT_NAME || 'local'
+                        }
+                    }, { onConflict: 'agent' });
+            } catch (hErr) {
+                console.warn(`[${this.name}] ⚠️ Heartbeat Table RLS Conflict (Registry Updated)`);
+            }
 
             // 2. Agent Heartbeat (Legacy Monitoring / SafetyNet)
             await this.supabase
@@ -2618,6 +2634,10 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     tasks_completed: this.tasksCompleted,
                     group_name: this.wisdom.squad || 'UNKNOWN'
                 }, { onConflict: 'agent_name' });
+
+            // [PHASE 13] ERC-8004 WEb3 SYNC: Bridge RepID to On-chain Reputation Registry
+            // This enables cross-chain discovery and trustless agent validation.
+            await ERC8004Bridge.syncReputation(this.name, this.reputationScore);
 
             if (this.isSurvivor) await this.runSurvivorResurrection();
 
@@ -3392,18 +3412,52 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         throw new Error("Max tool recursion");
     }
 
-    // ============================================
     // ERC-8004: CROSS-CHAIN BRIDGE (ELITE)
     // ============================================
-    async integrateErc8004(taskId: string, evaluationScore: number) {
-        // SBT Mapping & Bayesian Aggregation Stub (Patent: Trinity Identity)
-        console.log(`[ERC-8004] 🌉 Bridging Task ${taskId} to HyperDAG. Weighting by belief: ${evaluationScore / 100}`);
+    async integrateErc8004(taskId: string, result: string, evaluationScore: number) {
+        // [PHASE 13] SOVEREIGN BRIDGE: Bind HyperDAG Audit Trail to ERC-8004
+        console.log(`[ERC-8004] 🌉 Bridging Task ${taskId} to HyperDAG. Weight: ${evaluationScore / 100}`);
+
         try {
-            // Placeholder: ethers.Contract('...').aggregateRepID(...)
-            // This enables cross-chain sovereign reputation as per whitepaper Part IV
+            // 1. Generate HyperDAG Signature (Proto-DAG Audit Trail)
+            const sig = await HyperDAG.signTask(this.name, taskId, result);
+
+            // 2. Register on-chain if high enough reputation or critical task
+            if (evaluationScore > 70) {
+                await ERC8004Bridge.syncReputation(this.name, this.reputationScore);
+                await ERC8004Bridge.validateTask(taskId, this.name, sig.signature_hex);
+            }
+
+            // 3. Update task in DB with transaction/signature hash
+            await this.supabase.from('trinity_tasks').update({
+                transaction_hash: sig.signature_hex,
+                metadata: {
+                    hyperdag_sig: sig,
+                    rep_synced: evaluationScore > 70
+                }
+            }).eq('id', taskId);
+
         } catch (e: any) {
             console.warn(`[ERC-8004] Interop failed: ${e.message}`);
         }
+    }
+
+    /**
+     * OpenClaw Safety Protocol (Phase 13)
+     * "Safe autonomous capability through transparency and verification."
+     */
+    async checkOpenClawSafe(task: Task): Promise<boolean> {
+        const isHighImpact = task.priority === 10 || (typeof task.priority === 'number' && task.priority >= 80);
+        const requiresHITL = task.description?.toLowerCase().includes('payment') || task.description?.toLowerCase().includes('security');
+
+        if (isHighImpact || requiresHITL) {
+            const hasVerify = (task.verify_count !== undefined && task.verify_count > 0);
+            if (!hasVerify && !task.requires_consensus) {
+                console.log(`[OpenClaw] 🛡️  High-impact task ${task.id} requires consensus or verification. Gating execution.`);
+                return false;
+            }
+        }
+        return true;
     }
 
     private async handleToolCall(fnName: string, args: any, artifactLinks: string[]): Promise<string> {

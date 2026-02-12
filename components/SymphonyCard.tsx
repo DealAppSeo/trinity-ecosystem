@@ -58,7 +58,7 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
                 <div className="flex justify-between items-start z-10 w-full mb-4">
                     {/* Left: Identity */}
                     <div className="flex flex-col gap-1 flex-1 min-w-[80px] pr-2">
-                        <h3 className="text-lg font-black text-white tracking-tight uppercase group-hover:text-violet-400 transition-colors uppercase truncate max-w-[120px]">
+                        <h3 className="text-lg font-black text-white tracking-tight uppercase group-hover:text-violet-400 transition-colors uppercase truncate" title={agent.agent_name.replace('trinity-', '')}>
                             {agent.agent_name.replace('trinity-', '')}
                         </h3>
                         {wisdom?.specialties?.[0] && (
@@ -66,8 +66,8 @@ export function SymphonyCard({ agent }: SymphonyCardProps) {
                                 {wisdom.specialties[0]}
                             </span>
                         )}
-                        <p className="text-[10px] font-semibold text-zinc-500 mt-1 mb-2 truncate">
-                            {role}
+                        <p className="text-[10px] font-semibold text-zinc-500 mt-1 mb-2">
+                            {group?.name || 'Autonomous Agent'}
                         </p>
 
                         {/* Current Activity Display */}

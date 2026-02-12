@@ -207,9 +207,13 @@ export default function TasksPage() {
         }
     };
 
+    const [isArtifactLoading, setIsArtifactLoading] = useState(false);
+
     const handleViewArtifact = async (task: TaskRecord) => {
+        setIsArtifactLoading(true);
         // Gates disabled for accessibility - direct access enabled
         try {
+            console.log(`[ARTIFACT] Fetching for task: ${task.id}`);
             // Extract artifact ID from db://trinity_artifacts/ID or use task ID
             let artifactId = task.artifact_url?.split('/').pop();
 
@@ -227,7 +231,12 @@ export default function TasksPage() {
                 .limit(1)
                 .maybeSingle();
 
-            if (error || !data) {
+            if (error) {
+                console.error('[ARTIFACT] Error:', error);
+                throw error;
+            }
+
+            if (!data) {
                 // FALLBACK: If no record in trinity_artifacts, show the task result if it exists
                 if (task.result) {
                     setSelectedArtifact({
@@ -242,7 +251,10 @@ export default function TasksPage() {
 
             setSelectedArtifact({ title: data.title, content: data.content });
         } catch (e) {
+            console.error('[ARTIFACT] Catch error:', e);
             showToast('Failed to load artifact', 'error');
+        } finally {
+            setIsArtifactLoading(false);
         }
     };
 
@@ -441,14 +453,16 @@ export default function TasksPage() {
                                                             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10"
                                                                 title={`Assigned/Claimed by: ${task.assigned_to || task.claimed_by}`}>
                                                                 <div className="flex flex-col items-end">
-                                                                    <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tighter">
-                                                                        {task.status === 'pending' ? 'ASSIGNED' : 'COMPLETED BY'}
+                                                                    <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tighter">
+                                                                        {task.status === 'pending' ? 'ASSIGNED' :
+                                                                            (['doing', 'in_progress', 'running'].includes(task.status)) ? 'CLAIMED BY' :
+                                                                                'COMPLETED BY'}
                                                                     </span>
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[7px] font-bold text-white shadow-sm shrink-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-3 h-3 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[6px] font-bold text-white shadow-sm shrink-0">
                                                                             {(task.assigned_to || task.claimed_by || '').replace('trinity-', '')[0]?.toUpperCase() || '?'}
                                                                         </div>
-                                                                        <span className="text-[10px] font-mono text-zinc-300">
+                                                                        <span className="text-[9px] font-mono text-zinc-300">
                                                                             {(task.assigned_to || task.claimed_by || '').replace('trinity-', '').toUpperCase()}
                                                                         </span>
                                                                     </div>
@@ -457,17 +471,19 @@ export default function TasksPage() {
 
                                                             {/* Verification Detail */}
                                                             {task.verified_by && task.verified_by.length > 0 && (
-                                                                <div className="flex flex-col items-end" title={`Verified by: ${task.verified_by.join(', ')}`}>
-                                                                    <span className="text-[8px] text-cyan-500 font-bold uppercase tracking-tighter">VERIFIED BY</span>
-                                                                    <div className="flex -space-x-1.5 overflow-hidden">
+                                                                <div className="flex flex-col items-end mt-1" title={`Verified by: ${task.verified_by.join(', ')}`}>
+                                                                    <span className="text-[7px] text-cyan-500 font-bold uppercase tracking-tighter mb-0.5">VERIFIED BY</span>
+                                                                    <div className="flex flex-wrap gap-1 justify-end max-w-[100px]">
                                                                         {task.verified_by.map((v, i) => (
-                                                                            <div key={i} className="inline-block w-3.5 h-3.5 rounded-full ring-[1px] ring-[#0B0B0F] bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-[7px] font-bold text-white" title={v}>
-                                                                                {v.replace('trinity-', '')[0]?.toUpperCase()}
+                                                                            <div key={i} className="flex items-center gap-1">
+                                                                                <div className="w-3 h-3 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-[6px] font-bold text-white" title={v}>
+                                                                                    {v.replace('trinity-', '')[0]?.toUpperCase()}
+                                                                                </div>
+                                                                                <span className="text-[8px] font-mono text-cyan-400">
+                                                                                    {v.replace('trinity-', '').toUpperCase()}
+                                                                                </span>
                                                                             </div>
                                                                         ))}
-                                                                        <span className="ml-2 text-[9px] font-mono text-cyan-400 self-center">
-                                                                            {task.verified_by.length}
-                                                                        </span>
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -500,9 +516,19 @@ export default function TasksPage() {
                                                 <div className="mt-2">
                                                     <button
                                                         onClick={() => handleViewArtifact(task)}
-                                                        className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 text-violet-400 text-[10px] font-bold transition-all"
+                                                        disabled={isArtifactLoading}
+                                                        className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 text-violet-400 text-[10px] font-bold transition-all disabled:opacity-50"
                                                     >
-                                                        <Eye className="w-3 h-3" /> VIEW ARTIFACT
+                                                        {isArtifactLoading ? (
+                                                            <>
+                                                                <span className="w-2 h-2 rounded-full bg-violet-400 animate-ping" />
+                                                                LOADING...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Eye className="w-3 h-3" /> VIEW ARTIFACT
+                                                            </>
+                                                        )}
                                                     </button>
                                                 </div>
                                             )}

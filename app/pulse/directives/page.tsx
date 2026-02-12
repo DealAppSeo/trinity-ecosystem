@@ -207,8 +207,10 @@ export default function FoundersDashboard() {
                 addHistory(`${action} command failed: ${data.error}`, 'error');
             }
         } catch (error: any) {
-            toast.error("Operation failed: " + error.message);
-            addHistory(`${action} operation error`, 'error');
+            console.error("Action error:", error);
+            const errorMsg = error.status === 401 ? "Invalid Admin Key. Please check the 'Identity Registry' below." : error.message;
+            toast.error("Operation failed: " + errorMsg);
+            addHistory(`${action} operation error: ${errorMsg}`, 'error');
         } finally {
             setActionLoading(null);
         }
@@ -374,11 +376,17 @@ export default function FoundersDashboard() {
 
                     {/* Founder Actions */}
                     <Card className="bg-[#0B0B0F]/80 border-white/10 backdrop-blur-xl overflow-hidden">
-                        <div className="p-6 border-b border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent">
+                        <div className="p-6 border-b border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <FlaskConical className="w-5 h-5 text-violet-400" />
                                 <h2 className="text-lg font-bold text-white">Founder Global Controls</h2>
                             </div>
+                            {!adminKey && (
+                                <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full animate-pulse transition-all">
+                                    <Shield className="w-3 h-3 text-red-500" />
+                                    <span className="text-[10px] font-black tracking-widest text-red-400 uppercase">Unauthorized: Key Missing</span>
+                                </div>
+                            )}
                         </div>
                         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <button

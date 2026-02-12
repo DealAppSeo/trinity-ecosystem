@@ -1,7 +1,7 @@
 🔍 Detected SERP keys: ["SERPER_API_KEY","SERP_API_KEY","USERPROFILE"]
-❌ OpenAI: ERROR - fetch is not a function (sk-proj-...N1QA)
-❌ Anthropic: ERROR - fetch is not a function (sk-ant-a...JwAA)
-❌ Groq: ERROR - fetch is not a function (gsk_UVFJ...xGOf)
-❌ DeepSeek: ERROR - fetch is not a function (sk-3e066...15ac)
-❌ SerpApi: ERROR - fetch is not a function
-❌ Figma: ERROR
+❌ OpenAI: INVALID (Unauthorized) (sk-proj-...N1QA)
+✅ Anthropic: WORKING (sk-ant-a...JwAA)
+✅ Groq: WORKING (gsk_UVFJ...xGOf)
+❌ DeepSeek: NO CREDITS / Rate Limited (sk-3e066...15ac)
+✅ SerpApi: WORKING (bc7e151c...)
+✅ Figma: WORKING

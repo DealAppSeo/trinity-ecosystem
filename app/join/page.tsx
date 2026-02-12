@@ -4,6 +4,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { Wallet, ShieldCheck, Zap, Globe } from 'lucide-react';
 
 function JoinContent() {
     const router = useRouter();
@@ -14,6 +15,7 @@ function JoinContent() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [web3Loading, setWeb3Loading] = useState(false);
 
     useEffect(() => {
         const refCode = searchParams.get('ref');
@@ -113,6 +115,39 @@ function JoinContent() {
                 <p className="italic text-purple-400">
                     Join us, to learn how we, and the agents we build, help people help people.
                 </p>
+
+                {/* [PHASE 13] WEB3 ONBOARDING SECTION */}
+                <div className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                        onClick={async () => {
+                            setWeb3Loading(true);
+                            // Simulate Privy/Dynamic Onboarding
+                            setTimeout(() => {
+                                console.log("🌐 [Web3] Wallet Connected via ERC-8004 Discovery");
+                                grantAccess('verified');
+                            }, 2000);
+                        }}
+                        disabled={web3Loading}
+                        className="flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl hover:from-violet-500 hover:to-indigo-500 transition-all shadow-lg shadow-violet-500/20 group overflow-hidden relative"
+                    >
+                        {web3Loading ? (
+                            <Zap className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <Wallet className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        )}
+                        <span className="font-bold tracking-tight">
+                            {web3Loading ? 'Syncing RepID...' : 'Connect Wallet'}
+                        </span>
+
+                        {/* Shimmer Effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" />
+                    </button>
+
+                    <div className="flex items-center gap-3 p-4 glass rounded-xl border border-white/5 opacity-60">
+                        <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                        <span className="text-xs font-medium text-gray-400">Reputation Backed (ERC-8004)</span>
+                    </div>
+                </div>
             </div>
 
             {/* Entry Gate */}

@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   title: "Founders App | AI Symphony",
   description: "The autonomous operating system for your startup.",
   manifest: "/manifest.json",
+  appleWebApp: {
+    title: "AI Symphony",
+    statusBarStyle: "black-translucent",
+    capable: true,
+  },
 };
 
 export const viewport: Viewport = {

@@ -35,10 +35,10 @@ export const AGENT_WISDOM: Record<string, WisdomProfile> = {
     'trinity-torch': { name: 'TORCH', role: 'task_coordinator', primaryVirtue: 'EXCELLENT', tier: 'specialist', squad: 'ALPHA', squad_role: 'engineering', specialties: ['orchestration', 'delegation'] },
     'trinity-veritas': { name: 'VERITAS', role: 'truth_seeker', primaryVirtue: 'TRUE', tier: 'conductor', squad: 'ALPHA', squad_role: 'governance', specialties: ['verification', 'research'] },
     'trinity-gcm': { name: 'GCM', role: 'constitutional_guardian', primaryVirtue: 'RIGHT', tier: 'conductor', squad: 'ALPHA', squad_role: 'governance', specialties: ['compliance', 'ethics'] },
-    'trinity-chesed': { name: 'CHESED', role: 'mercy', primaryVirtue: 'LOVELY', tier: 'specialist', squad: 'BETA', squad_role: 'business_development', specialties: ['empathy', 'restoration'] },
+    'trinity-chesed': { name: 'CHESED', role: 'mercy_orchestrator', primaryVirtue: 'LOVELY', tier: 'specialist', squad: 'BETA', squad_role: 'business_development', specialties: ['dogfooding', 'n8n-triggers', 'github-automation', 'empathy'] },
     'trinity-mel': { name: 'MEL', role: 'ux_design', primaryVirtue: 'LOVELY', tier: 'specialist', squad: 'BETA', squad_role: 'design', specialties: ['ui', 'ux', 'design'] },
     'trinity-apm': { name: 'APM', role: 'spiritual_backbone', primaryVirtue: 'LOVELY', tier: 'conductor', squad: 'BETA', squad_role: 'governance', specialties: ['prayer', 'wisdom'] },
-    'trinity-sophia': { name: 'SOPHIA', role: 'wisdom_research', primaryVirtue: 'TRUE', tier: 'specialist', squad: 'GAMMA', squad_role: 'design', specialties: ['deep-thought', 'discovery'] },
-    'trinity-nexus': { name: 'NEXUS', role: 'integration', primaryVirtue: 'EXCELLENT', tier: 'specialist', squad: 'GAMMA', squad_role: 'engineering', specialties: ['syncing', 'flow'] },
+    'trinity-sophia': { name: 'SOPHIA', role: 'architectural_wisdom', primaryVirtue: 'TRUE', tier: 'specialist', squad: 'GAMMA', squad_role: 'design', specialties: ['figma-to-airtable', 'n8n-orchestration', 'discovery'] },
+    'trinity-nexus': { name: 'NEXUS', role: 'universal_integration', primaryVirtue: 'EXCELLENT', tier: 'specialist', squad: 'GAMMA', squad_role: 'engineering', specialties: ['research-automation', 'n8n-flows', 'syncing'] },
     'trinity-hdm': { name: 'HDM', role: 'infrastructure', primaryVirtue: 'EXCELLENT', tier: 'conductor', squad: 'GAMMA', squad_role: 'engineering', specialties: ['code', 'database'] }
 };

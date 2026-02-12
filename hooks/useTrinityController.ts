@@ -10,6 +10,7 @@ export const useTrinityController = () => {
     const [logs, setLogs] = useState<any[]>([]);
     const [heartbeats, setHeartbeats] = useState<any[]>([]);
     const [stats, setStats] = useState<any>(null);
+    const [sovereignData, setSovereignData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [brainStatus, setBrainStatus] = useState<'online' | 'offline'>('offline');
     const channelRef = useRef<any>(null);
@@ -159,6 +160,13 @@ export const useTrinityController = () => {
                 active_tasks: (taskList || []).filter(t => ['pending', 'in_progress', 'doing', 'running'].includes(t.status)).length
             });
 
+            // [PHASE 10] Fetch Sovereign Ecosystem Data
+            const sovRes = await fetch('/api/sovereign');
+            if (sovRes.ok) {
+                const sovData = await sovRes.json();
+                setSovereignData(sovData);
+            }
+
         } catch (error) {
             console.error('Error fetching Trinity data:', error);
         } finally {
@@ -234,6 +242,7 @@ export const useTrinityController = () => {
         logs,
         heartbeats,
         stats,
+        sovereignData,
         loading,
         createTask,
         killRandomAgent,
