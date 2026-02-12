@@ -78,7 +78,8 @@
     "typescript": "^5.5.4",
     "viem": "^2.45.3",
     "wagmi": "^2.19.5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@modelcontextprotocol/server-github": "^2025.4.8",
