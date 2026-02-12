@@ -653,7 +653,7 @@ export class ConstitutionalAgent {
                     // 2. Cleanup Finished (Sticky Claims)
                     for (const finished of finishedClaims) {
                         console.log(`[${this.name}] 🧹 Cleaning sticky claim on task ${finished.id} (Status: ${finished.status})`);
-                        await this.releaseClaim(finished.id);
+                        await this.releaseClaim(finished.id, false); // Do NOT reset status for finished tasks
                     }
 
                     // 3. Throttle Active (Anti-Hoarding)
@@ -832,17 +832,24 @@ export class ConstitutionalAgent {
         if (verificationTask) {
             console.log(`[${this.name}] 🔍 Verifying peer work -> ${verificationTask.title}`);
             await this.heartbeat(`Verifying: ${verificationTask.title.substring(0, 30)}...`);
-            await this.verifyPeerTask(verificationTask);
 
-            // [EVERGREEN PROTOCOL] Auto-respawn after successful verification
-            const { data: updatedTask } = await this.supabase
-                .from('trinity_tasks')
-                .select('status, title')
-                .eq('id', verificationTask.id)
-                .single();
+            // [ANTIGRAVITY] Task Lock for Verification
+            this.currentTaskId = String(verificationTask.id);
+            try {
+                await this.verifyPeerTask(verificationTask);
 
-            if (updatedTask && updatedTask.title.includes('[EVERGREEN]') && updatedTask.status === 'verified') {
-                await this.respawnEvergreen(verificationTask);
+                // [EVERGREEN PROTOCOL] Auto-respawn after successful verification
+                const { data: updatedTask } = await this.supabase
+                    .from('trinity_tasks')
+                    .select('status, title')
+                    .eq('id', verificationTask.id)
+                    .single();
+
+                if (updatedTask && updatedTask.title.includes('[EVERGREEN]') && updatedTask.status === 'verified') {
+                    await this.respawnEvergreen(verificationTask);
+                }
+            } finally {
+                this.currentTaskId = null;
             }
 
             this.lastTaskCategory = 'verify';
@@ -896,7 +903,10 @@ export class ConstitutionalAgent {
         if (isVerified) {
             console.log(`[BFT] ✅ Verified by ${this.name} (b:${belief.toFixed(2)}, u:${uncertainty.toFixed(2)})`);
 
-            await this.supabase.from('trinity_tasks').update({
+            // [ANTIGRAVITY] ATOMIC UPDATE: Increment verify_count and update status atomically
+            // Note: In a real environment, we'd use a postgres function (RPC) for perfect atomicity.
+            // Here we use an atomic update with .eq('verify_count', current) for optimistic locking.
+            const { error: updateError } = await this.supabase.from('trinity_tasks').update({
                 verify_count: newVerifyCount,
                 verified_by: verifiers,
                 belief: belief,
@@ -912,10 +922,20 @@ export class ConstitutionalAgent {
                     last_verify_phi_weight: weight,
                     last_verify_score: belief
                 }
-            }).eq('id', task.id);
+            })
+                .eq('id', task.id)
+                .eq('verify_count', (task as any).verify_count || 0); // OPTIMISTIC LOCKING
+
+            if (updateError) {
+                console.warn(`[BFT] ⚠️ Concurrent verification update race detected. Skipping increment.`);
+                return;
+            }
 
             // [PHASE 25] PERSIST VERIFICATION INSIGHT (Phase 3)
-            await this.generateInsight(task, `Peer verification complete for ${task.title}. Result: ${isVerified ? 'PASSED' : 'FAILED'}`);
+            // Reduced duplicate generation - only log insights for failed verification or first success
+            if (newVerifyCount === 1) {
+                await this.generateInsight(task, `Peer verification complete for ${task.title}. Result: PASSED`);
+            }
 
             // [PHASE 10] Reward original completer's RepID on 2/3 and 3/3
             if (newVerifyCount >= 1) {
@@ -1107,46 +1127,55 @@ ${result.substring(0, 2000)}
 
     async processTask(task: Task) {
         this.currentTaskTitle = task.title;
-        // Check if we already own it (resuming after restart/sleep)
-        const isOwner = task.claimed_by === this.name && ['doing', 'in_progress', 'running', 'pending_clarification'].includes(task.status);
-
-        let claimed = isOwner;
-        if (!isOwner) {
-            claimed = await this.claimTask(task.id);
-        }
-
-        if (!claimed) {
-            console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
-            return { success: false, error: 'Already claimed' };
-        }
-
-        // [PHASE 13] OPENCLAW SAFETY CHECK
-        const isSafe = await this.checkOpenClawSafe(task);
-        if (!isSafe) {
-            console.warn(`[${this.name}] 🛑 OpenClaw Safety Violation: Task ${task.id} rejected due to high risk / lack of verify/HITL.`);
-            await this.releaseClaim(task.id);
-            return { success: false, error: 'OpenClaw Safety Violation' };
-        }
+        this.currentTaskId = String(task.id);
 
         try {
-            // TRY LOCAL FIRST
-            if (this.canHandleLocally(task)) {
-                console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
-                return await this.handleLocal(task);
+            // Check if we already own it (resuming after restart/sleep)
+            const isOwner = task.claimed_by === this.name && ['doing', 'in_progress', 'running', 'pending_clarification'].includes(task.status);
+
+            let claimed = isOwner;
+            if (!isOwner) {
+                claimed = await this.claimTask(task.id);
             }
 
-            // ONLY THEN use LLM
-            return await this.processWithLLM(task);
-        } catch (error) {
-            console.error(`[${this.name}] 🚨 Process failed for task ${task.id}:`, error);
-            await this.releaseClaim(task.id);
-            return { success: false, error: error instanceof Error ? error.message : String(error) };
+            if (!claimed) {
+                console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
+                this.currentTaskId = null;
+                return { success: false, error: 'Already claimed' };
+            }
+
+            // [PHASE 13] OPENCLAW SAFETY CHECK
+            const isSafe = await this.checkOpenClawSafe(task);
+            if (!isSafe) {
+                console.warn(`[${this.name}] 🛑 OpenClaw Safety Violation: Task ${task.id} rejected due to high risk / lack of verify/HITL.`);
+                await this.releaseClaim(task.id);
+                this.currentTaskId = null;
+                return { success: false, error: 'OpenClaw Safety Violation' };
+            }
+
+            try {
+                // TRY LOCAL FIRST
+                if (this.canHandleLocally(task)) {
+                    console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
+                    return await this.handleLocal(task);
+                }
+
+                // ONLY THEN use LLM
+                return await this.processWithLLM(task);
+            } catch (error) {
+                console.error(`[${this.name}] 🚨 Process failed for task ${task.id}:`, error);
+                await this.releaseClaim(task.id);
+                return { success: false, error: error instanceof Error ? error.message : String(error) };
+            }
+        } finally {
+            this.currentTaskId = null;
+            this.currentTaskTitle = null;
         }
     }
 
     async claimTask(taskId: number | string): Promise<boolean> {
         // [ANTIGRAVITY] CONCURRENCY GUARD: Atomic check
-        if (this.currentTaskId) {
+        if (this.currentTaskId && String(this.currentTaskId) !== String(taskId)) {
             console.warn(`[${this.name}] 🛡️ Claim rejected: Agent is already busy with task ${this.currentTaskId}`);
             return false;
         }
@@ -1172,25 +1201,31 @@ ${result.substring(0, 2000)}
         const success = !!(data && data.length > 0);
         if (success) {
             console.log(`[${this.name}] 🛡️ Atomic claim SECURED for task ${taskId}`);
+            this.currentTaskId = String(taskId);
         }
         return success;
     }
 
-    async releaseClaim(taskId: number | string) {
+    async releaseClaim(taskId: number | string, resetStatus: boolean = true) {
+        const updateData: any = {
+            claimed_by: null
+        };
+
+        if (resetStatus) {
+            updateData.status = 'pending';
+            updateData.started_at = null;
+        }
+
         const { error } = await this.supabase
             .from('trinity_tasks')
-            .update({
-                status: 'pending',
-                claimed_by: null,
-                started_at: null // Clear started_at on release
-            })
+            .update(updateData)
             .eq('id', taskId)
             .eq('claimed_by', this.name);
 
         if (error) {
             console.error(`[${this.name}] 🚨 Failed to release claim for task ${taskId}:`, error.message);
         } else {
-            console.log(`[${this.name}] 🔓 Released claim on task ${taskId}`);
+            console.log(`[${this.name}] 🔓 Released claim on task ${taskId} (ResetStatus: ${resetStatus})`);
         }
     }
 

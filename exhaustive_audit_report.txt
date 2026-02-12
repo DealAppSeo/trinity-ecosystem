@@ -1,0 +1,28 @@
+❌ [LLM] OpenAI: Status 401: Incorrect API key provided: sk-proj-**************...
+✅ [LLM] Anthropic: Working
+✅ [LLM] Groq: Working
+❌ [LLM] DeepSeek: Status 402: Insufficient Balance...
+❌ [LLM] Cerebras: Status 503: No server is available to handle this request....
+✅ [LLM] OpenRouter: Working
+❌ [LLM] Perplexity: Status 400: Invalid model 'llama-3.1-sonar-small-128k-online'....
+❌ [LLM] Cohere: Status 405: ...
+⚪ [LLM] Google Gemini: Missing Key
+✅ [LLM] StabilityAI: Working
+✅ [SEARCH] Tavily: Working
+✅ [SEARCH] SerpApi: Working
+⚪ [SEARCH] SerperAI: Missing Key
+❌ [SEARCH] You.com: Status 403
+⚪ [SEARCH] Brave: Missing Key
+✅ [SERVICE] Supabase: Working
+✅ [SERVICE] Airtable: Working
+❌ [SERVICE] Upstash Redis: Error: fetch failed
+✅ [SERVICE] Figma: Working
+✅ [SERVICE] Github: Working
+❌ [SERVICE] Portkey: Status 400
+❌ [SERVICE] Flowise: Status 404
+❌ [GAP] Spreadsheets: Gaps: Need xlsx or exceljs
+❌ [GAP] Word Documents: Gaps: Need docx
+❌ [GAP] PDF Reports: Gaps: Need pdfkit or jspdf
+❌ [GAP] Image Editing: Gaps: Need sharp or canvas
+❌ [GAP] Markdown Parsing: Gaps: Need markdown-it
+❌ [GAP] Automation (n8n): Gaps: Need n8n-nodes-base
