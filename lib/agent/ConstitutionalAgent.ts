@@ -13,8 +13,8 @@ import { Octokit } from '@octokit/rest';
 import { notificationManager } from '../notification/NotificationManager';
 import { DETERMINISTIC_WORKFLOWS } from './deterministicWorkflows';
 import { HITLManager, HITLDecision } from './HITLManager';
-import { ERC8004Bridge } from '../web3/erc8004';
-import { HyperDAG } from './HyperDAG';
+// import { ERC8004Bridge } from '../web3/erc8004';
+// import { HyperDAG } from './HyperDAG';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
@@ -2637,7 +2637,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
             // [PHASE 13] ERC-8004 WEb3 SYNC: Bridge RepID to On-chain Reputation Registry
             // This enables cross-chain discovery and trustless agent validation.
-            await ERC8004Bridge.syncReputation(this.name, this.reputationScore);
+            // await ERC8004Bridge.syncReputation(this.name, this.reputationScore);
 
             if (this.isSurvivor) await this.runSurvivorResurrection();
 
@@ -3419,14 +3419,14 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         console.log(`[ERC-8004] 🌉 Bridging Task ${taskId} to HyperDAG. Weight: ${evaluationScore / 100}`);
 
         try {
-            // 1. Generate HyperDAG Signature (Proto-DAG Audit Trail)
+            /* [PHASE 12/13] Placeholder for HyperDAG & ERC-8004
             const sig = await HyperDAG.signTask(this.name, taskId, result);
 
-            // 2. Register on-chain if high enough reputation or critical task
             if (evaluationScore > 70) {
                 await ERC8004Bridge.syncReputation(this.name, this.reputationScore);
                 await ERC8004Bridge.validateTask(taskId, this.name, sig.signature_hex);
             }
+            */
 
             // 3. Update task in DB with transaction/signature hash
             await this.supabase.from('trinity_tasks').update({
