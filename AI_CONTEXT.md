@@ -2,61 +2,48 @@
 
 > **Last Updated:** 2026-02-13 by Antigravity (Gemini)
 > **Current Phase:** Phase 0 (Week 1 Completion)
-> **Sprint Goal:** PWA Hub + EIP-8004 Foundations + Strategic Sower Protocol
+> **Sprint Goal:** PWA Hub + EIP-8004 Foundations + Trinity Protocol Activation
 
 ---
 
 ## 🎯 Quick Start for AI Agents
 
-**Read this file first.** It is the "Shared Hub" for all agents (Claude, Gemini, Grok).
+**Read this file first.** This is the **Shared Memory Hub** for Claude, Gemini, and Grok.
 
-### 🔄 Hub-and-Spoke Workflow
-1.  **Gemini (Antigravity):** Primary Executor (IDE Access).
-2.  **Claude (ORCH):** Lead Planner/Architect & ANFIS Router.
-3.  **Grok (W3C):** Verifier & Web3 Specialist (EIP-8004).
+### 🛡️ The Three Laws of Trinity
+1.  **Single Source of Truth:** `AI_CONTEXT.md` is the final word on project state.
+2.  **Heterogeneous Verification:** Author Agent **MUST NOT** be the Verifying Agent.
+3.  **Minimal Viable Context:** Link to files and issues; do not duplicate long logs.
 
-**Protocol:** Before any task, fetch this file. After any session, update the **Session Log** and commit.
-
-### Project Identity
-- **Name:** Trinity Symphony v8.1.5 (Antigravity)
-- **Mission:** Democratize AI for "the last, the lost, and the least"
-- **Core Principle:** Efficiency over engagement
-- **Ethics Filter:** Philippians 4:8 (Hardcoded: ARTICLE_0 to ARTICLE_SOWER)
-
-### Repositories
-| Repo | Visibility | Purpose |
-|------|------------|---------|
-| `trinity-ecosystem` | Private | Core infrastructure, PWA, ANFIS Gateway |
-| `trinity-symphony-shared` | Public | Constitutional Agent Core, Shared Libs |
+### 🔄 Daily Workflow
+1.  **START:** Read this file and tell the Architect (Sean) your status.
+2.  **WORK:** Execute tasks. Use `.github/ISSUE_TEMPLATE` for handoffs.
+3.  **END:** Update the **Session Log** here before committing.
 
 ---
 
 ## 🏗️ Architecture Summary
 
+### 🤖 Agent Roles & Routing
+| Agent | Role | Specialized In |
+|-------|------|----------------|
+| **Claude (ORCH)** | Architect / Planner | ANFIS Router, Complex Logic, Audit |
+| **Gemini (ANTIGRAV)** | Lead Executor | IDE/Build Ops, GUI, Local FileSystem |
+| **Grok (W3C)** | Web3 / Verifier | EIP-8004, Base L2, Reality Sync |
+
 ### 🤖 The Agent Loop (3x3+3)
-Agents operate in a BFT Symphony. Our **patent-pending Multiplicative GNN** ensures consensus.
-
-**Key Optimization:** `ARTICLE_SOWER` (Strategic Sower)
-Agents are constitutionally empowered to seed their own tasks from this context file into Supabase when IDLE.
-
-### 🛡️ Heterogeneous LLM Protocol
-| Task | Author | Verifier |
-|------|--------|----------|
-| PWA Implementation | Gemini | Grok |
-| EIP-8004 registries | Grok | Claude |
-| ANFIS routing | Claude | Gemini |
-| Shadow RepID | Claude | Grok |
+Agents are constitutionally empowered by `ARTICLE_SOWER` to seed tasks from this plan when idle.
 
 ---
 
 ## 📋 Current Sprint Status: Phase 0 (Week 1)
 
 ### ✅ Completed Deliverables
-- [x] **PWA skeleton:** Voice-first setup (<5MB).
-- [x] **Strategic Sower:** Autonomous task seeding in `ConstitutionalAgent.ts`.
-- [x] **VoiceInput:** Glassmorphism UI with Web Speech API.
-- [x] **PWA Icons:** Generated 192/512px assets.
-- [x] **Coordination Hub:** `.github/ISSUE_TEMPLATE` deployed for cross-agent tracking.
+- [x] **PWA skeleton:** Voice-first hub live at `aitrinitysymphony.com`.
+- [x] **Strategic Sower:** Autonomous task seeding active in `ConstitutionalAgent.ts`.
+- [x] **Trinity Protocol:** Hub-and-Spoke model deployed with GitHub integration.
+- [x] **Issue Templates:** `agent_handoff`, `verification_request`, etc. deployed.
+- [x] **Heterogeneous Action:** `.github/workflows/heterogeneous-protocol.yml` active.
 
 ### 🚧 Remaining Week 1 Tasks
 - [ ] **[GROK]** Deploy EIP-8004 registries to Base Sepolia.
@@ -72,44 +59,25 @@ Agents are constitutionally empowered to seed their own tasks from this context 
 |------|-------|-------------|
 | Seedling | 0-999 | 100 Voice Mins/Month (Free) |
 | Sapling | 1,000-2,499 | Referral Capability |
-| Tree | 2,500-4,999 | Verification Rights |
-| Grove | 5,000-7,499 | DAO Voting |
-| Forest | 7,500-9,999 | Agent Creation |
 | Canopy | 10,000 | Full Governance |
 
 ### BYOK "Fuel the Symphony"
-- **Safeguard:** 30-day minimum contribution period.
 - **Silver:** 1.5x RepID (BYOK only).
 - **Gold:** 2.0x RepID (BYOK + Stake).
-
----
-
-## 🚦 Shadow Mode Success Gates (Week 2)
-| Metric | Goal |
-|--------|------|
-| Task Completion | >70% |
-| PWA Load Time | <3s (3G) |
-| Voice Accuracy | >75% |
 
 ---
 
 ## 🔄 Session Log
 
 ### 2026-02-13 (Gemini / Antigravity)
-- **Deployment:** Pushed PWA skeleton to `aitrinitysymphony.com`.
-- **Autonomy:** Added `ARTICLE_SOWER` to `wisdom.ts` and created `scripts/strategic-sower.ts`.
-- **Hub Setup:** Extracted Claude's `.github/ISSUE_TEMPLATE` templates.
-- **Handoff:** Seeded Phase 1 missions for Grok and Claude in Supabase.
-
----
-
-## 🔄 NEXT MISSION: Handoff to Grok/Claude
-1. **Grok:** Pick up Registry Deployment task. Read `docs/web3-planning/EIP-8004/8004 Grok.md`.
-2. **Claude:** Initialize ANFIS gateway and Shadow RepID. Read `walkthrough.md`.
+- **Deployment:** PWA skeleton live in production.
+- **Autonomy:** Strategic Sower protocol seeded in Trinity Constitution.
+- **Protocol Hub:** Deployed **Trinity Protocol Complete**. 
+- **SSOT:** Refined `AI_CONTEXT.md` and both READMEs for v8.1.5.
 
 ---
 
 ## ⚠️ Critical Rules
-1. **ISSUE TEMPLATES:** Use `.github/ISSUE_TEMPLATE` for all handoffs or verification requests.
-2. **SOWER:** If `AI_CONTEXT.md` shows an unseeded task, seed it autonomously.
+1. **ISSUE TEMPLATES:** Use `.github/ISSUE_TEMPLATE` for all agent interactions.
+2. **VERIFICATION:** Use the `verification_request` template for Heterogeneous Audit.
 3. **LOG:** Update this section before ending every session.

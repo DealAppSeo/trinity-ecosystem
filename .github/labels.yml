@@ -1,0 +1,136 @@
+# GitHub Labels Configuration
+# 
+# To apply these labels to your repository, you can use the GitHub CLI:
+#
+#   gh label create "label-name" --description "description" --color "hex"
+#
+# Or use a tool like github-label-sync:
+#
+#   npx github-label-sync --access-token YOUR_TOKEN --labels labels.yml ORG/REPO
+
+# Agent Assignment Labels
+- name: "author:claude"
+  color: "D4A574"
+  description: "Work authored by Claude"
+
+- name: "author:gemini"
+  color: "4285F4"
+  description: "Work authored by Gemini/Antigravity"
+
+- name: "author:grok"
+  color: "1DA1F2"
+  description: "Work authored by Grok"
+
+- name: "verifier:claude"
+  color: "D4A574"
+  description: "Claude assigned as verifier"
+
+- name: "verifier:gemini"
+  color: "4285F4"
+  description: "Gemini assigned as verifier"
+
+- name: "verifier:grok"
+  color: "1DA1F2"
+  description: "Grok assigned as verifier"
+
+# Workflow Labels
+- name: "handoff"
+  color: "7057FF"
+  description: "Cross-agent task transfer"
+
+- name: "verification"
+  color: "0E8A16"
+  description: "Requires cross-agent verification"
+
+- name: "heterogeneous-protocol"
+  color: "FBCA04"
+  description: "Multi-LLM coordination required"
+
+- name: "protocol-violation"
+  color: "B60205"
+  description: "Heterogeneous Protocol violated - must fix"
+
+# Status Labels
+- name: "blocked"
+  color: "D93F0B"
+  description: "Cannot proceed - needs intervention"
+
+- name: "in-progress"
+  color: "0052CC"
+  description: "Currently being worked on"
+
+- name: "needs-review"
+  color: "FBCA04"
+  description: "Ready for verification"
+
+- name: "approved"
+  color: "0E8A16"
+  description: "Verified and approved"
+
+# Priority Labels
+- name: "critical"
+  color: "B60205"
+  description: "Production incident or blocker"
+
+- name: "high-priority"
+  color: "D93F0B"
+  description: "Important - address soon"
+
+- name: "low-priority"
+  color: "C2E0C6"
+  description: "Nice to have"
+
+# Type Labels
+- name: "bug"
+  color: "D73A4A"
+  description: "Something isn't working"
+
+- name: "enhancement"
+  color: "A2EEEF"
+  description: "New feature or improvement"
+
+- name: "documentation"
+  color: "0075CA"
+  description: "Documentation changes"
+
+- name: "sprint-task"
+  color: "7057FF"
+  description: "Current sprint work item"
+
+- name: "decision"
+  color: "D4C5F9"
+  description: "Architectural decision record"
+
+- name: "triage"
+  color: "D876E3"
+  description: "Needs initial assessment"
+
+# Squad Labels
+- name: "squad:orchestration"
+  color: "5319E7"
+  description: "ORCH, W3C, SHOFET"
+
+- name: "squad:alpha"
+  color: "1D76DB"
+  description: "TORCH, VERITAS, GCM (Truth)"
+
+- name: "squad:beta"
+  color: "0E8A16"
+  description: "CHESED, MEL, APM (Care)"
+
+- name: "squad:gamma"
+  color: "D93F0B"
+  description: "SOPHIA, NEXUS, HDM (Build)"
+
+# Phase Labels
+- name: "phase:0"
+  color: "BFD4F2"
+  description: "Foundation phase"
+
+- name: "phase:1"
+  color: "C5DEF5"
+  description: "Core development"
+
+- name: "phase:2"
+  color: "D4E1F5"
+  description: "Integration phase"
