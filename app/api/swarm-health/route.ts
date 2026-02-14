@@ -10,7 +10,8 @@ export async function GET() {
             .from('trinity_agent_registry')
             .select('agent_name, status, last_active, reputation_score, current_tier, squad, current_task_summary')
             .gte('last_active', new Date(Date.now() - 5 * 60 * 1000).toISOString())
-            .in('status', ['online', 'active', 'idle', 'green', 'blue', 'amber']);
+            .in('status', ['online', 'active', 'idle', 'green', 'blue', 'amber'])
+            .not('agent_name', 'in', '("trinity-ecosystem","trinity-science","trinity-symphony")');
 
         if (agentsError) throw agentsError;
 
@@ -45,7 +46,19 @@ export async function GET() {
             return acc;
         }, {});
 
-        // 6. Antigravity Health Score (Weighted by Consensus)
+        // 6. Infrastructure Status (squad = 'INFRA')
+        const { data: infraAgents } = await supabase
+            .from('trinity_agent_registry')
+            .select('agent_name, status, last_active, current_tier')
+            .eq('squad', 'INFRA');
+
+        const infraStatus = (infraAgents || []).map(ia => ({
+            name: ia.agent_name,
+            status: (Date.now() - new Date(ia.last_active).getTime()) < 5 * 60 * 1000 ? 'RUNNING' : 'DOWN',
+            type: ia.current_tier
+        }));
+
+        // 7. Antigravity Health Score (Weighted by Consensus)
         const currentBacklog = backlogCount || 0;
         const totalPossible = 12; // Static swarm size
         const healthScore = Math.min(100,
@@ -60,6 +73,7 @@ export async function GET() {
             active_agents: activeCount,
             total_registered: 12,
             verification_backlog: currentBacklog,
+            infrastructure: infraStatus,
             bft_stats: {
                 recent_verified: verifiedCount,
                 recent_failed: failedCount,

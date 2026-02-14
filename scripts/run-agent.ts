@@ -72,9 +72,19 @@ const finalAgentName = normalizedName;
 
 async function startAgent() {
     // DYNAMIC IMPORT TO ENSURE ENV VARS ARE LOADED FIRST
-    const { ConstitutionalAgent } = await import('../lib/agent/ConstitutionalAgent');
+    const CA = await import('../lib/agent/ConstitutionalAgent');
+    const { ConstitutionalAgent } = CA;
 
     console.log(`🤖 Starting Agent: ${finalAgentName}...`);
+    try {
+        const fs = await import('fs');
+        const caPath = path.resolve(__dirname, '../lib/agent/ConstitutionalAgent.ts');
+        console.log(`📍 Active ConstitutionalAgent Source: ${caPath}`);
+        if (fs.existsSync(caPath)) {
+            const stats = fs.statSync(caPath);
+            console.log(`📅 Last Modified: ${stats.mtime.toISOString()}`);
+        }
+    } catch (e) { }
 
     const agent = new ConstitutionalAgent({ name: finalAgentName });
     try {

@@ -126,7 +126,7 @@ export default function FoundersDashboard() {
         const { data } = await supabase
             .from('trinity_tasks')
             .select('*')
-            .eq('status', 'pending')
+            .in('status', ['pending', 'doing', 'pending_clarification'])
             .order('priority', { ascending: false })
             .order('created_at', { ascending: true });
         if (data) setTasks(data as any);

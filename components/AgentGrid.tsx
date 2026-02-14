@@ -43,17 +43,24 @@ const GROUP_CONFIG: Record<string, any> = {
 
 export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGridProps) {
     // Filter out legacy/duplicate agent names (short names)
-    // Filter out legacy/duplicate agent names (short names)
-    // We only want 'trinity-' prefixes now
-    const BLACKLIST = ['MCP', 'MCP_SERVER', 'ANFIS_DEMO_BOT'];
+    // We only want 'trinity-' prefixes now for specialists.
+    // System entities are handled by the Health Dashboard.
+    const BLACKLIST = [
+        'MCP',
+        'MCP_SERVER',
+        'ANFIS_DEMO_BOT',
+        'trinity-ecosystem',
+        'trinity-science',
+        'trinity-symphony'
+    ];
 
     // Normalize to handle case sensitivity
     const filteredAgents = agents.filter(a => {
-        const name = a.agent_name.toLowerCase();
-        // Allow 'trinity-orch' etc.
+        if (!a.agent_name) return false;
         if (BLACKLIST.includes(a.agent_name)) return false;
+
+        // Ensure we only show the 12 core agents or those with a valid squad
         // Hide "short names" if they are just duplicates of full names (legacy check)
-        // But for now, we just want to ensure we show the 12 specific agents
         return true;
     });
 

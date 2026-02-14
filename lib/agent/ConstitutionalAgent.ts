@@ -1,3 +1,6 @@
+console.log("###################################################");
+console.log("### ACTIVE SOURCE: lib/agent/ConstitutionalAgent.ts ###");
+console.log("###################################################");
 import * as fs from 'fs';
 import { supabaseAdmin as supabase } from '../supabase';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -570,9 +573,9 @@ export class ConstitutionalAgent {
                     console.warn(`[${this.name}] ⚠️ Health check error:`, healthError);
                 }
 
-                // [ANTIGRAVITY] STUCK TASK WATCHDOG: Release tasks stuck in 'doing' for > 5 mins (Aggressive Recovery v2)
-                const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-                const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+                // [ANTIGRAVITY] STUCK TASK WATCHDOG: Release tasks stuck in 'doing' for > 45 mins (Relaxed for complex work)
+                const fortyFiveMinsAgo = new Date(Date.now() - 45 * 60 * 1000).toISOString();
+                const sixtyMinsAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
                 // 1. Monitor MY OWN stuck tasks
                 const { data: myStuckTasks } = await this.supabase
@@ -580,7 +583,7 @@ export class ConstitutionalAgent {
                     .select('id, title')
                     .eq('claimed_by', this.name)
                     .in('status', ['doing', 'in_progress', 'running'])
-                    .lt('started_at', fiveMinsAgo);
+                    .lt('started_at', fortyFiveMinsAgo);
 
                 if (myStuckTasks && myStuckTasks.length > 0) {
                     for (const stuck of myStuckTasks) {
@@ -603,7 +606,7 @@ export class ConstitutionalAgent {
                 // Updated to check squad names correctly: ALPHA, BETA, GAMMA, ORCHESTRATION
                 const isInspector = ['GAMMA', 'BETA', 'ORCHESTRATION'].includes(this.squad);
                 if (isInspector) {
-                    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+                    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
                     // Find tasks claimed by others that are "doing"
                     const { data: peerTasks } = await this.supabase
@@ -612,7 +615,7 @@ export class ConstitutionalAgent {
                         .neq('claimed_by', this.name)
                         .not('claimed_by', 'is', null) // Ensure claimed_by is not null
                         .in('status', ['doing', 'in_progress', 'running'])
-                        .lt('started_at', fiveMinsAgo);
+                        .lt('started_at', fortyFiveMinsAgo);
 
                     if (peerTasks && peerTasks.length > 0) {
                         for (const task of peerTasks) {
@@ -701,9 +704,18 @@ export class ConstitutionalAgent {
                     : [this.tryExecute.bind(this), this.tryVerify.bind(this)];
 
                 for (const strategy of strategies) {
-                    if (await strategy()) {
-                        taskHandled = true;
-                        break;
+                    if (typeof strategy !== 'function') {
+                        console.error(`[${this.name}] ❌ Invalid strategy: ${typeof strategy}`);
+                        continue;
+                    }
+                    try {
+                        const handled = await strategy();
+                        if (handled) {
+                            taskHandled = true;
+                            break;
+                        }
+                    } catch (err: any) {
+                        console.error(`[${this.name}] ❌ Strategy Execution Error:`, err.message);
                     }
                 }
 
@@ -1007,6 +1019,7 @@ export class ConstitutionalAgent {
     }
 
     async getNextTask(strictlyAssigned = false) {
+        console.log(`[${this.name}] 🔍 POLL START: strictlyAssigned=${strictlyAssigned}, status=['pending', 'todo', 'pending_clarification']`);
         // [ANTIGRAVITY] CONCURRENCY GUARD: If already busy, don't pick up more work.
         if (this.currentTaskId) {
             return null;
@@ -1032,7 +1045,7 @@ export class ConstitutionalAgent {
         const isExpert = (this.reputationScore || 0) > 80;
 
         const { data: task, error } = await query
-            .in('status', ['pending', 'pending_clarification'])
+            .in('status', ['pending', 'todo', 'pending_clarification'])
             .is('claimed_by', null)
             // If expert, prioritize clarification tasks (mentorship)
             .order('status', { ascending: false })
@@ -1733,6 +1746,10 @@ IMPORTANT: Your response will be automatically parsed for artifacts. If you prod
     }
 
     async spawnMaintenanceTask(reason?: string) {
+        // [ANTIGRAVITY] RECURSION GUARD: Never spawn a healing task FROM a healing task
+        const isHealing = reason?.includes('[HEALING]') || reason?.includes('[ANTIFRAGILE]');
+        if (isHealing) return;
+
         // [ANTIGRAVITY] Loop Dampening: Check Throttle
         const canSpawn = await this.canCreateHealingTask();
         if (!canSpawn) {
@@ -2262,7 +2279,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
             return false;
         }
 
-        const limit = 2; // Global limit 2 per hour to avoid spam
+        const limit = 20; // Increased from 2 to 20 to allow swarm recovery during stabilization
         if ((count || 0) >= limit) {
             console.warn(`[${this.name}] 🛑 HEALING THROTTLED: Global diagnostics count ${count}/${limit} per hour.`);
             return false;
@@ -2991,8 +3008,9 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 } catch (e: any) {
                     const errorMsg = e.message === 'PROVIDER_STALL' ? 'STALLED (120s)' : e.message;
 
-                    // [ANTIFRAGILE] Demote temporarily if it's a structural failure (429, 404, 402, Timeout)
-                    if (errorMsg.includes('429') || errorMsg.includes('404') || errorMsg.includes('402') || errorMsg.includes('Timeout') || errorMsg.includes('STALLED')) {
+                    // [ANTIFRAGILE] Demote temporarily if it's a structural failure (401, 404, 429, 402, Timeout)
+                    if (errorMsg.includes('401') || errorMsg.includes('404') || errorMsg.includes('429') || errorMsg.includes('402') || errorMsg.includes('Timeout') || errorMsg.includes('STALLED')) {
+                        console.warn(`[${this.name}] 📉 Circuit breaker triggered for ${providerKey} (${errorMsg}). Demoting.`);
                         this.router.demote(providerKey);
                     }
 
@@ -3486,10 +3504,16 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         const requiresHITL = task.description?.toLowerCase().includes('payment') || task.description?.toLowerCase().includes('security');
 
         if (isHighImpact || requiresHITL) {
-            const hasVerify = (task.verify_count !== undefined && task.verify_count > 0);
-            if (!hasVerify && !task.requires_consensus) {
-                console.log(`[OpenClaw] 🛡️  High-impact task ${task.id} requires consensus or verification. Gating execution.`);
-                return false;
+            // [ANTIGRAVITY] RELAXED FOR STABILIZATION: Allow P10 tasks (system-led) to proceed 
+            // without verification unless they are explicitly security/payment related.
+            if (requiresHITL) {
+                const hasVerify = (task.verify_count !== undefined && task.verify_count > 0);
+                if (!hasVerify && !task.requires_consensus) {
+                    console.log(`[OpenClaw] 🛡️  Critical task ${task.id} requires consensus or verification. Gating execution.`);
+                    return false;
+                }
+            } else {
+                console.log(`[OpenClaw] 🛡️  High-impact task ${task.id} permitted under stabilization override.`);
             }
         }
         return true;

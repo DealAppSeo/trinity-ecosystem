@@ -59,8 +59,22 @@ export class IntelligenceRouter {
         // 3. SPECIALIZED MODEL DETECTION (Keyword Overrides)
         const forcedModel = this.detectSpecializedRequest(task);
         if (forcedModel) {
-            console.log(`[ROUTER] 🎯 Special Request Detected: ${forcedModel}.`);
-            return [forcedModel];
+            // Map common model keys back to their implementation providers
+            let provider = 'openai'; // Default fallback
+            if (forcedModel.startsWith('gemini')) provider = 'gemini';
+            else if (forcedModel.startsWith('claude')) provider = 'anthropic';
+            else if (forcedModel.startsWith('llama')) provider = 'groq';
+            else if (forcedModel.includes('deepseek')) provider = 'deepseek';
+            else if (forcedModel.includes('qwen')) provider = 'together';
+            else if (forcedModel.includes('kimi')) provider = 'kimi';
+            else if (forcedModel.includes('flux') || forcedModel.includes('sd3')) provider = 'fireworks';
+
+            console.log(`[ROUTER] 🎯 Special Request Detected: ${forcedModel}. Routing to ${provider}.`);
+
+            // Only return if the provider is actually available
+            if (availableProviders.includes(provider)) {
+                return [provider];
+            }
         }
 
         // Sync registry
@@ -97,7 +111,7 @@ export class IntelligenceRouter {
 
                 // C. Cost Awareness (COST WEIGHT - Inverse relationship)
                 // Lower cost is better when cost weight is high
-                const costScore = info.cost_per_token ? (1 / (info.cost_per_token * 1000000)) : 10;
+                const costScore = (info as any).cost_per_token || info.cost_per_m_tokens ? (1 / (((info as any).cost_per_token || info.cost_per_m_tokens) * 1000000)) : 10;
                 score += costScore * (this.weights.cost / 50);
 
                 // D. ADAPTIVE LOGIC

@@ -1,81 +1,55 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+
 import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-async function diagnoseSwarm() {
-    console.log('🩺 Trinity Swarm Diagnostic');
-    console.log('==========================================');
-
-    // 1. Check Heartbeats
-    console.log('\n💓 Heartbeats (Activity Check)');
-    const { data: heartbeats, error: hbError } = await supabase
-        .from('trinity_heartbeat')
-        .select('*')
-        .order('last_seen', { ascending: false });
-
-    if (hbError) console.error('❌ Error fetching heartbeats:', hbError.message);
-    else if (!heartbeats || heartbeats.length === 0) console.log('⚠️  No heartbeats found. SWARM MAY BE DEAD.');
-    else {
-        const now = new Date();
-        heartbeats.forEach(hb => {
-            const diff = now.getTime() - new Date(hb.last_seen).getTime();
-            const mins = (diff / 60000).toFixed(1);
-            const status = diff < 300000 ? '🟢 LIVE' : '🔴 STALE'; // 5 min threshold
-            console.log(`${status} ${hb.agent.padEnd(20)} ${mins} mins ago`);
-        });
-    }
-
-    // 2. Check Runtime Errors
-    console.log('\n💥 Recent Runtime Errors (Last 5)');
-    const { data: errors, error: errError } = await supabase
-        .from('trinity_runtime_errors')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-    if (errError) console.error('❌ Error fetching errors:', errError.message);
-    else if (!errors || errors.length === 0) console.log('✨ No recent errors.');
-    else {
-        errors.forEach(e => {
-            console.log(`[${e.severity}] ${e.agent_name}: ${e.error_message.substring(0, 80)}...`);
-        });
-    }
-
-    // 3. Check & Force Start Sprint Task
-    console.log('\n🏃 Sprint Task Status');
-    const { data: tasks, error: taskError } = await supabase
+async function diagnose() {
+    console.log('--- DIAGNOSING MISSIONS ---');
+    const { data: missions, error: mError } = await supabase
         .from('trinity_tasks')
-        .select('*')
-        .ilike('title', '%SPRINT%Generate 200%')
-        .single();
+        .select('id, title, status, verify_count, verified_by')
+        .in('status', ['done', 'verified', 'completed']);
 
-    if (taskError && taskError.code !== 'PGRST116') console.error('❌ Error looking for sprint task:', taskError.message);
-    else if (!tasks) console.log('⚠️  Sprint Task NOT FOUND.');
-    else {
-        console.log(`Task found: [${tasks.status}] ${tasks.title} (Assigned: ${tasks.assigned_to})`);
+    if (mError) {
+        console.error('Mission error:', mError);
+    } else {
+        missions.forEach(m => {
+            const verifiers = m.verified_by || [];
+            console.log(`Mission: ${m.title} | ID: ${m.id}`);
+            console.log(`  Status: ${m.status}`);
+            console.log(`  Verify Count (DB): ${m.verify_count}`);
+            console.log(`  Verifiers Count (Array): ${verifiers.length}`);
+            console.log(`  Verifiers: ${verifiers.join(', ')}`);
 
-        if (tasks.status === 'pending' || tasks.status === 'todo') {
-            console.log('⚡ Sprint is PENDING. Attempting FORCE START...');
-            const { error: updateError } = await supabase
-                .from('trinity_tasks')
-                .update({
-                    status: 'in_progress',
-                    assigned_to: 'trinity-sophia',
-                    started_at: new Date().toISOString()
-                })
-                .eq('id', tasks.id);
+            if (verifiers.length >= 2 && m.status !== 'verified') {
+                console.warn(`  ⚠️ ALERT: Mission has ${verifiers.length} verifiers but status is ${m.status}!`);
+            }
+        });
+    }
 
-            if (updateError) console.error('❌ Failed to force start:', updateError.message);
-            else console.log('✅ FORCE START SUCCESSFUL. Assigned to trinity-sophia.');
-        } else {
-            console.log('✅ Sprint already in progress.');
-        }
+    console.log('\n--- DIAGNOSING AGENTS ---');
+    const { data: agents, error: aError } = await supabase
+        .from('trinity_agent_registry')
+        .select('agent_name, status, last_active, squad');
+
+    if (aError) {
+        console.error('Agent error:', aError);
+    } else {
+        agents.forEach(a => {
+            const lastActive = a.last_active ? new Date(a.last_active) : null;
+            const ageInMins = lastActive ? (Date.now() - lastActive.getTime()) / 60000 : Infinity;
+            console.log(`Agent: ${a.agent_name} | Squad: ${a.squad} | Status: ${a.status}`);
+            console.log(`  Last Active: ${a.last_active || 'NEVER'} (${ageInMins.toFixed(1)} mins ago)`);
+            if (ageInMins > 5) {
+                console.warn(`  ⚠️ ALERT: Agent is stale (> 5 mins)!`);
+            }
+        });
     }
 }
 
-diagnoseSwarm();
+diagnose();

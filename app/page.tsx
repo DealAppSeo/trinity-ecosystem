@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { EcosystemGrid } from '@/components/EcosystemGrid';
 import { AgentGrid } from '@/components/AgentGrid';
 import { Button } from '@/components/ui/Button';
+import { VoiceInput } from '@/components/VoiceInput';
 export const dynamic = 'force-dynamic';
 
 export default async function LandingPage() {
@@ -47,7 +48,7 @@ export default async function LandingPage() {
           Helping people help people.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mb-12">
           <Link href="/join" className="w-full">
             <Button className="w-full text-lg py-6 shadow-glow-violet">
               Get Early Access
@@ -58,6 +59,11 @@ export default async function LandingPage() {
               Launch Controller
             </Button>
           </Link>
+        </div>
+
+        {/* VOICE FIRST ENTRY POINT */}
+        <div className="w-full max-w-md mb-16 animate-fade-in-up">
+          <VoiceInput />
         </div>
 
         {/* Trust Indicators */}

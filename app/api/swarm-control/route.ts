@@ -39,16 +39,13 @@ export async function POST(req: Request) {
             const { error: taskError } = await supabase.from('trinity_tasks').insert(wakeTasks);
             if (taskError) throw taskError;
 
-            // 2. Force update registry to "active/idle" and update timestamp so UI sees them ONLINE
+            // 2. Force update registry
             await supabase
                 .from('trinity_agent_registry')
-                .update({
-                    status: 'online',
-                    last_active: nowStr
-                })
+                .update({ status: 'online', last_active: nowStr })
                 .in('agent_name', agents);
 
-            // 3. Update heartbeats as well
+            // 3. Force update heartbeats
             const heartbeats = agents.map(agent => ({
                 agent,
                 last_seen: nowStr,
@@ -56,7 +53,16 @@ export async function POST(req: Request) {
             }));
             await supabase.from('trinity_heartbeat').upsert(heartbeats, { onConflict: 'agent' });
 
-            return NextResponse.json({ message: 'Swarm wake signal dispatched. All nodes marked ACTIVE.' });
+            // 4. Force update agent_status (UI SSOT)
+            const statusUpdates = agents.map(agent => ({
+                agent_name: agent,
+                status: 'online',
+                last_active: nowStr,
+                current_task: '[REBOOT] Swarm wake signal received.'
+            }));
+            await supabase.from('agent_status').upsert(statusUpdates, { onConflict: 'agent_name' });
+
+            return NextResponse.json({ message: 'Swarm wake signal dispatched. All nodes marked ONLINE.' });
         }
 
         if (action === 'FLUSH_GHOSTS') {
