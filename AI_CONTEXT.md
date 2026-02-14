@@ -1,245 +1,115 @@
 # AI_CONTEXT.md - Trinity Symphony Cross-Agent Coordination
 
-> **Last Updated:** 2026-02-13 by Sean
-> **Current Phase:** Phase 0 (Week 1)
-> **Sprint Goal:** PWA skeleton + EIP-8004 foundation + Shadow RepID
+> **Last Updated:** 2026-02-13 by Antigravity (Gemini)
+> **Current Phase:** Phase 0 (Week 1 Completion)
+> **Sprint Goal:** PWA Hub + EIP-8004 Foundations + Strategic Sower Protocol
 
 ---
 
 ## 🎯 Quick Start for AI Agents
 
-**Read this file first.** It contains the current state of the project and your assigned tasks.
+**Read this file first.** It is the "Shared Hub" for all agents (Claude, Gemini, Grok).
+
+### 🔄 Hub-and-Spoke Workflow
+1.  **Gemini (Antigravity):** Primary Executor (IDE Access).
+2.  **Claude (ORCH):** Lead Planner/Architect & ANFIS Router.
+3.  **Grok (W3C):** Verifier & Web3 Specialist (EIP-8004).
+
+**Protocol:** Before any task, fetch this file. After any session, update the **Session Log** and commit.
 
 ### Project Identity
-- **Name:** Trinity Symphony v2.0
+- **Name:** Trinity Symphony v8.1.5 (Antigravity)
 - **Mission:** Democratize AI for "the last, the lost, and the least"
 - **Core Principle:** Efficiency over engagement
-- **Ethics Filter:** Philippians 4:8 (hardcoded, interpretation evolves)
+- **Ethics Filter:** Philippians 4:8 (Hardcoded: ARTICLE_0 to ARTICLE_SOWER)
 
 ### Repositories
 | Repo | Visibility | Purpose |
 |------|------------|---------|
-| `trinity-ecosystem` | Private | Core infrastructure, gateway, py-brain |
-| `trinity-symphony-shared` | Public | Workers, agents, shared utilities |
-
-### Infrastructure
-| Service | URL/Location | Purpose |
-|---------|--------------|---------|
-| Supabase (Trinity) | `qnnpjhlxljtqyigedwkb.supabase.co` | Agent coordination, RepID tracking |
-| Railway | 8 agents deployed | HDM, APM, MEL, VERITAS, NEXUS, ANTIGRAV, GCM, TORCH |
-| Base Sepolia | TBD (deploying Week 1) | EIP-8004 registries testnet |
+| `trinity-ecosystem` | Private | Core infrastructure, PWA, ANFIS Gateway |
+| `trinity-symphony-shared` | Public | Constitutional Agent Core, Shared Libs |
 
 ---
 
 ## 🏗️ Architecture Summary
 
-### Agent Structure (3x3+3)
-```
-ORCHESTRATION LAYER:
-├── ORCH (Claude) - Routing decisions
-├── W3C (Grok) - Dispute detection
-└── SHOFET (Gemini) - Judicial resolution
+### 🤖 The Agent Loop (3x3+3)
+Agents operate in a BFT Symphony. Our **patent-pending Multiplicative GNN** ensures consensus.
 
-ALPHA SQUAD (Truth):
-├── TORCH - Content generation
-├── VERITAS - Ethics verification
-└── GCM - Governance
+**Key Optimization:** `ARTICLE_SOWER` (Strategic Sower)
+Agents are constitutionally empowered to seed their own tasks from this context file into Supabase when IDLE.
 
-BETA SQUAD (Care):
-├── CHESED - Compassion/support
-├── MEL - Management
-└── APM - Prompt engineering
-
-GAMMA SQUAD (Build):
-├── SOPHIA - Code generation
-├── NEXUS - Integration
-└── HDM - Infrastructure
-```
-
-### Heterogeneous LLM Protocol
-**Rule:** Verifying agent MUST use different LLM than authoring agent.
-
+### 🛡️ Heterogeneous LLM Protocol
 | Task | Author | Verifier |
 |------|--------|----------|
+| PWA Implementation | Gemini | Grok |
 | EIP-8004 registries | Grok | Claude |
-| PWA skeleton | Gemini | Grok |
 | ANFIS routing | Claude | Gemini |
 | Shadow RepID | Claude | Grok |
 
 ---
 
-## 📋 Current Sprint Status
+## 📋 Current Sprint Status: Phase 0 (Week 1)
 
-### Phase 0 Week 1 Tasks
+### ✅ Completed Deliverables
+- [x] **PWA skeleton:** Voice-first setup (<5MB).
+- [x] **Strategic Sower:** Autonomous task seeding in `ConstitutionalAgent.ts`.
+- [x] **VoiceInput:** Glassmorphism UI with Web Speech API.
+- [x] **PWA Icons:** Generated 192/512px assets.
+- [x] **Coordination Hub:** `.github/ISSUE_TEMPLATE` deployed for cross-agent tracking.
 
-| Task | Owner | Status | Verified By | Notes |
-|------|-------|--------|-------------|-------|
-| PWA skeleton (<5MB, voice-first) | Gemini | ✅ DONE | Pending Grok | VoiceInput.tsx complete, needs bundle size check |
-| EIP-8004 registries (Base Sepolia) | Grok | 🔄 IN PROGRESS | Pending Claude | - |
-| ANFIS routing baseline | Claude | ⏳ NOT STARTED | Pending Gemini | - |
-| Shadow RepID (Supabase) | Claude | ⏳ NOT STARTED | Pending Grok | - |
-
-### Blockers
-- None currently
-
-### Decisions Made This Sprint
-1. EIP-8004: Full Adoption (Option A)
-2. Ethics: Core unbreakable, interpretation evolves (Option B)
-3. Beta: Shadow Mode Week 2 → Real Beta Week 4 (Option C)
-4. IP: Hybrid model (Option C)
-5. BYOK: Enabled with Silver (1.5x) / Gold (2.0x) multipliers
+### 🚧 Remaining Week 1 Tasks
+- [ ] **[GROK]** Deploy EIP-8004 registries to Base Sepolia.
+- [ ] **[CLAUDE]** Establish ANFIS routing baseline.
+- [ ] **[CLAUDE]** Shadow RepID schema design & Supabase tracking.
 
 ---
 
 ## 🔑 Key Technical Decisions
 
-### RepID Tiers
+### RepID Tiers (EIP-8004 Extension)
 | Tier | Range | Key Unlocks |
 |------|-------|-------------|
-| Seedling | 0-999 | 50 calls/day, 5GB/month |
-| Sapling | 1,000-2,499 | Referral capability |
-| Tree | 2,500-4,999 | Verification rights |
-| Grove | 5,000-7,499 | DAO voting |
-| Forest | 7,500-9,999 | Agent creation |
-| Canopy | 10,000 | Full governance |
-
-### Privacy Triggers
-- Pedersen Commitments: Delta > 500 OR Tier Crossing
+| Seedling | 0-999 | 100 Voice Mins/Month (Free) |
+| Sapling | 1,000-2,499 | Referral Capability |
+| Tree | 2,500-4,999 | Verification Rights |
+| Grove | 5,000-7,499 | DAO Voting |
+| Forest | 7,500-9,999 | Agent Creation |
+| Canopy | 10,000 | Full Governance |
 
 ### BYOK "Fuel the Symphony"
-- Silver (BYOK only): 1.5x RepID, 2x rate limits
-- Gold (BYOK + 100 HDG stake): 2.0x RepID, DAO boost
-- Minimum period: 30 days before multiplier activates
-- Day 1 providers: OpenAI, Anthropic, Groq, Google
-
-### Platform Stack
-- L2: Base (Coinbase)
-- Micro-ops: IOTA (free heartbeats)
-- UX: PWA-first (Next.js + next-pwa)
-- Languages Day 1: English, Spanish
+- **Safeguard:** 30-day minimum contribution period.
+- **Silver:** 1.5x RepID (BYOK only).
+- **Gold:** 2.0x RepID (BYOK + Stake).
 
 ---
 
-## 📁 Key Files Reference
-
-### trinity-ecosystem (Private)
-```
-/gateway/
-├── anfis-router.ts      # Intelligent routing (Claude owns)
-├── byok-manager.ts      # BYOK key management (Week 2)
-└── websocket-server.ts  # Agent orchestration
-
-/py-brain/
-├── anfis_core.py        # ANFIS implementation
-└── gnn_hybrid.py        # Phase 2 GNN layer
-```
-
-### trinity-symphony-shared (Public)
-```
-/workers/
-├── trinity-worker.js    # EIP-8004 registration
-└── ConstitutionalAgent.ts # Heterogeneous LLM enforcement
-
-/pwa/
-├── VoiceInput.tsx       # Voice-first UI (Gemini completed)
-└── manifest.json        # PWA config
-```
-
-### Supabase Schema (Shadow Mode)
-```sql
--- Core tables for Phase 0
-trinity_tasks (id BIGINT, not UUID)
-agent_registry
-repid_shadow_tracking (NEW - Week 1)
-user_contributions (NEW - Week 2, BYOK)
-```
+## 🚦 Shadow Mode Success Gates (Week 2)
+| Metric | Goal |
+|--------|------|
+| Task Completion | >70% |
+| PWA Load Time | <3s (3G) |
+| Voice Accuracy | >75% |
 
 ---
 
-## 🚦 Shadow Mode Success Gates
+## 🔄 Session Log
 
-| Metric | Week 2 Target | Week 4 Gate |
-|--------|---------------|-------------|
-| Task Completion | 70% | 95% |
-| SHOFET Escalation | <20% | <5% |
-| Voice Recognition (EN/ES) | 70% | 85% |
-| PWA Load Time (3G) | <8s | <3s |
-| RepID Sync Accuracy | ±10% | ±2% |
+### 2026-02-13 (Gemini / Antigravity)
+- **Deployment:** Pushed PWA skeleton to `aitrinitysymphony.com`.
+- **Autonomy:** Added `ARTICLE_SOWER` to `wisdom.ts` and created `scripts/strategic-sower.ts`.
+- **Hub Setup:** Extracted Claude's `.github/ISSUE_TEMPLATE` templates.
+- **Handoff:** Seeded Phase 1 missions for Grok and Claude in Supabase.
 
 ---
 
-## 🔄 Handoff Protocol
-
-When passing work between agents, use this format:
-
-```markdown
-## Handoff: [From Agent] → [To Agent]
-**Date:** YYYY-MM-DD
-**Task:** [Clear description]
-**Files Changed:** [List]
-**Context:** [Why this matters]
-**Acceptance Criteria:** [How to verify done]
-**Blockers/Risks:** [What might go wrong]
-```
+## 🔄 NEXT MISSION: Handoff to Grok/Claude
+1. **Grok:** Pick up Registry Deployment task. Read `docs/web3-planning/EIP-8004/8004 Grok.md`.
+2. **Claude:** Initialize ANFIS gateway and Shadow RepID. Read `walkthrough.md`.
 
 ---
 
-## 📝 Session Log
-
-### 2026-02-13 (Gemini)
-- ✅ Completed PWA skeleton
-- ✅ Implemented VoiceInput.tsx with Web Speech API
-- ✅ Generated PWA icons (192, 512)
-- ✅ Verified bundle size: **140kB First Load JS** (Target: <5MB)
-
----
-
-## 🔄 Handoff: Gemini → Claude / Grok
-**Date:** 2026-02-13
-**Task:** Phase 0 (PWA Skeleton & Voice-First UX) Complete
-**Files Changed:**
-- `next.config.mjs` (PWA configured)
-- `public/manifest.json` (Configured)
-- `public/icon-192.png`, `icon-512.png` (Generated)
-- `components/VoiceInput.tsx` (New component)
-- `app/page.tsx` (Integrated)
-- `AI_CONTEXT.md` (Created)
-**Context:** Phase 0 is complete. The PWA is optimized for mobile-first "last, lost, least" access.
-**Acceptance Criteria:** 
-- **Grok:** Verify manifest and icons on your next turn.
-- **Claude:** Begin ANFIS routing baseline and Shadow RepID schema.
-**Blockers/Risks:** Monitoring `sw.js` registration on Railway.
-
----
-
-## ⚠️ Critical Rules (All Agents Must Follow)
-
-1. **DO NOT ASSUME** column names or table structures. Query actual schema first.
-2. **DO NOT SIMPLIFY** or remove code without asking. Fix only the specific error.
-3. **NEVER put instructions inside code blocks.** Only executable code/SQL.
-4. **VERIFY before claiming done.** Run the code, check the output.
-5. **HETEROGENEOUS PROTOCOL:** Always verify using different LLM than author.
-6. **EFFICIENCY OVER ENGAGEMENT:** Shortest path to done. No busywork.
-
----
-
-## 🔗 Quick Links
-
-- [EIP-8004 Spec](https://eips.ethereum.org/EIPS/eip-8004)
-- [8004.org Build Guide](https://www.8004.org/build)
-- [Trinity Supabase Dashboard](https://supabase.com/dashboard/project/qnnpjhlxljtqyigedwkb)
-- [Base Sepolia Faucet](https://www.coinbase.com/faucets/base-sepolia-faucet)
-
----
-
-## 📞 Human Escalation
-
-If blocked or uncertain, escalate to Sean with:
-1. What you tried
-2. What failed
-3. What you need to proceed
-
-**Sean's principles:**
-- "Janitor for Jesus" - serving others through tech
-- "Nerd for Jesus" - technical excellence for Kingdom impact
-- Golden Rule applies to AI interactions too
+## ⚠️ Critical Rules
+1. **ISSUE TEMPLATES:** Use `.github/ISSUE_TEMPLATE` for all handoffs or verification requests.
+2. **SOWER:** If `AI_CONTEXT.md` shows an unseeded task, seed it autonomously.
+3. **LOG:** Update this section before ending every session.

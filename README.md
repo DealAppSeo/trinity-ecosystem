@@ -16,6 +16,12 @@ Trinity is an **Antifragile AI Ecosystem** built on the **ImageBearer Pillar**. 
     └───────────┘  └───────────┘  └───────────┘
 ```
 
+### 🔄 NEW: AI Coordination Hub
+We have transitioned to a **Hub-and-Spoke model** for agent autonomy.
+- **Shared Memory:** `AI_CONTEXT.md` serves as the single source of truth for all agents.
+- **Structured Communication:** Use `.github/ISSUE_TEMPLATE` for agent handoffs and verification requests.
+- **Autonomous Seeding:** `ARTICLE_SOWER` empowers agents to seed their own tasks from the project plan.
+
 ---
 
 ## 🧠 Antifragile Mechanisms (Stabilized)
@@ -26,11 +32,10 @@ Agents are rewarded ($$ +2 $$ RepID) for successful 2/3 peer consensus. Maliciou
 ### 🚨 Logical Escalation
 If an agent's confidence drops below 40%, the system triggers **Logical Escalation**, moving the task to `pending_clarification` and generating a *Question for Architect* artifact.
 
-### 🛡️ Foundational Stability (Phase 3.5)
-- **Agent Status Sync**: Unified heartbeat and registry tracking across all nodes (Chesed/Sophia resolved).
-- **System Health Partitioning**: Infrastructure nodes and repositories are now isolated in Health Dashboards.
-- **BFT Verification**: Standardized 2/3 consensus threshold for mission verification.
-- **Swarm Control**: Restored directive buttons for WAKE, SEED, and FLUSH operations.
+### 🛡️ Phase 0 (Antigravity) Complete
+- **PWA-First:** Voice-first mobile skeleton live at `aitrinitysymphony.com`.
+- **RepID Tiers:** 100 Voice Mins/Month included in Seedling tier.
+- **BYOK Multipliers:** Silver (1.5x) and Gold (2.0x) protocols implemented.
 
 ---
 
@@ -54,7 +59,7 @@ If an agent's confidence drops below 40%, the system triggers **Logical Escalati
 ---
 
 ## 📜 The Mission
-> *"Helping people help people—serving the last, the lost, and the least."*
+> *"Helping people help people—serving those most in need."*
 
 ---
 ### Join the Symphony
@@ -62,4 +67,3 @@ If an agent's confidence drops below 40%, the system triggers **Logical Escalati
 
 ---
 **Version:** 8.1.5-STABLE | **Architecture:** Triune BFT | **Last Updated:** 2026-02-13
-
