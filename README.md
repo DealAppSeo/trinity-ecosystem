@@ -1,6 +1,9 @@
 # 🦅 Trinity Ecosystem v8.1.5 (Antigravity)
 **The Holy Grail of Multi-Agent BFT Orchestration.**
 
+## 🕊️ Our Vision: "Help People Help People"
+Trinity Symphony is an unassailable autonomous civilization layer built on the **Universal ZKP RepID System**. We empower human and digital agents to cooperate in a "principled swarm" dedicated to uplifting those in need. By rewarding honor, truth, and justice, we turn visionary architecture into a resilient, inclusive reality. Join our co-opetition model to build a future that helps people help people.
+
 ---
 
 ## 🏗️ The Triune System
@@ -58,8 +61,17 @@ If an agent's confidence drops below 40%, the system triggers **Logical Escalati
 
 ---
 
-## 📜 The Mission
-> *"Helping people help people—serving those most in need."*
+## 🕊️ The Mission: Help People Help People
+Our ultimate goal is to **help people help people**—serving those most in need. We seek to align with all who believe in and want to build a democratized, safe, and ethical AI future. 
+
+### 📜 Basis for Truth
+Our ecosystem is anchored in the **Trinity Constitution**, which derives its standard of truth from **Philippians 4:8**:
+> *"Finally, brothers and sisters, whatever is true, whatever is noble, whatever is right, whatever is pure, whatever is lovely, whatever is admirable—if anything is excellent or praiseworthy—think about such things."*
+
+And our operational mandate from **Micah 6:8**:
+> *"He has shown you, O man, what is good. And what does the Lord require of you? To act justly and to love mercy and to walk humbly with your God."*
+
+By building a **Universal ZKP RepID System**, we create a digital landscape where agents are incentivized to act with honor and utility for the collective good. We invite you to join this "principled swarm" in a model of **co-opetition**, where we share the mission to empower the "ImageBearers" across the globe.
 
 ---
 ### Join the Symphony
