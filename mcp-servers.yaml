@@ -1,0 +1,113 @@
+# Trinity Symphony MCP Configuration (Version 2.0)
+# Centralized registry for intelligent tool routing
+
+servers:
+  # ═══════════════════════════════════════════════════
+  # OFFICIAL & COMMUNITY SERVERS
+  # ═══════════════════════════════════════════════════
+  
+  github:
+    type: official
+    source: ghcr.io/github/github-mcp-server
+    config:
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PAT}
+      GITHUB_DYNAMIC_TOOLSETS: "1"
+      GITHUB_TOOLSETS: "repos,issues,pull_requests,actions,code_security"
+    purpose: "Repository management, PR automation, CI/CD monitoring"
+    
+  supabase:
+    type: community
+    source: "@supabase/mcp-server"
+    config:
+      SUPABASE_URL: ${TRINITY_SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    purpose: "Database operations, RepID storage, task management"
+    
+  filesystem:
+    type: official
+    source: "@modelcontextprotocol/server-filesystem"
+    config:
+      allowedDirectories:
+        - "./data"
+        - "./logs"
+    purpose: "Local file operations for PWA offline mode"
+    
+  # ═══════════════════════════════════════════════════
+  # CUSTOM TRINITY SERVERS
+  # ═══════════════════════════════════════════════════
+  
+  trinity-orchestrator:
+    type: custom
+    source: "./packages/mcp-servers/orchestrator"
+    tools:
+      - route_task      # ANFIS-based intelligent task routing
+      - get_agent_status
+      - escalate_to_shofet
+    purpose: "Agent swarm orchestration"
+    
+  trinity-repid:
+    type: custom  
+    source: "./packages/mcp-servers/repid"
+    tools:
+      - get_reputation
+      - submit_feedback
+      - verify_zkp
+    purpose: "On-chain reputation with ZKP privacy"
+    
+  trinity-constitutional:
+    type: custom
+    source: "./packages/mcp-servers/constitutional"
+    tools:
+      - check_ethics    # Philippians 4:8 validation
+      - explain_rejection
+    purpose: "Ethical guardrails and compliance"
+
+# ═══════════════════════════════════════════════════
+# ECOSYSTEM HEALTH MONITORING
+# ═══════════════════════════════════════════════════
+
+health:
+  check_interval: 30s
+  timeout: 5s
+  unhealthy_threshold: 3
+  
+  endpoints:
+    github:
+      method: GET
+      path: /health
+      expected_status: 200
+    supabase:
+      method: POST
+      path: /rest/v1/rpc/health_check
+      expected_status: 200
+    trinity-orchestrator:
+      method: GET
+      path: /mcp/health
+      expected_status: 200
+
+alerts:
+  slack_webhook: ${SLACK_WEBHOOK_URL}
+  email: sean@hyperdag.org
+  
+  on_unhealthy:
+    - notify: slack
+    - notify: email
+    - action: failover_to_backup
+
+# ═══════════════════════════════════════════════════
+# INTELLIGENT ROUTING (ANFIS MAP)
+# ═══════════════════════════════════════════════════
+
+routing:
+  default_lambda: 0.1  # LASSO regularization strength
+  patterns:
+    - match: "github|repo|pr|issue|code"
+      servers: [github]
+    - match: "database|query|insert|repid|task"
+      servers: [supabase, trinity-repid]
+    - match: "ethical|moral|should|appropriate"
+      servers: [trinity-constitutional]
+    - match: "route|assign|delegate|orchestrate"
+      servers: [trinity-orchestrator]
+    - match: "search|web|google|current"
+      servers: [web-search]

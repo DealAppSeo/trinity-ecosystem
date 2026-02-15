@@ -1,0 +1,33 @@
+name: Sync AI_CONTEXT.md
+
+on:
+  push:
+    paths:
+      - 'AI_CONTEXT.md'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Sync to trinity-symphony-shared
+        uses: dmnemec/copy_file_to_another_repo_action@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.GH_PAT }}
+        with:
+          source_file: 'AI_CONTEXT.md'
+          destination_repo: 'DealAppSeo/trinity-symphony-shared'
+          destination_branch: 'main'
+          commit_message: '🤖 [Trinity Sync] AI_CONTEXT.md updated'
+          
+      - name: Sync to hyperdag-protocol
+        uses: dmnemec/copy_file_to_another_repo_action@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.GH_PAT }}
+        with:
+          source_file: 'AI_CONTEXT.md'
+          destination_repo: 'DealAppSeo/hyperdag-protocol'
+          destination_branch: 'main'
+          commit_message: '🤖 [Trinity Sync] AI_CONTEXT.md updated'

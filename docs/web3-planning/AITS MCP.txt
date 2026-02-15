@@ -1,0 +1,685 @@
+# MCP Architecture for AI Trinity Symphony
+## Intelligent Routing with ANFIS/LASSO Optimization
+
+**Version:** 1.0 | **Date:** February 15, 2026  
+**Author:** Claude (Opus 4.5) for HyperDAG/Trinity Symphony
+
+---
+
+## Executive Summary
+
+Based on the latest MCP specification (2025-11-25) and ecosystem developments, this document outlines how to implement an optimal MCP layer for Trinity Symphony that:
+
+1. Leverages **GitHub's official MCP Server** for repository management
+2. Implements **intelligent tool routing** via ANFIS adaptive fuzzy logic
+3. Uses **LASSO regularization** for sparse tool selection (token optimization)
+4. Enables **cross-agent coordination** through the Autonomous Swarm Protocol
+5. Aligns with **EIP-8004** for on-chain agent identity and reputation
+
+---
+
+## Part 1: MCP Ecosystem State (February 2026)
+
+### 1.1 Key MCP Developments
+
+| Milestone | Impact on Trinity Symphony |
+|-----------|---------------------------|
+| **AAIF Transfer (Dec 2025)** | MCP now under Linux Foundation with Anthropic, OpenAI, Block as co-founders — protocol stability guaranteed |
+| **97M+ SDK Downloads** | Mature ecosystem; use official SDKs (TypeScript/Python) |
+| **Streamable HTTP (Mar 2025)** | Remote MCP servers now practical — can deploy to Railway/Render |
+| **Tasks API (Nov 2025)** | Async operations for long-running agent tasks |
+| **Elicitation (Jun 2025)** | Servers can request user input mid-session — enables consent flows |
+| **OAuth 2.1 Resource Servers** | Required for production security — integrate with EIP-8004 wallets |
+
+### 1.2 GitHub MCP Server Capabilities
+
+GitHub's official MCP server (https://github.com/github/github-mcp-server) provides:
+
+```
+TOOLSETS (Enable via --toolsets flag):
+├── repos          → Browse code, commits, project structure
+├── issues         → Create, update, manage issues
+├── pull_requests  → PR automation and code review
+├── actions        → CI/CD workflow monitoring
+├── code_security  → Dependabot alerts, security findings
+├── experiments    → Beta features (dynamic toolsets, lockdown mode)
+└── copilot        → Copilot Coding Agent integration
+```
+
+**Critical for Trinity Symphony:**
+- `get_me` function for natural language queries ("show me my private repos")
+- Dynamic toolset discovery (`GITHUB_DYNAMIC_TOOLSETS=1`)
+- Read-only mode for verification agents (`GITHUB_READ_ONLY=1`)
+- Lockdown mode for public repo security (`GITHUB_LOCKDOWN_MODE=1`)
+
+---
+
+## Part 2: ANFIS-MCP Router Architecture
+
+### 2.1 The Token Optimization Problem
+
+From Anthropic's engineering blog: "As MCP usage scales, loading all tool definitions upfront increases agent cost and latency."
+
+**Our Solution:** ANFIS (Adaptive Neuro-Fuzzy Inference System) combined with LASSO regularization for intelligent, sparse tool selection.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    TRINITY SYMPHONY MCP ROUTER                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    │
+│  │   USER QUERY    │───▶│   ANFIS LAYER   │───▶│  TOOL SELECTOR  │    │
+│  │                 │    │                 │    │    (LASSO)      │    │
+│  └─────────────────┘    └─────────────────┘    └────────┬────────┘    │
+│                                                          │              │
+│         ┌────────────────────────────────────────────────┼────────┐    │
+│         ▼                    ▼                    ▼      ▼        │    │
+│  ┌─────────────┐      ┌─────────────┐      ┌─────────────┐       │    │
+│  │   GITHUB    │      │  SUPABASE   │      │   CUSTOM    │       │    │
+│  │    MCP      │      │    MCP      │      │  AGENTS     │       │    │
+│  │   SERVER    │      │   SERVER    │      │   (MCP)     │       │    │
+│  ├─────────────┤      ├─────────────┤      ├─────────────┤       │    │
+│  │ repos       │      │ query       │      │ TORCH       │       │    │
+│  │ issues      │      │ insert      │      │ VERITAS     │       │    │
+│  │ pull_reqs   │      │ update      │      │ GCM         │       │    │
+│  │ actions     │      │ rpc         │      │ SOPHIA      │       │    │
+│  └─────────────┘      └─────────────┘      └─────────────┘       │    │
+│                                                                   │    │
+│  ┌───────────────────────────────────────────────────────────────┘    │
+│  │                                                                     │
+│  │  REPID FEEDBACK LOOP                                               │
+│  │  ├── Success rate per tool → ANFIS rule weight adjustment          │
+│  │  ├── Latency metrics → Provider preference update                  │
+│  │  └── Cost tracking → Free-tier priority enforcement                │
+│  │                                                                     │
+└──┴─────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.2 ANFIS Router Implementation
+
+```typescript
+// packages/trinity-web3-bridge/src/mcp/anfis-router.ts
+
+import { FuzzySet, ANFISLayer } from './anfis-core';
+import { MCPClient, MCPServer } from '@modelcontextprotocol/sdk/client';
+
+interface RoutingContext {
+  query: string;
+  queryEmbedding: number[];
+  userRepID: number;
+  energyMode: 'full' | 'balanced' | 'saver';
+  requiredCapabilities: string[];
+}
+
+interface ToolScore {
+  toolId: string;
+  serverId: string;
+  relevanceScore: number;    // Semantic similarity (0-1)
+  costScore: number;         // Lower = cheaper (0-1)
+  latencyScore: number;      // Lower = faster (0-1)
+  reliabilityScore: number;  // From RepID feedback (0-1)
+}
+
+export class ANFISMCPRouter {
+  private anfisLayer: ANFISLayer;
+  private mcpServers: Map<string, MCPServer>;
+  private toolIndex: ToolIndex;
+  
+  // LASSO regularization parameter (controls sparsity)
+  private lambda: number = 0.1;
+  
+  constructor(config: RouterConfig) {
+    this.anfisLayer = new ANFISLayer({
+      inputDimensions: 4, // relevance, cost, latency, reliability
+      fuzzyRules: this.generatePhilippians48Rules(),
+      learningRate: 0.01
+    });
+    
+    this.mcpServers = new Map();
+    this.toolIndex = new ToolIndex();
+  }
+  
+  /**
+   * Intelligent tool selection using ANFIS + LASSO
+   * Returns only the most relevant tools (sparse selection)
+   */
+  async selectTools(context: RoutingContext): Promise<ToolScore[]> {
+    // Step 1: Semantic search for candidate tools
+    const candidates = await this.toolIndex.search(
+      context.queryEmbedding,
+      { limit: 50 } // Cast wide net initially
+    );
+    
+    // Step 2: Score each candidate through ANFIS
+    const scored = candidates.map(tool => ({
+      ...tool,
+      anfisScore: this.anfisLayer.evaluate([
+        tool.relevanceScore,
+        tool.costScore,
+        tool.latencyScore,
+        tool.reliabilityScore
+      ])
+    }));
+    
+    // Step 3: Apply LASSO regularization for sparsity
+    const sparse = this.applyLasso(scored, context.energyMode);
+    
+    // Step 4: Enforce RepID tier limits
+    const tiered = this.enforceRepIDLimits(sparse, context.userRepID);
+    
+    return tiered;
+  }
+  
+  /**
+   * LASSO regularization: minimize tools while maximizing utility
+   * L1 penalty encourages sparse tool selection
+   */
+  private applyLasso(tools: ScoredTool[], energyMode: string): ScoredTool[] {
+    // Adjust lambda based on energy mode
+    const lambdaAdjusted = energyMode === 'saver' 
+      ? this.lambda * 2    // More aggressive sparsity
+      : energyMode === 'full'
+      ? this.lambda * 0.5  // Allow more tools
+      : this.lambda;
+    
+    // Sort by ANFIS score descending
+    const sorted = [...tools].sort((a, b) => b.anfisScore - a.anfisScore);
+    
+    // Select tools where marginal utility exceeds L1 penalty
+    const selected: ScoredTool[] = [];
+    let cumulativeUtility = 0;
+    
+    for (const tool of sorted) {
+      const marginalUtility = tool.anfisScore - cumulativeUtility * lambdaAdjusted;
+      
+      if (marginalUtility > 0) {
+        selected.push(tool);
+        cumulativeUtility += tool.anfisScore;
+      }
+      
+      // Hard cap: max 10 tools per query (token budget)
+      if (selected.length >= 10) break;
+    }
+    
+    return selected;
+  }
+  
+  /**
+   * Generate fuzzy rules based on Philippians 4:8 principles
+   * Maps ethical considerations to routing decisions
+   */
+  private generatePhilippians48Rules(): FuzzyRule[] {
+    return [
+      // Truth: Prioritize reliable, verified tools
+      {
+        antecedent: { reliability: 'high', relevance: 'high' },
+        consequent: { priority: 'very_high' },
+        weight: 1.0
+      },
+      // Honesty: Penalize tools with known accuracy issues
+      {
+        antecedent: { reliability: 'low' },
+        consequent: { priority: 'very_low' },
+        weight: 0.9
+      },
+      // Justice: Balance cost fairly across user tiers
+      {
+        antecedent: { cost: 'high', userTier: 'seedling' },
+        consequent: { priority: 'low' },
+        weight: 0.8
+      },
+      // Excellence: Prefer performant tools
+      {
+        antecedent: { latency: 'low', reliability: 'high' },
+        consequent: { priority: 'high' },
+        weight: 0.85
+      }
+    ];
+  }
+}
+```
+
+### 2.3 LASSO Feature Selection for RAG
+
+```typescript
+// packages/trinity-web3-bridge/src/mcp/lasso-rag.ts
+
+/**
+ * LASSO-regularized retrieval for optimal context selection
+ * Minimizes token usage while maximizing information density
+ */
+export class LASSORAGSelector {
+  private embeddings: EmbeddingModel;
+  private vectorStore: VectorStore;
+  
+  /**
+   * Select optimal context chunks using LASSO-style regularization
+   */
+  async selectContext(
+    query: string,
+    maxTokens: number,
+    sources: ContextSource[]
+  ): Promise<SelectedContext[]> {
+    const queryEmbedding = await this.embeddings.embed(query);
+    
+    // Retrieve candidate chunks
+    const candidates = await this.vectorStore.search(queryEmbedding, {
+      limit: 100,
+      sources: sources.map(s => s.id)
+    });
+    
+    // LASSO optimization: maximize relevance, minimize token count
+    return this.lassoSelect(candidates, maxTokens);
+  }
+  
+  private lassoSelect(
+    candidates: Chunk[],
+    maxTokens: number
+  ): SelectedContext[] {
+    // Dynamic lambda based on token budget
+    const lambda = 0.001 * maxTokens;
+    
+    // Greedy forward selection with L1 penalty
+    const selected: SelectedContext[] = [];
+    let usedTokens = 0;
+    let cumulativeRelevance = 0;
+    
+    // Sort by relevance/token ratio (efficiency)
+    const sorted = candidates.sort((a, b) => 
+      (b.relevance / b.tokenCount) - (a.relevance / a.tokenCount)
+    );
+    
+    for (const chunk of sorted) {
+      // L1 penalty increases with each selection
+      const penalty = lambda * selected.length;
+      const adjustedRelevance = chunk.relevance - penalty;
+      
+      // Check if chunk adds sufficient value
+      if (adjustedRelevance > 0 && usedTokens + chunk.tokenCount <= maxTokens) {
+        // Redundancy check: skip if too similar to existing
+        if (!this.isRedundant(chunk, selected)) {
+          selected.push({
+            content: chunk.content,
+            source: chunk.source,
+            relevance: chunk.relevance,
+            tokens: chunk.tokenCount
+          });
+          usedTokens += chunk.tokenCount;
+          cumulativeRelevance += chunk.relevance;
+        }
+      }
+    }
+    
+    return selected;
+  }
+  
+  private isRedundant(chunk: Chunk, selected: SelectedContext[]): boolean {
+    // Cosine similarity threshold for redundancy
+    const threshold = 0.85;
+    
+    return selected.some(s => 
+      this.cosineSimilarity(chunk.embedding, s.embedding) > threshold
+    );
+  }
+}
+```
+
+---
+
+## Part 3: MCP Server Configuration for Trinity Symphony
+
+### 3.1 Recommended MCP Server Stack
+
+```yaml
+# mcp-servers.yaml
+# Trinity Symphony MCP Configuration
+
+servers:
+  # ═══════════════════════════════════════════════════
+  # CORE INFRASTRUCTURE
+  # ═══════════════════════════════════════════════════
+  
+  github:
+    type: official
+    source: ghcr.io/github/github-mcp-server
+    config:
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PAT}
+      GITHUB_DYNAMIC_TOOLSETS: "1"  # Enable semantic discovery
+      GITHUB_TOOLSETS: "repos,issues,pull_requests,actions,code_security"
+    purpose: "Repository management, PR automation, CI/CD monitoring"
+    
+  supabase:
+    type: community
+    source: "@supabase/mcp-server"
+    config:
+      SUPABASE_URL: ${TRINITY_SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    purpose: "Database operations, RepID storage, task management"
+    
+  filesystem:
+    type: official
+    source: "@modelcontextprotocol/server-filesystem"
+    config:
+      allowedDirectories:
+        - "/home/claude"
+        - "/mnt/user-data"
+    purpose: "Local file operations for PWA offline mode"
+    
+  # ═══════════════════════════════════════════════════
+  # TRINITY SYMPHONY CUSTOM AGENTS (as MCP Servers)
+  # ═══════════════════════════════════════════════════
+  
+  trinity-orchestrator:
+    type: custom
+    source: "./packages/mcp-servers/orchestrator"
+    config:
+      SWARM_CONFIG: "./swarm-config.yaml"
+      ANFIS_MODEL: "./models/anfis-router.onnx"
+    tools:
+      - route_task      # Intelligent task routing
+      - get_agent_status
+      - escalate_to_shofet
+    purpose: "Agent swarm orchestration, ANFIS routing"
+    
+  trinity-repid:
+    type: custom  
+    source: "./packages/mcp-servers/repid"
+    config:
+      EIP8004_REGISTRY: ${BASE_SEPOLIA_REGISTRY}
+      PEDERSEN_THRESHOLD: 500
+    tools:
+      - get_reputation
+      - submit_feedback
+      - verify_zkp
+    purpose: "On-chain reputation with ZKP privacy"
+    
+  trinity-constitutional:
+    type: custom
+    source: "./packages/mcp-servers/constitutional"
+    config:
+      ETHICS_MODEL: "./models/philippians48.onnx"
+    tools:
+      - check_ethics    # Pre-execution ethics check
+      - explain_rejection
+    purpose: "Philippians 4:8 ethical validation"
+    
+  # ═══════════════════════════════════════════════════
+  # EXTERNAL INTEGRATIONS
+  # ═══════════════════════════════════════════════════
+  
+  web-search:
+    type: official
+    source: "@anthropic/mcp-server-web-search"
+    purpose: "Real-time web search for current information"
+    
+  memory:
+    type: community
+    source: "@mem0/mcp-server"
+    config:
+      VECTOR_DB: "chromadb"
+      EMBEDDING_MODEL: "text-embedding-3-small"
+    purpose: "Long-term memory and RAG retrieval"
+
+# ═══════════════════════════════════════════════════
+# ROUTING RULES (ANFIS pre-filters)
+# ═══════════════════════════════════════════════════
+
+routing:
+  patterns:
+    - match: "github|repo|pr|issue|code"
+      servers: [github]
+      priority: 1
+      
+    - match: "database|query|insert|update|repid|task"
+      servers: [supabase, trinity-repid]
+      priority: 1
+      
+    - match: "ethical|moral|appropriate|should"
+      servers: [trinity-constitutional]
+      priority: 0  # Always check ethics first
+      
+    - match: "route|assign|delegate|orchestrate"
+      servers: [trinity-orchestrator]
+      priority: 1
+      
+  fallback:
+    - servers: [trinity-orchestrator]  # ORCH decides if no pattern match
+```
+
+### 3.2 GitHub Integration for Trinity Repos
+
+```typescript
+// packages/trinity-web3-bridge/src/mcp/github-integration.ts
+
+import { MCPClient } from '@modelcontextprotocol/sdk/client';
+import { StreamableHTTPTransport } from '@modelcontextprotocol/sdk/transport';
+
+export class TrinityGitHubMCP {
+  private client: MCPClient;
+  
+  constructor() {
+    this.client = new MCPClient({
+      name: 'trinity-symphony',
+      version: '2.0.0'
+    });
+  }
+  
+  async connect() {
+    // Connect to GitHub's remote MCP server
+    const transport = new StreamableHTTPTransport({
+      url: 'https://api.github.com/mcp',  // Or self-hosted
+      headers: {
+        'Authorization': `Bearer ${process.env.GITHUB_PAT}`
+      }
+    });
+    
+    await this.client.connect(transport);
+  }
+  
+  /**
+   * Sync AI_CONTEXT.md to all Trinity repos
+   * This is the single source of truth for agent coordination
+   */
+  async syncAIContext(content: string): Promise<void> {
+    const repos = [
+      'DealAppSeo/trinity-ecosystem',
+      'DealAppSeo/trinity-symphony-shared',
+      'DealAppSeo/hyperdag-protocol',
+      'DealAppSeo/hyperdag-platform'
+    ];
+    
+    for (const repo of repos) {
+      await this.client.callTool('update_file', {
+        repo,
+        path: 'AI_CONTEXT.md',
+        content,
+        message: `🤖 [Trinity Sync] Updated AI_CONTEXT.md`,
+        branch: 'main'
+      });
+    }
+  }
+  
+  /**
+   * Create GitHub Issue for agent handoff
+   * Implements Autonomous Swarm Protocol
+   */
+  async createAgentHandoff(params: {
+    fromAgent: string;
+    toAgent: string;
+    task: string;
+    context: string;
+    acceptanceCriteria: string[];
+  }): Promise<string> {
+    const issueBody = `
+## Handoff: ${params.fromAgent} → ${params.toAgent}
+
+**Date:** ${new Date().toISOString()}
+
+### Task
+${params.task}
+
+### Context
+${params.context}
+
+### Acceptance Criteria
+${params.acceptanceCriteria.map(c => `- [ ] ${c}`).join('\n')}
+
+### Labels
+- \`agent-task\`
+- \`${params.toAgent.toLowerCase()}\`
+- \`priority:normal\`
+
+---
+*Generated by Trinity Symphony Orchestrator*
+    `;
+    
+    const result = await this.client.callTool('create_issue', {
+      repo: 'DealAppSeo/trinity-ecosystem',
+      title: `[${params.toAgent}] ${params.task.substring(0, 50)}...`,
+      body: issueBody,
+      labels: ['agent-task', params.toAgent.toLowerCase()]
+    });
+    
+    return result.issue_url;
+  }
+}
+```
+
+---
+
+## Part 4: Repository Documentation Improvements
+
+### 4.1 Recommended README Additions
+
+For **trinity-ecosystem**:
+
+```markdown
+## 🔌 MCP Integration
+
+Trinity Symphony uses the [Model Context Protocol](https://modelcontextprotocol.io) 
+for seamless AI-to-tool integration.
+
+### Quick Start with MCP
+
+\`\`\`bash
+# Install Trinity MCP servers
+npx @trinity-symphony/mcp-cli install
+
+# Connect Claude Desktop
+npx @trinity-symphony/mcp-cli configure claude-desktop
+
+# Or connect any MCP-compatible client
+npx @trinity-symphony/mcp-cli connect
+\`\`\`
+
+### Available MCP Servers
+
+| Server | Purpose | Tools |
+|--------|---------|-------|
+| `trinity-orchestrator` | Agent swarm management | `route_task`, `get_status`, `escalate` |
+| `trinity-repid` | On-chain reputation | `get_rep`, `submit_feedback`, `verify_zkp` |
+| `trinity-constitutional` | Ethics validation | `check_ethics`, `explain_rejection` |
+
+### For Developers
+
+Instead of forking, extend Trinity by:
+
+1. **Building MCP Servers**: Add new capabilities via the MCP standard
+2. **Contributing Agents**: Create specialized agents that plug into the swarm
+3. **Extending RepID**: Build on our unified reputation layer
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
+```
+
+### 4.2 Recommended AI_CONTEXT.md Structure
+
+```markdown
+# AI_CONTEXT.md - Trinity Symphony Source of Truth
+
+> **Last Updated:** 2026-02-15 by ORCH
+> **Next Sync:** 2026-02-16 00:00 UTC
+
+## Active Sprint
+
+**Goal:** Complete EIP-8004 Phase 0 deployment to Base Sepolia
+
+### Agent Assignments
+
+| Agent | Current Task | Status | Blocked By |
+|-------|-------------|--------|------------|
+| TORCH | Ethics module unit tests | 🟢 In Progress | - |
+| VERITAS | ZKP circuit audit | 🟡 Pending | Gemini review |
+| SOPHIA | ANFIS model training | 🟢 In Progress | - |
+| NEXUS | MCP router deployment | 🔴 Blocked | Railway quota |
+
+### Open Issues Requiring Human Decision
+
+1. **#142**: x402 payment integration scope - [Decision needed by Sean]
+2. **#156**: Filecoin vs IPFS for off-chain data - [Cost analysis pending]
+
+### MCP Server Health
+
+| Server | Status | Last Heartbeat | Error Rate |
+|--------|--------|----------------|------------|
+| github | 🟢 | 2m ago | 0.1% |
+| supabase | 🟢 | 1m ago | 0.0% |
+| trinity-orchestrator | 🟢 | 30s ago | 0.2% |
+| trinity-repid | 🟡 | 5m ago | 1.2% |
+
+## Architecture Decisions
+
+### ADR-001: ANFIS over Pure Transformer Routing
+**Status:** Accepted  
+**Context:** Need efficient tool selection with interpretable rules  
+**Decision:** Use ANFIS for fuzzy rule-based routing, reserving transformers for semantic search only  
+**Consequences:** +Lower latency, +Interpretable, -Less flexible than pure neural
+
+### ADR-002: GitHub Issues as Agent Communication Bus
+**Status:** Accepted  
+**Context:** Need async, auditable agent-to-agent messaging  
+**Decision:** Use GitHub Issues with structured labels for handoffs  
+**Consequences:** +Auditable, +Free, +Human-visible, -Rate limits
+
+---
+
+*This file is auto-synced across all Trinity repos every 6 hours*
+```
+
+---
+
+## Part 5: Action Items
+
+### Immediate (This Week)
+
+1. **Create `hyperdag-protocol` repo on GitHub** and push Gemini's local work
+2. **Add MCP configuration** to both `trinity-ecosystem` and `hyperdag-platform`
+3. **Implement GitHub MCP server** connection with dynamic toolsets
+4. **Update READMEs** with MCP quick-start sections
+
+### Short-term (Next 2 Weeks)
+
+5. **Build `trinity-orchestrator` MCP server** with ANFIS routing
+6. **Create `trinity-repid` MCP server** bridging Supabase ↔ Base Sepolia
+7. **Deploy MCP servers** to Railway with health monitoring
+8. **Implement AI_CONTEXT.md auto-sync** via GitHub Actions
+
+### Medium-term (Month 1)
+
+9. **Train ANFIS model** on routing decisions from Shadow Mode
+10. **Integrate LASSO-RAG** for optimal context selection
+11. **Submit MCP servers** to official registry (https://github.com/mcp)
+12. **Publish npm packages** (`@trinity-symphony/mcp-*`)
+
+---
+
+## Appendix: Key MCP Resources
+
+- **MCP Spec (2025-11-25)**: https://modelcontextprotocol.io/specification/2025-11-25
+- **GitHub MCP Server**: https://github.com/github/github-mcp-server
+- **MCP Registry**: https://github.com/mcp
+- **Anthropic MCP Courses**: https://anthropic.skilljar.com/model-context-protocol-advanced-topics
+- **Code Execution with MCP**: https://www.anthropic.com/engineering/code-execution-with-mcp
+
+---
+
+*Built with Honor, Justice, and Truth. Grounded in Micah 6:8.*

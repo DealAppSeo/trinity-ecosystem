@@ -13,7 +13,7 @@ import { AddTaskModal } from '@/components/modals/AddTaskModal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import InviteManager from '@/components/InviteManager';
 import Link from 'next/link';
-import { Skull, Share2, AlertTriangle, ServerCrash, Activity } from 'lucide-react';
+import { Skull, Share2, AlertTriangle, ServerCrash, Activity, Mic, MicOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ import { ConstitutionalHeartbeat } from '@/components/ConstitutionalHeartbeat';
 import { InfraHealthCard } from '@/components/InfraHealthCard';
 import { HITLActionCenter } from '@/components/HITLActionCenter';
 import { SovereignMemoryExplorer } from '@/components/SovereignMemoryExplorer';
+import { VoiceInput } from '@/components/VoiceInput';
 
 export default function ConductorPage() {
     // consolidated logic via hook
@@ -138,18 +139,41 @@ export default function ConductorPage() {
 
     // --- SHARE FEATURE ---
 
+    const handleVoiceCommand = async (transcript: string) => {
+        const cmd = transcript.toLowerCase();
+
+        if (cmd.includes('wake') || cmd.includes('start') || cmd.includes('activate')) {
+            await wakeTrinity();
+        } else if (cmd.includes('reboot') || cmd.includes('reset') || cmd.includes('restart')) {
+            await resetTrinity();
+        } else if (cmd.includes('status') || cmd.includes('report') || cmd.includes('check')) {
+            toast.info(`System Status: ${onlineCount} agents active, ${busyCount} working.`);
+        } else {
+            toast(`Command heard: "${transcript}"`, {
+                description: "I'm still learning to parse complex voice commands.",
+            });
+        }
+    };
+
     return (
         <div className="min-h-screen bg-obsidian-base flex flex-col pb-24 md:pb-0">
             {/* North Star Directive Input (Relocated) */}
-            <div className="container mx-auto px-4 py-2 mb-4">
-                <input
-                    type="text"
-                    value={northStar}
-                    onChange={(e) => setNorthStar(e.target.value)}
-                    onBlur={updateNorthStar}
-                    placeholder="Set North Star Directive..."
-                    className="w-full bg-zinc-900/50 border border-white/10 text-sm px-4 py-3 rounded-lg text-zinc-300 focus:border-accent-violet focus:ring-1 focus:ring-accent-violet focus:outline-none transition-all placeholder:text-zinc-600"
-                />
+            <div className="container mx-auto px-4 py-2 mb-4 flex gap-3">
+                <div className="flex-1">
+                    <input
+                        type="text"
+                        value={northStar}
+                        onChange={(e) => setNorthStar(e.target.value)}
+                        onBlur={updateNorthStar}
+                        placeholder="Set North Star Directive..."
+                        className="w-full bg-zinc-900/50 border border-white/10 text-sm px-4 py-3 rounded-lg text-zinc-300 focus:border-accent-violet focus:ring-1 focus:ring-accent-violet focus:outline-none transition-all placeholder:text-zinc-600"
+                    />
+                </div>
+                <div className="shrink-0 flex items-center">
+                    <VoiceInput
+                        onTranscript={handleVoiceCommand}
+                    />
+                </div>
             </div>
 
             <main className="flex-1 container mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">

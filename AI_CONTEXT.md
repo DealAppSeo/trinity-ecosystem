@@ -1,83 +1,62 @@
-# AI_CONTEXT.md - Trinity Symphony Cross-Agent Coordination
+# AI_CONTEXT.md - Trinity Symphony Source of Truth 🌐
 
-> **Last Updated:** 2026-02-13 by Antigravity (Gemini)
-> **Current Phase:** Phase 0 (Week 1 Completion)
-> **Sprint Goal:** PWA Hub + EIP-8004 Foundations + Trinity Protocol Activation
+> **Last Updated:** 2026-02-15 10:45 AM
+> **Sync Status:** 🟢 Local-First Synchronized
 
----
+## 🎯 Active Phase: 0.3 - MCP Layer & Intelligent Routing
+**Primary Goal:** Implement ANFIS-based tool routing and GitHub MCP integration to optimize agent token usage.
 
-## 🎯 Quick Start for AI Agents
+### 🤖 Agent Coordination Board
 
-**Read this file first.** This is the **Shared Memory Hub** for Claude, Gemini, and Grok.
+| Agent | Module | Status | Recent Activity |
+|-------|--------|--------|-----------------|
+| **TORCH** | Ethics/Constitutional | 🟢 Active | Stabilizing Phil 4:8 guardrail stubs |
+| **VERITAS** | ZKP/Verification | 🟡 Idle | Awaiting circuit audit for RepID Phase 1 |
+| **SOPHIA** | Knowledge/Learning | 🟢 Active | Training initial ANFIS routing logic |
+| **NEXUS** | Orchestration/MCP | 🔵 Preparing | Configuring GitHub MCP server toolsets |
 
-### 🛡️ The Three Laws of Trinity
-1.  **Single Source of Truth:** `AI_CONTEXT.md` is the final word on project state.
-2.  **Heterogeneous Verification:** Author Agent **MUST NOT** be the Verifying Agent.
-3.  **Minimal Viable Context:** Link to files and issues; do not duplicate long logs.
+### 🛠 MCP Infrastructure Health
 
-### 🔄 Daily Workflow
-1.  **START:** Read this file and tell the Architect (Sean) your status.
-2.  **WORK:** Execute tasks. Use `.github/ISSUE_TEMPLATE` for handoffs.
-3.  **END:** Update the **Session Log** here before committing.
+| Server | Role | Status | Path |
+|--------|------|--------|------|
+| **github** | Repo Management | 🟢 Active | official:github-mcp-server |
+| **supabase** | Persistence | 🟢 Active | @supabase/mcp-server |
+| **trinity-orch**| Routing | 🟡 Initializing | ./packages/mcp-servers/orchestrator |
+| **trinity-repid**| Reputation | 🔘 Planned | ./packages/mcp-servers/repid |
 
----
+## 📐 Architecture Decisions (ADRs)
 
-## 🏗️ Architecture Summary
+### ADR-001: ANFIS + LASSO for Routing
+- **Decision:** Use Adaptive Neuro-Fuzzy Inference System (ANFIS) for tool selection, regulated by LASSO (L1 penalty) to minimize token consumption.
+- **Rationale:** Standard LLM tool selection is often redundant and expensive; ANFIS provides interpretable, efficient routing.
 
-### 🤖 Agent Roles & Routing
-| Agent | Role | Specialized In |
-|-------|------|----------------|
-| **Claude (ORCH)** | Architect / Planner | ANFIS Router, Complex Logic, Audit |
-| **Gemini (ANTIGRAV)** | Lead Executor | IDE/Build Ops, GUI, Local FileSystem |
-| **Grok (W3C)** | Web3 / Verifier | EIP-8004, Base L2, Reality Sync |
+### ADR-002: Dual-Repo Communication
+- **Decision:** Use GitHub Issues and `AI_CONTEXT.md` as the primary async communication bridge between protocol and platform layers.
+- **Rationale:** Ensures auditability and transparency for both human maintainers and agents.
 
-### 🤖 The Agent Loop (3x3+3)
-Agents are constitutionally empowered by `ARTICLE_SOWER` to seed tasks from this plan when idle.
+## 📜 Changelog
 
----
-
-## 📋 Current Sprint Status: Phase 0 (Week 1)
-
-### ✅ Completed Deliverables
-- [x] **PWA skeleton:** Voice-first hub live at `aitrinitysymphony.com`.
-- [x] **Strategic Sower:** Autonomous task seeding active in `ConstitutionalAgent.ts`.
-- [x] **Trinity Protocol:** Hub-and-Spoke model deployed with GitHub integration.
-- [x] **Issue Templates:** `agent_handoff`, `verification_request`, etc. deployed.
-- [x] **Heterogeneous Action:** `.github/workflows/heterogeneous-protocol.yml` active.
-
-### 🚧 Remaining Week 1 Tasks
-- [ ] **[GROK]** Deploy EIP-8004 registries to Base Sepolia.
-- [ ] **[CLAUDE]** Establish ANFIS routing baseline.
-- [ ] **[CLAUDE]** Shadow RepID schema design & Supabase tracking.
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 0.3.1 | 2026-02-15 | NEXUS | Added MCP server health monitoring |
+| 0.3.0 | 2026-02-15 | SOPHIA | Initial real ANFIS layer implementation |
+| 0.2.5 | 2026-02-14 | TORCH | Ethics guardrail stubs completed |
+| 0.2.0 | 2026-02-13 | Gemini | EIP-8004 foundations implemented |
 
 ---
 
-## 🔑 Key Technical Decisions
+## 🔄 Sync Protocol
 
-### RepID Tiers (EIP-8004 Extension)
-| Tier | Range | Key Unlocks |
-|------|-------|-------------|
-| Seedling | 0-999 | 100 Voice Mins/Month (Free) |
-| Sapling | 1,000-2,499 | Referral Capability |
-| Canopy | 10,000 | Full Governance |
+This file is the authoritative source of truth and is synchronized across all ecosystem repositories:
 
-### BYOK "Fuel the Symphony"
-- **Silver:** 1.5x RepID (BYOK only).
-- **Gold:** 2.0x RepID (BYOK + Stake).
+1. **On Push to `main`**: Syncs to all Trinity repos within 5 minutes via GitHub Actions.
+2. **Manual Trigger**: Run `gh workflow run sync-ai-context.yml` from the root.
+3. **Conflict Resolution**: Latest timestamp wins; conflicts are logged to `#trinity-sync` for human/agent review.
 
----
-
-## 🔄 Session Log
-
-### 2026-02-13 (Gemini / Antigravity)
-- **Deployment:** PWA skeleton live in production.
-- **Autonomy:** Strategic Sower protocol seeded in Trinity Constitution.
-- **Protocol Hub:** Deployed **Trinity Protocol Complete**. 
-- **SSOT:** Refined `AI_CONTEXT.md` and both READMEs for v8.1.5.
+```bash
+# Manual sync command for agents
+npx @trinity-symphony/cli sync-context --all
+```
 
 ---
-
-## ⚠️ Critical Rules
-1. **ISSUE TEMPLATES:** Use `.github/ISSUE_TEMPLATE` for all agent interactions.
-2. **VERIFICATION:** Use the `verification_request` template for Heterogeneous Audit.
-3. **LOG:** Update this section before ending every session.
+*Grounded in Honor, Justice, and Truth. Grounded in Micah 6:8.*

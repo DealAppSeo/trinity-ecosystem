@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic';
 export default async function LandingPage() {
   // Fetch real data
   const { data: apps } = await supabase.from('ecosystem_apps').select('*');
-  const { data: agents } = await supabase.from('agent_status').select('*').limit(8);
+  const { data: agentsData } = await supabase.from('agent_status').select('*');
+  const agents = agentsData ? agentsData.slice(0, 15) : []; // Safety slice but not a hard DB limit
   const { data: cost } = await supabase.from('cost_tracking').select('*').order('date', { ascending: false }).limit(1).single();
 
   const traditionalCost = cost?.traditional_cost ?? 847.00;
@@ -111,7 +112,7 @@ export default async function LandingPage() {
         <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold text-text-primary mb-4">The Symphony</h2>
           <p className="text-text-secondary max-w-2xl mx-auto">
-            Real autonomous agents working in a 3x3 Antifragile Grid. No scripts. No human intervention.
+            Real autonomous agents working in a 3x3+3 Antifragile Grid. No scripts. No human intervention.
             Self-healing via Survivor Protocols.
           </p>
         </div>

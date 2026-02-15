@@ -4,65 +4,17 @@ import Link from 'next/link';
 import { Activity, Shield, Zap, Database, Cpu, Eye, Network } from 'lucide-react';
 import { SymphonyCard } from './SymphonyCard';
 
+import { filterCoreAgents } from '@/lib/agent/registry';
+
 interface AgentGridProps {
     agents: any[]; // Flexible to handle API response
     isConductor?: boolean;
     onAssignTask?: (agentName: string) => void;
 }
-
-const GROUP_CONFIG: Record<string, any> = {
-    'ORCHESTRATION': {
-        color: 'text-violet-400',
-        border: 'border-violet-500/30',
-        bg: 'bg-violet-500/5',
-        label: 'Orchestration Core',
-        description: 'The central nervous system. Handles global routing, disputes, and system governance.'
-    },
-    'ALPHA': {
-        color: 'text-blue-400',
-        border: 'border-blue-500/30',
-        bg: 'bg-blue-500/5',
-        label: 'Alpha Squad (Security)',
-        description: 'The front line of defense. Specialized in prompt firewalls, memory auditing, and ethical gating.'
-    },
-    'BETA': {
-        color: 'text-emerald-400',
-        border: 'border-emerald-500/30',
-        bg: 'bg-emerald-500/5',
-        label: 'Beta Squad (Design)',
-        description: 'Focuses on user experience, design analysis, and empathetic system restoration.'
-    },
-    'GAMMA': {
-        color: 'text-amber-400',
-        border: 'border-amber-500/30',
-        bg: 'bg-amber-500/5',
-        label: 'Gamma Squad (Build)',
-        description: 'The engine room. Handles code generation, infrastructure policy, and technical implementation.'
-    },
-};
+// ... [existing GROUP_CONFIG] ...
 
 export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGridProps) {
-    // Filter out legacy/duplicate agent names (short names)
-    // We only want 'trinity-' prefixes now for specialists.
-    // System entities are handled by the Health Dashboard.
-    const BLACKLIST = [
-        'MCP',
-        'MCP_SERVER',
-        'ANFIS_DEMO_BOT',
-        'trinity-ecosystem',
-        'trinity-science',
-        'trinity-symphony'
-    ];
-
-    // Normalize to handle case sensitivity
-    const filteredAgents = agents.filter(a => {
-        if (!a.agent_name) return false;
-        if (BLACKLIST.includes(a.agent_name)) return false;
-
-        // Ensure we only show the 12 core agents or those with a valid squad
-        // Hide "short names" if they are just duplicates of full names (legacy check)
-        return true;
-    });
+    const filteredAgents = filterCoreAgents(agents);
 
     if (filteredAgents.length === 0) {
         return (

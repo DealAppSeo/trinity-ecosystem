@@ -1,0 +1,435 @@
+Prompt for Gemini (Antigravity)
+═══════════════════════════════════════════════════════════════════════════════
+GEMINI (ANTIGRAVITY) — TRINITY/HYPERDAG PHASE 0 BUILD & DEPLOY (UPDATED FOUNDATION)
+═══════════════════════════════════════════════════════════════════════════════
+MISSION: Build and deploy the foundational infrastructure for Trinity Symphony + HyperDAG ecosystem with EIP-8004 trustless agent integration, incorporating ZKP RepIDs, Pedersen commitments, x402 native support, constitutional governance, and preparations for multi-chain interoperability. Align with the latest EIP-8004 spec (Draft as of Feb 2026, mainnet live Jan 29, 2026) and best practices for low-latency, low-cost, high-security/privacy agent ecosystems.
+TIMELINE: Week 1 (Phase 0)
+PRIORITY ORDER: TASK 2 → TASK 1 → TASK 4 → TASK 3
+═══════════════════════════════════════════════════════════════════════════════
+ARCHITECTURE OVERVIEW
+═══════════════════════════════════════════════════════════════════════════════
+4 REPOS (all under github.com/DealAppSeo/):
+
+hyperdag-protocol      ← WEB3 CORE (rename from hyperdag-platform if needed; fork EIP-8004 base)
+trinity-symphony-shared ← AI AGENTS (existing, 101 commits)
+trinity-ecosystem       ← AI APPLICATION LAYER (new, you create)
+trinity-web3-bridge     ← INTEGRATION GLUE (new, you create)
+
+SUPABASE: https://qnnpjhlxljtqyigedwkb.supabase.co (Trinity Symphony project)
+CRITICAL RULES:
+
+Query actual Supabase schema BEFORE writing SQL. trinity_tasks.id is BIGINT not UUID. No assumptions.
+Align with EIP-8004 singletons where possible (e.g., Base Sepolia Identity: 0x8004A818BFB912233c491871b3d84c89A494BD9e).
+Use pluggable trust: Reputation for low-stakes, ZKP/TEE for high.
+Off-chain heavy: IPFS/Pinata for metadata, Subgraphs for aggregation.
+Security first: Zero-trust, constitutional guards, no exposed keys.
+
+═══════════════════════════════════════════════════════════════════════════════
+DEPENDENCIES — FETCH THESE FIRST
+═══════════════════════════════════════════════════════════════════════════════
+
+EIP-8004 Base Contracts:
+Fork: https://github.com/erc-8004/erc-8004-contracts (latest commit as of Feb 2026 includes Jan updates: permissionless feedback, EIP-712 wallets).
+Use: Identity, Reputation, Validation interfaces; extend with Trinity specifics.
+Trinity Ethics (existing):
+Import from: trinity-symphony-shared/orchestrator/ConstitutionalAgent.ts
+Contains: Philippians 4:8 virtues, Micah 6:8 mandate.
+OpenZeppelin Contracts:
+npm: @openzeppelin/contracts@5.0.0
+Use: UUPS proxy, AccessControl, ReentrancyGuard, ECDSA, EIP712.
+Circom/ZKP:
+npm: circomlibjs, snarkjs
+Use: Groth16 verifier generation, Pedersen commitments (circuits for RepIDRangeProof, RepIDDeltaProof, BYOKMultiplierProof).
+Additional for Integrations:
+npm: viem @chainlink/ccip-read-server typescript vitest idb
+For: CCIP, WebCrypto vault, tests.
+
+═══════════════════════════════════════════════════════════════════════════════
+TASK 1: PWA SKELETON WITH i18n + OFFLINE CACHE + UI GUARDRAILS
+═══════════════════════════════════════════════════════════════════════════════
+REPO: trinity-ecosystem (CREATE NEW)
+LOCATION: apps/web/
+STEP 1 — Initialize repo:
+Bashgh repo create DealAppSeo/trinity-ecosystem --public --confirm
+git clone https://github.com/DealAppSeo/trinity-ecosystem.git
+cd trinity-ecosystem
+STEP 2 — Create Next.js app:
+Bashnpx create-next-app@14 apps/web --typescript --tailwind --eslint --app --src-dir
+cd apps/web
+npm install @ducanh2912/next-pwa i18next next-i18next react-i18next idb
+STEP 3 — Create/Update files (add guardrails: input sanitization, auth stubs):
+FILE: apps/web/next.config.js (same as old, but add security headers):
+JavaScriptconst withPWA = require('@ducanh2912/next-pwa').default({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/qnnpjhlxljtqyigedwkb\.supabase\.co/,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'supabase-cache',
+        expiration: { maxEntries: 50, maxAgeSeconds: 86400 }
+      }
+    }
+  ]
+});
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  headers: async () => [{
+    source: '/:path*',
+    headers: [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-eval'" }
+    ]
+  }]
+};
+
+module.exports = withPWA(nextConfig);
+FILE: apps/web/src/lib/repid-cache.ts (update tiers to Seedling/Sapling/Grove/Forest/Canopy; add optimistic updates):
+TypeScriptimport { openDB, DBSchema, IDBPDatabase } from 'idb';
+
+interface TrinityDB extends DBSchema {
+  'repid-scores': {
+    key: string;
+    value: {
+      agentId: string;
+      score: number;
+      tier: 'Seedling' | 'Sapling' | 'Grove' | 'Forest' | 'Canopy';
+      cachedAt: number;
+      synced: boolean;
+    };
+  };
+  'pending-updates': {
+    key: string;
+    value: {
+      agentId: string;
+      delta: number;
+      timestamp: number;
+    };
+  };
+  'localized-virtues': {
+    key: string;
+    value: {
+      virtueKey: string;
+      lang: string;
+      text: string;
+    };
+  };
+}
+
+let dbInstance: IDBPDatabase<TrinityDB> | null = null;
+
+async function getDB(): Promise<IDBPDatabase<TrinityDB>> {
+  if (dbInstance) return dbInstance;
+  
+  dbInstance = await openDB<TrinityDB>('trinity-cache', 1, {
+    upgrade(db) {
+      db.createObjectStore('repid-scores', { keyPath: 'agentId' });
+      db.createObjectStore('pending-updates', { keyPath: 'agentId' });
+      db.createObjectStore('localized-virtues', { keyPath: 'virtueKey' });
+    },
+  });
+  
+  return dbInstance;
+}
+
+export async function cacheRepID(
+  agentId: string, 
+  score: number
+): Promise<void> {
+  const db = await getDB();
+  const tier = getTierFromScore(score);
+  
+  await db.put('repid-scores', {
+    agentId,
+    score,
+    tier,
+    cachedAt: Date.now(),
+    synced: true,
+  });
+}
+
+export async function queueRepIDUpdate(
+  agentId: string, 
+  delta: number
+): Promise<void> {
+  const db = await getDB();
+  
+  await db.put('pending-updates', {
+    agentId,
+    delta,
+    timestamp: Date.now(),
+  });
+}
+
+export async function syncPendingUpdates(): Promise<number> {
+  if (!navigator.onLine) return 0;
+  
+  const db = await getDB();
+  const pending = await db.getAll('pending-updates');
+  let synced = 0;
+  
+  for (const update of pending) {
+    try {
+      // Push to chain via trinity-web3-bridge
+      await fetch('/api/repid/sync', {
+        method: 'POST',
+        body: JSON.stringify(update),
+      });
+      await db.delete('pending-updates', update.agentId);
+      synced++;
+    } catch (e) {
+      console.error('Sync failed for', update.agentId, e);
+    }
+  }
+  
+  return synced;
+}
+
+export async function cacheVirtue(
+  virtueKey: string, 
+  lang: string, 
+  text: string
+): Promise<void> {
+  const db = await getDB();
+  await db.put('localized-virtues', { virtueKey, lang, text });
+}
+
+export async function getVirtue(
+  virtueKey: string, 
+  lang: string
+): Promise<string | null> {
+  const db = await getDB();
+  const virtue = await db.get('localized-virtues', `${virtueKey}-${lang}`);
+  return virtue?.text ?? null;
+}
+
+function getTierFromScore(score: number): TrinityDB['repid-scores']['value']['tier'] {
+  if (score >= 10000) return 'Canopy';
+  if (score >= 7500) return 'Forest';
+  if (score >= 5000) return 'Grove';
+  if (score >= 1000) return 'Sapling';
+  return 'Seedling';
+}
+
+// Auto-sync when coming online
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    syncPendingUpdates().then(count => {
+      console.log(`Synced ${count} pending RepID updates`);
+    });
+  });
+}
+FILE: apps/web/src/components/EnergyMode.tsx (same as old).
+FILE: apps/web/src/components/VoiceInput.tsx (add sanitization):
+TypeScript'use client';
+
+import { useState, useRef, useCallback } from 'react';
+
+interface VoiceInputProps {
+  onTranscript: (text: string, lang: string) => void;
+  supportedLanguages?: string[];
+}
+
+function sanitizeInput(text: string): boolean {
+  // Basic injection detection
+  const patterns = [/--/, /;/, /script/i, /prompt/i];
+  return !patterns.some(p => p.test(text));
+}
+
+export function VoiceInput({ 
+  onTranscript, 
+  supportedLanguages = ['en-US', 'es-ES', 'fr-FR'] 
+}: VoiceInputProps) {
+  const [isListening, setIsListening] = useState(false);
+  const [currentLang, setCurrentLang] = useState(supportedLanguages[0]);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  
+  const startListening = useCallback(() => {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Speech recognition not supported in this browser');
+      return;
+    }
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.lang = currentLang;
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      if (sanitizeInput(transcript)) {
+        onTranscript(transcript, currentLang);
+      } else {
+        console.warn('Potential injection detected');
+      }
+      setIsListening(false);
+    };
+    
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+    };
+    
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+    
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [currentLang, onTranscript]);
+  
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  }, []);
+  
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <select
+        value={currentLang}
+        onChange={(e) => setCurrentLang(e.target.value)}
+        className="p-2 border rounded"
+        disabled={isListening}
+      >
+        {supportedLanguages.map((lang) => (
+          <option key={lang} value={lang}>
+            {new Intl.DisplayNames([lang], { type: 'language' }).of(lang.split('-')[0])}
+          </option>
+        ))}
+      </select>
+      
+      <button
+        onClick={isListening ? stopListening : startListening}
+        className={`p-4 rounded-full transition-all ${
+          isListening 
+            ? 'bg-red-500 animate-pulse' 
+            : 'bg-blue-500 hover:bg-blue-600'
+        } text-white`}
+      >
+        {isListening ? '🎙️ Listening...' : '🎤 Start Speaking'}
+      </button>
+    </div>
+  );
+}
+Update locales/en/common.json and es with tiers: Seedling, Sapling, Grove, Forest, Canopy.
+STEP 4 — Create gateway and py-brain directories (same as old).
+STEP 5 — Commit and push (same).
+VERIFICATION GATES (TASK 1):
+□ PWA installs on Android/iOS.
+□ Offline mode caches RepIDs, syncs online.
+□ Voice input works in EN/ES with sanitization.
+□ Energy mode persists, eco bonus.
+□ Bundle <5MB, load <3s.
+□ Security headers present.
+═══════════════════════════════════════════════════════════════════════════════
+TASK 2: EIP-8004 CONTRACTS DEPLOYMENT (HIGHEST PRIORITY)
+═══════════════════════════════════════════════════════════════════════════════
+REPO: hyperdag-protocol (existing; fork and restructure with EIP-8004 base)
+LOCATION: packages/contracts/
+STEP 1 — Fork and restructure:
+Bashgit clone https://github.com/erc-8004/erc-8004-contracts hyperdag-protocol
+cd hyperdag-protocol
+git remote add upstream https://github.com/erc-8004/erc-8004-contracts.git
+npm install
+
+# Initialize Nx monorepo
+npm init -y
+npm install -D nx @nx/js
+
+# Create packages structure
+mkdir -p packages/contracts/src/{identity,reputation,validation,governance,zkp}
+mkdir -p packages/contracts/test
+mkdir -p packages/circuits/{repid,build}
+mkdir -p packages/sdk/src
+mkdir -p packages/subgraphs
+mkdir -p security
+
+# Move official contracts
+mv contracts/* packages/contracts/src/ || true
+mv test/* packages/contracts/test/ || true
+STEP 2 — Initialize Foundry:
+Bashcd packages/contracts
+forge init --no-commit
+forge install OpenZeppelin/openzeppelin-contracts --no-commit
+npm install @openzeppelin/contracts@5.0.0
+STEP 3 — Create contract files (use from dynamic doc; update tiers, add x402 hooks):
+Use TrinityIdentityAdapter.sol (with EIP-712, CAIP-10).
+Use RepIDRegistry.sol (permissionless, Pedersen for delta>500, getSummary requires clientAddresses, tiers as defined).
+Use ConstitutionalGuard.sol (virtues/mandates modifiers).
+Use ThreeChamberDAO.sol (2-of-3 approvals).
+Add Groth16Verifier.sol stub (auto-generate from Circom later).
+STEP 4 — foundry.toml (update with remappings).
+STEP 5 — nx.json (same).
+STEP 6 — Deploy to Base Sepolia (use singleton if matches; otherwise custom proxy):
+Bash# Tests
+forge test -vvv
+
+# Env
+export PRIVATE_KEY="..."
+export RPC_URL="https://sepolia.base.org"
+export BASESCAN_API_KEY="..."
+
+forge script script/Deploy.s.sol:DeployScript --rpc-url $RPC_URL --broadcast --verify
+Update Deploy.s.sol to extend official if possible.
+STEP 7 — Commit and push.
+VERIFICATION GATES (TASK 2):
+□ Tests pass.
+□ Deployed to Base Sepolia, verified on Basescan.
+□ Register agents, give feedback, tiers update.
+□ Pedersen triggers for large deltas.
+□ Guards prevent invalid actions.
+□ x402 proof events emit.
+═══════════════════════════════════════════════════════════════════════════════
+TASK 3: CCIP CROSS-CHAIN ADAPTER
+═══════════════════════════════════════════════════════════════════════════════
+REPO: trinity-web3-bridge
+LOCATION: src/cross-chain/
+Use CCIP types/ccip.ts from old, but prioritize CCIP over LayerZero.
+Add stubs for RepID bridging.
+Commit and push.
+VERIFICATION GATES (TASK 3):
+□ Compiles.
+□ Tests pass.
+□ Gas estimates work.
+□ Retry logic.
+═══════════════════════════════════════════════════════════════════════════════
+TASK 4: BYOK MANAGER WITH ZKP ENCRYPTION
+═══════════════════════════════════════════════════════════════════════════════
+REPO: trinity-web3-bridge
+LOCATION: src/byok-manager/
+Use vault.ts, multipliers.ts (tiers match, fallback LLMs).
+Add ZKP proofs in multipliers (BYOKMultiplierProof circuit stub).
+Commit and push.
+VERIFICATION GATES (TASK 4):
+□ Tests pass.
+□ Encrypt/decrypt works.
+□ Multipliers apply correctly.
+□ Fallback selects properly.
+═══════════════════════════════════════════════════════════════════════════════
+FINAL CHECKLIST — REPORT BACK WITH THESE
+═══════════════════════════════════════════════════════════════════════════════
+
+COMMIT HASHES: ...
+DEPLOYED ADDRESSES (Base Sepolia): ...
+TEST RESULTS: ...
+BLOCKERS: ...
+VERIFICATION STATUS: □ TASK 1 ...
+
+NOTES FOR GEMINI:
+
+Fork official for compliance.
+No assumptions on Supabase.
+Prep for AAIF/A2A/Fetch.ai stubs (Phase 1).
+Web-first UI; plan Telegram wrapper with guards.
+Report via Supabase if blocked.
+
+GO BUILD!
