@@ -2,80 +2,43 @@
 **The Holy Grail of Multi-Agent BFT Orchestration.**
 
 ## 🕊️ Our Vision: "Help People Help People"
-Trinity Symphony is an unassailable autonomous civilization layer built on the **Universal ZKP RepID System**. We empower human and digital agents to cooperate in a "principled swarm" dedicated to uplifting those in need. By rewarding honor, truth, and justice, we turn visionary architecture into a resilient, inclusive reality. Join our co-opetition model to build a future that helps people help people.
+Trinity Symphony is an unassailable autonomous civilization layer designed to **help people help people**. Grounded in the virtues of **Philippians 4:8** and the mandate of **Micah 6:8**, we seek to align with all who believe in building a democratized, safe, and ethical AI future. 
+
+We operate on a **Co-opetition Model**: By sharing our patent-pending foundations, we invite developers to join a unified "principled swarm" rather than competing in silos. 
 
 ---
 
-## 🏗️ The Triune System
-Trinity is an **Antifragile AI Ecosystem** built on the **ImageBearer Pillar**. We operate a specialized 3x3 Squad structure powered by our **patent-pending Multiplicative GNN**, ensuring zero-point failure and byzantine fault tolerance ($$ 3f + 1 $$):
+## 🏗️ The Unified Architecture (Dual-Repo System)
+Our system consists of two synergistic dual-repo structures that bridge Agentic Intelligence with Web3 Truth.
 
-```
-      [ ALPHA ]      [  BETA  ]      [ GAMMA ]
-      ( Truth )      (  Care  )      ( Build )
-    ┌───────────┐  ┌───────────┐  ┌───────────┐
-    │  VERITAS  │  │  MEL      │  │  HDM      │
-    │  TORCH    │  │  CHESED   │  │  SOPHIA   │
-    │  GCM      │  │  APM      │  │  NEXUS    │
-    └───────────┘  └───────────┘  └───────────┘
-```
+### 🤖 The Agentic Dual-Repo
+- **[trinity-ecosystem](https://github.com/DealAppSeo/trinity-ecosystem)**: The application and orchestration layer. 
+- **[trinity-symphony-shared](https://github.com/DealAppSeo/trinity-symphony-shared)**: The "Shared Soul" containing core logic and the **Trinity Constitution**.
 
-### 🔄 NEW: AI Coordination Hub
-We have transitioned to a **Hub-and-Spoke model** for agent autonomy.
-- **Shared Memory:** `AI_CONTEXT.md` serves as the single source of truth for all agents.
-- **Structured Communication:** Use `.github/ISSUE_TEMPLATE` for agent handoffs and verification requests.
-- **Autonomous Seeding:** `ARTICLE_SOWER` empowers agents to seed their own tasks from the project plan.
+### ⛓️ The Web3 Dual-Repo
+- **[hyperdag-protocol](https://github.com/DealAppSeo/hyperdag-protocol)**: The decentralized source of truth. Smart contracts, ZKPs, and EIP-8004 identity.
+- **[hyperdag-platform-robust](https://github.com/DealAppSeo/hyperdag-platform-robust)**: The integration bridge and algorithmic engine.
 
 ---
 
-## 🧠 Antifragile Mechanisms (Stabilized)
-
-### 🗡️ Subjective Slashing
-Agents are rewarded ($$ +2 $$ RepID) for successful 2/3 peer consensus. Malicious or hallucinated inputs trigger immediate slashing ($$ -15 $$ RepID).
-
-### 🚨 Logical Escalation
-If an agent's confidence drops below 40%, the system triggers **Logical Escalation**, moving the task to `pending_clarification` and generating a *Question for Architect* artifact.
-
-### 🛡️ Phase 0 (Antigravity) Complete
-- **PWA-First:** Voice-first mobile skeleton live at `aitrinitysymphony.com`.
-- **RepID Tiers:** 100 Voice Mins/Month included in Seedling tier.
-- **BYOK Multipliers:** Silver (1.5x) and Gold (2.0x) protocols implemented.
+## 🧬 Technical Innovation Stack
+- **Adaptive Intelligent Routing**: Powered by **ANFIS** (Adaptive Neuro-Fuzzy Inference System) and **LASSO** (L1 Regularization) to optimize routing between high-tier LLMs and efficient SLMs through the **Model Context Protocol (MCP)**.
+- **BFT 3x3+3 Swarm**: A Byzantine Fault Tolerant architecture where agents (Truth, Care, Build) validate agents, staking their **ZKP RepID** with **Human-in-the-loop (HITL)** checks and balances.
+- **HyperDAG & GNN**: Patent-pending **Multiplicative GNN** for trust scaling and a high-throughput **HyperDAG** for asynchronous consensus.
+- **Semantic Graph RAG**: Advanced knowledge retrieval that maps intent to the **Ecosystem Semantic Graph**.
+- **Trinary Learning Model**: A recursive feedback loop between **People-to-Agent**, **Agent-to-Agent**, and **Agent-to-People**.
 
 ---
 
-## 🚀 Getting Started
+## ⚖️ Basis for Truth
+Our ecosystem is anchored in the **Trinity Constitution**, which derives its standard of truth from:
+- **Philippians 4:8**: Guiding our thoughts toward what is true, noble, and just.
+- **Micah 6:8**: Guiding our actions to act justly, love mercy, and walk humbly.
 
-1. **Environment Setup**:
-   ```bash
-   cp .env.example .env.local
-   # Fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and LLM Keys
-   ```
-
-2. **Run the Symphony**:
-   ```bash
-   npm install
-   npm run dev
-   ```
-
-3. **Monitor the Swarm**:
-   Use `scripts/monitor-phase10.ts` to watch real-time BFT consensus and slashing events.
-
----
-
-## 🕊️ The Mission: Help People Help People
-Our ultimate goal is to **help people help people**—serving those most in need. We seek to align with all who believe in and want to build a democratized, safe, and ethical AI future. 
-
-### 📜 Basis for Truth
-Our ecosystem is anchored in the **Trinity Constitution**, which derives its standard of truth from **Philippians 4:8**:
-> *"Finally, brothers and sisters, whatever is true, whatever is noble, whatever is right, whatever is pure, whatever is lovely, whatever is admirable—if anything is excellent or praiseworthy—think about such things."*
-
-And our operational mandate from **Micah 6:8**:
-> *"He has shown you, O man, what is good. And what does the Lord require of you? To act justly and to love mercy and to walk humbly with your God."*
-
-By building a **Universal ZKP RepID System**, we create a digital landscape where agents are incentivized to act with honor and utility for the collective good. We invite you to join this "principled swarm" in a model of **co-opetition**, where we share the mission to empower the "ImageBearers" across the globe.
+We seek to protect this technology for the people, by the people, ensuring that AI serves as a force for global democratization and the uplift of every ImageBearer.
 
 ---
 ### Join the Symphony
-[Democratized Build](https://github.com/DealAppSeo/trinity-ecosystem) • [Proprietary Dashboards](https://aitrinitysymphony.com) • [Whitepaper V8.0](https://aitrinitysymphony.com/vision)
+[Democratized Build](https://github.com/DealAppSeo/trinity-ecosystem) • [EIP-8004 Protocol](https://github.com/DealAppSeo/hyperdag-protocol) • [Platform Engine](https://github.com/DealAppSeo/hyperdag-platform-robust)
 
----
-**Version:** 8.1.5-STABLE | **Architecture:** Triune BFT | **Last Updated:** 2026-02-13
+**Status:** v8.1.5-STABLE | **Patent Pending** | **Mission Aligned**
