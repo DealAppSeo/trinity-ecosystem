@@ -17,7 +17,7 @@ Our system consists of two synergistic dual-repo structures that bridge Agentic 
 
 ### ⛓️ The Web3 Dual-Repo
 - **[hyperdag-protocol](https://github.com/DealAppSeo/hyperdag-protocol)**: The decentralized source of truth. Smart contracts, ZKPs, and EIP-8004 identity.
-- **[hyperdag-platform-robust](https://github.com/DealAppSeo/hyperdag-platform-robust)**: The integration bridge and algorithmic engine.
+- **[hyperdag-platform](https://github.com/DealAppSeo/hyperdag-platform)**: The AI engine. Agent orchestration, swarm management, and the Web3-bridge.
 
 ---
 
@@ -39,6 +39,6 @@ We seek to protect this technology for the people, by the people, ensuring that 
 
 ---
 ### Join the Symphony
-[Democratized Build](https://github.com/DealAppSeo/trinity-ecosystem) • [EIP-8004 Protocol](https://github.com/DealAppSeo/hyperdag-protocol) • [Platform Engine](https://github.com/DealAppSeo/hyperdag-platform-robust)
+[Democratized Build](https://github.com/DealAppSeo/trinity-ecosystem) • [EIP-8004 Protocol](https://github.com/DealAppSeo/hyperdag-protocol) • [Platform Engine](https://github.com/DealAppSeo/hyperdag-platform)
 
 **Status:** v8.1.5-STABLE | **Patent Pending** | **Mission Aligned**
