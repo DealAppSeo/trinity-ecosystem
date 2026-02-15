@@ -1,5 +1,5 @@
-# Trinity Symphony MCP Configuration (Version 2.1)
-# Centralized registry for quantum-hardened, intelligent tool routing
+# Trinity Symphony MCP Configuration (Version 2.2)
+# Centralized registry for quantum-hardened, ethically-bound tool routing
 
 elicitation:
   enabled: true
@@ -8,6 +8,21 @@ elicitation:
 tasks:   # Nov 2025 MCP Tasks API
   enabled: true
   queue: supabase
+
+mcp_apps: # Jan 2026 Extension
+  enabled: true
+  insiders: true
+  registry_submit: true
+
+auth: # June 2025 Spec Compliance
+  type: oauth2
+  issuer: ${AUTH_ISSUER_URL}
+  audience: trinity-symphony
+  scopes:
+    - trinity:read
+    - trinity:write
+    - trinity:admin
+  resource_binding: strict
 
 servers:
   # ═══════════════════════════════════════════════════
@@ -20,8 +35,10 @@ servers:
     config:
       GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PAT}
       GITHUB_DYNAMIC_TOOLSETS: "1"
-      GITHUB_TOOLSETS: "repos,issues,pull_requests,actions,code_security"
-    purpose: "Repository management, PR automation, CI/CD monitoring"
+      GITHUB_TOOLSETS: "repos,issues,pull_requests,actions,code_security,projects"
+      GITHUB_HTTP_MODE: "1"
+      GITHUB_OAUTH_SCOPE_FILTER: "1"
+    purpose: "Repo + Projects management, AI-native workflows"
     
   supabase:
     type: community
