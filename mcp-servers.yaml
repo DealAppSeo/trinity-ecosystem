@@ -1,5 +1,13 @@
-# Trinity Symphony MCP Configuration (Version 2.0)
-# Centralized registry for intelligent tool routing
+# Trinity Symphony MCP Configuration (Version 2.1)
+# Centralized registry for quantum-hardened, intelligent tool routing
+
+elicitation:
+  enabled: true
+  max_tokens: 200
+
+tasks:   # Nov 2025 MCP Tasks API
+  enabled: true
+  queue: supabase
 
 servers:
   # ═══════════════════════════════════════════════════
