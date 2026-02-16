@@ -17,6 +17,10 @@ function JoinContent() {
     const [error, setError] = useState('');
     const [web3Loading, setWeb3Loading] = useState(false);
 
+    const [tier, setTier] = useState<'standard' | 'byok'>('standard');
+    const [promoCode, setPromoCode] = useState('');
+    const [byokKey, setByokKey] = useState('');
+
     useEffect(() => {
         const refCode = searchParams.get('ref');
         if (refCode) {
@@ -24,6 +28,7 @@ function JoinContent() {
             setCode(refCode); // Auto-fill the code for UX
         }
     }, [searchParams]);
+
     const handleAccess = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -42,34 +47,33 @@ function JoinContent() {
             return;
         }
 
-        // 2. Check Access Code (Verified Access - Level 1)
-        // Note: In a real app, this would check a DB for activated invite codes
-        const VERIFIED_CODES = ['trinity', 'genesis', 'alpha'];
-        if (VERIFIED_CODES.includes(cleanCode)) {
-            console.log('✅ Verified Access Granted');
-            grantAccess('verified');
-            return;
-        }
+        // 2. Process Early Adopter (Email + Tier + Optional BYOK)
+        if (email && email.includes('@')) {
+            try {
+                const response = await fetch('/api/onboard', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email,
+                        tier,
+                        byok: tier === 'byok',
+                        byok_key: byokKey,
+                        promo_code: promoCode,
+                        referral_from: code
+                    })
+                });
 
-        // 3. Guest Access (Soft Gate - Level 0)
-        if (cleanCode === 'mel' || cleanCode === 'spark' || (email && email.includes('@'))) {
-            console.log('👀 Guest Access Granted (Read-Only)');
+                if (!response.ok) throw new Error('Onboarding failed');
 
-            // Persist Lead if email provided
-            if (email && email.includes('@')) {
-                try {
-                    await fetch('/api/join', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email, referral_from: code })
-                    });
-                } catch (err) {
-                    console.error('Failed to persist lead:', err);
-                }
+                console.log('✅ Early Adopter Registered');
+                grantAccess('verified');
+                return;
+            } catch (err) {
+                console.error('Failed to persist lead:', err);
+                setError('Registration failed. Please try again.');
+                setLoading(false);
+                return;
             }
-
-            grantAccess('guest');
-            return;
         }
 
         setError('Invalid Symphony Key or Access Code. Please enter your email for guest access.');
@@ -77,18 +81,16 @@ function JoinContent() {
     };
 
     const grantAccess = (role: 'founder' | 'guest' | 'verified') => {
-        // Set Cookies with broader scope and modern flags
+        // ... [grantAccess implementation] ...
         const expiry = 60 * 60 * 24 * 365; // 1 Year
         document.cookie = `trinity_access=true; Path=/; Max-Age=${expiry}; SameSite=Lax`;
         document.cookie = `trinity_role=${role}; Path=/; Max-Age=${expiry}; SameSite=Lax`;
 
-        // LocalStorage fallback for non-middleware checks
         localStorage.setItem('trinity_role', role);
         localStorage.setItem('trinity_access', 'true');
 
         console.log(`🔓 Access Granted as ${role}. Redirecting...`);
 
-        // Redirect
         setTimeout(() => {
             router.push('/pulse/conductor');
         }, 500);
@@ -110,76 +112,89 @@ function JoinContent() {
                     We believe AI should be democratized, created to be <span className="text-white font-medium">safe</span> and <span className="text-white font-medium">ethical</span>.
                 </p>
                 <p>
-                    If you agree that AI should be for the people—not just the largest corporations—and that it should empower financial, educational, and healthcare inclusion...
-                </p>
-                <p className="italic text-purple-400">
-                    Join us, to learn how we, and the agents we build, help people help people.
+                    Join our Early Adopter program and save 50-90% on AI costs by bringing your own API keys.
                 </p>
 
-                {/* [PHASE 13] WEB3 ONBOARDING SECTION */}
-                <div className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Pricing Tiers */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
                     <button
-                        onClick={async () => {
-                            setWeb3Loading(true);
-                            // Simulate Privy/Dynamic Onboarding
-                            setTimeout(() => {
-                                console.log("🌐 [Web3] Wallet Connected via ERC-8004 Discovery");
-                                grantAccess('verified');
-                            }, 2000);
-                        }}
-                        disabled={web3Loading}
-                        className="flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl hover:from-violet-500 hover:to-indigo-500 transition-all shadow-lg shadow-violet-500/20 group overflow-hidden relative"
+                        onClick={() => setTier('standard')}
+                        className={`p-6 rounded-2xl border transition-all text-left group ${tier === 'standard' ? 'border-purple-500 bg-purple-500/10' : 'border-white/5 bg-white/5 hover:border-white/10'}`}
                     >
-                        {web3Loading ? (
-                            <Zap className="w-5 h-5 animate-spin" />
-                        ) : (
-                            <Wallet className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                        )}
-                        <span className="font-bold tracking-tight">
-                            {web3Loading ? 'Syncing RepID...' : 'Connect Wallet'}
-                        </span>
-
-                        {/* Shimmer Effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" />
+                        <div className="flex justify-between items-start mb-4">
+                            <span className="text-xs font-bold uppercase tracking-widest text-purple-400">Standard</span>
+                            <span className="text-2xl font-bold">$100<span className="text-xs text-gray-500">/mo</span></span>
+                        </div>
+                        <p className="text-sm text-gray-400">Fixed cost, managed infrastructure. No keys required.</p>
                     </button>
 
-                    <div className="flex items-center gap-3 p-4 glass rounded-xl border border-white/5 opacity-60">
-                        <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                        <span className="text-xs font-medium text-gray-400">Reputation Backed (ERC-8004)</span>
-                    </div>
+                    <button
+                        onClick={() => setTier('byok')}
+                        className={`p-6 rounded-2xl border transition-all text-left group ${tier === 'byok' ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/5 bg-white/5 hover:border-white/10'}`}
+                    >
+                        <div className="flex justify-between items-start mb-4">
+                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">BYOK</span>
+                            <span className="text-2xl font-bold">$20<span className="text-xs text-gray-500">/mo</span></span>
+                        </div>
+                        <p className="text-sm text-gray-400">Founder-Lite. Plug in your own OpenAI/Anthropic keys.</p>
+                    </button>
                 </div>
             </div>
 
             {/* Entry Gate */}
-            <form onSubmit={handleAccess} className="space-y-4 max-w-md">
+            <form onSubmit={handleAccess} className="space-y-6 max-w-md">
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Email Address</label>
+                        <input
+                            type="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="you@future.com"
+                            className="w-full bg-gray-900 border border-gray-800 rounded-md p-4 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                        />
+                    </div>
 
-                {/* Email Input */}
-                <div>
-                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Email Address</label>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@future.com"
-                        className="w-full bg-gray-900 border border-gray-800 rounded-md p-4 text-white focus:outline-none focus:border-purple-500 transition-colors"
-                    />
+                    {tier === 'byok' && (
+                        <div>
+                            <label className="block text-xs uppercase tracking-widest text-emerald-500 mb-2">Your API Key (Optional for now)</label>
+                            <input
+                                type="text"
+                                value={byokKey}
+                                onChange={(e) => setByokKey(e.target.value)}
+                                placeholder="sk-..."
+                                className="w-full bg-emerald-950/20 border border-emerald-500/20 rounded-md p-4 text-white focus:outline-none focus:border-emerald-500 transition-colors font-mono text-sm"
+                            />
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Access Code</label>
+                            <input
+                                type="text"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value)}
+                                placeholder="SPARK"
+                                className="w-full bg-gray-900 border border-gray-800 rounded-md p-4 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Discount Code</label>
+                            <input
+                                type="text"
+                                value={promoCode}
+                                onChange={(e) => setPromoCode(e.target.value)}
+                                placeholder="EARLY50"
+                                className="w-full bg-gray-900 border border-gray-800 rounded-md p-4 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                {/* Access Code Input */}
-                <div>
-                    <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Access Code (Guest)</label>
-                    <input
-                        type="text"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        placeholder="e.g. SPARK"
-                        className="w-full bg-gray-900 border border-gray-800 rounded-md p-4 text-white focus:outline-none focus:border-purple-500 transition-colors"
-                    />
-                </div>
-
-                {/* Symphony Key Input */}
-                <div className="pt-4 border-t border-white/5">
-                    <label className="block text-xs uppercase tracking-widest text-gold mb-2">Symphony Key (Founder)</label>
+                <div className="pt-6 border-t border-white/5">
+                    <label className="block text-xs uppercase tracking-widest text-gold mb-2">Symphony Key (Founders Only)</label>
                     <input
                         type="password"
                         value={password}
@@ -194,14 +209,10 @@ function JoinContent() {
                 <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-6 text-lg bg-white text-black hover:bg-gray-200 transition-colors"
+                    className="w-full py-6 text-lg bg-white text-black hover:bg-gray-200 transition-colors shadow-xl shadow-white/5"
                 >
-                    {loading ? 'Verifying...' : 'Enter Ecosystem →'}
+                    {loading ? 'Processing...' : 'Secure Early Access →'}
                 </Button>
-
-                <p className="text-xs text-gray-600 text-center pt-4">
-                    Unlock advanced features by connecting GitHub or LinkedIn later.
-                </p>
             </form>
         </div>
     );

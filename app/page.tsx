@@ -71,11 +71,11 @@ export default async function LandingPage() {
         <div className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-text-muted font-mono">
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 bg-status-online rounded-full" />
-            3x3 Antifragile Grid
+            12 Specialized Agents
           </span>
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 bg-status-working rounded-full" />
-            99% Hallucination Catch (ANFIS)
+            ANFIS Optimized
           </span>
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 bg-gold rounded-full" />
@@ -112,7 +112,7 @@ export default async function LandingPage() {
         <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold text-text-primary mb-4">The Symphony</h2>
           <p className="text-text-secondary max-w-2xl mx-auto">
-            Real autonomous agents working in a 3x3+3 Antifragile Grid. No scripts. No human intervention.
+            12 autonomous specialized agents working in concert. No scripts. No human intervention.
             Self-healing via Survivor Protocols.
           </p>
         </div>
