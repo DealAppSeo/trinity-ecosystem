@@ -1,0 +1,94 @@
+--- [STARTUP WEEKEND FAILURE ANALYSIS] ---
+
+
+- [137094] [STARTUP WEEKEND] Peer Review & ROI Voting: Pitch Selection
+  Failed At: 2026-02-17T19:56:13.9+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"ORCHESTRATION","required_artifacts":["Voting_Results.json","Roadmap_Selection_Report.md"]}
+  ---
+
+- [137093] [STARTUP WEEKEND] Pitch New Idea: The 'Deep Executive Assistant' (AI x Web3)
+  Failed At: 2026-02-17T19:56:06.576+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"BETA","required_artifacts":["Pitch_Deck_v1.md","Business_Model_Canvas.json"]}
+  ---
+
+- [137092] [STARTUP WEEKEND] Identify 'Executive Painkillers': Time & Money Saving Gaps
+  Failed At: 2026-02-17T19:55:58.653+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"GAMMA","required_artifacts":["Exec_Pain_Point_Report.md","ROI_Opportunity_Matrix.csv"]}
+  ---
+
+- [137091] [STARTUP WEEKEND] Reverse Engineer 2025 Successes: Agentic AI x Web3 x Quantum
+  Failed At: 2026-02-17T19:55:51.531+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"ALPHA","required_artifacts":["Competitor_Insight_2025.json","Strategy_Reverse_Engineered.md"]}
+  ---
+
+- [137445] [STARTUP WEEKEND] Autonomous Pitch: CTO (HDM)
+  Failed At: 2026-02-17T19:55:20.911+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"GAMMA","required_artifacts":["Pitch_Proposal_HDM.json"]}
+  ---
+
+- [137446] [STARTUP WEEKEND] Peer Review & Top 3 Selection
+  Failed At: 2026-02-17T19:54:59.467+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"ORCHESTRATION","required_artifacts":["Top_3_Selection.json"]}
+  ---
+
+- [137493] [STARTUP WEEKEND] Swarm Consensus: The All-In Pivot
+  Failed At: 2026-02-17T19:54:52.186+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"ORCHESTRATION","required_artifacts":["Consensus_Report.json"]}
+  ---
+
+- [137443] [STARTUP WEEKEND] Autonomous Pitch: Business Developer (SOPHIA)
+  Failed At: 2026-02-17T19:54:46.12+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"GAMMA","required_artifacts":["Pitch_Proposal_Sophia.json"]}
+  ---
+
+- [137444] [STARTUP WEEKEND] Autonomous Pitch: Growth Hacker (CHESED)
+  Failed At: 2026-02-17T19:54:45.049+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"BETA","required_artifacts":["Pitch_Proposal_Chesed.json"]}
+  ---
+
+- [136850] [SPRINT 0] [TORCH] Social Media Viral Thread Concept
+  Failed At: 2026-02-17T07:51:55.508+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"ALPHA","required_artifacts":["Viral_Thread_Concept.md"]}
+  ---
+
+- [136849] [SPRINT 0] [SOPHIA] B2B Pricing Model & Go-To-Market Performa
+  Failed At: 2026-02-17T07:51:48.647+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"GAMMA","required_artifacts":["Pricing_Model.csv","GTM_Roadmap.md"]}
+  ---
+
+- [136848] [SPRINT 0] [CHESED] Growth Hack: Early Adopter Magnet Strategy
+  Failed At: 2026-02-17T07:51:41.844+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"BETA","required_artifacts":["Growth_Strategy.md","Viral_Coefficient_Projections.csv"]}
+  ---
+
+- [136847] [SPRINT 0] [NEXUS] Technical MVP Specification & API Interface
+  Failed At: 2026-02-17T07:51:34.863+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"GAMMA","required_artifacts":["MVP_Spec.json","API_Endpoints.md"]}
+  ---
+
+- [136846] [SPRINT 0] [MEL] User Story & Persona Mapping for #1 Opportunity
+  Failed At: 2026-02-17T07:51:28.148+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"BETA","required_artifacts":["Personas.json","User_Stories.md"]}
+  ---
+
+- [136845] [SPRINT 0] [VERITAS] Market Gap Identification: AI x Web3 Convergence
+  Failed At: 2026-02-17T07:51:20.933+00:00
+  Result/Error: ERROR: LLM call failed to produce output. Check API keys and connectivity.
+  Metadata: {"squad":"ALPHA","required_artifacts":["Market_Gap_Matrix.csv"]}
+  ---
+
+--- [ANALYSIS COMPLETE] ---

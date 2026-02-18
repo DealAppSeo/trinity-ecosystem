@@ -27,7 +27,7 @@ export default async function LandingPage() {
 
         <h1 className="text-4xl md:text-6xl font-bold text-text-primary mb-2 tracking-tight max-w-4xl leading-tight">
           Welcome to the <br />
-          <span className="text-accent-violet">Founders App</span>
+          <span className="text-accent-violet">AI Trinity Symphony</span>
         </h1>
 
         <div className="flex flex-col items-center mb-10 animate-fade-in">
@@ -168,7 +168,7 @@ export default async function LandingPage() {
       {/* FOOTER */}
       <footer className="px-6 py-12 border-t border-obsidian-border bg-obsidian-surface text-center">
         <p className="text-text-muted text-sm">
-          © 2026 Trinity Ecosystem. Built for the future of humanity.
+          © 2026 AI Trinity Symphony. Built for the future of humanity.
         </p>
       </footer>
     </main>

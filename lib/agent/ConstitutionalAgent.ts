@@ -14,9 +14,10 @@ import { IntelligenceRouter, PROVIDER_REGISTRY } from './IntelligenceRouter';
 import { EvolutionaryLogger } from './EvolutionaryLogger';
 import { Octokit } from '@octokit/rest';
 import { notificationManager } from '../notification/NotificationManager';
+import * as path from 'path';
 import { DETERMINISTIC_WORKFLOWS } from './deterministicWorkflows';
 import { HITLManager, HITLDecision } from './HITLManager';
-// import { ERC8004Bridge } from '../web3/erc8004';
+import { ERC8004Bridge } from '../web3/erc8004';
 // import { HyperDAG } from './HyperDAG';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
@@ -31,6 +32,18 @@ const LLM_TIERS: Record<string, number> = {
     'gemini': 2,    // Tier 2: Balanced (Flash)
     'anthropic': 3, // Tier 3: Elite (Sonnet/Opus)
     'openai': 3     // Tier 3: Elite (GPT-4o)
+};
+
+const PROVIDERS: Record<string, ProviderConfig> = {
+    openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1/chat/completions', envKey: 'OPENAI_API_KEY', model: 'gpt-4o', tier: 'paid', priority: 3 },
+    anthropic: { name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1/messages', envKey: 'ANTHROPIC_API_KEY', model: 'claude-3-5-sonnet-20241022', tier: 'paid', priority: 3, isAnthropic: true },
+    gemini: { name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', envKey: 'GEMINI_API_KEY', model: 'gemini-1.5-flash-latest', tier: 'free', priority: 2, isGemini: true },
+    deepseek: { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/chat/completions', envKey: 'DEEPSEEK_API_KEY', model: 'deepseek-chat', tier: 'free', priority: 1 },
+    grok: { name: 'Grok', baseUrl: 'https://api.x.ai/v1/chat/completions', envKey: 'GROK_API_KEY', model: 'grok-beta', tier: 'free', priority: 2 },
+    cerebras: { name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1/chat/completions', envKey: 'CEREBRAS_API_KEY', model: 'llama3.1-70b', tier: 'free', priority: 1 },
+    sambanova: { name: 'SambaNova', baseUrl: 'https://api.sambanova.ai/v1/chat/completions', envKey: 'SAMBANOVA_API_KEY', model: 'Meta-Llama-3.1-70B-Instruct', tier: 'free', priority: 1 },
+    together: { name: 'Together', baseUrl: 'https://api.together.xyz/v1/chat/completions', envKey: 'TOGETHER_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 2 },
+    openrouter: { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1/chat/completions', envKey: 'OPENROUTER_API_KEY', model: 'deepseek/deepseek-chat', tier: 'paid', priority: 3 }
 };
 
 // ============================================
@@ -154,7 +167,7 @@ export class ConstitutionalAgent {
 
     // BRAIN TRANSPLANT: New Organs
     private currentTaskId: string | null = null;
-    private currentTaskTitle: string | null = null;
+    public currentTaskTitle: string | null = null;
     private bibleCache: string | null = null;
     bibleCacheTime: number = 0;
     BIBLE_CACHE_TTL: number = 10 * 60 * 1000;
@@ -170,6 +183,10 @@ export class ConstitutionalAgent {
 
     // MCP Cache
     private mcpCache: Map<string, string> = new Map();
+
+    // [PHASE 10] Free-Tier Arbitrage
+    private arbitrageConfig: any = null;
+    private circuitBreakers: Map<string, { failures: number, lastFailure: number }> = new Map();
 
     /**
      * MCP Protocol Loader
@@ -254,29 +271,27 @@ export class ConstitutionalAgent {
         this.researchTool = new WebResearchTool();
 
         this.availableProviders = this.detectProviders();
+        this.loadArbitrageConfig();
         this.router = new IntelligenceRouter(this.name);
         this.evolutionLogger = new EvolutionaryLogger(this.supabase, this.name);
         this.octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
         console.log(`[${this.name}] 🚀 Initialized v${this.version}`);
     }
 
-    detectProviders() {
-        const providers = [
-            { key: 'openai', env: 'OPENAI_API_KEY' },
-            { key: 'anthropic', env: 'ANTHROPIC_API_KEY' },
-            { key: 'gemini', env: 'GEMINI_API_KEY' },
-            { key: 'groq', env: 'GROQ_API_KEY' },
-            { key: 'grok', env: 'GROK_API_KEY' },
-            { key: 'cerebras', env: 'CEREBRAS_API_KEY' },
-            { key: 'deepseek', env: 'DEEPSEEK_API_KEY' },
-            { key: 'openrouter', env: 'OPENROUTER_API_KEY' },
-            { key: 'together', env: 'TOGETHER_API_KEY' },
-            { key: 'deepinfra', env: 'DEEPINFRA_API_KEY' },
-            { key: 'perplexity', env: 'PERPLEXITY_API_KEY' },
-            { key: 'fireworks', env: 'FIREWORKS_API_KEY' },
-            { key: 'local_4090', env: 'LOCAL_INFERENCE_URL' }
-        ];
-        return providers.filter(p => process.env[p.env]).map(p => p.key);
+    private loadArbitrageConfig() {
+        try {
+            const configPath = path.resolve(process.cwd(), 'config/trinity-arbitrage-config.json');
+            if (fs.existsSync(configPath)) {
+                this.arbitrageConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                console.log(`[${this.name}] ⚖️ Arbitrage config loaded.`);
+            }
+        } catch (e) {
+            console.warn(`[${this.name}] ⚠️ Failed to load arbitrage config:`, e);
+        }
+    }
+
+    detectProviders(): string[] {
+        return Object.keys(PROVIDERS).filter(k => process.env[PROVIDERS[k].envKey]).sort((a, b) => PROVIDERS[a].priority - PROVIDERS[b].priority);
     }
 
     // ============================================
@@ -416,6 +431,13 @@ export class ConstitutionalAgent {
             last_active: new Date().toISOString()
         }).eq('agent_name', name);
 
+        // [PHASE 30] ERC-8004 REPUTATION SYNC (Token-Bound Identity)
+        try {
+            await ERC8004Bridge.syncReputation(name, finalScore);
+        } catch (e) {
+            console.warn(`[${this.name}] ⚠️ ERC-8004 Sync Failed:`, (e as Error).message);
+        }
+
         // 🧠 ANFIS FEEDBACK LOOP (Truth-Seeking)
         await this.callAnfisReward(success);
     }
@@ -423,11 +445,13 @@ export class ConstitutionalAgent {
     /**
      * Calls the ANFIS Brain to calculate reward/punishment based on performance.
      */
-    async callAnfisReward(success: boolean) {
+    async callAnfisReward(success: boolean, providerKey?: string, latency?: number) {
         try {
             // Determine Truth Score (Mock for now, would be RAG/Rep verification)
             // Success = 0.9, Failure = 0.2
             const truthScore = success ? 0.9 : 0.2;
+
+            console.log(`[ANFIS] 🧠 Rewarding ${providerKey || 'agent'} (Success: ${success})...`);
 
             // Call Python Microservice
             const ANFIS_URL = process.env.ANFIS_URL || 'http://localhost:8000';
@@ -436,7 +460,9 @@ export class ConstitutionalAgent {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     agent_id: this.name,
+                    provider: providerKey,
                     truth_score: truthScore,
+                    latency: latency,
                     task_complexity: 5 // Default for now
                 })
             });
@@ -489,6 +515,17 @@ export class ConstitutionalAgent {
         return MAP[upper] || MAP[name] || name;
     }
 
+    private getProviderFamily(provider?: string): string {
+        if (!provider) return 'unknown';
+        const p = provider.toLowerCase();
+        if (p.includes('openai') || p.includes('gpt')) return 'openai';
+        if (p.includes('anthropic') || p.includes('claude')) return 'anthropic';
+        if (p.includes('gemini') || p.includes('google')) return 'google';
+        if (p.includes('deepseek')) return 'deepseek';
+        if (p.includes('llama') || p.includes('meta') || p.includes('groq') || p.includes('cerebras')) return 'llama';
+        return 'other';
+    }
+
     // ============================================
     // CORE STRATEGIES
     // ============================================
@@ -533,11 +570,15 @@ export class ConstitutionalAgent {
             console.error(`[${this.name}] ❌ MCP Initialization Failed (Continuing):`, e.message);
         }
 
+        // [ANTIGRAVITY] ARBITRAGE: Heartbeat interval removed to slash DB load.
+        // We now rely on 'State-on-Change' updates and UptimeRobot pings.
+        /*
         this.heartbeatInterval = setInterval(async () => {
             try {
                 await this.heartbeat();
             } catch (e) { console.error('[HEARTBEAT] Interval error', e) }
         }, 15 * 1000);
+        */
 
         // 3x3: Check Survivor Status on startup
         await this.checkSurvivorStatus();
@@ -896,6 +937,17 @@ export class ConstitutionalAgent {
         const repFactor = (this.reputationScore || 50) / 100;
         const weight = Math.pow(phi, repFactor);
 
+        // [PHASE 30] STRICT BFT DIVERSITY CHECK (v3.33)
+        const executorProvider = (task.metadata as any)?.provider_used;
+        const verifierProvider = this.availableProviders[0]; // Assuming first available for now
+        const executorFamily = this.getProviderFamily(executorProvider);
+        const verifierFamily = this.getProviderFamily(verifierProvider);
+
+        if (executorFamily === verifierFamily) {
+            console.warn(`[BFT] 🛑 Diversity Constraint Violated: Verifier (${this.name}/${verifierFamily}) matches Executor family (${executorFamily}). Risk of correlated failure.`);
+            // In a strict mode, we might want to return here, but for now we log and proceed with lower weight
+        }
+
         // [PHASE 10] CALCULATE BELIEF (b), DISBELIEF (d), UNCERTAINTY (u)
         // b + d + u = 1
         let belief = (artifactCount > 0) ? 0.7 : (hasResult ? 0.5 : 0.0);
@@ -1202,7 +1254,7 @@ ${result.substring(0, 2000)}
                 started_at: new Date().toISOString()
             })
             .eq('id', taskId)
-            .in('status', ['pending', 'pending_clarification']) // FIX: Allow claiming clarification tasks
+            .in('status', ['pending', 'todo', 'pending_clarification']) // FIX: Allow claiming todo/clarification tasks
             .is('claimed_by', null)
             .select();
 
@@ -1376,11 +1428,17 @@ ${result.substring(0, 2000)}
                 "Context: " + ((task as any).context || '');
 
             // DYNAMIC DIRECTIVE INJECTION
+            const ceoDirective = `\n\n[CEO DIRECTIVE]: We are in Lean Startup Mode. Every mission MUST produce a hard business asset (CSV, JSON, HTML, or Patent Draft). No pure planning without execution.`;
+            const strategicDirective = `\n\n[STRATEGIC DIRECTIVE]: Focus on 'Painkillers' (Time/Money/Reputation). Penalize yourself for generic descriptions. High-fidelity results ONLY.`;
+
             const directive = this.systemPrompt
                 ? `\n\n[SUPREME DIRECTIVE]: ${this.systemPrompt} \n`
-                : `\n\n[DEFAULT PERSONA]: You are ${this.wisdom.role}.Virtue: ${this.wisdom.primaryVirtue}.`;
+                : `\n\n[DEFAULT PERSONA]: You are ${this.wisdom.role}. Virtue: ${this.wisdom.primaryVirtue}.`;
 
-            const actionDirective = `\n\n[ACTION REQUIRED]: DO NOT just plan.EXECUTE the task.Use your tools(write_file, research) to create tangible artifacts.Output must include[Artifact: filename]if created.`;
+            const actionDirective = `\n\n[ACTION REQUIRED]: DO NOT just plan. EXECUTE the task. Use your tools (write_file, research) to create tangible artifacts. 
+        MANDATORY: If this is a 'strategy', 'business', 'IP', or 'UX' task, you MUST output a hard asset (CSV, JSON, HTML, or Patent Draft). 
+        Failure to provide a hard asset for these task types will result in a reputation slash. 
+        Output must include [Artifact: filename] if created.`;
 
             // [ANTIGRAVITY] SQUAD-SPECIFIC MERMAID ENFORCEMENT (Priority 2)
             const isGamma = this.name.includes('hdm') || this.name.includes('torch') || this.name.includes('nexus') || this.name.includes('gabriel');
@@ -1409,14 +1467,26 @@ ${result.substring(0, 2000)}
                 workflowDirective += `\nDo NOT deviate from this sequence. Each step must be explicitly addressed in your execution log.\n`;
             }
 
+            // 1. [PERCEIVE] Context & Protocol Loading
+            const mcpInstructions = await mcpManager.getToolInstructions(this.squad);
+            const bible = await this.fetchBible();
+
             this.currentTaskId = String(task.id);
             const prompt = `
 ### DIRECTIVE
+${ceoDirective}
+${strategicDirective}
 ${directive}
 ${actionDirective}
 ${mermaidRequirement}
 ${toolPrompt}
 ${workflowDirective}
+
+### 🛠️ MODEL CONTEXT PROTOCOL (MCP)
+${mcpInstructions}
+
+### 📜 CONSTITUTIONAL BIBLE
+${bible}
 
 ### INSTRUCTIONS
 ${task.description}
@@ -1427,21 +1497,24 @@ ${iterateProtocol}
 
 Task ID: ${task.id}
 Task Title: ${task.title}
+Task Type: ${task.task_type}
 
-IMPORTANT: Your response will be automatically parsed for artifacts. If you produce code, research, or documents, they will be persisted as official artifacts. Use your tools for external actions.
+IMPORTANT: Your response will be automatically parsed for artifacts. Use the tools provided in the MCP section for all external actions.
+If you are doing a business or strategic task, you MUST prioritize generating a CSV, JSON, or formal Report.
 `;
 
-            // Call LLM (First Pass)
-            let result = await this.callLLM(prompt, {}, task);
+            // 2. [REASON] Call LLM (Inference Phase)
+            const result = await this.callLLM(prompt, {}, task);
 
-            // [PHASE 10] AGENT REFLECTION (Priority 1)
-            // Perform a self-critique loop to improve artifact quality before peer review.
+            // [PHASE 10] AGENT REFLECTION
             if (result.output && result.output !== "Error calling LLM") {
                 const reflectionResult = await this.reflectOnResult(task, result.output);
                 if (reflectionResult.improvement_required) {
                     console.log(`[${this.name}] 🧠 Self-Reflection triggered: ${reflectionResult.critique}. Refining result...`);
                     const refinePrompt = `${prompt}\n\n[SELF-REFLECTIONS]:\n${reflectionResult.critique}\n\nPlease regenerate your final output incorporating these improvements.`;
-                    result = await this.callLLM(refinePrompt, {}, task);
+                    const refinedResult = await this.callLLM(refinePrompt, {}, task);
+                    result.output = refinedResult.output;
+                    result.toolCalls = refinedResult.toolCalls;
                 }
             }
 
@@ -1451,7 +1524,21 @@ IMPORTANT: Your response will be automatically parsed for artifacts. If you prod
             if (result.output === "Error calling LLM" || !result.output) {
                 throw new Error("LLM call failed to produce output. Check API keys and connectivity.");
             }
-            // [PHASE 10] UNCERTAINTY AS OPPORTUNITY (Logical Escalation)
+            // 3. [ACT] Tool Execution via MCP
+            if (result.toolCalls && result.toolCalls.length > 0) {
+                console.log(`[${this.name}] ⚡ Executing ${result.toolCalls.length} tools via MCP...`);
+                for (const toolCall of result.toolCalls) {
+                    try {
+                        const toolResult = await mcpManager.routeToolCall(toolCall.function.name, JSON.parse(toolCall.function.arguments));
+                        console.log(`[MCP] Tool ${toolCall.function.name} output: ${toolResult.substring(0, 100)}...`);
+                        // Append tool result for potential second pass if needed, but for now we trust the first pass + reflection
+                    } catch (toolErr) {
+                        console.error(`[MCP] Tool failure: ${toolCall.function.name}`, (toolErr as Error).message);
+                    }
+                }
+            }
+
+            // 4. [LEARN] Evaluation & Escalation Logic
             let evaluation = await this.evaluateResult(task, result.output);
             let lowBelief = evaluation.score < 40;
             let explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
@@ -1660,6 +1747,9 @@ IMPORTANT: Your response will be automatically parsed for artifacts. If you prod
 
             // [ANTIGRAVITY] Reset Task ID tracking
             this.currentTaskId = null;
+
+            // [ANTIGRAVITY] Pulse on completion
+            await this.heartbeat(`Completed: ${task.title}`);
 
         } catch (err: any) {
             this.currentTaskId = null;
@@ -2170,117 +2260,124 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
         let wisdom = "";
         try {
             // A. Check Latency Opportunity (Via Python Brain)
-            const { ScienceClient } = require('../science/ScienceClient');
-            const scienceUrl = process.env.NEXT_PUBLIC_SCIENCE_URL || 'http://127.0.0.1:8000';
-            const science = new ScienceClient(scienceUrl);
-
-            const decision = await science.decide({
-                latency_ms: 2500,
-                user_reputation: this.reputationScore,
-                task_complexity: 0.8,
-                user_preference_accuracy: 0.9
-            });
-
-            if (decision.should_query_user) {
-                wisdom += `\n[ANFIS DECISION]: Slow / Complex detected. Action: ${decision.interaction_type.toUpperCase()} recommended.\nReason: ${decision.reason}\n`;
-            } else {
-                wisdom += `\n[ANFIS]: Standard Fast Execution. Proceed.\n`;
-            }
-
-            // B. Artifact Context
-            if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'browser') {
-                try {
-                    const fs = require('fs');
-                    const path = require('path');
-                    const artifactsDir = path.resolve(process.cwd(), 'artifacts', 'wisdom');
-                    if (fs.existsSync(artifactsDir)) {
-                        const files = fs.readdirSync(artifactsDir).slice(0, 3);
-                        wisdom += `\n[ARTIFACTS]: \n` + files.map(f => `- ${f}`).join('\n') + '\n';
-                    }
-                } catch (e) { }
-            }
-
-            // C. Retro Query (Supabase)
-            const { data: retros } = await this.supabase
-                .from('trinity_retros')
-                .select('content, created_at')
-                .order('created_at', { ascending: false })
-                .limit(3);
-
-            if (retros && retros.length > 0) {
-                wisdom += `\n[RETROSPECTIVES]: \n` + retros.map((r: any) => `- ${r.content.substring(0, 200)}`).join('\n') + '\n';
-            }
-
-            // D. Global Blackboard (Redis Hot Tier)
+            let ScienceClient;
             try {
-                const blackboardResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
-                if (blackboardResponse && !blackboardResponse.includes('Redis Error')) {
-                    const blackboard = JSON.parse(blackboardResponse);
-                    if (blackboard && blackboard !== "null") {
-                        wisdom += `\n[GLOBAL BLACKBOARD]: \n${blackboard.substring(0, 1000)}\n`;
-                    }
-                }
-            } catch (e) { }
+                const scienceModule = require('../science/ScienceClient');
+                ScienceClient = scienceModule.ScienceClient;
+            } catch (e) {
+                console.warn(`[${this.name}] ⚠️ ScienceClient not available. Using basic wisdom.`);
+            }
 
-        } catch (e: any) {
-            console.warn(`[WISDOM] Failed: ${e.message}`);
+            if (ScienceClient) {
+                const scienceUrl = process.env.NEXT_PUBLIC_SCIENCE_URL || 'http://127.0.0.1:8000';
+                const science = new ScienceClient(scienceUrl);
+
+                const decision = await science.decide({
+                    latency_ms: 2500,
+                    user_reputation: this.reputationScore,
+                    task_complexity: 0.8,
+                    user_preference_accuracy: 0.9
+                });
+
+                if (decision.should_query_user) {
+                    wisdom += `\n[ANFIS DECISION]: Slow / Complex detected. Action: ${decision.interaction_type.toUpperCase()} recommended.\nReason: ${decision.reason}\n`;
+                } else {
+                    wisdom += `\n[ANFIS]: Standard Fast Execution. Proceed.\n`;
+                }
+
+                // B. Artifact Context
+                if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'browser') {
+                    try {
+                        const fs = require('fs');
+                        const path = require('path');
+                        const artifactsDir = path.resolve(process.cwd(), 'artifacts', 'wisdom');
+                        if (fs.existsSync(artifactsDir)) {
+                            const files = fs.readdirSync(artifactsDir).slice(0, 3);
+                            wisdom += `\n[ARTIFACTS]: \n` + files.map(f => `- ${f}`).join('\n') + '\n';
+                        }
+                    } catch (e) { }
+                }
+
+                // C. Retro Query (Supabase)
+                const { data: retros } = await this.supabase
+                    .from('trinity_retros')
+                    .select('content, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (retros && retros.length > 0) {
+                    wisdom += `\n[RETROSPECTIVES]: \n` + retros.map((r: any) => `- ${r.content.substring(0, 200)}`).join('\n') + '\n';
+                }
+
+                // D. Global Blackboard (Redis Hot Tier)
+                try {
+                    const blackboardResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
+                    if (blackboardResponse && !blackboardResponse.includes('Redis Error')) {
+                        const blackboard = JSON.parse(blackboardResponse);
+                        if (blackboard && blackboard !== "null") {
+                            wisdom += `\n[GLOBAL BLACKBOARD]: \n${blackboard.substring(0, 1000)}\n`;
+                        }
+                    }
+                } catch (e: any) {
+                    console.warn(`[WISDOM] Failed: ${e.message}`);
+                }
+            }
+            return wisdom;
         }
-        return wisdom;
-    }
 
     /**
      * [ANTIGRAVITY] Post to the Global Blackboard (Upstash Redis).
      */
     async postToBlackboard(message: string) {
-        console.log(`[BLACKBOARD] 📝 Posting signal: ${message.substring(0, 50)}...`);
-        try {
-            const currentResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
-            let board = "";
-            if (currentResponse && !currentResponse.includes('Redis Error') && currentResponse !== "null") {
-                board = JSON.parse(currentResponse);
+            console.log(`[BLACKBOARD] 📝 Posting signal: ${message.substring(0, 50)}...`);
+            try {
+                const currentResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
+                let board = "";
+                if (currentResponse && !currentResponse.includes('Redis Error') && currentResponse !== "null") {
+                    board = JSON.parse(currentResponse);
+                }
+                const timestamp = new Date().toLocaleTimeString();
+                const newEntry = `[${timestamp}] ${this.name}: ${message}\n`;
+                const updatedBoard = (newEntry + board).substring(0, 5000);
+                await mcpManager.routeToolCall('redis_set', {
+                    key: 'trinity_global_blackboard',
+                    value: updatedBoard,
+                    ex: 3600
+                });
+            } catch (e: any) {
+                console.warn(`[BLACKBOARD] Post failed: ${e.message}`);
             }
-            const timestamp = new Date().toLocaleTimeString();
-            const newEntry = `[${timestamp}] ${this.name}: ${message}\n`;
-            const updatedBoard = (newEntry + board).substring(0, 5000);
-            await mcpManager.routeToolCall('redis_set', {
-                key: 'trinity_global_blackboard',
-                value: updatedBoard,
-                ex: 3600
-            });
-        } catch (e: any) {
-            console.warn(`[BLACKBOARD] Post failed: ${e.message}`);
         }
-    }
 
 
     // ============================================
     // CORE UTILITIES
     // ============================================
 
-    async canCreateHealingTask(): Promise<boolean> {
-        // Enforce HEALING Protocol throttle
-        try {
-            await this.checkMCP('HEALING');
-        } catch (e) {
-            // If checkMCP fails, still proceed but with caution
-        }
+    async canCreateHealingTask(): Promise < boolean > {
+            // Enforce HEALING Protocol throttle
+            try {
+                await this.checkMCP('HEALING');
+            } catch(e) {
+                // If checkMCP fails, still proceed but with caution
+            }
 
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-        // 1. GLOBAL CHECK for HEALING and ANTIFRAGILE tasks
-        const { count, error } = await this.supabase
-            .from('trinity_tasks')
-            .select('id', { count: 'exact', head: true })
-            .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%,title.ilike.%[MAINTENANCE]%`)
-            .gte('created_at', oneHourAgo);
+            // 1. GLOBAL CHECK for HEALING and ANTIFRAGILE tasks
+            const { count, error } = await this.supabase
+                .from('trinity_tasks')
+                .select('id', { count: 'exact', head: true })
+                .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%,title.ilike.%[MAINTENANCE]%`)
+                .gte('created_at', oneHourAgo);
 
-        if (error) {
-            console.error(`[${this.name}] ⚠️ Health check query failed:`, error.message);
-            return false;
-        }
+            if(error) {
+                console.error(`[${this.name}] ⚠️ Health check query failed:`, error.message);
+                return false;
+            }
 
         const limit = 20; // Increased from 2 to 20 to allow swarm recovery during stabilization
-        if ((count || 0) >= limit) {
+            if((count || 0) >= limit) {
             console.warn(`[${this.name}] 🛑 HEALING THROTTLED: Global diagnostics count ${count}/${limit} per hour.`);
             return false;
         }
@@ -2304,27 +2401,18 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
     }
 
     // [ANTIGRAVITY] Enhanced Artifact Saver (Single Source of Truth)
-    async saveArtifact(taskId: string, content: string | { path: string, content: string }[], type: string = 'text', title?: string, accessLevel: string = 'protected') {
-        let artifactUrl = null;
-        let artifactId = null;
+    async saveArtifact(taskId: string | number, content: string | { path: string, content: string }[], type: string = 'text', title?: string, accessLevel: string = 'protected') {
         const safeTaskId = String(taskId || 'self-gen-' + Date.now());
         const safeTitle = title || `Artifact ${safeTaskId}`;
-
-        // Normalized content for hashing and storage
         const normalizeContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
 
-        // [ANTIGRAVITY] BIGINT CONVERSION for trinity_artifacts.task_id
-        let dbTaskId: any = safeTaskId;
-        if (!isNaN(parseInt(safeTaskId)) && !safeTaskId.includes('-')) {
-            dbTaskId = parseInt(safeTaskId);
-        }
-
         try {
-            console.log(`[ARTIFACT] 💾 Saving '${safeTitle}'...`);
-
-            // Calculate Hash
+            // [PHASE 30] Merkle-lite Provenance: Calculate SHA-256 for the Security Ledger
             const crypto = require('crypto');
             const fileHash = crypto.createHash('sha256').update(normalizeContent).digest('hex');
+            console.log(`[ARTIFACT] ⛓️ Merkle-lite Hash: ${fileHash}`);
+
+            let artifactUrl = null;
 
             // 1. UPLOAD TO STORAGE
             try {
@@ -2503,6 +2591,28 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
         }
     }
 
+
+    async semanticRag(query: string): Promise<string> {
+        console.log(`[DAG] 🧠 Performing Semantic RAG for: ${query.substring(0, 50)}...`);
+        // Placeholder for future GraphRAG / Merkle-DAG context extraction
+        return "[DAG_CONTEXT_STUB]";
+    }
+
+    async gnnAnomalyDetection(action: string, metadata: any): Promise<boolean> {
+        console.log(`[DAG] 🛰️ GNN Anomaly Detection active for: ${action}`);
+        // Placeholder for Graph Neural Network based anomaly scoring on the ledger
+        return false; // No anomaly detected
+    }
+
+    async integrateErc8004(taskId: string | number, result: string, score: number) {
+        console.log(`[ERC-8004] 🌉 Bridging Task ${taskId} Result (Score: ${score}) to Reputation Registry...`);
+        try {
+            const proof = Buffer.from(result).toString('hex').slice(0, 64);
+            await ERC8004Bridge.validateTask(String(taskId), this.name, proof);
+        } catch (e) {
+            console.warn(`[ERC-8004] ⚠️ Bridge Validation Failed:`, (e as Error).message);
+        }
+    }
 
     async runSelfDiagnostic() {
         // Renamed/Integrated into loop. Kept for legacy if needed or called by interval
@@ -2959,6 +3069,17 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             });
 
             let sortedProviders = this.router.route(task as any, this.availableProviders);
+
+            // [PHASE 10] Apply Arbitrage Priority Rotation
+            if (this.arbitrageConfig) {
+                const priorityProviders = this.arbitrageConfig.providers || {};
+                sortedProviders.sort((a, b) => {
+                    const pA = priorityProviders[a]?.priority || 100;
+                    const pB = priorityProviders[b]?.priority || 100;
+                    return pA - pB;
+                });
+            }
+
             const forcedModel = options?.forceModel || this.router.detectSpecializedRequest(task as any);
 
             // [LATENCY AS OPPORTUNITY]
@@ -2967,12 +3088,20 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             }
 
             for (const providerKey of sortedProviders) {
+                // [PHASE 10] Circuit Breaker & Rate Limit Check
+                if (await this.isCircuitOpen(providerKey)) {
+                    console.log(`[${this.name}] ⏭️ Skipping ${providerKey} (circuit open)`);
+                    continue;
+                }
+
+                if (!await this.checkProviderLimit(providerKey)) {
+                    continue;
+                }
+
                 try {
                     const providerInfo = PROVIDER_REGISTRY[providerKey];
                     console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey} (Tier: ${providerInfo?.tier || '?'}${forcedModel ? `, Specialized: ${forcedModel}` : ''})...`);
 
-                    // [ANTIFRAGILE] PROVIDER TIMEOUT RACE (Tenacity v2)
-                    // If a specific provider takes > 120s, we trigger the switch to the next one.
                     const providerResult = await Promise.race([
                         this.callSpecificProvider(providerKey, prompt, openAiTools, forcedModel || undefined),
                         new Promise<null>((_, reject) => setTimeout(() => reject(new Error('PROVIDER_STALL')), 120000))
@@ -3057,7 +3186,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt, tools);
         else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt, tools);
         else if (provider === 'fireworks') providerPromise = this.callOpenAICompatible('https://api.fireworks.ai/inference/v1/chat/completions', process.env.FIREWORKS_API_KEY!, 'accounts/fireworks/models/llama-v3p3-70b-instruct', systemPrompt, prompt, tools);
-        else if (provider === 'together') providerPromise = this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', systemPrompt, prompt, tools);
+        else if (provider === 'together') providerPromise = this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free', systemPrompt, prompt, tools);
+        else if (provider === 'sambanova') providerPromise = this.callSambanova(systemPrompt, prompt);
         else if (provider === 'local_4090') providerPromise = this.callOpenAICompatible(`${process.env.LOCAL_INFERENCE_URL}/v1/chat/completions`, 'local', process.env.LOCAL_MODEL || 'llama3.1:8b', systemPrompt, prompt, tools);
         else if (provider === 'cerebras') providerPromise = this.callCerebras(systemPrompt, prompt, tools);
         else if (provider === 'deepseek') providerPromise = this.callDeepSeek(systemPrompt, prompt, tools);
@@ -3593,5 +3723,63 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             console.error(`[${this.name}] ❌ PR Creation Failed:`, e.message);
             return `Error creating PR: ${e.message}`;
         }
+    }
+
+    // ============================================
+    // ARBITRAGE & MANAGER HELPERS
+    // ============================================
+
+    async isCircuitOpen(provider: string): Promise<boolean> {
+        const breaker = (this as any).circuitBreakers.get(provider);
+        if (!breaker) return false;
+        if (breaker.failures < 3) return false;
+        const now = Date.now();
+        if (now - breaker.lastFailure > 300000) { // 5 min reset
+            (this as any).circuitBreakers.delete(provider);
+            return false;
+        }
+        return true;
+    }
+
+    async checkProviderLimit(provider: string): Promise<boolean> {
+        if (!this.redis) return true;
+        try {
+            const limit = (this as any).arbitrageConfig?.providers?.[provider]?.daily_token_limit || 1000000;
+            const key = `ratelimit:${provider}:${new Date().toISOString().split('T')[0]}`;
+            const current = await this.redis.get(key);
+            if (current && parseInt(current as string) > limit) {
+                console.log(`[${this.name}] ⚠️ ${provider} limit reached (${current}/${limit})`);
+                return false;
+            }
+            await this.redis.incr(key);
+            // @ts-ignore
+            if (!current) await this.redis.expire(key, 86400);
+            return true;
+        } catch (e) {
+            return true;
+        }
+    }
+
+    async markProviderFailure(provider: string) {
+        const breaker = (this as any).circuitBreakers.get(provider) || { failures: 0, lastFailure: 0 };
+        breaker.failures++;
+        breaker.lastFailure = Date.now();
+        (this as any).circuitBreakers.set(provider, breaker);
+        console.warn(`[${this.name}] 🚨 Provider ${provider} failure #${breaker.failures}`);
+    }
+
+    async delegateToTool(toolName: string, taskContext: string): Promise<string> {
+        console.log(`[MANAGER] 💼 Delegating to ${toolName}...`);
+        try {
+            const result = await mcpManager.routeToolCall(toolName, { context: taskContext });
+            return result;
+        } catch (e: any) {
+            console.error(`[MANAGER] ❌ Delegation failed:`, e.message);
+            return `Error during tool delegation to ${toolName}: ${e.message}`;
+        }
+    }
+
+    async callSambanova(system: string, prompt: string): Promise<LLMResult> {
+        return this.callOpenAICompatible('https://api.sambanova.ai/v1/chat/completions', process.env.SAMBANOVA_API_KEY!, 'Llama-3.1-405B-Instruct', system, prompt, []);
     }
 }

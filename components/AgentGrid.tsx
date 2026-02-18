@@ -11,7 +11,36 @@ interface AgentGridProps {
     isConductor?: boolean;
     onAssignTask?: (agentName: string) => void;
 }
-// ... [existing GROUP_CONFIG] ...
+const GROUP_CONFIG: Record<string, any> = {
+    ORCHESTRATION: {
+        color: 'text-violet-400',
+        border: 'border-violet-500/30',
+        bg: 'bg-violet-500/5',
+        label: 'Orchestration (CORE)',
+        description: 'The central nervous system. Handles global routing, disputes (SHOFET), and web3 Consensus (W3C).'
+    },
+    ALPHA: {
+        color: 'text-red-400',
+        border: 'border-red-500/30',
+        bg: 'bg-red-500/5',
+        label: 'Alpha Squad (SECURITY)',
+        description: 'The front line of defense. Handles prompt injections, memory auditing, and ethical gating.'
+    },
+    BETA: {
+        color: 'text-amber-400',
+        border: 'border-amber-500/30',
+        bg: 'bg-amber-500/5',
+        label: 'Beta Squad (DESIGN)',
+        description: 'Focuses on user experience, design analysis, and empathetic restoration.'
+    },
+    GAMMA: {
+        color: 'text-emerald-400',
+        border: 'border-emerald-500/30',
+        bg: 'bg-emerald-500/5',
+        label: 'Gamma Squad (BUILD)',
+        description: 'Handles the code generation, network policy enforcement, and technical wisdom.'
+    }
+};
 
 export function AgentGrid({ agents, isConductor = false, onAssignTask }: AgentGridProps) {
     const filteredAgents = filterCoreAgents(agents);

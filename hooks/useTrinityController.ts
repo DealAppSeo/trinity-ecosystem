@@ -209,11 +209,15 @@ export const useTrinityController = () => {
 
         // Realtime Subscription
         let timeoutId: NodeJS.Timeout;
+        const lastFetchRef = { current: 0 };
         const debouncedRefresh = () => {
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
+                const now = Date.now();
+                if (now - lastFetchRef.current < 5000) return; // Minimum 5s between fetches
+                lastFetchRef.current = now;
                 fetchData();
-            }, 500);
+            }, 5000);
         };
 
         const channel = supabase.channel('trinity_realtime_data')

@@ -1,7 +1,9 @@
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 
-import * as dotenv from 'dotenv';
-dotenv.config({ path: 'c:/Users/Cash4/OneDrive/Desktop/trinity-ecosystem/hyperdag-sandbox/.env.local' });
-console.log('--- ENV TEST ---');
-console.log('SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'OK' : 'MISSING');
-console.log('AIRTABLE_KEY:', process.env.AIRTABLE_API_KEY ? 'OK' : 'MISSING');
-console.log('--- END TEST ---');
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL);
+console.log('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log('SUPABASE_ANON_KEY AVAILABLE:', !!process.env.SUPABASE_ANON_KEY);
+console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY AVAILABLE:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+console.log('SERVICE_ROLE_KEY AVAILABLE:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);

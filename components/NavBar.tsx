@@ -42,9 +42,9 @@ export function NavBar() {
         if (pathname.includes('/watch')) return 'Public View';
         if (pathname.includes('/join')) return 'Join the Symphony';
 
-        if (isController && (pathname === '/' || pathname === '' || pathname === '/pulse/directives')) return 'Trinity Controller';
+        if (isController && (pathname === '/' || pathname === '' || pathname === '/pulse/directives')) return 'Symphony Controller';
 
-        return 'Trinity Controller';
+        return 'AI Trinity Symphony';
     };
 
     const isPulse = pathname?.startsWith('/pulse') || (typeof window !== 'undefined' && window.location.hostname.includes('controller'));

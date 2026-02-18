@@ -23,6 +23,7 @@ const evergreenMissions = [
         task_type: 'code',
         priority: 90,
         status: 'pending',
+        requires_consensus: true,
         metadata: { squad: 'ALPHA', required_artifacts: ['Report.md', 'code_fix.patch'] }
     },
     {
@@ -31,6 +32,7 @@ const evergreenMissions = [
         task_type: 'research',
         priority: 70,
         status: 'pending',
+        requires_consensus: true,
         metadata: { squad: 'BETA', required_artifacts: ['Research_report.md', 'routing_spec.json'] }
     },
     {
@@ -39,6 +41,7 @@ const evergreenMissions = [
         task_type: 'data',
         priority: 85,
         status: 'pending',
+        requires_consensus: true,
         metadata: { squad: 'GAMMA', required_artifacts: ['Optimization_report.md', 'anfis_config.yaml'] }
     },
     {
@@ -47,6 +50,7 @@ const evergreenMissions = [
         task_type: 'audit',
         priority: 60,
         status: 'pending',
+        requires_consensus: true,
         metadata: { squad: 'ALPHA', required_artifacts: ['Audit_report.md'] }
     },
     {
@@ -55,6 +59,7 @@ const evergreenMissions = [
         task_type: 'research',
         priority: 95,
         status: 'pending',
+        requires_consensus: true,
         metadata: { squad: 'GAMMA', required_artifacts: ['Integration_spec.md', 'proof_poc.rs'] }
     },
     {
@@ -63,7 +68,26 @@ const evergreenMissions = [
         task_type: 'report',
         priority: 40,
         status: 'pending',
+        requires_consensus: true,
         metadata: { squad: 'BETA', required_artifacts: ['Feedback_report.md'] }
+    },
+    {
+        title: "[EVERGREEN] Vibe Handoff: Next-Gen Dashboard UI",
+        description: "Generate a 'Vibe Seed' for Bolt.new or v0.dev to create a ultra-premium 3D/Glassmorphism dashboard for the Trinity Swarm.",
+        task_type: 'design',
+        priority: 92,
+        status: 'pending',
+        requires_consensus: true,
+        metadata: { squad: 'BETA', required_artifacts: ['Vibe_Seed.md', 'UI_Mockup.png'], platform_target: 'bolt' }
+    },
+    {
+        title: "[EVERGREEN] Manager Mode: Multi-Tool Integration Audit",
+        description: "Orchestrate a research mission using Tavily (Search), n8n (Automation), and Puppeteer (Browsing) to audit competitor agent ecosystems.",
+        task_type: 'research',
+        priority: 88,
+        status: 'pending',
+        requires_consensus: true,
+        metadata: { squad: 'ALPHA', required_artifacts: ['Competitive_Audit.md'], use_manager_mode: true }
     },
     {
         title: "[EVERGREEN] Gemini: System Oversight",
@@ -71,6 +95,7 @@ const evergreenMissions = [
         task_type: 'meta',
         priority: 100,
         status: 'pending',
+        requires_consensus: true,
         assigned_to: 'trinity-orch', // Assigned to the chief orchestrator
         metadata: { required_artifacts: ['Swarm_vitality_report.md'] }
     }

@@ -50,9 +50,9 @@ async function serviceHeartbeat() {
         }
     };
 
-    // Pulse immediately then every 30 seconds
+    // Pulse immediately then every 5 minutes (Arbitrage Optimization)
     await pulse();
-    setInterval(pulse, 30000);
+    setInterval(pulse, 5 * 60 * 1000);
 }
 
 serviceHeartbeat();

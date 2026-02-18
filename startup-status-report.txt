@@ -1,0 +1,80 @@
+--- [STARTUP WEEKEND STATUS CHECK] ---
+
+Found 15 Startup-related tasks:
+
+- [137445] [STARTUP WEEKEND] Autonomous Pitch: CTO (HDM)
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [137443] [STARTUP WEEKEND] Autonomous Pitch: Business Developer (SOPHIA)
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [137444] [STARTUP WEEKEND] Autonomous Pitch: Growth Hacker (CHESED)
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [137493] [STARTUP WEEKEND] Swarm Consensus: The All-In Pivot
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [137446] [STARTUP WEEKEND] Peer Review & Top 3 Selection
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [137091] [STARTUP WEEKEND] Reverse Engineer 2025 Successes: Agentic AI x Web3 x Quantum
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [137092] [STARTUP WEEKEND] Identify 'Executive Painkillers': Time & Money Saving Gaps
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [136845] [SPRINT 0] [VERITAS] Market Gap Identification: AI x Web3 Convergence
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [137093] [STARTUP WEEKEND] Pitch New Idea: The 'Deep Executive Assistant' (AI x Web3)
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [136846] [SPRINT 0] [MEL] User Story & Persona Mapping for #1 Opportunity
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [137094] [STARTUP WEEKEND] Peer Review & ROI Voting: Pitch Selection
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [136847] [SPRINT 0] [NEXUS] Technical MVP Specification & API Interface
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [136848] [SPRINT 0] [CHESED] Growth Hack: Early Adopter Magnet Strategy
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [136849] [SPRINT 0] [SOPHIA] B2B Pricing Model & Go-To-Market Performa
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+- [136850] [SPRINT 0] [TORCH] Social Media Viral Thread Concept
+  Status: failed | Assigned: null | Claimed: null
+  ❌ No artifacts found for this task.
+  ---
+
+--- [CHECK COMPLETE] ---

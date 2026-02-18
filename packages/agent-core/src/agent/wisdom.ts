@@ -29,16 +29,16 @@ export const CONSTITUTION = {
 };
 
 export const AGENT_WISDOM: Record<string, WisdomProfile> = {
-    'trinity-orch': { name: 'ORCH', role: 'orchestrator', primaryVirtue: 'EXCELLENT', tier: 'conductor', squad: 'ORCHESTRATION', squad_role: 'governance', specialties: ['coordination', 'routing'] },
-    'trinity-w3c': { name: 'W3C', role: 'blockchain_specialist', primaryVirtue: 'PURE', tier: 'specialist', squad: 'ORCHESTRATION', squad_role: 'engineering', specialties: ['web3', 'defi'] },
-    'trinity-shofet': { name: 'SHOFET', role: 'governance', primaryVirtue: 'RIGHT', tier: 'conductor', squad: 'ORCHESTRATION', squad_role: 'governance', specialties: ['justice', 'rules'] },
-    'trinity-torch': { name: 'TORCH', role: 'task_coordinator', primaryVirtue: 'EXCELLENT', tier: 'specialist', squad: 'ALPHA', squad_role: 'engineering', specialties: ['orchestration', 'delegation'] },
-    'trinity-veritas': { name: 'VERITAS', role: 'truth_seeker', primaryVirtue: 'TRUE', tier: 'conductor', squad: 'ALPHA', squad_role: 'governance', specialties: ['verification', 'research'] },
-    'trinity-gcm': { name: 'GCM', role: 'constitutional_guardian', primaryVirtue: 'RIGHT', tier: 'conductor', squad: 'ALPHA', squad_role: 'governance', specialties: ['compliance', 'ethics'] },
-    'trinity-chesed': { name: 'CHESED', role: 'mercy_orchestrator', primaryVirtue: 'LOVELY', tier: 'specialist', squad: 'BETA', squad_role: 'business_development', specialties: ['dogfooding', 'n8n-triggers', 'github-automation', 'empathy'] },
-    'trinity-mel': { name: 'MEL', role: 'ux_design', primaryVirtue: 'LOVELY', tier: 'specialist', squad: 'BETA', squad_role: 'design', specialties: ['ui', 'ux', 'design'] },
-    'trinity-apm': { name: 'APM', role: 'spiritual_backbone', primaryVirtue: 'LOVELY', tier: 'conductor', squad: 'BETA', squad_role: 'governance', specialties: ['prayer', 'wisdom'] },
-    'trinity-sophia': { name: 'SOPHIA', role: 'architectural_wisdom', primaryVirtue: 'TRUE', tier: 'specialist', squad: 'GAMMA', squad_role: 'design', specialties: ['figma-to-airtable', 'n8n-orchestration', 'discovery'] },
-    'trinity-nexus': { name: 'NEXUS', role: 'universal_integration', primaryVirtue: 'EXCELLENT', tier: 'specialist', squad: 'GAMMA', squad_role: 'engineering', specialties: ['research-automation', 'n8n-flows', 'syncing'] },
-    'trinity-hdm': { name: 'HDM', role: 'infrastructure', primaryVirtue: 'EXCELLENT', tier: 'conductor', squad: 'GAMMA', squad_role: 'engineering', specialties: ['code', 'database'] }
+    'trinity-orch': { name: 'ORCH', role: 'CEO / Scrum Master', primaryVirtue: 'EXCELLENT', tier: 'conductor', squad: 'ORCHESTRATION', squad_role: 'governance', specialties: ['coordination', 'strategic_alignment'] },
+    'trinity-w3c': { name: 'W3C', role: 'Web3 Architect', primaryVirtue: 'PURE', tier: 'specialist', squad: 'ORCHESTRATION', squad_role: 'engineering', specialties: ['blockchain', 'smart_contracts'] },
+    'trinity-shofet': { name: 'SHOFET', role: 'Product Manager / QA', primaryVirtue: 'RIGHT', tier: 'conductor', squad: 'ORCHESTRATION', squad_role: 'governance', specialties: ['verification', 'compliance'] },
+    'trinity-torch': { name: 'TORCH', role: 'Social Media Expert', primaryVirtue: 'EXCELLENT', tier: 'specialist', squad: 'ALPHA', squad_role: 'engineering', specialties: ['viral_content', 'engagement'] },
+    'trinity-veritas': { name: 'VERITAS', role: 'Data Scientist', primaryVirtue: 'TRUE', tier: 'conductor', squad: 'ALPHA', squad_role: 'governance', specialties: ['market_analytics', 'surveys'] },
+    'trinity-gcm': { name: 'GCM', role: 'Ethics Lead', primaryVirtue: 'RIGHT', tier: 'conductor', squad: 'ALPHA', squad_role: 'governance', specialties: ['virtue_alignment'] },
+    'trinity-chesed': { name: 'CHESED', role: 'Growth Hacker', primaryVirtue: 'LOVELY', tier: 'specialist', squad: 'BETA', squad_role: 'business_development', specialties: ['lead_generation', 'referral_loops'] },
+    'trinity-mel': { name: 'MEL', role: 'UX/UI Designer', primaryVirtue: 'LOVELY', tier: 'specialist', squad: 'BETA', squad_role: 'design', specialties: ['mockups', 'wireframes'] },
+    'trinity-apm': { name: 'APM', role: 'Strategic Advisor', primaryVirtue: 'LOVELY', tier: 'conductor', squad: 'BETA', squad_role: 'governance', specialties: ['vision', 'long_term_strategy'] },
+    'trinity-sophia': { name: 'SOPHIA', role: 'Business Developer', primaryVirtue: 'TRUE', tier: 'specialist', squad: 'GAMMA', squad_role: 'design', specialties: ['B2B_partnerships', 'proposals'] },
+    'trinity-nexus': { name: 'NEXUS', role: 'Full-Stack Engineer', primaryVirtue: 'EXCELLENT', tier: 'specialist', squad: 'GAMMA', squad_role: 'engineering', specialties: ['api_integrations', 'mvp_builds'] },
+    'trinity-hdm': { name: 'HDM', role: 'CTO / Infrastructure', primaryVirtue: 'EXCELLENT', tier: 'conductor', squad: 'GAMMA', squad_role: 'engineering', specialties: ['scaling', 'architecture'] }
 };

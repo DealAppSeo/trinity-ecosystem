@@ -126,6 +126,7 @@ async function startAgent() {
                 reputation: agent.reputationScore,
                 tier: agent.autonomyTier,
                 tasks_handled: agent.sessionMetrics?.tasksCompleted || 0,
+                current_task: agent.currentTaskTitle || 'Idle',
                 last_pulse_s: Math.round(pulseDiff / 1000)
             },
             path_accessed: req.url // For debugging redundancy

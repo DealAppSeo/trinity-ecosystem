@@ -11,8 +11,9 @@ export function Gatekeeper() {
     const [authorized, setAuthorized] = useState(false);
 
     useEffect(() => {
-        // 1. Allow public routes
-        if (pathname === '/join') {
+        // 1. Allow public & Stakeholder routes
+        const publicRoutes = ['/join', '/pulse/watch', '/pulse/agents'];
+        if (publicRoutes.includes(pathname)) {
             setAuthorized(true);
             return;
         }
