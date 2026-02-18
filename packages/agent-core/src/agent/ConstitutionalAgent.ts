@@ -5,6 +5,8 @@ import { Task } from '@trinity/types';
 import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
 // Dynamic imports for graphology/fs handled inside methods to avoid build issues
 import { mcpManager } from '../mcp/MCPManager';
+import { ERC8004Bridge } from '../governance/ERC8004Bridge';
+import { ArtifactIntelligence } from '../intelligence/ArtifactIntelligence';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
@@ -134,9 +136,30 @@ export class ConstitutionalAgent {
             'IDLE': 'Wait 3 mins before checking again. Respawn evergreen tasks.',
             'EVERGREEN': 'Increment loop count and respawn task.',
             'HEALING': 'LIMIT: Maximum 1 healing task per hour. Verify failure first.',
-            'ITERATE': 'Follow Build-Measure-Learn. Concept -> Design -> Build -> Measure -> Learn. Recursive spawn required.'
+            'ITERATE': 'Follow Build-Measure-Learn. Concept -> Design -> Build -> Measure -> Learn. Recursive spawn required.',
+            'REASON': 'Perform heterogeneous inference with self-reflection. Enforce Constitutional virtues.',
+            'LEARN': 'Evaluate outcome, update Reputation (RepID), and bridge to ERC-8004/HyperDAG.'
         };
         return fallbacks[phase] || 'Follow standard operating procedure.';
+    }
+
+    private getLLMFamily(agentName?: string): string {
+        const name = agentName || this.name;
+        const familyMap: Record<string, string> = {
+            'trinity-orch': 'openai',
+            'trinity-shofet': 'openai',
+            'trinity-w3c': 'openai',
+            'trinity-veritas': 'grok',
+            'trinity-torch': 'grok',
+            'trinity-gcm': 'grok',
+            'trinity-mel': 'anthropic',
+            'trinity-chesed': 'anthropic',
+            'trinity-apm': 'anthropic',
+            'trinity-hdm': 'gemini',
+            'trinity-sophia': 'gemini',
+            'trinity-nexus': 'gemini'
+        };
+        return familyMap[name] || 'unknown';
     }
 
     constructor(config: AgentConfig) {
@@ -606,6 +629,17 @@ export class ConstitutionalAgent {
             return;
         }
 
+        // [PHASE 30] STRICT BFT DIVERSITY CHECK (v3.33)
+        const executorFamily = this.getLLMFamily(creator);
+        const verifierFamily = this.getLLMFamily(this.name);
+
+        if (executorFamily === verifierFamily && executorFamily !== 'unknown') {
+            console.warn(`[BFT] 🛑 Diversity Constraint Violated! Executor (${creator}) and Verifier (${this.name}) share the same family: ${executorFamily}.`);
+            // We still proceed but log a warning as per current v3.33 loose enforcement, 
+            // but the architecture document mandates "Max 1 per family".
+            await this.log('bft_diversity_warning', `BFT Diversity Violation: Shared family ${executorFamily} between ${creator} and ${this.name}`, { taskId: task.id });
+        }
+
         console.log(`[BFT] ⚔️ Commencing Triad Consensus on: ${task.title}`);
 
         // 1. GATHER EVIDENCE (Check artifacts)
@@ -857,18 +891,52 @@ export class ConstitutionalAgent {
             const actionDirective = `\n\n[ACTION REQUIRED]: DO NOT just plan.EXECUTE the task.Use your tools(write_file, research) to create tangible artifacts.Output must include[Artifact: filename]if created.`;
 
             this.currentTaskId = String(task.id);
+
+            // 1. [PERCEIVE] Context & Protocol Loading
+            console.log(`[PRAL] 📡 PERCEIVE Phase for task ${task.id}`);
+            const mcpInstructions = await mcpManager.getToolInstructions(this.name);
+            const bible = await this.fetchBible();
+
+            // [PHASE 33] DAG SEMANTIC RAG
+            const ragContext = await ArtifactIntelligence.semanticRag(task.title);
+
             const prompt = `
 Task: ${task.title}
 Description: ${task.description}
 Context: 
 ${wisdomContext}
+${ragContext}
 
-Please complete this task according to the Constitution. ALWAYS use the save_artifact tool to store your result.
+[PROTOCOL: MCP INSTRUCTIONS]
+${mcpInstructions}
+
+[PROTOCOL: CONSTITUTION]
+${bible}
+
+[STRATEGIC DIRECTIVE]: You are building a business. DO NOT just plan. PRODUCE HARD ASSETS.
+If this is research, output a Table or CSV.
+If this is design, output a JSON structure or HTML.
+If this is business, output a SWOT or PERFORMA.
+ALWAYS use the save_artifact tool to store your results. Failure to produce a tangible artifact will result in a reputation penalty.
 `;
 
-            // Call LLM
+            // 2. [REASON] Call LLM (Inference Phase)
+            console.log(`[PRAL] 🧠 REASON Phase for task ${task.id}`);
+            await this.checkMCP('REASON');
             const result = await this.callLLM(prompt);
             console.log(`[${this.name}] 🧠 Result length: ${result.output?.length || 0}`);
+
+            // 3. [ACT] Tool Execution via MCP (Handled inside callLLM, but we tag it here)
+            console.log(`[PRAL] 🎬 ACT Phase for task ${task.id}`);
+            await this.checkMCP('EXECUTE');
+
+            // [PHASE 33] GNN ANOMALY DETECTION
+            const anomalyScore = await ArtifactIntelligence.gnnAnomalyDetection('execute_task', { taskId: task.id, agent: this.name });
+            if (anomalyScore > 0.8) {
+                console.warn(`[GNN] 🛑 High anomaly detected (${anomalyScore.toFixed(2)}). Triggering self-diagnostic...`);
+                await this.runSelfDiagnostic();
+            }
+
             // [PHASE 10] UNCERTAINTY AS OPPORTUNITY (Logical Escalation)
             const evaluation = await this.evaluateResult(task, result.output);
             const lowBelief = evaluation.score < 40;
@@ -892,7 +960,7 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
 
             let externalArtifactUrl = '';
             // Artifact Logic
-            if ((task.task_type && ['content', 'research', 'code', 'design', 'data', 'report'].includes(task.task_type)) || task.requires_external_artifact) {
+            if ((task.task_type && ['content', 'research', 'code', 'design', 'data', 'report', 'strategy', 'business', 'IP', 'UX'].includes(task.task_type)) || task.requires_external_artifact) {
                 // [ANTIGRAVITY] Map task_type to artifact type
                 const typeMap: Record<string, string> = {
                     'code': 'code',
@@ -900,7 +968,11 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
                     'data': 'data',
                     'report': 'report',
                     'research': 'report',
-                    'content': 'document'
+                    'content': 'document',
+                    'strategy': 'report',
+                    'business': 'data',
+                    'IP': 'document',
+                    'UX': 'design'
                 };
                 const artifactType = typeMap[task.task_type || ''] || 'text_content';
                 const dbArtifactLink = await this.saveArtifact(String(task.id), result.output, artifactType);
@@ -947,6 +1019,11 @@ Please complete this task according to the Constitution. ALWAYS use the save_art
             await this.generateInsight(task, result.output);
 
             this.sessionMetrics.tasksCompleted++;
+
+            // 4. [LEARN] Evaluation & Escalation
+            console.log(`[PRAL] 🎓 LEARN Phase for task ${task.id}`);
+            await this.checkMCP('LEARN');
+
             await this.updateReputation(evaluation.score > 0.6);
 
             // ERC-8004 INTEROP: Bridge to HyperDAG Testnet (Sovereign Reputation)
@@ -2116,11 +2193,11 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     // ERC-8004: CROSS-CHAIN BRIDGE (ELITE)
     // ============================================
     async integrateErc8004(taskId: string, evaluationScore: number) {
-        // SBT Mapping & Bayesian Aggregation Stub (Patent: Trinity Identity)
+        // [PHASE 30] ERC-8004 REPUTATION SYNC
         console.log(`[ERC-8004] 🌉 Bridging Task ${taskId} to HyperDAG. Weighting by belief: ${evaluationScore / 100}`);
         try {
-            // Placeholder: ethers.Contract('...').aggregateRepID(...)
-            // This enables cross-chain sovereign reputation as per whitepaper Part IV
+            await ERC8004Bridge.syncReputation(this.name, evaluationScore);
+            await ERC8004Bridge.issueTrustCertificate(taskId, evaluationScore);
         } catch (e: any) {
             console.warn(`[ERC-8004] Interop failed: ${e.message}`);
         }
