@@ -3,57 +3,73 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org)
 [![Platform](https://img.shields.io/badge/Platform-Web3%20%2B%20AI-orange)](https://aitrinitysymphony.com)
+[![BFT](https://img.shields.io/badge/Security-3--Ply_BFT-green)](./docs/CORE_CONCEPTS.md#byzantine-fault-tolerance-bft)
+[![Evolutionary](https://img.shields.io/badge/Optimization-ESP_Engine-purple)](./docs/CORE_CONCEPTS.md#evolutionary-swarm-pruning-esp)
 
-**Sovereign multi-agent infrastructure at the trivergence of Web3 + AI + Quantum-Resistant Tech.**
+**Sovereign multi-agent infrastructure at the trivergence of Web3 + AI + Antifragility.**
 
-## 🕊️ Vision: Democratized Agentic AI for Humanity
-We are building a **sovereign, community-owned multi-agent ecosystem**. Individual developers and users — not corporations — own the agents, the reputation system (**Universal ZKP RepID**), and the governance (**BFT 3x3+3**).
-
-Our agent swarms continuously audit and rate large foundation models on transparent, verifiable safety and ethics benchmarks. Only models that demonstrably put human flourishing above profit and exploitation are integrated into the Trinity Symphony.
-
-### 📜 Basis for Truth
-Our ecosystem is anchored in the **Trinity Constitution**, grounded in **Philippians 4:8** and **Micah 6:8**. Our mission is to **help people help people**—serving those most in need.
+The AI Trinity Symphony is not just a chatbot or a workflow engine—it is a **Self-Optimizing Autonomous Civilization Layer**. We are building a world where agents are sovereign, reputation is verifiable, and computation is antifragile.
 
 ---
 
-## 🏗️ The Unified Architecture (Dual-Repo System)
+## 🏛️ The Architecture of Sovereignty
+
+Our ecosystem utilizes a **Dual-Repo "Shared Soul" Architecture**, separating the visual orchestration from the core constitutional logic.
+
+### 🔄 The Routing & Consensus Flow
 ```mermaid
 graph TD
-    A[Human / Agent] --> B[Universal ZKP RepID]
-    B --> C[HyperDAG Consensus]
-    C --> D[Trinity Symphony Swarm]
-    D --> E[ALPHA: Truth]
-    D --> F[BETA: Care]
-    D --> G[GAMMA: Build]
-```
-
-### 🤖 The Agentic Dual-Repo
-- **[trinity-ecosystem](https://github.com/DealAppSeo/trinity-ecosystem)**: The application and orchestration layer. 
-- **[trinity-symphony-shared](https://github.com/DealAppSeo/trinity-symphony-shared)**: The Shared Soul containing core BFT logic.
-
-### ⛓️ The Web3 Dual-Repo
-- **[hyperdag-protocol](https://github.com/DealAppSeo/hyperdag-protocol)**: The decentralized source of truth. Smart contracts & EIP-8004.
-- **[hyperdag-platform](https://github.com/DealAppSeo/hyperdag-platform)**: The integration bridge and algorithmic engine.
-
----
-
-## ⚡ Quick Start
-```bash
-git clone https://github.com/DealAppSeo/trinity-ecosystem.git
-cd trinity-ecosystem
-npm install
-npm run dev
+    User([User Request]) --> Router{Intelligence Router}
+    Router -->|Risk Assessment| Risk[Risk Score Engine]
+    
+    subgraph "3-Ply BFT Consensus"
+    Risk -->|High Risk| Execs[3+ Heterogeneous Executors]
+    Execs --> Vers[3+ Cross-Family Verifiers]
+    Vers --> ANFIS[ANFIS Fuzzy Aggregator]
+    end
+    
+    ANFIS -->|Truth| Result[Consensus Output]
+    Result --> Merkle[(Merkle DAG Audit Trail)]
+    
+    subgraph "Self-Optimization Loop"
+    Result --> Stats[Evolutionary Logger]
+    Stats --> ESP[ESP Pruning Engine]
+    ESP -->|Mutate/Prune| Router
+    end
 ```
 
 ---
 
-## 🧬 Technical Innovation Stack
-- **ANFIS + LASSO Routing**: Adaptive fuzzy routing using MCP for 94% token efficiency.
-- **BFT 3x3+3 Architecture**: Agents-validating-agents with RepID-staked consensus.
-- **QuantumVault**: Hybrid signatures (ECDSA + ML-DSA) for post-quantum safety.
-- **Trinary Learning**: Recursive People-Agent-People feedback model.
+## 🧬 Technical Pillars
 
-## 🤝 Community & Patents
-We operate on a **Co-opetition Model**. Patents for **Multiplicative GNN** and **HyperDAG** are held **defensively** to prevent corporate monopoly. Royalty-free license granted to all open-source users in good faith.
+- **[3-Ply BFT Consensus](./docs/CORE_CONCEPTS.md#byzantine-fault-tolerance-bft)**: Byzantine Fault Tolerant routing that ensures 99.9% semantic integrity for critical tasks.
+- **[Evolutionary Swarm Pruning (ESP)](./docs/CORE_CONCEPTS.md#evolutionary-swarm-pruning-esp)**: Bio-inspired "Natural Selection" for AI agents. We prune inefficiency and reward excellence.
+- **[ANFIS-Driven Arbitrage](./docs/CORE_CONCEPTS.md#anfis-adaptive-neuro-fuzzy-inference-system)**: Fuzzy-logic based intelligence routing that balances **Cost, Speed, and Quality** in real-time.
+- **[Merkle DAG Audit Trail](./docs/CORE_CONCEPTS.md#merkle-dag-directed-acyclic-graph)**: Every decision is content-addressed and cryptographically linked for total transparency.
+- **[ZKP RepID Credentials](./docs/CORE_CONCEPTS.md#zkp-repid-zero-knowledge-reputation-id)**: Privacy-preserving reputation that scales agent permissions without exposing PII.
+
+---
+
+## 🏗️ Repo Ecosystem
+
+| Repository | Purpose | Primary Tech |
+| :--- | :--- | :--- |
+| **[trinity-ecosystem](https://github.com/DealAppSeo/trinity-ecosystem)** | The Orchestration Layer & Dashboard | Next.js, RadixUI, Supabase |
+| **[trinity-symphony-shared](https://github.com/DealAppSeo/trinity-symphony-shared)** | The "Shared Soul" (Core Logic) | TypeScript, ANFIS, Custom BFT |
+| **[hyperdag-protocol](https://github.com/DealAppSeo/hyperdag-protocol)** | The Decentralized Ledger | Solidity, EIP-8004, Merkle DAG |
+
+---
+
+## 🤝 Join the Symphony
+
+We are looking for collaborators who believe in **Democratized Agentic AI**. Whether you are a GNN researcher, a Web3 developer, or a Prompt Engineer—there is a chair in the orchestra for you.
+
+### Getting Started
+1. Review our **[Technical Glossary](./docs/CORE_CONCEPTS.md)** to understand our primitives.
+2. Check the **[Ecosystem Status Report](ECOSYSTEM_STATUS_REPORT.md)** for active tasks.
+3. Join the conversation on **[X](https://x.com/aitrinitysymphony)** or **[Discord](https://discord.gg/yourlink)**.
+
+### Co-opetition Model
+We hold patents defensively to prevent corporate enclosure. If you are building in the open, you have our blessing (and a royalty-free license).
 
 [Contributing](CONTRIBUTING.md) • [Security](SECURITY.md) • [Code of Conduct](CODE_OF_CONDUCT.md)

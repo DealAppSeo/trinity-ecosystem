@@ -1,8 +1,9 @@
-
 import { Task, ProviderConfig, WisdomProfile } from './types';
 import { AGENT_WISDOM } from './wisdom';
 import { UnifiedServiceRegistry, ServiceDefinition, ServiceTier } from './UnifiedServiceRegistry';
 import { RedisAdapter } from './RedisAdapter';
+import { BFTModel } from './BFTModel';
+import { MerkleDAG } from './MerkleDAG';
 
 export interface RoutingWeights {
     speed: number;   // 0-100
@@ -18,6 +19,7 @@ export class IntelligenceRouter {
     private redis: RedisAdapter;
     private weights: RoutingWeights = { speed: 50, quality: 50, cost: 50 };
     private GLOBAL_DAILY_BUDGET = parseFloat(process.env.GLOBAL_DAILY_BUDGET || '5.0');
+    private dag: MerkleDAG = new MerkleDAG();
 
     constructor(agentName: string, weights?: RoutingWeights) {
         this.agentName = agentName;
@@ -27,9 +29,15 @@ export class IntelligenceRouter {
     }
 
     /**
-     * Determines the optimal provider based on task context and diversity requirements.
+     * Determines the optimal provider(s) based on task context, risk, and diversity requirements.
      */
     async route(task: Task, availableProviders: string[]): Promise<string[]> {
+        // [PHASE 13] Determine Risk Level for 3-Ply BFT
+        const riskScore = this.calculateRiskScore(task);
+        const requirements = BFTModel.getRequiredPlys(riskScore);
+
+        console.log(`[ROUTER] 🛡️ Risk Score: ${riskScore.toFixed(2)}. Req: ${requirements.executors} Exec, ${requirements.verifiers} Ver.`);
+
         // [ANTIFRAGILE] Filter out demoted providers
         const activeProviders = availableProviders.filter(p => !this.demotedProviders.has(p));
 
@@ -145,7 +153,7 @@ export class IntelligenceRouter {
             }));
 
         const sorted = candidates.sort((a, b) => b.score - a.score);
-        const result = sorted.map(c => c.key);
+        let result = sorted.map(c => c.key);
 
         if (result.length === 0 && availableProviders.length > 0) {
             result.push(...availableProviders);
@@ -167,7 +175,31 @@ export class IntelligenceRouter {
             });
         }
 
-        return result;
+        // [BFT MANDATE] Return required number of executors/verifiers
+        const totalNeeded = requirements.executors + (isVerification ? 0 : requirements.verifiers);
+        const finalSelection = result.slice(0, Math.max(1, totalNeeded));
+
+        // [MerkleDAG] Log routing decision
+        this.dag.addNode({
+            agent: this.agentName,
+            task: task.id,
+            decision: finalSelection,
+            risk: riskScore
+        });
+
+        return finalSelection;
+    }
+
+    private calculateRiskScore(task: Task): number {
+        const text = `${task.title} ${task.description}`.toLowerCase();
+        let score = 0.1; // Baseline
+
+        if (text.match(/security|auth|login|wallet|private|key|secret/i)) score += 0.5;
+        if (text.match(/money|transaction|payment|fund|token|stake/i)) score += 0.4;
+        if (text.match(/critical|emergency|urgent|production/i)) score += 0.3;
+        if (text.match(/delete|drop|wipe|reset/i)) score += 0.4;
+
+        return Math.min(1, score);
     }
 
     public suggestTools(task: Task): string[] {
