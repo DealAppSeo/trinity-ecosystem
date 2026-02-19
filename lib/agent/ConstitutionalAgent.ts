@@ -2224,16 +2224,15 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
         return { improvement_required: false, critique: "" };
     }
 
-    async logBenchmark(task: Task, score: number) {
+    async logBenchmark(task: Task, score: number, metricName: string = 'automated_eval') {
         try {
-            // Check if table exists (lazy assumption)
             await this.supabase
                 .from('trinity_agent_benchmarks')
                 .insert({
                     agent_name: this.name,
                     benchmark_type: (task as any).metadata?.tags?.[0] || 'unknown',
                     score: score,
-                    metric_name: 'automated_eval',
+                    metric_name: metricName,
                     created_at: new Date().toISOString()
                 });
         } catch (e: any) {
@@ -2323,61 +2322,65 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                 }
             }
             return wisdom;
+        } catch (e) {
+            console.warn(`[${this.name}] ⚠️ Wisdom gathering failed:`, e);
+            return wisdom;
         }
+    }
 
     /**
      * [ANTIGRAVITY] Post to the Global Blackboard (Upstash Redis).
      */
     async postToBlackboard(message: string) {
-            console.log(`[BLACKBOARD] 📝 Posting signal: ${message.substring(0, 50)}...`);
-            try {
-                const currentResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
-                let board = "";
-                if (currentResponse && !currentResponse.includes('Redis Error') && currentResponse !== "null") {
-                    board = JSON.parse(currentResponse);
-                }
-                const timestamp = new Date().toLocaleTimeString();
-                const newEntry = `[${timestamp}] ${this.name}: ${message}\n`;
-                const updatedBoard = (newEntry + board).substring(0, 5000);
-                await mcpManager.routeToolCall('redis_set', {
-                    key: 'trinity_global_blackboard',
-                    value: updatedBoard,
-                    ex: 3600
-                });
-            } catch (e: any) {
-                console.warn(`[BLACKBOARD] Post failed: ${e.message}`);
+        console.log(`[BLACKBOARD] 📝 Posting signal: ${message.substring(0, 50)}...`);
+        try {
+            const currentResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
+            let board = "";
+            if (currentResponse && !currentResponse.includes('Redis Error') && currentResponse !== "null") {
+                board = JSON.parse(currentResponse);
             }
+            const timestamp = new Date().toLocaleTimeString();
+            const newEntry = `[${timestamp}] ${this.name}: ${message}\n`;
+            const updatedBoard = (newEntry + board).substring(0, 5000);
+            await mcpManager.routeToolCall('redis_set', {
+                key: 'trinity_global_blackboard',
+                value: updatedBoard,
+                ex: 3600
+            });
+        } catch (e: any) {
+            console.warn(`[BLACKBOARD] Post failed: ${e.message}`);
         }
+    }
 
 
     // ============================================
     // CORE UTILITIES
     // ============================================
 
-    async canCreateHealingTask(): Promise < boolean > {
-            // Enforce HEALING Protocol throttle
-            try {
-                await this.checkMCP('HEALING');
-            } catch(e) {
-                // If checkMCP fails, still proceed but with caution
-            }
+    async canCreateHealingTask(): Promise<boolean> {
+        // Enforce HEALING Protocol throttle
+        try {
+            await this.checkMCP('HEALING');
+        } catch (e) {
+            // If checkMCP fails, still proceed but with caution
+        }
 
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-            // 1. GLOBAL CHECK for HEALING and ANTIFRAGILE tasks
-            const { count, error } = await this.supabase
-                .from('trinity_tasks')
-                .select('id', { count: 'exact', head: true })
-                .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%,title.ilike.%[MAINTENANCE]%`)
-                .gte('created_at', oneHourAgo);
+        // 1. GLOBAL CHECK for HEALING and ANTIFRAGILE tasks
+        const { count, error } = await this.supabase
+            .from('trinity_tasks')
+            .select('id', { count: 'exact', head: true })
+            .or(`title.ilike.%[HEALING]%,title.ilike.%[ANTIFRAGILE]%,title.ilike.%[MAINTENANCE]%`)
+            .gte('created_at', oneHourAgo);
 
-            if(error) {
-                console.error(`[${this.name}] ⚠️ Health check query failed:`, error.message);
-                return false;
-            }
+        if (error) {
+            console.error(`[${this.name}] ⚠️ Health check query failed:`, error.message);
+            return false;
+        }
 
         const limit = 20; // Increased from 2 to 20 to allow swarm recovery during stabilization
-            if((count || 0) >= limit) {
+        if ((count || 0) >= limit) {
             console.warn(`[${this.name}] 🛑 HEALING THROTTLED: Global diagnostics count ${count}/${limit} per hour.`);
             return false;
         }
@@ -3131,6 +3134,9 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                                 effect_score: 100, // Initial assume
                                 learned_insight: `Successfully utilized ${providerKey} for ${task.task_type || 'general'} task.`
                             });
+
+                            // [ANTIGRAVITY] RESILIENCE PULSE: Success record
+                            await this.logBenchmark(task, 100, 'resilience_pulse');
                         }
                         return providerResult;
                     }
@@ -3156,6 +3162,9 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         provider: providerKey,
                         taskId: task?.id
                     });
+
+                    // [ANTIGRAVITY] RESILIENCE PULSE: Failover record
+                    if (task) await this.logBenchmark(task, 0, 'resilience_pulse');
                 }
             }
             throw new Error('All LLM providers exhausted or stalled.');
