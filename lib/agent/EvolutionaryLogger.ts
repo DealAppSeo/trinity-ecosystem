@@ -126,8 +126,16 @@ export class EvolutionaryLogger {
             if (error || !logs || logs.length < 5) return { shouldHeal: false, reason: 'Insufficient history' };
 
             const failureCount = logs.filter(l => l.outcome === 'Failure' || (l.effect_score !== undefined && l.effect_score < 30)).length;
+            const resourceExhausted = logs.some(l =>
+                l.outcome === 'Failure' &&
+                (l.insight?.includes('402') || l.insight?.includes('429') || l.insight?.includes('exhausted'))
+            );
 
             // Higher threshold for healing trigger
+            if (resourceExhausted) {
+                return { shouldHeal: true, reason: `Critical Resource Exhaustion (402/429) detected in recent history.` };
+            }
+
             if (failureCount >= 6) {
                 return { shouldHeal: true, reason: `Persistent failure detected (${failureCount}/10 recent tasks failed)` };
             }
