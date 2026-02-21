@@ -17,9 +17,12 @@ import { notificationManager } from '../notification/NotificationManager';
 import * as path from 'path';
 import { DETERMINISTIC_WORKFLOWS } from './deterministicWorkflows';
 import { HITLManager, HITLDecision } from './HITLManager';
-import { ERC8004Bridge } from '../web3/erc8004';
-import { MemoryManager } from '../memory/MemoryManager';
-import { LLMService } from '../memory/ShimiTree';
+import { ERC8004Bridge } from '@/lib/web3/erc8004';
+import { MemoryManager } from '@/lib/memory/MemoryManager';
+import { LLMService } from '@/lib/memory/ShimiTree';
+import { VeritasConverter } from './VeritasConverter';
+import { TIMLManager, TIMLAllocation } from './TIMLManager';
+import { SBFAOperator, SBFAInput, SBFAResult } from './SBFAOperator';
 // import { HyperDAG } from './HyperDAG';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
@@ -31,6 +34,8 @@ const LLM_TIERS: Record<string, number> = {
     'groq': 1,      // Tier 1: Fast/Free (Llama 3.3)
     'cerebras': 1,  // Tier 1: Ultra-Fast (Llama 3.1)
     'deepseek': 1,  // Tier 1: Cost-Efficient (DeepSeek V3/R1)
+    'siliconflow': 1, // Tier 1: Economy Arbitrage
+    'deepinfra': 1,  // Tier 1: Economy Arbitrage
     'gemini': 2,    // Tier 2: Balanced (Flash)
     'anthropic': 3, // Tier 3: Elite (Sonnet/Opus)
     'openai': 3     // Tier 3: Elite (GPT-4o)
@@ -41,7 +46,9 @@ const PROVIDERS: Record<string, ProviderConfig> = {
     anthropic: { name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1/messages', envKey: 'ANTHROPIC_API_KEY', model: 'claude-3-5-sonnet-20241022', tier: 'paid', priority: 3, isAnthropic: true },
     gemini: { name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', envKey: 'GEMINI_API_KEY', model: 'gemini-1.5-flash-latest', tier: 'free', priority: 2, isGemini: true },
     deepseek: { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/chat/completions', envKey: 'DEEPSEEK_API_KEY', model: 'deepseek-chat', tier: 'free', priority: 1 },
-    grok: { name: 'Grok', baseUrl: 'https://api.x.ai/v1/chat/completions', envKey: 'GROK_API_KEY', model: 'grok-beta', tier: 'free', priority: 2 },
+    siliconflow: { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1/chat/completions', envKey: 'SILICONFLOW_API_KEY', model: 'deepseek-ai/DeepSeek-V3', tier: 'free', priority: 1 },
+    deepinfra: { name: 'DeepInfra', baseUrl: 'https://api.deepinfra.com/v1/openai/chat/completions', envKey: 'DEEPINFRA_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 1 },
+    grok: { name: 'Grok', baseUrl: 'https://api.x.ai/v1/chat/completions', envKey: 'GROK_API_KEY', model: 'grok-2-1212', tier: 'free', priority: 2 },
     cerebras: { name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1/chat/completions', envKey: 'CEREBRAS_API_KEY', model: 'llama3.1-70b', tier: 'free', priority: 1 },
     sambanova: { name: 'SambaNova', baseUrl: 'https://api.sambanova.ai/v1/chat/completions', envKey: 'SAMBANOVA_API_KEY', model: 'Meta-Llama-3.1-70B-Instruct', tier: 'free', priority: 1 },
     together: { name: 'Together', baseUrl: 'https://api.together.xyz/v1/chat/completions', envKey: 'TOGETHER_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 2 },
@@ -191,6 +198,8 @@ export class ConstitutionalAgent {
 
     // [PHASE 10] Free-Tier Arbitrage
     private arbitrageConfig: any = null;
+
+    private timl: TIMLManager = new TIMLManager();
     private circuitBreakers: Map<string, { failures: number, lastFailure: number }> = new Map();
 
     // [PHASE 3] Persistent Agentic Memory
@@ -1536,8 +1545,66 @@ IMPORTANT: Your response will be automatically parsed for artifacts. Use the too
 If you are doing a business or strategic task, you MUST prioritize generating a CSV, JSON, or formal Report.
 `;
 
-            // 2. [REASON] Call LLM (Inference Phase)
-            const result = await this.callLLM(prompt, {}, task);
+            // 2. [TIML ANALYSIS] Multiscale Load Balancing
+            const { alpha, allocation } = await this.timl.analyze(this.name);
+            console.log(`[TIML] 🌀 Allocation Strategy: FAST=${allocation.fast_budget.toFixed(2)}, MID=${allocation.mid_budget.toFixed(2)}, SLOW=${allocation.slow_budget.toFixed(2)}`);
+
+            let result: any;
+            let sbfaResult: SBFAResult | null = null;
+            let pathTaken: 'FAST' | 'MID' | 'SLOW' = 'MID';
+
+            if (allocation.slow_budget > 0.5) {
+                pathTaken = 'SLOW';
+                console.log(`[TIML] 🐢 SLOW PATH: Executing Full Triadic SBFA...`);
+                sbfaResult = await this.runTriadicSBFA(prompt, task);
+                result = sbfaResult.primaryResponse;
+            } else {
+                pathTaken = allocation.fast_budget > 0.7 ? 'FAST' : 'MID';
+                console.log(`[TIML] ⚡ ${pathTaken} PATH: Executing Single LLM Call...`);
+
+                // [FIX 1] Fast path belief extraction
+                const beliefInstruction = "\n\nIMPORTANT: End your response with a confidence assessment in this exact format: <belief>[p_success, p_partial, p_failure]</belief> where values sum to 1.0.";
+                const fastPrompt = prompt + beliefInstruction;
+
+                // Pass allocation to router for budget-aware scoring
+                result = await this.callLLM(fastPrompt, { timlAllocation: allocation }, task);
+
+                // [CONFIDENCE GATE] Verify single call grounding
+                const belief = VeritasConverter.extract(result.output || "");
+                const maxProb = Math.max(...belief);
+
+                if (maxProb < 0.65) {
+                    console.warn(`[TIML] ⚠️ Single call confidence low (${maxProb.toFixed(2)}). Escalating to Triadic SBFA...`);
+                    pathTaken = 'SLOW';
+                    sbfaResult = await this.runTriadicSBFA(prompt, task);
+                    result = sbfaResult.primaryResponse;
+                }
+            }
+
+            // 3. [AUDIT] Log Routing Decision
+            await this.log('timl_routing_decision', `TIML Route: ${pathTaken}`, {
+                taskId: task.id,
+                path: pathTaken,
+                alpha,
+                allocation,
+                confidence: result.output ? Math.max(...VeritasConverter.extract(result.output)) : 0
+            });
+
+            // Log detailed SBFA Pi Terms if available (only in SLOW path)
+            if (sbfaResult) {
+                await this.log('sbfa_pi_terms', `SBFA Triadic Consensus: ${sbfaResult.status}`, {
+                    taskId: task.id,
+                    pi_terms: {
+                        total_s_pi: sbfaResult.sPi,
+                        loss: sbfaResult.loss,
+                        disagreement: sbfaResult.disagreement,
+                        cost: sbfaResult.cost,
+                        latency: sbfaResult.latency,
+                        risk: sbfaResult.risk
+                    },
+                    aggregated_belief: sbfaResult.aggregatedBelief
+                });
+            }
 
             // [PHASE 10] AGENT REFLECTION
             if (result.output && result.output !== "Error calling LLM") {
@@ -1550,8 +1617,6 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     result.toolCalls = refinedResult.toolCalls;
                 }
             }
-
-            console.log(`[${this.name}] 🧠 Result length: ${result.output?.length || 0}`);
 
             // [ANTIGRAVITY] ERROR PROPAGATION: Do not continue if LLM failed
             if (result.output === "Error calling LLM" || !result.output) {
@@ -1784,6 +1849,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
             // [ANTIGRAVITY] Pulse on completion
             await this.heartbeat(`Completed: ${task.title}`);
+            return { success: true, llm_used: true };
 
         } catch (err: any) {
             this.currentTaskId = null;
@@ -1828,6 +1894,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 await this.releaseClaim(task.id);
             }
             await this.logResiliencePulse(false, Date.now() - (this as any).taskStartTime);
+            return { success: false, llm_used: true };
         }
     }
 
@@ -2461,6 +2528,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
             console.log(`[ARTIFACT] ⛓️ Merkle-lite Hash: ${fileHash}`);
 
             let artifactUrl = null;
+            let artifactId = null;
 
             // 1. UPLOAD TO STORAGE
             try {
@@ -2526,7 +2594,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                     }
 
                     const payload: any = {
-                        task_id: dbTaskId,
+                        task_id: safeTaskId,
                         title: safeTitle,
                         content: normalizeContent, // Ensuring content is included
                         artifact_type: type || 'text',
@@ -3146,7 +3214,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 }
             });
 
-            let sortedProviders = this.router.route(task as any, this.availableProviders);
+            let sortedProviders = await this.router.route(task as any, this.availableProviders, options?.timlAllocation);
 
             // [PHASE 10] Apply Arbitrage Priority Rotation
             if (this.arbitrageConfig) {
@@ -3160,10 +3228,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
             const forcedModel = options?.forceModel || this.router.detectSpecializedRequest(task as any);
 
-            // [LATENCY AS OPPORTUNITY]
-            if (prompt.includes('Slow / Complex') || prompt.includes('Score: 8')) {
-                sortedProviders = this.router.applyLatencyLogic(sortedProviders.map(p => ({ key: p })), 4000).map(c => c.key);
-            }
+            // [LATENCY AS OPPORTUNITY] - Removed non-existent applyLatencyLogic
 
             for (const providerKey of sortedProviders) {
                 // [PHASE 10] Circuit Breaker & Rate Limit Check
@@ -3177,7 +3242,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 }
 
                 try {
-                    const providerInfo = PROVIDER_REGISTRY[providerKey];
+                    const providerInfo = PROVIDERS[providerKey];
                     console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey} (Tier: ${providerInfo?.tier || '?'}${forcedModel ? `, Specialized: ${forcedModel}` : ''})...`);
 
                     const providerResult = await Promise.race([
@@ -3316,7 +3381,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt, tools);
         else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt, tools);
         else if (provider === 'fireworks') providerPromise = this.callOpenAICompatible('https://api.fireworks.ai/inference/v1/chat/completions', process.env.FIREWORKS_API_KEY!, 'accounts/fireworks/models/llama-v3p3-70b-instruct', systemPrompt, prompt, tools);
-        else if (provider === 'together') providerPromise = this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free', systemPrompt, prompt, tools);
+        else if (provider === 'together') providerPromise = this.callOpenAICompatible('https://api.together.xyz/v1/chat/completions', process.env.TOGETHER_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', systemPrompt, prompt, tools);
         else if (provider === 'sambanova') providerPromise = this.callSambanova(systemPrompt, prompt);
         else if (provider === 'local_4090') providerPromise = this.callOpenAICompatible(`${process.env.LOCAL_INFERENCE_URL}/v1/chat/completions`, 'local', process.env.LOCAL_MODEL || 'llama3.1:8b', systemPrompt, prompt, tools);
         else if (provider === 'cerebras') providerPromise = this.callCerebras(systemPrompt, prompt, tools);
@@ -3338,6 +3403,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         }
         else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt, tools, modelOverride);
         else if (provider === 'deepinfra') providerPromise = this.callDeepInfra(systemPrompt, prompt, tools);
+        else if (provider === 'siliconflow') providerPromise = this.callSiliconFlow(systemPrompt, prompt, tools);
         else if (provider === 'kimi') {
             const isThinking = prompt.toLowerCase().includes('reason') || prompt.toLowerCase().includes('logic') || prompt.toLowerCase().includes('complex') || prompt.toLowerCase().includes('analyze');
             providerPromise = this.callOpenAICompatible('https://api.moonshot.ai/v1/chat/completions', process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || 'kimi', modelOverride || 'kimi-k2.5', systemPrompt, prompt, tools, 'kimi', { thinking: isThinking });
@@ -3573,15 +3639,15 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     }
 
     async callGrok(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.x.ai/v1/chat/completions', process.env.GROK_API_KEY!, 'grok-beta', system, prompt, tools, 'grok');
+        return this.callOpenAICompatible(PROVIDERS.grok.baseUrl, process.env.GROK_API_KEY!, PROVIDERS.grok.model, system, prompt, tools, 'grok');
     }
 
     async callGroq(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', process.env.GROQ_API_KEY!, 'llama-3.3-70b-versatile', system, prompt, tools, 'groq');
+        return this.callOpenAICompatible(PROVIDERS.groq.baseUrl, process.env.GROQ_API_KEY!, PROVIDERS.groq.model, system, prompt, tools, 'groq');
     }
 
     async callCerebras(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.cerebras.ai/v1/chat/completions', process.env.CEREBRAS_API_KEY!, 'llama3.1-8b', system, prompt, tools, 'cerebras');
+        return this.callOpenAICompatible(PROVIDERS.cerebras.baseUrl, process.env.CEREBRAS_API_KEY!, PROVIDERS.cerebras.model, system, prompt, tools, 'cerebras');
     }
 
     async callDeepSeek(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
@@ -3604,7 +3670,13 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     }
 
     async callDeepInfra(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.deepinfra.com/v1/openai/chat/completions', process.env.DEEPINFRA_API_KEY!, 'meta-llama/Llama-3.3-70B-Instruct-Turbo', system, prompt, tools, 'deepinfra');
+        const model = process.env.DEEPINFRA_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+        return this.callOpenAICompatible('https://api.deepinfra.com/v1/openai/chat/completions', process.env.DEEPINFRA_API_KEY!, model, system, prompt, tools, 'deepinfra');
+    }
+
+    async callSiliconFlow(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+        const model = process.env.SILICONFLOW_MODEL || 'deepseek-ai/DeepSeek-V3';
+        return this.callOpenAICompatible('https://api.siliconflow.cn/v1/chat/completions', process.env.SILICONFLOW_API_KEY!, model, system, prompt, tools, 'siliconflow');
     }
 
     async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[], providerKey?: string, options: any = {}): Promise<LLMResult> {
@@ -3614,7 +3686,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         ];
 
         const artifactLinks: string[] = [];
-        const providerInfo = providerKey ? PROVIDER_REGISTRY[providerKey] : null;
+        const providerInfo = providerKey ? PROVIDERS[providerKey] : null;
         let supportsTools = providerInfo ? providerInfo.supportsTools : true;
 
         // Final Model-Specific Compatibility Check
@@ -3944,5 +4016,36 @@ ${task.description}
 
     async callSambanova(system: string, prompt: string): Promise<LLMResult> {
         return this.callOpenAICompatible('https://api.sambanova.ai/v1/chat/completions', process.env.SAMBANOVA_API_KEY!, 'Llama-3.1-405B-Instruct', system, prompt, []);
+    }
+
+    async runTriadicSBFA(prompt: string, task: Task): Promise<SBFAResult & { primaryResponse: any }> {
+        const roles = [
+            { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Focus on verifiable facts and primary data." },
+            { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty Impact. Focus on high-level integration and alignment with Trinity goals." },
+            { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique & Edge Cases. Search for flaws, risks, and potential failures." }
+        ];
+
+        const triadResponses = await Promise.all(roles.map(async (role) => {
+            const roleStartTime = Date.now();
+            const rolePrompt = `${prompt}\n\nMANDATORY ROLE INSTRUCTION: ${role.prompt}\n\nYou MUST include a belief vector in your response in the format: <belief>[p_success, p_partial, p_failure]</belief>.`;
+            // Triadic ALWAYS uses Elite/Balanced routing (slow path)
+            const response = await this.callLLM(rolePrompt, {}, task);
+            const latency = (Date.now() - roleStartTime) / 1000;
+            const belief = VeritasConverter.extract(response.output || "");
+            const cost = response.usage?.total_tokens || 0;
+
+            return { role: role.id, response, latency, belief, cost };
+        }));
+
+        const sbfaInput: SBFAInput = {
+            beliefs: triadResponses.map(r => r.belief),
+            latencies: triadResponses.map(r => r.latency),
+            costs: triadResponses.map(r => r.cost)
+        };
+
+        const sbfaResult = SBFAOperator.process(sbfaInput);
+        const primaryResponse = triadResponses.find(r => r.role === 'ROOT')?.response || triadResponses[0].response;
+
+        return { ...sbfaResult, primaryResponse };
     }
 }

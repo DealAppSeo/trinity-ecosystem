@@ -1,21 +1,52 @@
-
-import { Redis } from '@upstash/redis';
+import { Redis as UpstashRedis } from '@upstash/redis';
+import Redis from 'ioredis';
 
 /**
  * [ANTIGRAVITY] Redis Adapter for Trinity Swarm.
- * Uses Upstash Redis for global state persistence, circuit breakers, and task temporary memory.
+ * Supports DragonflyDB (TCP/TLS) as primary and Upstash Redis (REST) as fallback.
  */
 export class RedisAdapter {
     private static instance: RedisAdapter;
-    private redis: Redis;
+    private redis: any; // Can be ioredis or @upstash/redis
+    private type: 'ioredis' | 'upstash' | 'mock' = 'mock';
 
     private constructor() {
-        const url = process.env.UPSTASH_REDIS_REST_URL;
-        const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+        // [PHASE 14] Multi-Provider Fallback (DragonflyDB Primary, Upstash Fallback)
+        const dragonflyUrl = process.env.DRAGONFLY_DB_URL;
+        const dragonflyPort = parseInt(process.env.DRAGONFLY_DB_PORT || '6385');
+        const dragonflyKey = process.env.DRAGONFLY_ACCESS_KEY;
 
-        if (!url || !token) {
-            console.warn('[REDIS] ⚠️ UPSTASH_REDIS_REST_URL or TOKEN missing. Adapter running in MOCK mode.');
-            // Mock redis for development
+        const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+        const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+        if (dragonflyUrl && dragonflyKey) {
+            console.log(`[REDIS] ⚡ Initializing Primary (DragonflyDB) on ${dragonflyUrl}:${dragonflyPort}...`);
+            try {
+                this.redis = new Redis({
+                    host: dragonflyUrl,
+                    port: dragonflyPort,
+                    password: dragonflyKey,
+                    tls: {}, // Port 6385 usually requires TLS
+                    retryStrategy: (times) => Math.min(times * 50, 2000)
+                });
+                this.type = 'ioredis';
+
+                this.redis.on('error', (err: any) => {
+                    console.error('[REDIS] ❌ Dragonfly Connection Error:', err.message);
+                });
+            } catch (e) {
+                console.error('[REDIS] ❌ Failed to create Dragonfly client, falling back...');
+            }
+        }
+
+        if (this.type === 'mock' && upstashUrl && upstashToken) {
+            console.log('[REDIS] 🐢 Initializing Fallback (Upstash Redis REST)...');
+            this.redis = new UpstashRedis({ url: upstashUrl, token: upstashToken });
+            this.type = 'upstash';
+        }
+
+        if (this.type === 'mock') {
+            console.warn('[REDIS] ⚠️ No database configuration found. Running in MOCK mode.');
             this.redis = {
                 get: async () => null,
                 set: async () => 'OK',
@@ -23,11 +54,6 @@ export class RedisAdapter {
                 incr: async () => 1,
                 expire: async () => 1
             } as any;
-        } else {
-            this.redis = new Redis({
-                url,
-                token,
-            });
         }
     }
 

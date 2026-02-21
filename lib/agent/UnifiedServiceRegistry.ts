@@ -41,6 +41,9 @@ export class UnifiedServiceRegistry {
     public async sync() {
         if (Date.now() - this.lastUpdate < this.REFRESH_INTERVAL && this.services.size > 0) return;
 
+        // Initialize with static defaults as baseline
+        this.loadStaticDefaults();
+
         try {
             console.log('[Registry] 🔄 Syncing Service Registry...');
             const { data, error } = await supabase
@@ -50,7 +53,7 @@ export class UnifiedServiceRegistry {
 
             if (error) throw error;
 
-            this.services.clear();
+            // Overlay Supabase services on top of defaults
             (data || []).forEach((s: any) => {
                 this.services.set(s.service_key, {
                     ...s,
@@ -59,11 +62,9 @@ export class UnifiedServiceRegistry {
             });
 
             this.lastUpdate = Date.now();
-            console.log(`[Registry] ✅ Synced ${this.services.size} active services.`);
+            console.log(`[Registry] ✅ Synced ${this.services.size} active services (Static + DB).`);
         } catch (e) {
-            console.error('[Registry] ❌ Sync failed:', e);
-            // Fallback to static defaults if DB fails
-            this.loadStaticDefaults();
+            console.error('[Registry] ❌ Sync failed (using static defaults):', e);
         }
     }
 
@@ -94,7 +95,11 @@ export class UnifiedServiceRegistry {
 
             // ECONOMY TIERS
             { service_key: 'deepseek-r1', service_type: 'llm', provider: 'openrouter', tier: 1, cost_per_m_tokens: 0.27, specialties: ['logic', 'math'] },
-            { service_key: 'siliconflow-qwen-2-5', service_type: 'llm', provider: 'siliconflow', tier: 1, cost_per_m_tokens: 0.1, specialties: ['code', 'fast'] }
+            { service_key: 'siliconflow-qwen-2-5', service_type: 'llm', provider: 'siliconflow', tier: 1, cost_per_m_tokens: 0.1, specialties: ['code', 'fast'] },
+            { service_key: 'deepinfra-llama-3-3', service_type: 'llm', provider: 'deepinfra', tier: 1, cost_per_m_tokens: 0.1, specialties: ['chat', 'general'] },
+            { service_key: 'groq-llama-3-3', service_type: 'llm', provider: 'groq', tier: 1, cost_per_m_tokens: 0.05, specialties: ['ultra-fast', 'chat'] },
+            { service_key: 'cerebras-llama-3-1', service_type: 'llm', provider: 'cerebras', tier: 1, cost_per_m_tokens: 0.05, specialties: ['extreme-speed', 'logic'] },
+            { service_key: 'together-llama-3-3', service_type: 'llm', provider: 'together', tier: 1, cost_per_m_tokens: 0.2, specialties: ['chat', 'fast'] }
         ];
 
         defaults.forEach(d => {

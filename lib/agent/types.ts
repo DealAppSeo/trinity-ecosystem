@@ -31,12 +31,21 @@ export interface ProviderConfig {
     isAnthropic?: boolean;
 }
 
+export interface LLMOptions {
+    forceModel?: string;
+    temperature?: number;
+    maxTokens?: number;
+    timlAllocation?: any;
+    task_type?: string;
+}
+
 export interface LLMResult {
     output: string;
     provider?: string;
     fromCache?: boolean;
     latency?: number;
-    artifactLinks?: string[]; // track tool-generated artifacts
+    artifactLinks?: string[];
+    toolCalls?: any[];
     usage?: {
         prompt_tokens: number;
         completion_tokens: number;

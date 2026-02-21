@@ -11,6 +11,8 @@ export interface RoutingWeights {
     cost: number;    // 0-100
 }
 
+import { TIMLAllocation } from './TIMLManager';
+
 export class IntelligenceRouter {
     private agentName: string;
     private sessionTasksCompleted: number = 0;
@@ -31,7 +33,7 @@ export class IntelligenceRouter {
     /**
      * Determines the optimal provider(s) based on task context, risk, and diversity requirements.
      */
-    async route(task: Task, availableProviders: string[]): Promise<string[]> {
+    async route(task: Task, availableProviders: string[], timlAllocation?: TIMLAllocation): Promise<string[]> {
         // [PHASE 13] Determine Risk Level for 3-Ply BFT
         const riskScore = this.calculateRiskScore(task);
         const requirements = BFTModel.getRequiredPlys(riskScore);
@@ -89,13 +91,18 @@ export class IntelligenceRouter {
         await this.registry.sync();
 
         // 3.5 [ECONOMY MODE Check]
-        const todayKey = `spend:${new Date().toISOString().split('T')[0]}`;
-        const currentSpendStr = await this.redis.get(todayKey);
-        const currentSpend = parseFloat(currentSpendStr || '0');
-        const isEconomyMode = currentSpend >= this.GLOBAL_DAILY_BUDGET;
+        let isEconomyMode = false;
+        try {
+            const todayKey = `spend:${new Date().toISOString().split('T')[0]}`;
+            const currentSpendStr = await this.redis.get(todayKey);
+            const currentSpend = parseFloat(currentSpendStr || '0');
+            isEconomyMode = currentSpend >= this.GLOBAL_DAILY_BUDGET;
 
-        if (isEconomyMode) {
-            console.warn(`[ROUTER] 🚨 GLOBAL BUDGET EXCEEDED ($${currentSpend.toFixed(2)} / $${this.GLOBAL_DAILY_BUDGET}). Activating Economy Mode.`);
+            if (isEconomyMode) {
+                console.warn(`[ROUTER] 🚨 GLOBAL BUDGET EXCEEDED ($${currentSpend.toFixed(2)} / $${this.GLOBAL_DAILY_BUDGET}). Activating Economy Mode.`);
+            }
+        } catch (e) {
+            console.warn(`[ROUTER] ⚠️ Redis spend check failed (Continuing in Standard Mode):`, (e as Error).message);
         }
 
         // 4. FILTER & SCORE (ANFIS 2.0 Arbitrage)
@@ -123,6 +130,13 @@ export class IntelligenceRouter {
                 score += costScore * (this.weights.cost / 50);
 
                 // D. ADAPTIVE LOGIC
+                // [TIML ALLOCATION BOOST]
+                if (timlAllocation) {
+                    if (info.tier === ServiceTier.ELITE) score += (timlAllocation.slow_budget * 200);
+                    if (info.tier === ServiceTier.BALANCED) score += (timlAllocation.mid_budget * 150);
+                    if (info.tier === ServiceTier.ECONOMY) score += (timlAllocation.fast_budget * 250);
+                }
+
                 // [FOUNDER/TOP-REP BOOST] - Access Elite by default
                 if (isFounder || isTopRep) {
                     if (info.tier === ServiceTier.ELITE) score += 200;
@@ -188,6 +202,22 @@ export class IntelligenceRouter {
         });
 
         return finalSelection;
+    }
+
+    public isModelToolCompatible(model: string): boolean {
+        const m = model.toLowerCase();
+        // Known models that support tools (function calling)
+        if (m.includes('gpt-4') || m.includes('gpt-3.5-turbo')) return true;
+        if (m.includes('claude-3')) return true;
+        if (m.includes('gemini')) return true;
+        if (m.includes('llama-3') || m.includes('llama3.1')) return true;
+        if (m.includes('deepseek-chat') || m.includes('deepseek-v3') || m.includes('deepseek-r1')) return true;
+        if (m.includes('mistral') || m.includes('mixtral')) return true;
+        if (m.includes('qwen')) return true;
+
+        // Default to true for unknown models as most modern ones support it
+        // and we want to be anti-fragile.
+        return true;
     }
 
     private calculateRiskScore(task: Task): number {

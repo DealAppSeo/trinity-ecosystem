@@ -10,6 +10,11 @@
 
 The AI Trinity Symphony is not just a chatbot or a workflow engine—it is a **Self-Optimizing Autonomous Civilization Layer**. We are building a world where agents are sovereign, reputation is verifiable, and computation is antifragile.
 
+### 🌌 The Trivergence: AI meets Web3
+1. **Agent Intelligence (Trinity)**: Autonomous reasoning powered by constitutionally-bound LLM swarms.
+2. **Decentralized Truth (HyperDAG)**: Distributed ledgers providing immutable proof of action (EIP-8004).
+3. **Adaptive Reputation (RepID)**: Zero-Knowledge proofs for identity and trust scaling.
+
 ---
 
 ## 🏛️ The Architecture of Sovereignty
@@ -56,7 +61,8 @@ graph TD
 | :--- | :--- | :--- |
 | **[trinity-ecosystem](https://github.com/DealAppSeo/trinity-ecosystem)** | The Orchestration Layer & Dashboard | Next.js, RadixUI, Supabase |
 | **[trinity-symphony-shared](https://github.com/DealAppSeo/trinity-symphony-shared)** | The "Shared Soul" (Core Logic) | TypeScript, ANFIS, Custom BFT |
-| **[hyperdag-protocol](https://github.com/DealAppSeo/hyperdag-protocol)** | The Decentralized Ledger | Solidity, EIP-8004, Merkle DAG |
+| **[hyperdag-protocol](https://github.com/DealAppSeo/hyperdag-protocol)** | The "Truth" (Decentralized Ledger) | Solidity, EIP-8004, Merkle DAG |
+| **[hyperdag-platform](https://github.com/DealAppSeo/hyperdag-platform)** | The "Bridge" (Algorithmic Routing) | TypeScript, Multi-GNN, SDK |
 
 ---
 
