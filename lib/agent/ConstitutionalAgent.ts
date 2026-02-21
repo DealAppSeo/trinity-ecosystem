@@ -46,9 +46,9 @@ const PROVIDERS: Record<string, ProviderConfig> = {
     anthropic: { name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1/messages', envKey: 'ANTHROPIC_API_KEY', model: 'claude-3-5-sonnet-20241022', tier: 'paid', priority: 3, isAnthropic: true },
     gemini: { name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', envKey: 'GEMINI_API_KEY', model: 'gemini-1.5-flash-latest', tier: 'free', priority: 2, isGemini: true },
     deepseek: { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/chat/completions', envKey: 'DEEPSEEK_API_KEY', model: 'deepseek-chat', tier: 'free', priority: 1 },
-    siliconflow: { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1/chat/completions', envKey: 'SILICONFLOW_API_KEY', model: 'deepseek-ai/DeepSeek-V3', tier: 'free', priority: 1 },
+    siliconflow: { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.com/v1/chat/completions', envKey: 'SILICONFLOW_API_KEY', model: 'deepseek-ai/DeepSeek-V3', tier: 'free', priority: 1 },
     deepinfra: { name: 'DeepInfra', baseUrl: 'https://api.deepinfra.com/v1/openai/chat/completions', envKey: 'DEEPINFRA_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 1 },
-    grok: { name: 'Grok', baseUrl: 'https://api.x.ai/v1/chat/completions', envKey: 'GROK_API_KEY', model: 'grok-2-1212', tier: 'free', priority: 2 },
+    grok: { name: 'Grok', baseUrl: 'https://api.x.ai/v1/chat/completions', envKey: 'GROK_API_KEY', model: 'grok-3', tier: 'free', priority: 2 },
     cerebras: { name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1/chat/completions', envKey: 'CEREBRAS_API_KEY', model: 'llama3.1-70b', tier: 'free', priority: 1 },
     sambanova: { name: 'SambaNova', baseUrl: 'https://api.sambanova.ai/v1/chat/completions', envKey: 'SAMBANOVA_API_KEY', model: 'Meta-Llama-3.1-70B-Instruct', tier: 'free', priority: 1 },
     together: { name: 'Together', baseUrl: 'https://api.together.xyz/v1/chat/completions', envKey: 'TOGETHER_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 2 },
@@ -3639,7 +3639,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     }
 
     async callGrok(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        return this.callOpenAICompatible(PROVIDERS.grok.baseUrl, process.env.GROK_API_KEY!, PROVIDERS.grok.model, system, prompt, tools, 'grok');
+        return this.callOpenAICompatible(PROVIDERS.grok.baseUrl, process.env.GROK_API_KEY!, 'grok-3', system, prompt, tools, 'grok');
     }
 
     async callGroq(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {

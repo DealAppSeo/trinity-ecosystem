@@ -67,7 +67,7 @@ export class AggregatorManager {
     private getEndpoint(provider: string): string {
         switch (provider) {
             case 'openrouter': return 'https://openrouter.ai/api/v1/chat/completions';
-            case 'siliconflow': return 'https://api.siliconflow.cn/v1/chat/completions';
+            case 'siliconflow': return 'https://api.siliconflow.com/v1/chat/completions';
             case 'deepinfra': return 'https://api.deepinfra.com/v1/openai/chat/completions';
             default: return 'https://api.openai.com/v1/chat/completions'; // Proxy-compatible
         }

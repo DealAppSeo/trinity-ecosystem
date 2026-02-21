@@ -1,0 +1,21 @@
+{
+  "flash_loan_attack_vectors": [
+    {
+      "type": "Pump and Dump",
+      "description": "Artificially inflating the price of an asset and then selling it at the inflated price",
+      "mitigation": "Implementing rate limiting"
+    },
+    {
+      "type": "Arbitrage",
+      "description": "Exploiting price differences between two or more markets",
+      "mitigation": "Implementing collateral requirements"
+    },
+    {
+      "type": "Liquidity Drain",
+      "description": "Draining the liquidity from a market, making it difficult for other traders to buy or sell assets",
+      "mitigation": "Implementing price feeds"
+    }
+  ]
+}
+
+<!-- RepID: 6A57CC5F | Signed by Trinity System -->

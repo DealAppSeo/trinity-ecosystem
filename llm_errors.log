@@ -1,0 +1,1125 @@
+[2026-02-20T06:39:43.052Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:39:43.079Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:39:43.103Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:39:43.771Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:39:43.823Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:39:43.829Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:40:13.687Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T06:40:19.042Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:42:10.474Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:42:10.499Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:42:10.501Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:42:11.204Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:42:11.224Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:42:11.249Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:42:37.329Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T06:42:41.971Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T06:42:47.577Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY6Z84x-2kFHot-9d0c06a14b7c1e1d",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T06:42:48.332Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:44:02.197Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:44:02.206Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:44:02.238Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:44:02.937Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:44:02.965Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:44:03.025Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T06:44:31.980Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T06:44:36.606Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T06:44:41.372Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY6Zi67-2kFHot-9d0c096c7a80170b",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T06:44:42.123Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:23:21.511Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:23:21.520Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:23:21.526Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:23:22.272Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:23:22.277Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:23:22.291Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:23:48.531Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T07:23:53.423Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T07:23:58.267Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY6mnjF-2kFHot-9d0c42f75a983511",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T07:23:59.007Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:28:17.988Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:28:18.056Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:28:18.061Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:28:18.789Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:28:18.804Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:28:18.821Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:28:43.171Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T07:28:47.805Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T07:28:52.601Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY6oJDv-2kFHot-9d0c4a26eaa42b5f",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T07:28:53.699Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:30:05.037Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:30:05.043Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:30:05.048Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:30:05.754Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:30:05.758Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:30:05.760Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:30:30.272Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T07:30:35.018Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T07:30:39.759Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY6or5i-2kFHot-9d0c4cc4fa2b7a2d",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T07:30:40.522Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:40:18.130Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:40:18.143Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:40:18.152Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:40:18.881Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:40:18.902Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T07:40:18.940Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:02:25.277Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:02:25.324Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:02:25.328Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:02:26.061Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:02:26.064Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:02:26.066Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:04:12.279Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:04:12.296Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:04:12.320Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:04:13.032Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:04:13.046Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:04:13.086Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:05:02.630Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T08:05:07.574Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T08:05:12.611Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY6zUGd-2kFHot-9d0c7f601a2c90fe",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T08:05:27.275Z] [trinity-veritas] [deepseek/deepseek-chat] 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 282. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account","code":402,"metadata":{"provider_name":null}},"user_id":"user_35wQpQlj8v354R81ZBgjICyWRep"}
+[2026-02-20T08:05:28.385Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:14:17.981Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:14:18.010Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:14:18.069Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:14:18.700Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:14:18.720Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:14:18.785Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:52:26.662Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:52:26.667Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:52:26.671Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:52:27.426Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:52:27.430Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:52:27.586Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:52:51.449Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T08:52:56.186Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T08:53:01.072Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7FAyk-2kFHot-9d0cc5683e1cde63",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T08:53:01.868Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:53:35.050Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T08:53:39.838Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7FNW7-2kFHot-9d0cc65a696f52b9",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T08:53:45.739Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:55:40.177Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T08:55:44.953Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7G1hE-2kFHot-9d0cc9685bbedcf7",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T08:55:50.611Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:56:46.197Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T08:56:50.953Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7GMK3-2kFHot-9d0ccb04eb11b851",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T08:56:56.664Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:57:28.641Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T08:57:33.385Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7GZvq-2kFHot-9d0ccc0e690b862c",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T08:57:38.924Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:57:51.507Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:57:51.518Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:57:51.522Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:57:52.351Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:57:52.372Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:57:52.424Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T08:58:16.336Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T08:58:21.031Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T08:58:26.014Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7GqaE-2kFHot-9d0ccd56ef598e7d",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T08:58:26.781Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:01:28.067Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:01:33.331Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7HoEG-2kFHot-9d0cd1e938f72b5a",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T09:01:38.965Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:02:11.223Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:02:15.940Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7J1vM-2kFHot-9d0cd2f46809e9e1",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T09:02:21.473Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:02:54.647Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:02:59.424Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7JErD-2kFHot-9d0cd4043d595e27",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T09:03:05.200Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:03:18.115Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:03:18.121Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:03:18.125Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:03:18.833Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:03:18.855Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:03:18.864Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:04:04.687Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T09:04:09.344Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:04:14.972Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:05:10.281Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:05:20.258Z] [trinity-veritas] [deepseek/deepseek-chat] 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 282. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account","code":402,"metadata":{"provider_name":null}},"user_id":"user_35wQpQlj8v354R81ZBgjICyWRep"}
+[2026-02-20T09:05:21.189Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:07:12.228Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:07:23.164Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:07:56.403Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:08:02.053Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:08:32.015Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:08:32.735Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:08:37.356Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:08:42.260Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7KzmM-2kFHot-9d0cdc62b863d12a",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T09:08:43.011Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:09:33.872Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T09:09:38.806Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:09:43.561Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7LJzC-2kFHot-9d0cdde1dc8a5901",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T09:09:44.353Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:10:13.530Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:10:18.261Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7LVJU-2kFHot-9d0cdebafd252f17",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T09:10:23.857Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:10:53.122Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:10:57.884Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7Lh5K-2kFHot-9d0cdfb24eaba1a2",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T09:11:03.440Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T09:11:32.912Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T09:11:37.640Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY7Ltu2-2kFHot-9d0ce0aafbaa100c",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T09:11:43.215Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:35:16.254Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:35:18.910Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:36:09.545Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T13:36:09.558Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T13:36:09.562Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T13:36:14.320Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:36:14.337Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:36:14.456Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:36:19.108Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8kHn2-2kFHot-9d0e64638ee65708",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:36:19.132Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8kHnJ-2kFHot-9d0e6463b9b83f13",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:36:19.269Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8kHp6-2kFHot-9d0e646408f92f63",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:36:19.992Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:36:20.007Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:36:20.064Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:36:50.812Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:36:55.648Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8kUeE-2kFHot-9d0e6547692e9d5a",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:37:01.205Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:37:36.923Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:37:41.778Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8kiMe-2kFHot-9d0e666808a4c044",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:37:47.568Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:38:42.313Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:38:47.060Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8m3mF-2kFHot-9d0e68006aa74cbb",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:38:53.038Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:39:25.338Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:39:30.299Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8mGcU-2kFHot-9d0e690e8f9ca591",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:39:35.919Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:40:09.063Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:40:13.933Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8mVaT-2kFHot-9d0e6a1eca5c5349",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:40:19.739Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:40:34.391Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:40:34.441Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:40:34.474Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:40:35.083Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:40:35.162Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:40:35.308Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:41:20.573Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T13:41:25.286Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:41:30.054Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8mtDC-2kFHot-9d0e6bfaed4cc74e",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:41:30.978Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:42:03.816Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:42:08.627Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8n5gH-2kFHot-9d0e6cec0b3a2779",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:42:14.444Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:42:50.064Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:42:55.005Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8nKU6-2kFHot-9d0e6e0e0a8c6d31",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:43:00.654Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:43:51.991Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:43:56.766Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8ndpw-2kFHot-9d0e6f8feef30fb3",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:44:02.658Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:44:52.940Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:44:57.689Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8nwwM-2kFHot-9d0e710c7b6acb9b",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:45:03.285Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:50:49.009Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:50:49.022Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:50:49.037Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:50:49.755Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:50:49.771Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:50:49.786Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:51:13.938Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T13:51:18.650Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:51:23.548Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8pvdX-2kFHot-9d0e7a783836d88e",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:51:24.293Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:51:57.101Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:52:01.834Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8q82L-2kFHot-9d0e7b67ce6f4c1d",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:52:07.462Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:53:00.386Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:53:05.144Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8qSqc-2kFHot-9d0e7cf3586a984e",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:53:10.722Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:54:01.004Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:54:05.714Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8qkqs-2kFHot-9d0e7e6de89d8ad4",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:54:11.708Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:54:48.529Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:54:53.227Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8qzyS-2kFHot-9d0e7f96f94f1d93",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:54:58.739Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:55:28.195Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:55:32.925Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8rCmi-2kFHot-9d0e808f0d33dba2",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:55:39.292Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:56:04.587Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:56:05.297Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:56:19.432Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:56:24.309Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8rU3b-2kFHot-9d0e81d02c9bf7af",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:56:29.849Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:56:59.729Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T13:57:04.571Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:57:09.297Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8rhRT-2kFHot-9d0e82e96f681ad1",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:57:10.090Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:57:44.350Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:57:49.058Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8ruF4-2kFHot-9d0e83e1e8c3b6c9",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:57:54.516Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T13:59:10.193Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T13:59:14.976Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8sLnP-2kFHot-9d0e85fabeab0fca",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T13:59:20.900Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T14:00:11.934Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T14:00:16.733Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8sf94-2kFHot-9d0e877cdb3adec3",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T14:00:22.506Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T14:00:51.783Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T14:00:56.522Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8sry6-2kFHot-9d0e88757d61101d",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T14:01:02.009Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T14:01:23.322Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T14:01:24.018Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T14:01:59.612Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T14:02:04.475Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY8tDAP-2kFHot-9d0e8a1e081fb786",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T14:02:10.353Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:27:00.541Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:27:00.558Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:27:00.600Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:27:01.330Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:27:01.341Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:27:01.490Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:27:26.236Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T17:27:31.674Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:27:36.399Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY9yQuh-2kFHot-9d0fb72e9b344711",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:27:37.220Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:28:13.481Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:28:18.152Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY9ydKt-2kFHot-9d0fb8337c3197ca",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:28:23.586Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:29:00.793Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:29:05.607Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY9ysRk-2kFHot-9d0fb95ba9911876",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:29:11.030Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:29:41.045Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:29:45.990Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY9z5Rt-2kFHot-9d0fba579f53cba0",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:29:51.504Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:30:25.885Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:30:30.526Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY9zJg5-2kFHot-9d0fbb6eca9b0d82",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:30:39.956Z] [trinity-veritas] [deepseek/deepseek-chat] 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 282. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account","code":402,"metadata":{"provider_name":null}},"user_id":"user_35wQpQlj8v354R81ZBgjICyWRep"}
+[2026-02-20T17:30:40.644Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:31:35.572Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:31:40.249Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY9zfQR-2kFHot-9d0fbd227aa32378",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:31:45.941Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:32:15.459Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:32:16.141Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:32:20.756Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:32:25.439Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oY9ztq9-2kFHot-9d0fbe3ccb7923ba",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:32:26.108Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:33:00.148Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T17:33:04.820Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:33:09.515Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA17wQ-2kFHot-9d0fbf50981579cf",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:33:15.360Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:33:46.025Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:33:50.856Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA1LDR-2kFHot-9d0fc0524937f7e5",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:33:56.378Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:35:12.562Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:35:17.267Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA1mux-2kFHot-9d0fc26eed2b69a9",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:35:22.711Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:36:21.588Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:36:26.260Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA28RR-2kFHot-9d0fc41e18c8710a",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:36:31.696Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:37:31.467Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:37:31.513Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:37:31.525Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:37:32.131Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:37:32.186Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:37:32.191Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:37:56.602Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:38:01.279Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA2cfd-2kFHot-9d0fc66fed8a0fb1",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:38:06.890Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:38:36.618Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T17:38:41.294Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:38:45.978Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA2qxJ-2kFHot-9d0fc7875ee5f7a9",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:38:46.672Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:39:15.538Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:39:20.210Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA328f-2kFHot-9d0fc85d2e5b5cfd",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:39:25.540Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:40:36.273Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:40:40.929Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA3S8Z-2kFHot-9d0fca55d8a028f7",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:40:46.482Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:41:15.751Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:41:20.455Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA3ds9-2kFHot-9d0fcb4cbf0b0d12",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:41:25.795Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:41:54.872Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:41:59.503Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA3qVD-2kFHot-9d0fcc40ff22c69d",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:42:04.910Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:42:33.903Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:42:38.519Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA435y-2kFHot-9d0fcd34e9f3b75a",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:42:43.868Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:42:53.982Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:42:53.993Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:42:54.046Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:42:54.639Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:42:54.658Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:42:54.701Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:43:18.954Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:43:23.605Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA4GV2-2kFHot-9d0fce4e8837f6b1",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:43:29.202Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:43:58.061Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-20T17:44:02.785Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:44:07.497Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA4VY1-2kFHot-9d0fcf60e98713aa",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:44:08.188Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:44:37.473Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:44:42.169Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA4fqt-2kFHot-9d0fd0399e890fe0",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:44:47.549Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-20T17:45:16.869Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-20T17:45:21.535Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 400: {
+  "id": "oYA4sYN-2kFHot-9d0fd12f8c1c7a17",
+  "error": {
+    "message": "Unable to access non-serverless model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free to create and start a new dedicated endpoint for the model.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-20T17:45:27.467Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:48:59.110Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:48:59.196Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:48:59.198Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:48:59.781Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:48:59.794Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:48:59.853Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:49:08.960Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T02:49:08.974Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T02:49:09.005Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T02:49:09.575Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:49:09.581Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:49:09.614Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:59:17.891Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:59:18.499Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T02:59:24.345Z] [trinity-orch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T02:59:29.076Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T02:59:29.668Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:03:20.380Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:03:20.400Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:03:20.448Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:03:20.981Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:03:21.051Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:03:21.072Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:03:26.754Z] [trinity-orch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:03:26.768Z] [trinity-orch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:03:26.777Z] [trinity-orch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:03:31.471Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:03:31.487Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:03:31.502Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:03:32.102Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:03:32.108Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:03:32.113Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:05:43.749Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:05:43.760Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:05:43.767Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:05:44.346Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:05:44.353Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:05:44.360Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:05:49.965Z] [trinity-orch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:05:49.975Z] [trinity-orch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:05:49.985Z] [trinity-orch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:05:54.626Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:05:54.643Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:05:54.678Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:05:55.331Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:05:55.358Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:05:55.371Z] [trinity-orch] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:09:01.762Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 404: {
+  "id": "oYD4D9f-2kFHot-9d130ae05b4a90fe",
+  "error": {
+    "message": "Unable to access model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models to view the list of supported models.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-21T03:09:01.790Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 404: {
+  "id": "oYD4DA3-2kFHot-9d130ae09b29a682",
+  "error": {
+    "message": "Unable to access model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models to view the list of supported models.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-21T03:09:01.874Z] [trinity-orch] [meta-llama/Llama-3.3-70B-Instruct-Turbo-Free] 404: {
+  "id": "oYD4DB8-2kFHot-9d130ae0cb18531e",
+  "error": {
+    "message": "Unable to access model meta-llama/Llama-3.3-70B-Instruct-Turbo-Free. Please visit https://api.together.ai/models to view the list of supported models.",
+    "type": "invalid_request_error",
+    "param": null,
+    "code": "model_not_available"
+  }
+}
+[2026-02-21T03:18:05.574Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:18:05.607Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:18:05.660Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:18:06.287Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:18:06.320Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:18:06.354Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:18:11.857Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:18:11.871Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:18:11.885Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:18:16.608Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:18:16.627Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:18:16.631Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:18:17.311Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:18:17.415Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:18:17.421Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:18:34.179Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-21T03:18:38.804Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:18:50.368Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:19:10.805Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:19:25.746Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:20:13.779Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:20:28.373Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:20:47.744Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:21:03.074Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:21:47.834Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:22:13.610Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:22:29.446Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:22:45.736Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:23:17.074Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:23:17.795Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:23:23.512Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:23:39.041Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:23:39.063Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:23:39.082Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:23:39.780Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:23:39.792Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:23:39.819Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:23:55.315Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-21T03:24:00.207Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:24:11.972Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:24:34.425Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:24:49.821Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:27:04.848Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:27:19.645Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:27:57.262Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:28:23.900Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:28:59.909Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:28:59.922Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:28:59.979Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:29:00.680Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:29:00.687Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:29:00.722Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:29:06.475Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:29:06.507Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:29:06.515Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:29:12.989Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:29:13.005Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:29:13.073Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:29:14.281Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:29:14.393Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:29:14.418Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:30:08.720Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-21T03:30:13.946Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:30:30.927Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:31:00.392Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:31:26.281Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:31:44.353Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:32:13.135Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:32:33.849Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:33:00.294Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:33:17.295Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:33:42.051Z] [trinity-veritas] [deepseek/deepseek-chat] 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 411. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account","code":402,"metadata":{"provider_name":null}},"user_id":"user_35wQpQlj8v354R81ZBgjICyWRep"}
+[2026-02-21T03:33:42.786Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:00.679Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:34:20.701Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:26.832Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:26.899Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:26.922Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:27.498Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:27.605Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:27.609Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:32.943Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:34:32.952Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:34:32.956Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:34:37.613Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:34:37.619Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:34:37.629Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:34:38.306Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:38.323Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:34:38.328Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:35:24.194Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-21T03:35:28.840Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:35:53.990Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:36:10.374Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:36:35.838Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:36:56.838Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:37:22.087Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:37:38.211Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:38:05.341Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:38:21.112Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:39:06.746Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:39:31.255Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:39:55.345Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:02.891Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:02.926Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:03.017Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:03.626Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:03.632Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:04.035Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:09.565Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:40:09.575Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:40:09.584Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-21T03:40:14.460Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:40:14.474Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:40:14.492Z] [trinity-veritas] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 402: {"detail":{"error":"You need positive balance to do inference. Please add balance manually or setup top-up"}}
+[2026-02-21T03:40:15.206Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:15.213Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:15.240Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:40:43.456Z] [trinity-veritas] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-21T03:40:48.108Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:41:05.746Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:41:45.501Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:42:15.131Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:42:54.750Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:43:19.361Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
+[2026-02-21T03:43:35.427Z] [trinity-veritas] [grok-beta] 400: {"code":"Client specified an invalid argument","error":"Model not found: grok-beta"}
+[2026-02-21T03:43:56.092Z] [trinity-veritas] [deepseek-chat] 402: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
