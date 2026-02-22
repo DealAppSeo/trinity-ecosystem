@@ -49,7 +49,7 @@ const PROVIDERS: Record<string, ProviderConfig> = {
     siliconflow: { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.com/v1/chat/completions', envKey: 'SILICONFLOW_API_KEY', model: 'deepseek-ai/DeepSeek-V3', tier: 'free', priority: 1 },
     deepinfra: { name: 'DeepInfra', baseUrl: 'https://api.deepinfra.com/v1/openai/chat/completions', envKey: 'DEEPINFRA_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 1 },
     grok: { name: 'Grok', baseUrl: 'https://api.x.ai/v1/chat/completions', envKey: 'GROK_API_KEY', model: 'grok-3', tier: 'free', priority: 2 },
-    cerebras: { name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1/chat/completions', envKey: 'CEREBRAS_API_KEY', model: 'llama3.1-70b', tier: 'free', priority: 1 },
+    cerebras: { name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1/chat/completions', envKey: 'CEREBRAS_API_KEY', model: 'llama3.1-8b', tier: 'free', priority: 1 },
     sambanova: { name: 'SambaNova', baseUrl: 'https://api.sambanova.ai/v1/chat/completions', envKey: 'SAMBANOVA_API_KEY', model: 'Meta-Llama-3.1-70B-Instruct', tier: 'free', priority: 1 },
     together: { name: 'Together', baseUrl: 'https://api.together.xyz/v1/chat/completions', envKey: 'TOGETHER_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 2 },
     openrouter: { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1/chat/completions', envKey: 'OPENROUTER_API_KEY', model: 'deepseek/deepseek-chat', tier: 'paid', priority: 3 }
@@ -2668,8 +2668,8 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
             // [ANTIGRAVITY] AUTOMATIC TASK COMPLETION (Constitutional Requirement)
             // When an artifact is saved, the associated task MUST move to 'done' 
             // so peer verification can be triggered autonomously.
-            if (dbTaskId && !isNaN(dbTaskId)) {
-                console.log(`[ARTIFACT] ✅ Marking task ${dbTaskId} as DONE (Awaiting Peer Verification)`);
+            if (safeTaskId && !isNaN(Number(safeTaskId))) {
+                console.log(`[ARTIFACT] ✅ Marking task ${safeTaskId} as DONE (Awaiting Peer Verification)`);
                 await this.supabase
                     .from('trinity_tasks')
                     .update({
@@ -2680,7 +2680,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                         result: `Task generated artifact: ${safeTitle}. Reference ID: ${artifactId || 'OK'}`,
                         verify_count: 0 // Reset for peer review
                     })
-                    .eq('id', dbTaskId);
+                    .eq('id', safeTaskId);
 
                 // [TRINITY SSOT] Update agent stats
                 this.tasksCompleted++;
