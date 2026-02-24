@@ -247,6 +247,13 @@ export class IntelligenceRouter {
         return suggestions;
     }
 
+    public getEscalationModel(task: Task): string {
+        const risk = this.calculateRiskScore(task);
+        if (risk > 0.7) return 'claude-3-5-sonnet-20241022';
+        if (risk > 0.4) return 'gpt-4o';
+        return 'deepseek-chat';
+    }
+
     demote(provider: string) {
         console.warn(`[ROUTER] 📉 Demoting ${provider} due to failure/quota.`);
         this.demotedProviders.add(provider);

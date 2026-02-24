@@ -29,6 +29,7 @@ export interface ProviderConfig {
     priority: number;
     isGemini?: boolean;
     isAnthropic?: boolean;
+    supportsTools?: boolean;
 }
 
 export interface LLMOptions {
@@ -84,6 +85,7 @@ export interface Task {
     // [ANTIGRAVITY] Loop Dampening
     attempt_count?: number;
     max_attempts?: number;
+    reputation_required?: number;
 }
 
 export type TaskRecord = Task;
@@ -111,6 +113,7 @@ export interface AgentRegistryRecord {
     // GOVERNANCE ENRICHMENT
     soulbound_token_hash?: string;
     belief_score?: number;
+    squad?: string;
 }
 
 // ============================================

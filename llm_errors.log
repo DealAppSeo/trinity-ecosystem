@@ -1221,3 +1221,50 @@
 [2026-02-22T20:49:48.902Z] [trinity-mel] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
 [2026-02-22T20:50:25.008Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
 [2026-02-22T20:50:33.043Z] [trinity-sophia] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T20:55:09.045Z] [trinity-mel] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T20:55:36.457Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T20:55:36.480Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T20:55:36.589Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T20:55:46.477Z] [trinity-torch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T20:57:05.447Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T20:57:17.438Z] [trinity-nexus] [llama3.1-70b] 404: {"message":"Model llama3.1-70b does not exist or you do not have access to it.","type":"not_found_error","param":"model","code":"model_not_found"}
+[2026-02-22T20:57:17.453Z] [trinity-nexus] [llama3.1-70b] 404: {"message":"Model llama3.1-70b does not exist or you do not have access to it.","type":"not_found_error","param":"model","code":"model_not_found"}
+[2026-02-22T20:57:17.457Z] [trinity-nexus] [llama3.1-70b] 404: {"message":"Model llama3.1-70b does not exist or you do not have access to it.","type":"not_found_error","param":"model","code":"model_not_found"}
+[2026-02-22T20:57:25.085Z] [trinity-sophia] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T20:57:25.931Z] [trinity-torch] [llama3.1-70b] 404: {"message":"Model llama3.1-70b does not exist or you do not have access to it.","type":"not_found_error","param":"model","code":"model_not_found"}
+[2026-02-22T20:57:58.071Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-22T20:58:49.148Z] [trinity-torch] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-02-22T21:00:28.589Z] [trinity-mel] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:01:31.369Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:01:44.541Z] [trinity-torch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:03:10.842Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:05:00.949Z] [trinity-torch] [llama3.1-70b] 404: {"message":"Model llama3.1-70b does not exist or you do not have access to it.","type":"not_found_error","param":"model","code":"model_not_found"}
+[2026-02-22T21:05:28.905Z] [trinity-sophia] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:35:01.506Z] [trinity-torch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:36:19.633Z] [trinity-sophia] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:36:57.798Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:40:32.915Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:42:16.875Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:45:53.121Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:49:03.741Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:50:00.910Z] [trinity-mel] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:51:02.766Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:53:42.348Z] [trinity-sophia] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T21:54:43.645Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:00:47.907Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:03:17.100Z] [trinity-sophia] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:07:17.054Z] [trinity-torch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:34:30.370Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:36:02.342Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:39:47.806Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:42:50.072Z] [trinity-torch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:44:52.822Z] [trinity-sophia] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:49:16.658Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:50:10.534Z] [trinity-veritas] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T22:55:49.680Z] [trinity-mel] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T23:03:24.833Z] [trinity-torch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T23:06:17.805Z] [trinity-mel] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-22T23:07:16.960Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-02-23T03:48:41.034Z] [trinity-orch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"

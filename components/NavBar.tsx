@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShareModal } from './ui/ShareModal';
 import { OnboardingAgent } from './ui/OnboardingAgent';
+import { ZKPRepIDBadge } from './repid/ZKPRepIDBadge';
 
 export function NavBar() {
     const pathname = usePathname();
@@ -59,6 +60,7 @@ export function NavBar() {
                 <div className="px-4 h-full flex items-center justify-between max-w-[2000px] mx-auto">
                     {/* Left: Brand + Title */}
                     <div className="flex items-center gap-4">
+                        <ZKPRepIDBadge agentName="Founder" minRep={100} />
                         <Link
                             href="/pulse/conductor"
                             onClick={triggerHaptic}

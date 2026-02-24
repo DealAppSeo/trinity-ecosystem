@@ -20,6 +20,7 @@ export interface SBFAResult {
     risk: number;
     sPi: number;
     status: 'COLLAPSE' | 'ABSTAIN';
+    primaryResponse?: any;
 }
 
 export class SBFAOperator {
@@ -43,29 +44,31 @@ export class SBFAOperator {
         const disagreement = this.calculateContradictionEnergy(beliefs);
 
         // 3. Functional Terms
-        // [FIX 2] Consistency loss: penalize when belief distributions disagree significantly
-        const loss = disagreement > 0.1 ? disagreement * 2.0 : 0.0;
-        const totalCost = costs.reduce((a, b) => a + b, 0);
-        const tailLatency = Math.max(...latencies);
-
         // Risk = Uncertainty (1 - max probability in agg distribution)
         const maxProb = Math.max(...aggregatedBelief);
         const risk = 1.0 - maxProb;
 
-        // 4. S(pi) Calculation
-        const sPi = (this.ALPHA * loss) +
+        // [PHASE 13] alpha_ell (Loss term): Continuous penalty for uncertainty and high-divergence triplets
+        const alpha_ell = (disagreement * this.ALPHA) + (risk * 0.5);
+        const totalCost = costs.reduce((a, b) => a + b, 0);
+        const tailLatency = Math.max(...latencies);
+
+        // 4. S(pi) Calculation (Refined Functional)
+        // S(pi) = ALPHA*loss + BETA*disagreement + GAMMA*cost + DELTA*latency + ETA*risk
+        const sPi = alpha_ell +
             (this.BETA * disagreement) +
             (this.GAMMA * totalCost) +
             (this.DELTA * tailLatency) +
             (this.ETA * risk);
 
         // 5. Decision Logic
+        // [PHASE 13] Fast Path Belief Extraction: Decisive collapse above 0.7 confidence
         const status = maxProb > 0.7 ? 'COLLAPSE' : 'ABSTAIN';
 
         return {
             aggregatedBelief,
             disagreement,
-            loss,
+            loss: alpha_ell,
             cost: totalCost,
             latency: tailLatency,
             risk,

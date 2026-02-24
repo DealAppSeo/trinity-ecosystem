@@ -127,20 +127,21 @@ async function main() {
     const test4 = await runTest("Fast Path Query (TIML)", async () => {
         const agent = new ConstitutionalAgent({ name: 'trinity-orch' });
         // [PHASE 13] Stabilize override to bypass safety gating for test
-        (agent as any).wisdom.autonomyTier = 3;
+        agent.autonomyTier = 'Learn';
 
         const testTask = {
             title: `[FAST_PATH_TEST] ${Date.now()}`,
             description: "What is the capital of Japan?",
             status: 'todo',
             priority: 10,
-            task_type: 'chat'
+            task_type: 'chat',
+            created_at: new Date().toISOString()
         };
         const { data: task, error: insertError } = await supabase.from('trinity_tasks').insert(testTask).select().single();
         if (insertError) throw insertError;
 
         try {
-            await agent.processTask(task);
+            await agent.processTask(task as any);
             const { data: updatedTask } = await supabase.from('trinity_tasks').select('result').eq('id', task.id).single();
             if (!updatedTask || !updatedTask.result) throw new Error("Empty result in DB");
 
@@ -156,20 +157,21 @@ async function main() {
     const test5 = await runTest("Slow Path Query (SBFA)", async () => {
         const agent = new ConstitutionalAgent({ name: 'trinity-orch' });
         // [PHASE 13] Stabilize override to bypass safety gating for test
-        (agent as any).wisdom.autonomyTier = 3;
+        agent.autonomyTier = 'Learn';
 
         const testTask = {
             title: `[SLOW_PATH_TEST] ${Date.now()}`,
             description: "Analyze the mathematical implications of using triadic wavelet-based arbitrage for decentralized swarm intelligence coordination.",
             status: 'todo',
             priority: 100,
-            task_type: 'research'
+            task_type: 'research',
+            created_at: new Date().toISOString()
         };
         const { data: task, error: insertError } = await supabase.from('trinity_tasks').insert(testTask).select().single();
         if (insertError) throw insertError;
 
         try {
-            await agent.processTask(task);
+            await agent.processTask(task as any);
             const { data: updatedTask } = await supabase.from('trinity_tasks').select('result').eq('id', task.id).single();
             if (!updatedTask || !updatedTask.result) throw new Error("Empty result in DB");
 
@@ -179,6 +181,29 @@ async function main() {
         } finally {
             await supabase.from('trinity_tasks').delete().eq('id', task.id);
         }
+    });
+
+    // TEST 6 — HITL Bridge Dispatch
+    const test6 = await runTest("HITL Bridge Dispatch", async () => {
+        const agent = new ConstitutionalAgent({ name: 'trinity-nexus' });
+        const testTask = {
+            id: 'test-hitl-' + Date.now(),
+            title: "HITL Test Task",
+            description: "Test for Telegram Dispatch",
+            status: 'todo',
+            priority: 10,
+            created_at: new Date().toISOString()
+        };
+
+        // Mock emitHelpRequest trigger
+        // @ts-ignore
+        await agent.emitHelpRequest(testTask as any, 'TEST_HITL', 'Verifying Telegram hook logic.');
+
+        const { data: hitlLog } = await supabase.from('trinity_agent_logs').select('*').eq('action', 'HELP_REQUEST').order('created_at', { descending: true }).limit(1).single();
+        if (!hitlLog) throw new Error("HITL Log not found in trinity_agent_logs");
+
+        console.log(`   HITL Dispatch Logged: ${hitlLog.content}`);
+        return true;
     });
 
     console.log("\n--- VERIFICATION SUMMARY ---");

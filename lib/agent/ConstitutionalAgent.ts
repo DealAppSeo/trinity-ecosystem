@@ -2387,7 +2387,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                 }
 
                 // B. Artifact Context
-                if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'browser') {
+                if (typeof process !== 'undefined' && (process.env.NODE_ENV as string) !== 'browser') {
                     try {
                         const fs = require('fs');
                         const path = require('path');
@@ -2666,7 +2666,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
             if (!success) throw lastError;
 
             // [ANTIGRAVITY] AUTOMATIC TASK COMPLETION (Constitutional Requirement)
-            // When an artifact is saved, the associated task MUST move to 'done' 
+            // When an artifact is saved, the associated task MUST move to 'done'
             // so peer verification can be triggered autonomously.
             if (safeTaskId && !isNaN(Number(safeTaskId))) {
                 console.log(`[ARTIFACT] ✅ Marking task ${safeTaskId} as DONE (Awaiting Peer Verification)`);
@@ -3799,33 +3799,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
     // ERC-8004: CROSS-CHAIN BRIDGE (ELITE)
     // ============================================
-    async integrateErc8004(taskId: string, result: string, evaluationScore: number) {
-        // [PHASE 13] SOVEREIGN BRIDGE: Bind HyperDAG Audit Trail to ERC-8004
-        console.log(`[ERC-8004] 🌉 Bridging Task ${taskId} to HyperDAG. Weight: ${evaluationScore / 100}`);
-
-        try {
-            /* [PHASE 12/13] Placeholder for HyperDAG & ERC-8004
-            const sig = await HyperDAG.signTask(this.name, taskId, result);
-    
-            if (evaluationScore > 70) {
-                await ERC8004Bridge.syncReputation(this.name, this.reputationScore);
-                await ERC8004Bridge.validateTask(taskId, this.name, sig.signature_hex);
-            }
-            */
-
-            // 3. Update task in DB with transaction/signature hash
-            await this.supabase.from('trinity_tasks').update({
-                transaction_hash: sig.signature_hex,
-                metadata: {
-                    hyperdag_sig: sig,
-                    rep_synced: evaluationScore > 70
-                }
-            }).eq('id', taskId);
-
-        } catch (e: any) {
-            console.warn(`[ERC-8004] Interop failed: ${e.message}`);
-        }
-    }
+    // [ANTIGRAVITY] Moved to lib/agent/types.ts or handled via ERC8004Bridge directly
 
     /**
      * OpenClaw Safety Protocol (Phase 13)
@@ -3925,6 +3899,22 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     status: 'pending_clarification',
                     result: `[SOS] ${errorCode}: ${details}. Requested intercession from ${this.squad} peers.`
                 }).eq('id', task.id);
+
+                // [PHASE 13] HITL BRIDGE: Dispatch to Telegram
+                try {
+                    const { HITLDispatcher } = await import('../hitl/HITLDispatcher');
+                    await HITLDispatcher.dispatchToHITL({
+                        taskId: task.id,
+                        agentId: this.name,
+                        agentRepId: this.reputationScore.toString(),
+                        missionSummary: task.title + ': ' + (task.description || '').slice(0, 400),
+                        confidenceScore: (this as any).currentConfidence || 0.5,
+                        spiScore: (this as any).latestSPi || 0,
+                        escalationReason: `${errorCode}: ${details}`
+                    });
+                } catch (hitlError: any) {
+                    console.error(`[${this.name}] ⚠️ HITL Dispatch Failed:`, hitlError.message);
+                }
             }
         } catch (e) {
             console.error(`[${this.name}] ❌ Failed to emit SOS:`, (e as Error).message);

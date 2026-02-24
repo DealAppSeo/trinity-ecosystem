@@ -109,6 +109,23 @@ async function startAgent() {
         const pulseDiff = now - lastPulse;
         const isHealthy = pulseDiff < 5 * 60 * 1000; // 5 mins
 
+        if (req.url === '/telegram/webhook' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', async () => {
+                try {
+                    const { HITLCallbackHandler } = await import('../lib/hitl/HITLCallbackHandler');
+                    await HITLCallbackHandler.handleTelegramCallback(JSON.parse(body));
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true }));
+                } catch (e: any) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+            });
+            return;
+        }
+
         if (!isHealthy) {
             console.warn(`[HEALTH] 🚨 Agent ${finalAgentName} is a ZOMBIE. Last pulse: ${Math.round(pulseDiff / 1000)}s ago. Returning 503.`);
             res.writeHead(503, { 'Content-Type': 'application/json' });
