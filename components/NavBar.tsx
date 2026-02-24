@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShareModal } from './ui/ShareModal';
 import { OnboardingAgent } from './ui/OnboardingAgent';
 import { ZKPRepIDBadge } from './repid/ZKPRepIDBadge';
+import { Button } from './ui/Button';
 
 export function NavBar() {
     const pathname = usePathname();
@@ -133,6 +134,14 @@ export function NavBar() {
                         </button>
 
                         {/* Voice Mode / Onboarding Toggle */}
+                        {!pathname.includes('/join') && (
+                            <Link href="/join">
+                                <Button size="sm" className="hidden md:flex px-6 shadow-glow-violet">
+                                    Join Symphony
+                                </Button>
+                            </Link>
+                        )}
+
                         <motion.button
                             whileHover={{ scale: 1.1, rotate: 5 }}
                             whileTap={{ scale: 0.9 }}

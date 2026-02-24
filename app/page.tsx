@@ -5,6 +5,8 @@ import { EcosystemGrid } from '@/components/EcosystemGrid';
 import { AgentGrid } from '@/components/AgentGrid';
 import { Button } from '@/components/ui/Button';
 import { VoiceInput } from '@/components/VoiceInput';
+import { TelegramLoginWidget } from '@/components/ui/TelegramLoginWidget';
+import { Sparkles } from 'lucide-react';
 export const dynamic = 'force-dynamic';
 
 export default async function LandingPage() {
@@ -25,31 +27,17 @@ export default async function LandingPage() {
         {/* Background Gradients */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-accent-violet/10 rounded-full blur-[120px] -z-10" />
 
-        <h1 className="text-4xl md:text-6xl font-bold text-text-primary mb-2 tracking-tight max-w-4xl leading-tight">
-          Welcome to the <br />
-          <span className="text-accent-violet">AI Trinity Symphony</span>
+        <h1 className="text-4xl md:text-7xl font-black text-text-primary mb-6 tracking-tighter max-w-5xl leading-[1.1]">
+          Orchestrate <br />
+          <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">Autonomous Intelligence</span>
         </h1>
 
-        <div className="flex flex-col items-center mb-10 animate-fade-in">
-          <span className="text-sm font-mono text-text-muted uppercase tracking-widest mb-4">Powered By</span>
-          <div className="relative w-[300px] h-[100px] md:w-[500px] md:h-[160px]">
-            <Image
-              src="/trinity-symphony.png"
-              alt="AI Trinity Symphony"
-              fill
-              className="object-contain drop-shadow-[0_0_15px_rgba(124,58,237,0.3)]"
-              priority
-            />
-          </div>
-        </div>
-
-        <p className="text-xl text-text-secondary mb-12 max-w-2xl leading-relaxed">
-          The Trinity Symphony orchestrates autonomous agents to solve complex problems at
-          <span className="text-text-primary font-semibold"> fraction of the cost</span>.
-          Helping people help people.
+        <p className="text-xl md:text-2xl text-text-secondary mb-12 max-w-3xl leading-relaxed">
+          The world's first <span className="text-status-online font-bold">Antifragile</span> agentic operating system.
+          12 specialized agents, one unified mission: solving your most complex problems at 1% of the cost.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mb-12">
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md mb-8">
           <Link href="/join" className="w-full">
             <Button className="w-full text-lg py-6 shadow-glow-violet">
               Get Early Access
@@ -62,9 +50,15 @@ export default async function LandingPage() {
           </Link>
         </div>
 
+        {/* VIRAL ENTRY POINT */}
+        <div className="mb-12">
+          <p className="text-sm text-text-muted mb-4 uppercase tracking-widest font-mono">Instant Access via</p>
+          <TelegramLoginWidget />
+        </div>
+
         {/* VOICE FIRST ENTRY POINT */}
         <div className="w-full max-w-md mb-16 animate-fade-in-up">
-          <VoiceInput />
+          <VoiceInput onResult={(text) => console.log('Voice Search:', text)} />
         </div>
 
         {/* Trust Indicators */}
@@ -81,6 +75,35 @@ export default async function LandingPage() {
             <span className="w-2 h-2 bg-gold rounded-full" />
             Byzantine Fault Tolerance
           </span>
+        </div>
+      </section>
+
+      {/* THE WHY SECTION */}
+      <section className="px-6 py-24 container mx-auto">
+        <div className="grid md:grid-cols-2 gap-16 items-center">
+          <div className="space-y-8">
+            <h2 className="text-3xl md:text-5xl font-bold text-text-primary leading-tight">
+              AI shouldn't cost a fortune. <br />
+              <span className="text-status-offline">Centralization is the bottleneck.</span>
+            </h2>
+            <div className="space-y-4 text-text-secondary text-lg">
+              <p>
+                Today's AI is locked behind ivory towers. It's expensive, opaque, and prone to single-point failures.
+              </p>
+              <p>
+                We built the <span className="text-accent-violet font-bold">Symphony</span> to democratize intelligence. By orchestrating a swarm of specialized, lightweight models, we provide 100x efficiency without sacrificing truth.
+              </p>
+            </div>
+          </div>
+
+          <div className="relative aspect-video rounded-3xl overflow-hidden border border-white/10 bg-obsidian-elevated p-8 flex items-center justify-center">
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-transparent" />
+            <div className="relative text-center">
+              <Sparkles className="w-12 h-12 text-accent-violet mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">BFT Reasoning</h3>
+              <p className="text-sm text-text-muted">High-integrity consensus across 12 unique agent perspectives.</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -152,17 +175,57 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* VIRAL REPUTATION SECTION */}
+      <section className="px-6 py-24 container mx-auto">
+        <div className="p-12 rounded-[2.5rem] bg-gradient-to-br from-obsidian-elevated to-obsidian-surface border border-white/5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-[100px] -z-10" />
+
+          <div className="max-w-3xl">
+            <h2 className="text-3xl md:text-5xl font-bold text-text-primary mb-8 leading-tight">
+              Privacy-Preserving <br />
+              <span className="text-cyan-400">Social Proof</span>
+            </h2>
+            <p className="text-xl text-text-secondary mb-10">
+              Your reputation is your equity. With **ZKP RedpID**, shared truths are verified without leaking your data. Tap into a global network of conductors and earn rewards for every successful orchestration.
+            </p>
+
+            <div className="flex flex-wrap gap-8">
+              <div className="space-y-2">
+                <div className="text-3xl font-bold text-white tracking-tighter">100%</div>
+                <div className="text-xs uppercase tracking-widest text-text-muted font-mono">Verifiable</div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-3xl font-bold text-white tracking-tighter">ZERO</div>
+                <div className="text-xs uppercase tracking-widest text-text-muted font-mono">Data Leakage</div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-3xl font-bold text-white tracking-tighter">VIRAL</div>
+                <div className="text-xs uppercase tracking-widest text-text-muted font-mono">Expansion</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FINAL CTA */}
-      <section className="px-6 py-32 text-center">
-        <h2 className="text-4xl font-bold text-text-primary mb-6">Ready to Conduct?</h2>
-        <p className="text-text-secondary mb-10 max-w-xl mx-auto">
-          Join the revolution of safe, affordable, and democratic AI.
+      <section className="px-6 py-32 text-center max-w-4xl mx-auto">
+        <h2 className="text-4xl md:text-6xl font-black text-text-primary mb-8 tracking-tight">
+          Ready to Conduct the <br />
+          <span className="text-accent-violet">Global Swarm?</span>
+        </h2>
+        <p className="text-xl text-text-secondary mb-12 leading-relaxed">
+          Join 8,000+ conductors who are leveraging the AI Trinity Symphony to build the future.
+          The next era of intelligence is decentralized.
         </p>
-        <Link href="/join">
-          <Button size="lg" className="px-12 text-lg shadow-glow-violet hover:shadow-glow-violet/50">
-            Initialize Identity
-          </Button>
-        </Link>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+          <Link href="/join" className="group relative w-full sm:w-auto">
+            <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 to-cyan-600 rounded-xl blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
+            <Button size="lg" className="relative px-12 py-8 text-xl w-full sm:w-auto">
+              Initialize Identity
+            </Button>
+          </Link>
+          <TelegramLoginWidget />
+        </div>
       </section>
 
       {/* FOOTER */}
