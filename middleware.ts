@@ -69,8 +69,11 @@ export default function middleware(request: NextRequest) {
     }
 
     // --- 3. SUBDOMAIN FALLTHROUGH ---
+    // If on controller subdomain, we've already handled / rewrite.
+    // For other paths, we just want to continue.
+    // Using rewrite to self can sometimes cause issues in certain environments.
     if (hostname.startsWith('controller.')) {
-        return NextResponse.rewrite(new URL(pathname, request.url));
+        return NextResponse.next();
     }
 
     return NextResponse.next();

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Lightbulb, Users, Grid, Zap } from 'lucide-react';
+import { Activity, Lightbulb, Users, Heart, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function MobileNav() {
@@ -10,10 +10,10 @@ export function MobileNav() {
 
     const navItems = [
         { name: 'Health', href: '/pulse/conductor', icon: Activity },
-        { name: 'Active', href: '/pulse/conductor?view=active', icon: Zap }, // Mapping "Active" to conductor for now
-        { name: 'Ideas', href: '/pulse/wisdom', icon: Lightbulb }, // Mapping "Ideas" to Wisdom/Governance
-        { name: 'Agents', href: '/pulse/conductor?view=agents', icon: Users },
-        { name: 'Apps', href: '/impact', icon: Grid }, // Mapping "Apps" to Landing for now or a new apps page
+        { name: 'Directives', href: '/pulse/directives', icon: Lightbulb },
+        { name: 'Wisdom', href: '/pulse/wisdom', icon: Users },
+        { name: 'Impact', href: '/impact', icon: Heart },
+        { name: 'Conductor', href: '/pulse/conductor', icon: Zap },
     ];
 
     return (

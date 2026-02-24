@@ -38,9 +38,9 @@ export function NavBar() {
         if (pathname.includes('/tasks')) return 'Tasks';
         if (pathname.includes('/artifacts')) return 'Artifacts';
         if (pathname.includes('/mission')) return 'New Mission';
-        if (pathname.includes('/directives')) return 'Ideas';
+        if (pathname.includes('/directives')) return 'Directives';
         if (pathname.includes('/sandbox')) return 'Apps';
-        if (pathname.includes('/wisdom')) return 'Governance';
+        if (pathname.includes('/wisdom')) return 'Wisdom';
         if (pathname.includes('/watch')) return 'Public View';
         if (pathname.includes('/join')) return 'Join the Symphony';
 
@@ -60,38 +60,42 @@ export function NavBar() {
             )}>
                 <div className="px-4 h-full flex items-center justify-between max-w-[2000px] mx-auto">
                     {/* Left: Brand + Title */}
-                    <div className="flex items-center gap-4">
-                        <ZKPRepIDBadge agentName="Founder" minRep={100} />
-                        <Link
-                            href="/pulse/conductor"
-                            onClick={triggerHaptic}
-                            className="flex items-center gap-3 group"
-                        >
-                            {!isPulse && (
-                                <motion.div
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:shadow-cyan-500/40 transition-all duration-500"
-                                >
-                                    <Activity className="w-6 h-6 text-white" />
-                                </motion.div>
-                            )}
+                    <Link
+                        href="/pulse/conductor"
+                        onClick={triggerHaptic}
+                        className="flex items-center gap-3 group"
+                    >
+                        {!isPulse && (
+                            <motion.div
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:shadow-cyan-500/40 transition-all duration-500"
+                            >
+                                <Activity className="w-6 h-6 text-white" />
+                            </motion.div>
+                        )}
 
-                            <div className="flex flex-col">
-                                {!isPulse && (
-                                    <span className="text-[10px] md:text-xs font-black bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent uppercase tracking-[0.2em] leading-none mb-1">
-                                        AI Trinity Symphony
-                                    </span>
-                                )}
-                                <h1 className="text-lg md:text-xl font-bold text-white tracking-tight leading-none group-hover:text-cyan-400 transition-colors">
-                                    {getPageTitle()}
-                                </h1>
-                            </div>
-                        </Link>
-                    </div>
+                        <div className="flex flex-col">
+                            {!isPulse && (
+                                <span className="text-[10px] md:text-xs font-black bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent uppercase tracking-[0.2em] leading-none mb-1">
+                                    AI Trinity Symphony
+                                </span>
+                            )}
+                            <h1 className="text-lg md:text-xl font-bold text-white tracking-tight leading-none group-hover:text-cyan-400 transition-colors">
+                                {getPageTitle()}
+                            </h1>
+                        </div>
+                    </Link>
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-2 sm:gap-4">
+                        {/* ZKP Badge (Role Sensitive) */}
+                        {isPulse && (
+                            <div className="hidden lg:block scale-50 -mr-6 origin-right opacity-80 hover:opacity-100 transition-opacity">
+                                <ZKPRepIDBadge agentName="Founder" minRep={100} />
+                            </div>
+                        )}
+
                         {/* Home Button */}
                         <motion.div
                             whileHover={{ scale: 1.05 }}
@@ -115,28 +119,17 @@ export function NavBar() {
                                 triggerHaptic();
                                 setIsShareOpen(true);
                             }}
-                            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 transition-all group"
+                            className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 transition-all group"
                         >
                             <Share2 className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                            <span className="text-xs font-bold uppercase tracking-wider">Share & Earn</span>
+                            <span className="text-xs font-bold uppercase tracking-wider">Share</span>
                             <div className="absolute -top-1 -right-1 w-2 h-2 bg-cyan-400 rounded-full animate-ping" />
                         </motion.button>
 
-                        {/* Mobile Share Icon only */}
-                        <button
-                            onClick={() => {
-                                triggerHaptic();
-                                setIsShareOpen(true);
-                            }}
-                            className="sm:hidden w-10 h-10 flex items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30"
-                        >
-                            <Share2 className="w-5 h-5" />
-                        </button>
-
                         {/* Voice Mode / Onboarding Toggle */}
-                        {!pathname.includes('/join') && (
+                        {!pathname.includes('/join') && !isPulse && (
                             <Link href="/join">
-                                <Button size="sm" className="hidden md:flex px-6 shadow-glow-violet">
+                                <Button size="sm" className="hidden md:flex px-6 shadow-glow-violet bg-violet-600 hover:bg-violet-500 text-white border-0">
                                     Join Symphony
                                 </Button>
                             </Link>

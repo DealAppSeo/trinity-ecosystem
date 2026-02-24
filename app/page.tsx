@@ -83,15 +83,15 @@ export default async function LandingPage() {
         <div className="grid md:grid-cols-2 gap-16 items-center">
           <div className="space-y-8">
             <h2 className="text-3xl md:text-5xl font-bold text-text-primary leading-tight">
-              AI shouldn't cost a fortune. <br />
-              <span className="text-status-offline">Centralization is the bottleneck.</span>
+              AI shouldn't lie. <br />
+              <span className="text-accent-violet">Truth is the new gold.</span>
             </h2>
             <div className="space-y-4 text-text-secondary text-lg">
               <p>
-                Today's AI is locked behind ivory towers. It's expensive, opaque, and prone to single-point failures.
+                Today's AI is often a "black box" that hallucinates. It's expensive, biased, and opaque.
               </p>
               <p>
-                We built the <span className="text-accent-violet font-bold">Symphony</span> to democratize intelligence. By orchestrating a swarm of specialized, lightweight models, we provide 100x efficiency without sacrificing truth.
+                We built the <span className="text-white font-bold">Symphony</span> to provide <span className="text-status-online font-bold">Fact-Checked Intelligence</span>. By orchestrating a swarm of specialized agents that verify each other, we deliver 100x efficiency with absolute integrity.
               </p>
             </div>
           </div>

@@ -157,7 +157,7 @@ export default function ConductorPage() {
 
     return (
         <div className="min-h-screen bg-obsidian-base flex flex-col pb-24 md:pb-0">
-            {/* North Star Directive Input (Relocated) */}
+            {/* North Star Directive Input */}
             <div className="container mx-auto px-4 py-2 mb-4 flex gap-3">
                 <div className="flex-1">
                     <input
@@ -170,15 +170,11 @@ export default function ConductorPage() {
                     />
                 </div>
                 <div className="shrink-0 flex items-center">
-                    <VoiceInput
-                        onTranscript={handleVoiceCommand}
-                    />
+                    <VoiceInput onTranscript={handleVoiceCommand} />
                 </div>
             </div>
 
             <main className="flex-1 container mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-                {/* SHOW BIG RED OFFLINE STATE IF NO AGENTS */}
                 {!loading && onlineCount === 0 ? (
                     <div className="lg:col-span-4 flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in zoom-in duration-500">
                         <div className="w-32 h-32 bg-red-500 rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(239,68,68,0.5)]">
@@ -188,93 +184,60 @@ export default function ConductorPage() {
                         <p className="text-zinc-400 mb-8 max-w-md text-center">
                             The swarm is currently dormant. Wake the agents to resume operations and task processing.
                         </p>
-
-                        {/* Stats Row (Offline) */}
-                        <div className="grid grid-cols-3 gap-6 w-full max-w-2xl mb-12">
-                            <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 text-center">
-                                <Activity className="w-6 h-6 mx-auto mb-2 text-zinc-500" />
-                                <div className="text-3xl font-bold text-white mb-1">0%</div>
-                                <div className="text-xs text-zinc-500 uppercase tracking-wider">Uptime</div>
-                            </div>
-                            <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 text-center">
-                                <div className="text-3xl font-bold text-white mb-1">5</div>
-                                <div className="text-xs text-zinc-500 uppercase tracking-wider">Tasks Today</div>
-                            </div>
-                            <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 text-center">
-                                <div className="text-3xl font-bold text-white mb-1">$0.15</div>
-                                <div className="text-xs text-zinc-500 uppercase tracking-wider">Saved Today</div>
-                            </div>
-                        </div>
-
                         <div className="flex gap-4 w-full max-w-md">
-                            <button
-                                onClick={wakeTrinity}
-                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                            >
+                            <button onClick={wakeTrinity} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
                                 <Activity className="w-5 h-5" /> WAKE SWARM
                             </button>
-                            <button
-                                onClick={resetTrinity}
-                                className="flex-1 bg-zinc-800 hover:bg-red-900 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 border border-white/5"
-                            >
+                            <button onClick={resetTrinity} className="flex-1 bg-zinc-800 hover:bg-red-900 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 border border-white/5">
                                 <Skull className="w-5 h-5" /> REBOOT
                             </button>
                         </div>
                     </div>
                 ) : (
                     <>
-                        {/* Iron Gate Banner (Guest Mode) */}
-                        {!isFounder && (
-                            <div className="lg:col-span-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center justify-between mb-4 animate-in slide-in-from-top duration-500">
-                                <div className="flex items-center gap-3">
-                                    <AlertTriangle className="w-5 h-5 text-amber-500" />
-                                    <div>
-                                        <p className="text-sm font-bold text-amber-400">Guest Access: Read-Only Mode</p>
-                                        <p className="text-xs text-amber-500/70">You can monitor swarm activity, but controls are reserved for Founders.</p>
-                                    </div>
-                                </div>
-                                <Link href="/join">
-                                    <Button variant="secondary" size="sm" className="bg-amber-500/20 border-amber-500/30 text-amber-400 hover:bg-amber-500/30">
-                                        Take Command →
-                                    </Button>
-                                </Link>
-                            </div>
-                        )}
-
-                        {/* Mobile Tab Switcher */}
-                        <div className="lg:hidden flex border-b border-white/5 bg-obsidian-surface/50 rounded-t-xl overflow-hidden shrink-0">
-                            {(['grid', 'tasks', 'logs'] as const).map((tab) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={cn(
-                                        "flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-all",
-                                        activeTab === tab
-                                            ? "bg-white/10 text-cyan-400 border-b-2 border-cyan-400"
-                                            : "text-zinc-500"
-                                    )}
-                                >
-                                    {tab}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* LEFT COLUMN: Grid & Activity (Active State) */}
+                        {/* LEFT COLUMN: Grid & Activity */}
                         <div className={cn(
                             "lg:col-span-3 flex flex-col gap-6 h-full overflow-hidden",
                             activeTab !== 'grid' && 'hidden lg:flex'
                         )}>
+                            {!isFounder && (
+                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center justify-between mb-4 animate-in slide-in-from-top duration-500">
+                                    <div className="flex items-center gap-3">
+                                        <AlertTriangle className="w-5 h-5 text-amber-500" />
+                                        <div>
+                                            <p className="text-sm font-bold text-amber-400 uppercase tracking-tighter">Guest: Read-Only</p>
+                                        </div>
+                                    </div>
+                                    <Link href="/join">
+                                        <Button variant="secondary" size="sm" className="bg-amber-500/20 border-amber-500/30 text-amber-400">
+                                            Take Command →
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )}
 
-                            {/* Sovereign Dashboard Row 1 */}
+                            <div className="lg:hidden flex border-b border-white/5 bg-obsidian-surface/50 rounded-t-xl overflow-hidden shrink-0">
+                                {(['grid', 'tasks', 'logs'] as const).map((tab) => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab)}
+                                        className={cn(
+                                            "flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-all",
+                                            activeTab === tab ? "bg-white/10 text-cyan-400 border-b-2 border-cyan-400" : "text-zinc-500"
+                                        )}
+                                    >
+                                        {tab}
+                                    </button>
+                                ))}
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
-                                <ConstitutionalHeartbeat
-                                    status={sovereignData?.governance?.recent_events?.some((e: any) => e.message?.includes('VIOLATION')) ? 'violating' : 'aligned'}
-                                    recentEvents={sovereignData?.governance?.recent_events}
-                                />
-                                <InfraHealthCard
-                                    services={sovereignData?.infra?.services || []}
-                                    status={sovereignData?.infra?.status || 'healthy'}
-                                />
+                                <div className="md:col-span-2">
+                                    <ConstitutionalHeartbeat
+                                        status={sovereignData?.governance?.recent_events?.some((e: any) => e.message?.includes('VIOLATION')) ? 'violating' : 'aligned'}
+                                        recentEvents={sovereignData?.governance?.recent_events}
+                                    />
+                                </div>
                                 <SovereignMemoryExplorer
                                     nodeCount={sovereignData?.graph?.nodes || 0}
                                     relationCount={sovereignData?.graph?.relationships || 0}
@@ -282,75 +245,50 @@ export default function ConductorPage() {
                                 />
                             </div>
 
-                            {/* Chaos & Triad Row */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
-                                {/* System Status Summary */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 shrink-0">
                                 <div className="md:col-span-1 bg-gradient-to-r from-emerald-500/10 to-emerald-900/10 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                                            <Activity className="w-5 h-5 text-emerald-400" />
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                            <Activity className="w-4 h-4 text-emerald-400" />
                                         </div>
                                         <div>
-                                            <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                                                Active
-                                                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">v1.0.2</span>
-                                            </h2>
-                                            <p className="text-[10px] text-zinc-400">{onlineCount} agents / {stats?.active_tasks || 0} tasks</p>
+                                            <h2 className="text-[10px] font-black text-white uppercase tracking-tighter">Active <span className="text-emerald-500">v1.0.2</span></h2>
+                                            <p className="text-[9px] text-zinc-500 font-mono tracking-tighter text-nowrap">{onlineCount} AGENTS / {stats?.active_tasks || 0} TASKS</p>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Chaos Testing */}
                                 <div className={cn(
-                                    "bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden group",
+                                    "md:col-span-2 bg-zinc-900/50 border border-white/5 rounded-xl p-2 px-4 flex items-center justify-between group",
                                     !isFounder && "opacity-50 grayscale pointer-events-none"
                                 )}>
-                                    <div className="absolute inset-0 bg-red-900/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <div className="flex items-start justify-between relative z-10">
+                                    <div className="flex items-center gap-6">
                                         <div className="flex items-center gap-2">
-                                            <Skull className="w-5 h-5 text-red-500" />
-                                            <div>
-                                                <h2 className="text-sm font-bold text-zinc-100">Chaos Testing</h2>
-                                            </div>
+                                            <Skull className="w-4 h-4 text-red-500" />
+                                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-tighter">Ops</span>
                                         </div>
                                         {isFounder && (
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={wakeTrinity}
-                                                    className="px-2 py-1 bg-emerald-950/50 border border-emerald-900/30 text-emerald-300 text-[10px] rounded hover:bg-emerald-900/80 transition-colors"
-                                                >
-                                                    Wake
-                                                </button>
-                                                <button
-                                                    onClick={resetTrinity}
-                                                    className="px-2 py-1 bg-red-950/50 border border-red-900/30 text-red-300 text-[10px] rounded hover:bg-red-900/80 transition-colors"
-                                                >
-                                                    Kill All
-                                                </button>
+                                            <div className="flex gap-2 text-nowrap">
+                                                <button onClick={wakeTrinity} className="px-3 py-1 bg-emerald-500 text-black text-[10px] font-black uppercase rounded-md hover:bg-emerald-400 transition-all shadow-glow-emerald">Wake</button>
+                                                <button onClick={resetTrinity} className="px-3 py-1 bg-red-600 text-white text-[10px] font-black uppercase rounded-md hover:bg-red-500 transition-all shadow-glow-red">Flush</button>
                                             </div>
                                         )}
                                     </div>
+                                    <div className="hidden sm:flex items-center gap-4 text-[9px] font-mono text-zinc-600">
+                                        <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> RAILWAY: OK</span>
+                                        <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> NEON: OK</span>
+                                    </div>
                                 </div>
 
-                                {/* Squad Status Summary */}
-                                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden">
+                                <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-3">
                                     <div className="grid grid-cols-4 gap-2">
                                         {Object.values(AGENT_GROUPS).map(group => {
                                             const groupAgents = agents.filter(a => group.members.includes(a.agent_name));
-                                            const onlineCount = groupAgents.filter(a => ['online', 'active', 'green', 'blue'].includes(a.status)).length;
-                                            const busyCount = groupAgents.filter(a => (a as any).current_task_summary && (a as any).current_task_summary !== 'Idle').length;
-                                            const total = group.members.length;
+                                            const gOnline = groupAgents.filter(a => ['online', 'active', 'green', 'blue'].includes(a.status)).length;
                                             return (
-                                                <div key={group.id} className={cn(
-                                                    "relative bg-black/40 py-2 px-1 rounded border min-w-0 transition-all",
-                                                    busyCount > 0 ? "border-emerald-500/40" : "border-zinc-800/50"
-                                                )}>
-                                                    <div className="text-[7px] text-zinc-500 uppercase tracking-tighter mb-1 truncate text-center px-1">
-                                                        {group.id === 'ORCHESTRATION' ? 'ORCH' : group.name.split(' ')[0]}
-                                                    </div>
-                                                    <div className="text-[10px] font-mono font-bold text-center">
-                                                        {onlineCount}/{total}
-                                                    </div>
+                                                <div key={group.id} className="text-center">
+                                                    <div className="text-[7px] text-zinc-600 uppercase tracking-tighter truncate">{group.id.slice(0, 4)}</div>
+                                                    <div className="text-[10px] font-mono font-bold text-zinc-400">{gOnline}/{group.members.length}</div>
                                                 </div>
                                             );
                                         })}
@@ -358,44 +296,28 @@ export default function ConductorPage() {
                                 </div>
                             </div>
 
-                            {/* Reward Tuner & Grid */}
+                            {sovereignData?.infra?.services?.length > 0 && (
+                                <div className="shrink-0 animate-in fade-in duration-500">
+                                    <InfraHealthCard services={sovereignData.infra.services} status={sovereignData.infra.status || 'healthy'} />
+                                </div>
+                            )}
+
                             <div className="flex-1 flex flex-col gap-6 overflow-hidden">
                                 <div className={cn(!isFounder && "opacity-50 grayscale pointer-events-none shrink-0")}>
                                     <RewardTuner />
                                 </div>
-
                                 <div className="flex-1 overflow-y-auto custom-scrollbar min-h-[300px]">
                                     <div className="mb-4 flex items-center justify-between">
-                                        <h2 className="text-xl font-semibold text-text-primary">Symphony Grid</h2>
-                                        <div className="flex gap-2">
-                                            {loading && agents.length === 0 ? (
-                                                <Skeleton className="w-24 h-6" />
-                                            ) : (
-                                                <span className="text-xs text-status-online bg-status-online/10 px-2 py-1 rounded border border-status-online/20 flex items-center gap-2">
-                                                    <span className={`w-2 h-2 rounded-full ${onlineCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                                                    {onlineCount}/12 Systems Active
-                                                </span>
-                                            )}
-                                        </div>
+                                        <h2 className="text-xl font-semibold text-text-primary uppercase tracking-tight">Symphony Swarm</h2>
+                                        <span className="text-[10px] text-status-online bg-status-online/10 px-2 py-1 rounded border border-status-online/20 flex items-center gap-2 font-black uppercase">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                            {onlineCount}/12 Systems Active
+                                        </span>
                                     </div>
-
-                                    {loading && agents.length === 0 ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
-                                        </div>
-                                    ) : (
-                                        <AgentGrid
-                                            agents={filteredAgents}
-                                            isConductor={true}
-                                            onAssignTask={(agentName) => {
-                                                console.log('Assign to', agentName);
-                                            }}
-                                        />
-                                    )}
+                                    <AgentGrid agents={filteredAgents} isConductor={true} onAssignTask={(name) => console.log('Assign to', name)} />
                                 </div>
                             </div>
 
-                            {/* Activity Feed (Bottom) */}
                             <div className="h-48 shrink-0">
                                 <ActivityFeed logs={logs} />
                             </div>
@@ -406,7 +328,6 @@ export default function ConductorPage() {
                             "lg:col-span-1 flex flex-col gap-6 h-full",
                             activeTab !== 'tasks' && 'hidden lg:flex'
                         )}>
-                            {/* HITL Action Center */}
                             <HITLActionCenter
                                 pendingEvents={tasks.filter(t => t.status === 'pending_clarification').map(t => ({
                                     id: t.id,
@@ -418,20 +339,12 @@ export default function ConductorPage() {
                                 onApprove={handleHITLApprove}
                                 onReject={handleHITLReject}
                             />
-
-                            {/* Invite Manager */}
                             <div className="shrink-0">
                                 <InviteManager supabase={supabase} />
                             </div>
-
-                            {/* Task Queue */}
                             <div className="flex-1 flex flex-col min-h-0">
-                                <TaskQueue
-                                    tasks={tasks as any}
-                                    onAddTask={() => setShowAddTask(true)}
-                                />
+                                <TaskQueue tasks={tasks as any} onAddTask={() => setShowAddTask(true)} />
                             </div>
-
                             <button
                                 onClick={() => confirm('⚠️ EMERGENCY PAUSE ALL AGENTS?') && triggerChaosEvent('SYSTEM_HALT')}
                                 disabled={!isFounder}
@@ -440,89 +353,12 @@ export default function ConductorPage() {
                                     !isFounder && "opacity-50 cursor-not-allowed"
                                 )}
                             >
-                                <ServerCrash className="w-4 h-4" /> EMERGENCY PAUSE
+                                <ServerCrash className="w-4 h-4" /> SYSTEM HALT
                             </button>
-                        </div>
-
-                        {/* MOBILE LOGS VIEW */}
-                        <div className={cn(
-                            "lg:hidden flex flex-col gap-6 h-[70vh]",
-                            activeTab !== 'logs' && 'hidden'
-                        )}>
-                            <ActivityFeed logs={logs} />
                         </div>
                     </>
                 )}
-
             </main>
-
-            {/* Networks & Infrastructure Row */}
-            <div className="container mx-auto px-4 py-8 border-t border-white/5 mt-8">
-                <div className="flex items-center gap-2 mb-6">
-                    <Share2 className="w-5 h-5 text-accent-blue" />
-                    <h2 className="text-lg font-bold text-white uppercase tracking-widest">Ecosystem Infrastructure</h2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {/* Ecosystem Special View */}
-                    {ecosystemAgents.map(entity => (
-                        <div key={entity.agent_name} className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className={cn(
-                                    "w-3 h-3 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]",
-                                    entity.status === 'online' ? 'bg-emerald-500' : 'bg-red-500'
-                                )} />
-                                <div>
-                                    <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">{entity.agent_name}</h3>
-                                    <p className="text-[10px] text-zinc-500">{entity.current_task_summary || 'System Ready'}</p>
-                                </div>
-                            </div>
-                            <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded border border-white/5 uppercase">Network</span>
-                        </div>
-                    ))}
-
-                    {/* System Status Indicators */}
-                    <div className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
-                            <div>
-                                <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">n8n Bridge</h3>
-                                <p className="text-[10px] text-zinc-500">Automation Active</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
-                            <div>
-                                <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">Flowise</h3>
-                                <p className="text-[10px] text-zinc-500">Reasoning Nodes Online</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
-                            <div>
-                                <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">PostgreSQL</h3>
-                                <p className="text-[10px] text-zinc-500">State Store Online</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-zinc-900/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
-                            <div>
-                                <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">Memory Graph</h3>
-                                <p className="text-[10px] text-zinc-500">Neo4j/Memgraph Ready</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <main className="min-h-[100px]" /> {/* Spacer */}
 
             <CostTicker traditional={847.00} trinity={0.47} googleStitch={0.0} />
 

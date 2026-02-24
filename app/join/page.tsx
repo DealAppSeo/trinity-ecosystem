@@ -97,121 +97,118 @@ function JoinContent() {
     };
 
     return (
-        <div className="max-w-2xl w-full space-y-12">
+        <div className="max-w-2xl w-full space-y-12 flex flex-col items-center text-center px-4">
             {/* Header */}
-            <div className="space-y-6 text-center md:text-left">
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
+            <div className="space-y-4">
+                <h1 className="text-4xl md:text-6xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-400 to-white animate-pulse">
                     Democratizing Intelligence.
                 </h1>
-                <div className="h-1 w-20 bg-purple-600 rounded-full mx-auto md:mx-0" />
+                <div className="h-1 w-24 bg-accent-violet rounded-full mx-auto" />
             </div>
 
             {/* Manifesto */}
-            <div className="space-y-6 text-lg md:text-xl text-gray-300 font-light leading-relaxed">
+            <div className="space-y-6 text-lg md:text-xl text-zinc-400 font-light leading-relaxed max-w-xl">
                 <p>
-                    We believe AI should be democratized, created to be <span className="text-white font-medium">safe</span> and <span className="text-white font-medium">ethical</span>.
-                </p>
-                <p>
-                    Join our Early Adopter program and save 50-90% on AI costs by bringing your own API keys.
+                    We believe AI should be <span className="text-white font-bold">safe, ethical, and fact-checked</span>. Join the first system built on truth.
                 </p>
 
                 {/* Pricing Tiers */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 text-left">
                     <button
                         onClick={() => setTier('standard')}
-                        className={`p-6 rounded-2xl border transition-all text-left group ${tier === 'standard' ? 'border-purple-500 bg-purple-500/10' : 'border-white/5 bg-white/5 hover:border-white/10'}`}
+                        className={`p-6 rounded-2xl border transition-all group ${tier === 'standard' ? 'border-accent-violet bg-accent-violet/10' : 'border-white/5 bg-white/5 hover:border-white/10'}`}
                     >
-                        <div className="flex justify-between items-start mb-4">
-                            <span className="text-xs font-bold uppercase tracking-widest text-purple-400">Standard</span>
-                            <span className="text-2xl font-bold">$100<span className="text-xs text-gray-500">/mo</span></span>
+                        <div className="flex justify-between items-start mb-2">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-accent-violet">Standard</span>
+                            <span className="text-xl font-bold">$100<span className="text-xs text-zinc-500">/mo</span></span>
                         </div>
-                        <p className="text-sm text-gray-400">Fixed cost, managed infrastructure. No keys required.</p>
+                        <p className="text-xs text-zinc-500">Managed infrastructure. Infinite peace of mind.</p>
                     </button>
 
                     <button
                         onClick={() => setTier('byok')}
-                        className={`p-6 rounded-2xl border transition-all text-left group ${tier === 'byok' ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/5 bg-white/5 hover:border-white/10'}`}
+                        className={`p-6 rounded-2xl border transition-all group ${tier === 'byok' ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/5 bg-white/5 hover:border-white/10'}`}
                     >
-                        <div className="flex justify-between items-start mb-4">
-                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">BYOK</span>
-                            <span className="text-2xl font-bold">$20<span className="text-xs text-gray-500">/mo</span></span>
+                        <div className="flex justify-between items-start mb-2">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">BYOK</span>
+                            <span className="text-xl font-bold">$20<span className="text-xs text-zinc-500">/mo</span></span>
                         </div>
-                        <p className="text-sm text-gray-400">Founder-Lite. Plug in your own OpenAI/Anthropic keys.</p>
+                        <p className="text-xs text-zinc-500">Plug in your own keys. Save up to 90%.</p>
                     </button>
                 </div>
             </div>
 
             {/* Entry Gate */}
-            <form onSubmit={handleAccess} className="space-y-6 max-w-md">
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Email Address</label>
+            <form onSubmit={handleAccess} className="space-y-8 w-full max-w-md">
+                <div className="space-y-6">
+                    <div className="text-left">
+                        <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-600 mb-2 font-black">Email Address</label>
                         <input
                             type="email"
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="you@future.com"
-                            className="w-full bg-gray-900 border border-gray-800 rounded-md p-4 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                            className="w-full bg-zinc-900/50 border border-white/5 rounded-xl p-4 text-white focus:outline-none focus:border-accent-violet transition-all shadow-inner"
                         />
                     </div>
 
                     {tier === 'byok' && (
-                        <div>
-                            <label className="block text-xs uppercase tracking-widest text-emerald-500 mb-2">Your API Key (Optional for now)</label>
+                        <div className="text-left animate-in slide-in-from-top duration-300">
+                            <label className="block text-[10px] uppercase tracking-[0.2em] text-emerald-500 mb-2 font-black">OpenAI / Anthropic Key</label>
                             <input
                                 type="text"
                                 value={byokKey}
                                 onChange={(e) => setByokKey(e.target.value)}
                                 placeholder="sk-..."
-                                className="w-full bg-emerald-950/20 border border-emerald-500/20 rounded-md p-4 text-white focus:outline-none focus:border-emerald-500 transition-colors font-mono text-sm"
+                                className="w-full bg-emerald-950/20 border border-emerald-500/20 rounded-xl p-4 text-white focus:outline-none focus:border-emerald-500 transition-all font-mono text-sm"
                             />
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4 text-left">
                         <div>
-                            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Access Code</label>
+                            <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-600 mb-2 font-black">Access Code</label>
                             <input
                                 type="text"
                                 value={code}
                                 onChange={(e) => setCode(e.target.value)}
                                 placeholder="SPARK"
-                                className="w-full bg-gray-900 border border-gray-800 rounded-md p-4 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                                className="w-full bg-zinc-900/50 border border-white/5 rounded-xl p-4 text-white focus:outline-none focus:border-accent-violet transition-all"
                             />
                         </div>
                         <div>
-                            <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Discount Code</label>
+                            <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-600 mb-2 font-black">Discount</label>
                             <input
                                 type="text"
                                 value={promoCode}
                                 onChange={(e) => setPromoCode(e.target.value)}
                                 placeholder="EARLY50"
-                                className="w-full bg-gray-900 border border-gray-800 rounded-md p-4 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                                className="w-full bg-zinc-900/50 border border-white/5 rounded-xl p-4 text-white focus:outline-none focus:border-accent-violet transition-all"
                             />
                         </div>
                     </div>
                 </div>
 
-                <div className="pt-6 border-t border-white/5">
-                    <label className="block text-xs uppercase tracking-widest text-gold mb-2">Symphony Key (Founders Only)</label>
+                <div className="pt-8 border-t border-white/5 text-left">
+                    <label className="block text-[10px] uppercase tracking-[0.2em] text-amber-500/70 mb-2 font-black">Symphony Key (Founders Only)</label>
                     <input
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full bg-gold/5 border border-gold/20 rounded-md p-4 text-gold focus:outline-none focus:border-gold transition-colors"
+                        className="w-full bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 text-amber-400 focus:outline-none focus:border-amber-500 transition-all"
                     />
                 </div>
 
-                {error && <p className="text-red-400 text-sm">{error}</p>}
+                {error && <p className="text-red-400 text-xs font-medium animate-bounce">{error}</p>}
 
                 <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-6 text-lg bg-white text-black hover:bg-gray-200 transition-colors shadow-xl shadow-white/5"
+                    className="w-full py-8 text-xl bg-white text-black hover:bg-zinc-200 transition-all rounded-2xl shadow-[0_20px_40px_rgba(255,255,255,0.1)] active:scale-95 disabled:opacity-50"
                 >
-                    {loading ? 'Processing...' : 'Secure Early Access →'}
+                    {loading ? 'Processing...' : 'Secure Early Access'}
                 </Button>
             </form>
         </div>
