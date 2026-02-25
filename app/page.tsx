@@ -21,7 +21,7 @@ export default async function LandingPage() {
     <main className="min-h-screen bg-obsidian-base pt-20 pb-16">
 
       {/* AHA! MOMENT HERO */}
-      <section className="relative px-6 py-24 md:py-40 flex flex-col items-center justify-center text-center overflow-hidden">
+      <section className="relative px-4 md:px-6 py-20 md:py-40 flex flex-col items-center justify-center text-center overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-accent-violet/5 rounded-full blur-[140px] -z-10" />
 
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-violet/10 border border-accent-violet/20 text-accent-violet text-[10px] font-black uppercase tracking-widest mb-8 animate-in fade-in slide-in-from-bottom duration-700">
@@ -29,35 +29,34 @@ export default async function LandingPage() {
           The Future of Decentralized Intelligence
         </div>
 
-        <h1 className="text-5xl md:text-8xl font-black text-white mb-8 tracking-tighter max-w-6xl leading-[0.9] animate-in fade-in slide-in-from-bottom duration-1000">
+        <h1 className="text-4xl md:text-8xl font-black text-white mb-6 md:mb-8 tracking-tighter max-w-6xl leading-tight md:leading-[1.1] animate-in fade-in slide-in-from-bottom duration-1000">
           Safe, Ethical AI. <br />
-          <span className="bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">100x Efficiency.</span>
+          <span className="bg-gradient-to-r from-violet-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">60-80% Savings.</span>
         </h1>
 
-        <p className="text-xl md:text-2xl text-zinc-400 mb-12 max-w-3xl leading-relaxed animate-in fade-in slide-in-from-bottom duration-1000 delay-200">
-          Solving the world's most complex problems with a swarm of specialized agents orchestrated for <span className="text-white font-bold">Absolute Integrity</span>.
+        <p className="text-lg md:text-2xl text-zinc-400 mb-10 md:mb-12 max-w-3xl leading-relaxed animate-in fade-in slide-in-from-bottom duration-1000 delay-200 px-4">
+          The AI Trinity Symphony combines specialized agents with <span className="text-white font-bold underline decoration-violet-500/50">Byzantine Fault Tolerance</span> to provide state-of-the-art results without the corporate tax.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center gap-6 w-full max-w-lg mb-12 animate-in fade-in slide-in-from-bottom duration-1000 delay-300">
-          <Link href="/join" className="w-full">
-            <Button className="w-full text-xl py-8 shadow-glow-violet bg-violet-600 hover:bg-violet-500 border-0">
-              Initialize Identity
+        <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-6 w-full max-w-2xl mb-12 animate-in fade-in slide-in-from-bottom duration-1000 delay-300 px-4">
+          <Link href="https://github.com/DealAppSeo" target="_blank" className="w-full">
+            <Button className="w-full text-lg py-7 shadow-glow-violet bg-violet-600 hover:bg-violet-500 border-0 flex items-center justify-center gap-2">
+              <Network className="w-5 h-5" /> Join the GitHub
             </Button>
           </Link>
           <Link href="/pulse/conductor" className="w-full">
-            <Button variant="secondary" className="w-full text-xl py-8 border-white/10 hover:bg-white/5">
-              Launch Controller
+            <Button variant="secondary" className="w-full text-lg py-7 border-white/10 hover:bg-white/5 flex items-center justify-center gap-2">
+              <ChevronRight className="w-5 h-5" /> Launch Controller
             </Button>
           </Link>
         </div>
 
         <div className="flex flex-col items-center gap-4 animate-in fade-in duration-1000 delay-500">
-          <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black">Powered by HyperDAG & BFT Protocol</p>
-          <div className="flex gap-4 opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500">
-            <Network size={20} className="text-white" />
-            <Shield size={20} className="text-white" />
-            <Zap size={20} className="text-white" />
-            <Cpu size={20} className="text-white" />
+          <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black">Open-Source Truth • Ethical Intelligence</p>
+          <div className="flex gap-6 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500">
+            <Network size={24} className="text-white" />
+            <Shield size={24} className="text-white" />
+            <Cpu size={24} className="text-white" />
           </div>
         </div>
       </section>
@@ -94,9 +93,9 @@ export default async function LandingPage() {
               <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-8 border border-cyan-500/20">
                 <Zap className="w-7 h-7 text-cyan-400" />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-4 tracking-tight">100x Cost Efficiency</h3>
+              <h3 className="text-2xl font-bold text-white mb-4 tracking-tight">60-80% Cost Efficiency</h3>
               <p className="text-zinc-400 leading-relaxed mb-8 flex-grow">
-                While others run every task through expensive LLMs, we use ANFIS/LASSO routing and SLM clusters to achieve 99% cost reduction without sacrificing reasoning depth.
+                While others run every task through expensive LLMs, we use ANFIS/LASSO routing and SLM clusters to achieve radical cost savings without sacrificing reasoning depth.
               </p>
               <Link href="/wisdom/definitions" className="inline-flex items-center gap-2 text-cyan-400 font-bold hover:text-cyan-300 transition-colors uppercase text-xs tracking-widest">
                 See the cost audit <ArrowRight className="w-4 h-4" />
@@ -168,16 +167,79 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ARCHITECTURE DEEP DIVE */}
-      <section className="px-6 py-24 md:py-40 bg-black">
+      {/* THE "KNOW HOW" DEEP DIVE */}
+      <section id="know-how" className="px-4 md:px-6 py-24 bg-obsidian-elevated/20 border-y border-white/5">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div className="relative aspect-square md:aspect-video rounded-[3rem] overflow-hidden border border-white/10 bg-black/40 p-8 flex flex-col justify-center">
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-cyan-500/10 blur-3xl -z-10" />
+              <div className="space-y-8">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-violet-600/20 flex items-center justify-center shrink-0 border border-violet-500/30">
+                    <Zap className="w-5 h-5 text-violet-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-black uppercase text-sm tracking-widest mb-2">ANFIS & LASSO Routing</h4>
+                    <p className="text-zinc-500 text-sm leading-relaxed">Recursive Fuzzy Logic (ANFIS) combined with Sparse Optimization (LASSO) ensures we only use the compute we need. Significant cost efficiency via intelligent SLM clustering.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-cyan-600/20 flex items-center justify-center shrink-0 border border-cyan-500/30">
+                    <BookOpen className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-black uppercase text-sm tracking-widest mb-2">GNN Semantic RAG</h4>
+                    <p className="text-zinc-500 text-sm leading-relaxed">Forget simple vector search. We use Multi-Relational Graph Neural Networks to provide deep context that grows with every interaction.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-600/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                    <Network className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-black uppercase text-sm tracking-widest mb-2">Edge-First Sovereignty</h4>
+                    <p className="text-zinc-500 text-sm leading-relaxed">Your data stays local. Our agents run on edge-optimized clusters, syncing only state-hashes to the decentralized HyperDAG.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-8">
+              <h2 className="text-sm font-black text-accent-violet uppercase tracking-[0.4em]">The Secret Sauce</h2>
+              <h3 className="text-4xl md:text-6xl font-black text-white tracking-tighter leading-tight">
+                State of the Art. <br />
+                <span className="text-zinc-500">Without the Corporate Tax.</span>
+              </h3>
+              <p className="text-zinc-400 text-lg leading-relaxed">
+                By combining never-before-combined formulas and decentralized infrastructure, we’ve built an ecosystem that scales with integrity. We use dual-repos with shared decentralized databases to maintain a "Shared Soul" across the swarm.
+              </p>
+              <div className="pt-4 flex flex-wrap gap-4">
+                <Link href="https://github.com/DealAppSeo" target="_blank">
+                  <Button className="bg-white text-black hover:bg-zinc-200 px-8 py-6 rounded-2xl font-black transition-all hover:scale-105 active:scale-95">
+                    Explore Repos
+                  </Button>
+                </Link>
+                <Link href="/join">
+                  <Button variant="outline" className="border-white/10 hover:bg-white/5 px-8 py-6 rounded-2xl font-black">
+                    Get Access
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ARCHITECTURE DEEP DIVE */}
+      <section className="px-4 md:px-6 py-24 md:py-40 bg-black">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 md:gap-20 items-center">
             <div>
               <h2 className="text-sm font-black text-accent-violet uppercase tracking-[0.4em] mb-8">Architectural Truth</h2>
-              <h3 className="text-5xl md:text-7xl font-black text-white mb-8 tracking-tighter leading-[0.9]">
+              <h3 className="text-4xl md:text-7xl font-black text-white mb-8 tracking-tighter leading-tight">
                 The 3x3+3 <br /> <span className="text-zinc-500">Tiered Governance.</span>
               </h3>
-              <p className="text-zinc-400 text-xl leading-relaxed mb-12">
+              <p className="text-zinc-400 text-lg md:text-xl leading-relaxed mb-12">
                 We don't trust a single model. We trust the <span className="text-white">Consensus.</span> Our architecture ensures that every input is processed by a diverse swarm of agents, cross-verified, and anchored in a tamper-proof Merkle DAG.
               </p>
 
@@ -200,17 +262,17 @@ export default async function LandingPage() {
               </ul>
             </div>
 
-            <div className="relative">
+            <div className="relative w-full max-w-full overflow-hidden">
               <div className="absolute -inset-20 bg-accent-violet/10 rounded-full blur-[120px] -z-10" />
-              <div className="p-10 rounded-[3rem] bg-obsidian-elevated/40 border border-white/10 backdrop-blur-xl relative overflow-hidden">
-                <div className="flex items-center gap-2 mb-8">
-                  <span className="w-3 h-3 rounded-full bg-red-500/50" />
-                  <span className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                  <span className="w-3 h-3 rounded-full bg-green-500/50" />
-                  <span className="ml-4 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Protocol: SYMPHONY_BFT_V3</span>
+              <div className="p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] bg-obsidian-elevated/40 border border-white/10 backdrop-blur-xl relative overflow-hidden">
+                <div className="flex items-center gap-2 mb-6 md:mb-8">
+                  <span className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-red-500/50" />
+                  <span className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-yellow-500/50" />
+                  <span className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-green-500/50" />
+                  <span className="ml-2 md:ml-4 text-[8px] md:text-[10px] font-mono text-zinc-600 uppercase tracking-widest truncate">Protocol: SYMPHONY_BFT_V3</span>
                 </div>
 
-                <div className="space-y-4 font-mono text-[11px] text-zinc-400 leading-normal">
+                <div className="space-y-4 font-mono text-[9px] md:text-[11px] text-zinc-400 leading-normal overflow-x-auto pb-4 scrollbar-none">
                   <div className="text-accent-violet"># Initialize Trinity Consensus</div>
                   <div>executor_ply(task_context) {'{'}</div>
                   <div className="pl-4">exec_a = family.anthropic.request(task)</div>
@@ -236,29 +298,30 @@ export default async function LandingPage() {
       </section>
 
       {/* CALL TO ACTION */}
-      <section className="px-6 py-24 mb-20 text-center max-w-5xl mx-auto border-t border-white/5">
-        <div className="p-16 md:p-24 rounded-[4rem] bg-gradient-to-br from-violet-600 to-indigo-900 relative overflow-hidden">
+      <section className="px-4 md:px-6 py-20 md:py-32 mb-20 text-center max-w-7xl mx-auto">
+        <div className="p-8 md:p-24 rounded-[3rem] md:rounded-[4rem] bg-gradient-to-br from-violet-600 to-indigo-900 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2" />
 
           <h2 className="text-4xl md:text-7xl font-black text-white mb-8 tracking-tighter leading-tight relative">
-            Build the Future of <br /> Ethical Intelligence.
+            Ready to Build?
           </h2>
           <p className="text-white/70 text-lg md:text-xl mb-12 max-w-2xl mx-auto relative font-medium">
-            Join a decentralized ecosystem where AI works for humanity. No gatekeepers. Just open-source truth.
+            Join the decentralized ecosystem where AI integrity meets radical efficiency. No gatekeepers. Just open-source truth.
           </p>
 
           <div className="flex flex-col md:flex-row gap-4 justify-center relative items-center">
             <Link
-              href="/join"
-              className="px-10 py-5 bg-white text-indigo-900 font-black rounded-full text-lg hover:shadow-xl hover:scale-105 transition-all active:scale-95 flex items-center gap-2"
+              href="https://github.com/DealAppSeo"
+              target="_blank"
+              className="w-full md:w-auto px-10 py-5 bg-white text-indigo-900 font-black rounded-2xl text-lg hover:shadow-xl hover:scale-105 transition-all active:scale-95 flex items-center justify-center gap-2"
             >
-              Initialize Identity <ArrowRight className="w-5 h-5" />
+              <Network className="w-5 h-5" /> Visit GitHub
             </Link>
             <Link
-              href="/pulse/conductor"
-              className="px-10 py-5 bg-transparent border-2 border-white/20 text-white font-black rounded-full text-lg hover:bg-white/10 transition-all flex items-center gap-2"
+              href="/join"
+              className="w-full md:w-auto px-10 py-5 bg-transparent border-2 border-white/20 text-white font-black rounded-2xl text-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2"
             >
-              Launch Controller
+              Create Account
             </Link>
           </div>
         </div>
