@@ -9,11 +9,10 @@ export function MobileNav() {
     const pathname = usePathname();
 
     const navItems = [
-        { name: 'Health', href: '/pulse/conductor', icon: Activity },
+        { name: 'System', href: '/pulse/conductor', icon: Activity },
         { name: 'Directives', href: '/pulse/directives', icon: Lightbulb },
         { name: 'Wisdom', href: '/pulse/wisdom', icon: Users },
         { name: 'Impact', href: '/impact', icon: Heart },
-        { name: 'Conductor', href: '/pulse/conductor', icon: Zap },
     ];
 
     return (

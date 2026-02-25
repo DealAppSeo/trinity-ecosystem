@@ -33,18 +33,11 @@ export function NavBar() {
     const getPageTitle = () => {
         const isController = typeof window !== 'undefined' && window.location.hostname.startsWith('controller');
 
-        if (pathname.includes('/dashboard')) return 'Dashboard';
-        if (pathname.includes('/agents')) return 'Agents';
-        if (pathname.includes('/tasks')) return 'Tasks';
-        if (pathname.includes('/artifacts')) return 'Artifacts';
-        if (pathname.includes('/mission')) return 'New Mission';
         if (pathname.includes('/directives')) return 'Directives';
-        if (pathname.includes('/sandbox')) return 'Apps';
         if (pathname.includes('/wisdom')) return 'Wisdom';
-        if (pathname.includes('/watch')) return 'Public View';
-        if (pathname.includes('/join')) return 'Join the Symphony';
-
-        if (isController && (pathname === '/' || pathname === '' || pathname === '/pulse/directives')) return 'Symphony Controller';
+        if (pathname.includes('/conductor')) return 'System Controller';
+        if (pathname.includes('/join')) return 'Gateway';
+        if (isController) return 'Symphony Controller';
 
         return 'AI Trinity Symphony';
     };
@@ -89,12 +82,6 @@ export function NavBar() {
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-2 sm:gap-4">
-                        {/* ZKP Badge (Role Sensitive) */}
-                        {isPulse && (
-                            <div className="hidden lg:block scale-50 -mr-6 origin-right opacity-80 hover:opacity-100 transition-opacity">
-                                <ZKPRepIDBadge agentName="Founder" minRep={100} />
-                            </div>
-                        )}
 
                         {/* Home Button */}
                         <motion.div

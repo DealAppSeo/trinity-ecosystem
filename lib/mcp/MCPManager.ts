@@ -41,9 +41,15 @@ export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
 
     constructor() {
-        // Auto-register built-ins? Or let main app do it. 
-        // For simplicity in this fix, let's register it here if we can, or just expect it.
-        // Actually, let's just make it available by default for now since it's core.
+        // Detect Build Phase (Next.js)
+        const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
+
+        if (isBuildTime) {
+            console.log('[MCPManager] Build phase detected. Skipping automatic server registration.');
+            return;
+        }
+
+        // Auto-register built-ins
         this.registerServer(new FileSystemMCP());
         this.registerServer(new PuppeteerMCP());
         this.registerServer(new FigmaMCP());

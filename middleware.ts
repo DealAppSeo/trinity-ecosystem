@@ -24,6 +24,12 @@ export default function middleware(request: NextRequest) {
         }
     }
 
+    // --- 1.5 REDUNDANT ROUTE CONSOLIDATION ---
+    const redundantPulseRoutes = ['/pulse/dashboard', '/pulse/agents', '/pulse/watch', '/pulse/sandbox'];
+    if (redundantPulseRoutes.includes(pathname)) {
+        return NextResponse.redirect(new URL('/pulse/conductor', request.url));
+    }
+
     // 2. AUTHENTICATION & PROTECTION (From Legacy Middleware) ---
 
     // Explicit Public Routes (Bypass All)

@@ -58,16 +58,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     };
 
     const navItems = [
-        { path: '/pulse/conductor', icon: Home, label: 'Conductor' },
-        { path: '/pulse/dashboard', icon: Activity, label: 'Dashboard' },
-        { path: '/pulse/tasks', icon: CheckSquare, label: 'Tasks' },
+        { path: '/pulse/conductor', icon: Home, label: 'System' },
         { path: '/pulse/directives', icon: Lightbulb, label: 'Directives' },
-        { path: '/pulse/agents', icon: Users, label: 'Agents' },
-        { path: '/pulse/sandbox', icon: LayoutGrid, label: 'Apps' },
-        { path: '/pulse/artifacts', icon: Package, label: 'Artifacts' },
-        { path: '/pulse/wisdom', icon: Layers, label: 'Governance' },
-        { path: '/pulse/watch', icon: Activity, label: 'Public View' },
-        { path: '/pulse/mission', icon: PlusCircle, label: 'New Mission' },
+        { path: '/pulse/wisdom', icon: Layers, label: 'Wisdom' },
+        { path: '/impact', icon: ShieldCheck, label: 'Impact' },
     ];
 
     return (

@@ -25,6 +25,7 @@ import { InfraHealthCard } from '@/components/InfraHealthCard';
 import { HITLActionCenter } from '@/components/HITLActionCenter';
 import { SovereignMemoryExplorer } from '@/components/SovereignMemoryExplorer';
 import { VoiceInput } from '@/components/VoiceInput';
+import { ZKPRepIDBadge } from '@/components/repid/ZKPRepIDBadge';
 
 export default function ConductorPage() {
     // consolidated logic via hook
@@ -231,18 +232,23 @@ export default function ConductorPage() {
                                 ))}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 shrink-0">
                                 <div className="md:col-span-2">
                                     <ConstitutionalHeartbeat
                                         status={sovereignData?.governance?.recent_events?.some((e: any) => e.message?.includes('VIOLATION')) ? 'violating' : 'aligned'}
                                         recentEvents={sovereignData?.governance?.recent_events}
                                     />
                                 </div>
-                                <SovereignMemoryExplorer
-                                    nodeCount={sovereignData?.graph?.nodes || 0}
-                                    relationCount={sovereignData?.graph?.relationships || 0}
-                                    lastSync={sovereignData?.graph?.last_sync}
-                                />
+                                <div className="md:col-span-1">
+                                    <ZKPRepIDBadge agentName="Controller" minRep={100} />
+                                </div>
+                                <div className="md:col-span-1">
+                                    <SovereignMemoryExplorer
+                                        nodeCount={sovereignData?.graph?.nodes || 0}
+                                        relationCount={sovereignData?.graph?.relationships || 0}
+                                        lastSync={sovereignData?.graph?.last_sync}
+                                    />
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 shrink-0">
