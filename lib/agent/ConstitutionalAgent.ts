@@ -1,4 +1,4 @@
-﻿console.log("###################################################");
+console.log("###################################################");
 console.log("### ACTIVE SOURCE: lib/agent/ConstitutionalAgent.ts ###");
 console.log("###################################################");
 import * as fs from 'fs';
@@ -4319,16 +4319,15 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             console.error(`[${this.name}] âŒ Failed to emit SOS:`, (e as Error).message);
         }
     }
-    }
 
     private async runSafetyRun(task: Task, originalError: string): Promise<LLMResult | null> {
         console.log(`[${this.name}] ðŸ›¡ï¸ Triggering Safety Run for task ${task.id}...`);
+        console.log(`[${this.name}] ðŸ›¡ï¸ Triggering Safety Run for task ${task.id}...`);
+    const safetyProviders = ['deepseek', 'gemini', 'groq', 'sambanova'].filter(p => this.availableProviders.includes(p));
+    if(safetyProviders.length === 0) return null;
 
-        const safetyProviders = ['deepseek', 'gemini', 'groq', 'sambanova'].filter(p => this.availableProviders.includes(p));
-        if (safetyProviders.length === 0) return null;
-
-        const safetyProvider = safetyProviders[0];
-        const safetyPrompt = `
+    const safetyProvider = safetyProviders[0];
+    const safetyPrompt = `
 [EMERGENCY SAFETY RUN]
 The primary processing unit hit an error: ${originalError}
 Please complete the following task with reduced complexity but high reliability.
@@ -4338,193 +4337,193 @@ Original Task: ${task.title}
 ${task.description}
 `;
 
-        try {
-            return await this.callSpecificProvider(safetyProvider, safetyPrompt, [], undefined);
-        } catch (e) {
-            console.error(`[${this.name}] âŒ Safety Run failed:`, (e as Error).message);
-            return null;
-        }
+    try {
+        return await this.callSpecificProvider(safetyProvider, safetyPrompt, [], undefined);
+    } catch(e) {
+        console.error(`[${this.name}] âŒ Safety Run failed:`, (e as Error).message);
+        return null;
     }
+}
 
     // ============================================
     // ARBITRAGE & MANAGER HELPERS
     // ============================================
 
-    async isCircuitOpen(provider: string): Promise<boolean> {
-        const breaker = (this as any).circuitBreakers.get(provider);
-        if (!breaker) return false;
-        if (breaker.failures < 3) return false;
-        const now = Date.now();
-        if (now - breaker.lastFailure > 300000) { // 5 min reset
-            (this as any).circuitBreakers.delete(provider);
-            return false;
-        }
-        return true;
+    async isCircuitOpen(provider: string): Promise < boolean > {
+    const breaker = (this as any).circuitBreakers.get(provider);
+    if(!breaker) return false;
+    if(breaker.failures < 3) return false;
+    const now = Date.now();
+    if(now - breaker.lastFailure > 300000) { // 5 min reset
+    (this as any).circuitBreakers.delete(provider);
+    return false;
+}
+return true;
     }
 
-    async checkProviderLimit(provider: string): Promise<boolean> {
-        if (!this.redis) return true;
-        try {
-            const limit = (this as any).arbitrageConfig?.providers?.[provider]?.daily_token_limit || 1000000;
-            const key = `ratelimit:${provider}:${new Date().toISOString().split('T')[0]}`;
-            const current = await this.redis.get(key);
-            if (current && parseInt(current as string) > limit) {
-                console.log(`[${this.name}] âš ï¸ ${provider} limit reached (${current}/${limit})`);
-                return false;
-            }
-            await this.redis.incr(key);
-            // @ts-ignore
-            if (!current) await this.redis.expire(key, 86400);
-            return true;
+    async checkProviderLimit(provider: string): Promise < boolean > {
+    if(!this.redis) return true;
+    try {
+        const limit = (this as any).arbitrageConfig?.providers?.[provider]?.daily_token_limit || 1000000;
+        const key = `ratelimit:${provider}:${new Date().toISOString().split('T')[0]}`;
+        const current = await this.redis.get(key);
+        if(current && parseInt(current as string) > limit) {
+    console.log(`[${this.name}] âš ï¸ ${provider} limit reached (${current}/${limit})`);
+    return false;
+}
+await this.redis.incr(key);
+// @ts-ignore
+if (!current) await this.redis.expire(key, 86400);
+return true;
         } catch (e) {
-            return true;
-        }
+    return true;
+}
     }
 
     async markProviderFailure(provider: string) {
-        const breaker = (this as any).circuitBreakers.get(provider) || { failures: 0, lastFailure: 0 };
-        breaker.failures++;
-        breaker.lastFailure = Date.now();
-        (this as any).circuitBreakers.set(provider, breaker);
-        console.warn(`[${this.name}] ðŸš¨ Provider ${provider} failure #${breaker.failures}`);
+    const breaker = (this as any).circuitBreakers.get(provider) || { failures: 0, lastFailure: 0 };
+    breaker.failures++;
+    breaker.lastFailure = Date.now();
+    (this as any).circuitBreakers.set(provider, breaker);
+    console.warn(`[${this.name}] ðŸš¨ Provider ${provider} failure #${breaker.failures}`);
+}
+
+    async delegateToTool(toolName: string, taskContext: string): Promise < string > {
+    console.log(`[MANAGER] ðŸ’¼ Delegating to ${toolName}...`);
+    try {
+        const result = await mcpManager.routeToolCall(toolName, { context: taskContext });
+        return result;
+    } catch(e: any) {
+        console.error(`[MANAGER] âŒ Delegation failed:`, e.message);
+        return `Error during tool delegation to ${toolName}: ${e.message}`;
+    }
+}
+
+    async callSambanova(system: string, prompt: string): Promise < LLMResult > {
+    return this.callOpenAICompatible('https://api.sambanova.ai/v1/chat/completions', process.env.SAMBANOVA_API_KEY!, 'Llama-3.1-405B-Instruct', system, prompt, []);
+}
+
+    async runMajor7Consensus(prompt: string, task: Task): Promise < SBFAResult & { primaryResponse: any; judasAgent?: string } > {
+    const roles = [
+        { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Primary data capture." },
+        { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty. High-level integration." },
+        { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique. Search for hidden flaws." },
+        { id: 'SEVENTH', prompt: "SEVENTH ROLE: Long-tail Calibration. Focus on extreme edge cases." }
+    ];
+
+    console.log(`[SYMPHONY] ðŸŽ» Executing Major7 (4-Agent) Parallel Dispatch...`);
+
+    const responses = await Promise.all(roles.map(async (role) => {
+        const roleStartTime = Date.now();
+        const rolePrompt = `${prompt}\n\nMANDATORY ROLE INSTRUCTION: ${role.prompt}\n\nYou MUST include a belief vector in your response in the format: <belief>[p_success, p_partial, p_failure]</belief>.`;
+        const response = await this.callLLM(rolePrompt, {}, task);
+        const latency = (Date.now() - roleStartTime) / 1000;
+        const belief = VeritasConverter.extract(response.output || "");
+        const cost = response.usage?.total_tokens || 0;
+
+        return { role: role.id, response, latency, belief, cost };
+    }));
+
+    const sbfaInput: SBFAInput = {
+        beliefs: responses.map(r => r.belief),
+        latencies: responses.map(r => r.latency),
+        costs: responses.map(r => r.cost)
+    };
+
+    const sbfaResult = SBFAOperator.process(sbfaInput);
+
+    // [PHASE P1] GOLDEN RATIO BFT THRESHOLD
+    // Override status based on 61.8% consensus rule
+    const maxProb = Math.max(...sbfaResult.aggregatedBelief);
+    const symphonyStatus = maxProb >= GOLDEN_RATIO_THRESHOLD ? 'COLLAPSE' : 'ABSTAIN';
+
+    // [PHASE P1] JUDAS AGENT DISCOVERY (Highest KL Divergence)
+    // We re-calculate KL per agent to find the outlier
+    const meanDist = [0, 0, 0];
+    responses.forEach(r => {
+        for (let j = 0; j < 3; j++) meanDist[j] += r.belief[j];
+    });
+    for(let j = 0; j < 3; j++) meanDist[j] /= responses.length;
+
+const kl = (p: number[], q: number[]) => {
+    let sum = 0;
+    for (let i = 0; i < 3; i++) {
+        const pi = Math.max(p[i], 1e-12);
+        const qi = Math.max(q[i], 1e-12);
+        sum += pi * Math.log(pi / qi);
+    }
+    return sum;
+};
+
+let maxKL = -1;
+let judasAgentIndex = -1;
+responses.forEach((r, idx) => {
+    const d = kl(r.belief, meanDist);
+    if (d > maxKL) {
+        maxKL = d;
+        judasAgentIndex = idx;
+    }
+});
+const judasAgent = responses[judasAgentIndex]?.role || 'NONE';
+const approvalRatio = responses.filter(r => r.belief[0] > 0.5).length / responses.length;
+
+console.log(`[SYMPHONY] ðŸŽ¼ Consensus Level: ${(maxProb * 100).toFixed(1)}% | Status: ${symphonyStatus} | Judas: ${judasAgent}`);
+
+// [PHASE P1] PERSISTENT CALIBRATION LOGGING
+await this.log('calibration_audit', `Major7 Consensus: ${symphonyStatus} (Judas: ${judasAgent})`, {
+    taskId: task.id,
+    maxProb,
+    judasAgent,
+    disagreement: sbfaResult.disagreement,
+    symphonyStatus,
+    approvalRatio
+});
+
+const primaryResponse = responses.find(r => r.role === 'ROOT')?.response || responses[0].response;
+
+// [PHASE P2] PYRO DYNAMIC HITL ESCALATION
+if (sbfaResult.disagreement >= PYRO_DISAGREEMENT_THRESHOLD || (symphonyStatus === 'ABSTAIN' && maxProb < 0.4)) {
+    console.log(`[SYMPHONY] ðŸ”¥ PYRO ESCALATION: Extreme disagreement detected (${sbfaResult.disagreement.toFixed(2)}). Triggering HITL...`);
+    await this.emitHelpRequest(task, 'BIT_FLIP_DETECTED', `Symphony Consensus Failure. Disagreement: ${sbfaResult.disagreement.toFixed(2)}. Judas: ${judasAgent}. Consensus failed Golden Ratio (Max: ${(maxProb * 100).toFixed(1)}%).`);
+}
+
+return {
+    ...sbfaResult,
+    status: symphonyStatus as any,
+    primaryResponse,
+    judasAgent
+};
     }
 
-    async delegateToTool(toolName: string, taskContext: string): Promise<string> {
-        console.log(`[MANAGER] ðŸ’¼ Delegating to ${toolName}...`);
-        try {
-            const result = await mcpManager.routeToolCall(toolName, { context: taskContext });
-            return result;
-        } catch (e: any) {
-            console.error(`[MANAGER] âŒ Delegation failed:`, e.message);
-            return `Error during tool delegation to ${toolName}: ${e.message}`;
-        }
-    }
+    async runTriadicSBFA(prompt: string, task: Task): Promise < SBFAResult & { primaryResponse: any } > {
+    const roles = [
+        { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Focus on verifiable facts and primary data." },
+        { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty Impact. Focus on high-level integration and alignment with Trinity goals." },
+        { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique & Edge Cases. Search for flaws, risks, and potential failures." }
+    ];
 
-    async callSambanova(system: string, prompt: string): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.sambanova.ai/v1/chat/completions', process.env.SAMBANOVA_API_KEY!, 'Llama-3.1-405B-Instruct', system, prompt, []);
-    }
+    const triadResponses = await Promise.all(roles.map(async (role) => {
+        const roleStartTime = Date.now();
+        const rolePrompt = `${prompt}\n\nMANDATORY ROLE INSTRUCTION: ${role.prompt}\n\nYou MUST include a belief vector in your response in the format: <belief>[p_success, p_partial, p_failure]</belief>.`;
+        // Triadic ALWAYS uses Elite/Balanced routing (slow path)
+        const response = await this.callLLM(rolePrompt, {}, task);
+        const latency = (Date.now() - roleStartTime) / 1000;
+        const belief = VeritasConverter.extract(response.output || "");
+        const cost = response.usage?.total_tokens || 0;
 
-    async runMajor7Consensus(prompt: string, task: Task): Promise<SBFAResult & { primaryResponse: any; judasAgent?: string }> {
-        const roles = [
-            { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Primary data capture." },
-            { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty. High-level integration." },
-            { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique. Search for hidden flaws." },
-            { id: 'SEVENTH', prompt: "SEVENTH ROLE: Long-tail Calibration. Focus on extreme edge cases." }
-        ];
+        return { role: role.id, response, latency, belief, cost };
+    }));
 
-        console.log(`[SYMPHONY] ðŸŽ» Executing Major7 (4-Agent) Parallel Dispatch...`);
+    const sbfaInput: SBFAInput = {
+        beliefs: triadResponses.map(r => r.belief),
+        latencies: triadResponses.map(r => r.latency),
+        costs: triadResponses.map(r => r.cost)
+    };
 
-        const responses = await Promise.all(roles.map(async (role) => {
-            const roleStartTime = Date.now();
-            const rolePrompt = `${prompt}\n\nMANDATORY ROLE INSTRUCTION: ${role.prompt}\n\nYou MUST include a belief vector in your response in the format: <belief>[p_success, p_partial, p_failure]</belief>.`;
-            const response = await this.callLLM(rolePrompt, {}, task);
-            const latency = (Date.now() - roleStartTime) / 1000;
-            const belief = VeritasConverter.extract(response.output || "");
-            const cost = response.usage?.total_tokens || 0;
+    const sbfaResult = SBFAOperator.process(sbfaInput);
+    const primaryResponse = triadResponses.find(r => r.role === 'ROOT')?.response || triadResponses[0].response;
 
-            return { role: role.id, response, latency, belief, cost };
-        }));
-
-        const sbfaInput: SBFAInput = {
-            beliefs: responses.map(r => r.belief),
-            latencies: responses.map(r => r.latency),
-            costs: responses.map(r => r.cost)
-        };
-
-        const sbfaResult = SBFAOperator.process(sbfaInput);
-
-        // [PHASE P1] GOLDEN RATIO BFT THRESHOLD
-        // Override status based on 61.8% consensus rule
-        const maxProb = Math.max(...sbfaResult.aggregatedBelief);
-        const symphonyStatus = maxProb >= GOLDEN_RATIO_THRESHOLD ? 'COLLAPSE' : 'ABSTAIN';
-
-        // [PHASE P1] JUDAS AGENT DISCOVERY (Highest KL Divergence)
-        // We re-calculate KL per agent to find the outlier
-        const meanDist = [0, 0, 0];
-        responses.forEach(r => {
-            for (let j = 0; j < 3; j++) meanDist[j] += r.belief[j];
-        });
-        for (let j = 0; j < 3; j++) meanDist[j] /= responses.length;
-
-        const kl = (p: number[], q: number[]) => {
-            let sum = 0;
-            for (let i = 0; i < 3; i++) {
-                const pi = Math.max(p[i], 1e-12);
-                const qi = Math.max(q[i], 1e-12);
-                sum += pi * Math.log(pi / qi);
-            }
-            return sum;
-        };
-
-        let maxKL = -1;
-        let judasAgentIndex = -1;
-        responses.forEach((r, idx) => {
-            const d = kl(r.belief, meanDist);
-            if (d > maxKL) {
-                maxKL = d;
-                judasAgentIndex = idx;
-            }
-        });
-        const judasAgent = responses[judasAgentIndex]?.role || 'NONE';
-        const approvalRatio = responses.filter(r => r.belief[0] > 0.5).length / responses.length;
-
-        console.log(`[SYMPHONY] ðŸŽ¼ Consensus Level: ${(maxProb * 100).toFixed(1)}% | Status: ${symphonyStatus} | Judas: ${judasAgent}`);
-
-        // [PHASE P1] PERSISTENT CALIBRATION LOGGING
-        await this.log('calibration_audit', `Major7 Consensus: ${symphonyStatus} (Judas: ${judasAgent})`, {
-            taskId: task.id,
-            maxProb,
-            judasAgent,
-            disagreement: sbfaResult.disagreement,
-            symphonyStatus,
-            approvalRatio
-        });
-
-        const primaryResponse = responses.find(r => r.role === 'ROOT')?.response || responses[0].response;
-
-        // [PHASE P2] PYRO DYNAMIC HITL ESCALATION
-        if (sbfaResult.disagreement >= PYRO_DISAGREEMENT_THRESHOLD || (symphonyStatus === 'ABSTAIN' && maxProb < 0.4)) {
-            console.log(`[SYMPHONY] ðŸ”¥ PYRO ESCALATION: Extreme disagreement detected (${sbfaResult.disagreement.toFixed(2)}). Triggering HITL...`);
-            await this.emitHelpRequest(task, 'BIT_FLIP_DETECTED', `Symphony Consensus Failure. Disagreement: ${sbfaResult.disagreement.toFixed(2)}. Judas: ${judasAgent}. Consensus failed Golden Ratio (Max: ${(maxProb * 100).toFixed(1)}%).`);
-        }
-
-        return {
-            ...sbfaResult,
-            status: symphonyStatus as any,
-            primaryResponse,
-            judasAgent
-        };
-    }
-
-    async runTriadicSBFA(prompt: string, task: Task): Promise<SBFAResult & { primaryResponse: any }> {
-        const roles = [
-            { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Focus on verifiable facts and primary data." },
-            { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty Impact. Focus on high-level integration and alignment with Trinity goals." },
-            { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique & Edge Cases. Search for flaws, risks, and potential failures." }
-        ];
-
-        const triadResponses = await Promise.all(roles.map(async (role) => {
-            const roleStartTime = Date.now();
-            const rolePrompt = `${prompt}\n\nMANDATORY ROLE INSTRUCTION: ${role.prompt}\n\nYou MUST include a belief vector in your response in the format: <belief>[p_success, p_partial, p_failure]</belief>.`;
-            // Triadic ALWAYS uses Elite/Balanced routing (slow path)
-            const response = await this.callLLM(rolePrompt, {}, task);
-            const latency = (Date.now() - roleStartTime) / 1000;
-            const belief = VeritasConverter.extract(response.output || "");
-            const cost = response.usage?.total_tokens || 0;
-
-            return { role: role.id, response, latency, belief, cost };
-        }));
-
-        const sbfaInput: SBFAInput = {
-            beliefs: triadResponses.map(r => r.belief),
-            latencies: triadResponses.map(r => r.latency),
-            costs: triadResponses.map(r => r.cost)
-        };
-
-        const sbfaResult = SBFAOperator.process(sbfaInput);
-        const primaryResponse = triadResponses.find(r => r.role === 'ROOT')?.response || triadResponses[0].response;
-
-        return { ...sbfaResult, primaryResponse };
-    }
+    return { ...sbfaResult, primaryResponse };
+}
 }
 
