@@ -24,8 +24,8 @@ function PulseGateContent() {
             return;
         }
 
-        // 3. No access -> Redirect to Join (Capture)
-        router.replace('/join');
+        // 3. No access -> Guest Exploration
+        router.replace('/pulse/conductor');
 
     }, [inviteCode, router]);
 

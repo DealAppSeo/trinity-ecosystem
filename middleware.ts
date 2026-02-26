@@ -53,7 +53,10 @@ export default function middleware(request: NextRequest) {
     const isVerified = role === 'verified' || role === 'founder';
 
     // Logic for Controller/Directives Pages
-    if (isProtectedRoute && !hasAccess) {
+    // Only redirect to /join if it's NOT a GET request (read-only allowed for guest) 
+    // OR if we want to enforce auth for these specifically.
+    // Given the user wants to defer signup, we'll allow GET requests.
+    if (isProtectedRoute && !hasAccess && request.method !== 'GET') {
         return NextResponse.redirect(new URL('/join', request.url));
     }
 
