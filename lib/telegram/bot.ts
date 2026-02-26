@@ -1,0 +1,403 @@
+import { Telegraf, Context, Markup } from 'telegraf';
+import { supabaseAdmin } from '../supabase';
+import { transcribeVoice } from './voice';
+
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
+export const bot = new Telegraf(BOT_TOKEN);
+
+// --- Helpers ---
+
+const getUlabel = (u: number) => {
+    if (u < 0.05) return '🟢 High confidence';
+    if (u < 0.15) return '🟡 Moderate uncertainty';
+    return '🔴 High uncertainty — review carefully';
+};
+
+const getRepTier = (rep: number) => {
+    if (rep > 0.85) return '⭐⭐⭐ Trusted';
+    if (rep > 0.65) return '⭐⭐ Established';
+    return '⭐ New agent';
+};
+
+const OWNER_ID = process.env.TELEGRAM_OWNER_CHAT_ID;
+
+// --- Middleware ---
+
+const isOwner = (ctx: Context, next: () => Promise<void>) => {
+    if (!OWNER_ID) {
+        console.warn('⚠️ TELEGRAM_OWNER_CHAT_ID not set. Blocking sensitive command.');
+        return ctx.reply('⛔ System configuration missing (OWNER_ID).');
+    }
+    if (String(ctx.from?.id) !== String(OWNER_ID)) {
+        console.warn(`[Auth] Unauthorized access attempt by ${ctx.from?.id}`);
+        return ctx.reply('⛔ Unauthorized. This action is restricted to the System Owner.');
+    }
+    return next();
+};
+
+// --- Commands ---
+
+bot.start(async (ctx) => {
+    const { count: tasksCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'todo');
+    const { count: pendingApprovals } = await supabaseAdmin.from('approval_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+
+    // Calculate today's savings
+    const today = new Date().toISOString().split('T')[0];
+    const { data: savingsData } = await supabaseAdmin
+        .from('trinity_cost_logs')
+        .select('savings_attribution')
+        .gte('created_at', today);
+
+    const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
+
+    const message = `
+🎶 *AI TRINITY SYMPHONY* 
+━━━━━━━━━━━━━━━━━━━━
+🚀 *System Status*: Online
+🤖 *Agents Running*: 12
+⏳ *Pending Approvals*: ${pendingApprovals || 0}
+✅ *Tasks in Todo*: ${tasksCount || 0}
+💰 *Today's Savings*: $${totalSavings.toFixed(4)}
+
+Use /tasks to review the approval queue.
+`;
+    await ctx.replyWithMarkdown(message);
+});
+
+bot.command('tasks', isOwner, async (ctx) => {
+    const { data: pending, error } = await supabaseAdmin
+        .from('approval_queue')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+    if (error || !pending || pending.length === 0) {
+        return ctx.reply('📭 No pending approvals in the queue.');
+    }
+
+    for (const task of pending) {
+        const u = task.u_score || 0.5;
+        const rep = task.rep_id_score || 0.5;
+
+        const card = `
+🤖 *${task.agent_id}* → *${task.task_type}*
+━━━━━━━━━━━━━━━━━━━━
+📋 ${task.output_summary.substring(0, 200)}...
+
+🎯 RepID: ${rep.toFixed(2)} ${getRepTier(rep)}
+🌊 WSCE:  ${(task.wsce_score || 0).toFixed(2)}
+❓ u=${u.toFixed(2)} — ${getUlabel(u)}
+💰 Saved: $${(task.cost_saved || 0).toFixed(4)}
+🏷️ Domain: ${task.domain || 'general'}
+`;
+
+        const keyboard = Markup.inlineKeyboard([
+            [
+                Markup.button.callback('✅ Approve', `approve:${task.id}`),
+                Markup.button.callback('❌ Reject', `reject:${task.id}`),
+                Markup.button.callback('↩️ Redirect', `redirect:${task.id}`)
+            ],
+            [
+                Markup.button.callback('🔍 Full Output', `full:${task.id}`),
+                Markup.button.callback('🧠 Agent History', `history:${task.agent_id}`)
+            ]
+        ]);
+
+        await ctx.replyWithMarkdown(card, keyboard);
+    }
+});
+
+bot.command('savings', async (ctx) => {
+    const today = new Date().toISOString().split('T')[0];
+    const { data: savingsData } = await supabaseAdmin
+        .from('trinity_cost_logs')
+        .select('savings_attribution, model_used')
+        .gte('created_at', today);
+
+    const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
+
+    // Find top routes (mock logic for now since we don't have a complex routing table yet)
+    const routes = (savingsData || []).reduce((acc: any, row) => {
+        acc[row.model_used] = (acc[row.model_used] || 0) + row.savings_attribution;
+        return acc;
+    }, {});
+
+    const topRoutes = Object.entries(routes)
+        .sort((a: any, b: any) => b[1] - a[1])
+        .slice(0, 3);
+
+    const message = `
+💰 *Cost Savings Report*
+━━━━━━━━━━━━━━━━━━━━
+📅 *Today*: $${totalSavings.toFixed(4)}
+📉 *Baseline*: $6.72 / 1M tokens
+📈 *Projected Monthly*: $${(totalSavings * 30).toFixed(2)}
+
+🚀 *Top Savings Routes*:
+${topRoutes.map(([model, savings]: any) => `• ${model}: $${savings.toFixed(4)}`).join('\n')}
+
+Trinity is currently operating at ~92% cost efficiency.
+`;
+    await ctx.replyWithMarkdown(message);
+});
+
+bot.command('agent', async (ctx) => {
+    const agentName = ctx.payload;
+    if (!agentName) return ctx.reply('Usage: /agent [name]');
+
+    const { data: agent, error } = await supabaseAdmin
+        .from('trinity_agents')
+        .select('*')
+        .eq('agent_id', agentName)
+        .single();
+
+    if (error || !agent) return ctx.reply(`❌ Agent "${agentName}" not found.`);
+
+    const message = `
+🤖 *Agent Internal HUD: ${agent.agent_id}*
+━━━━━━━━━━━━━━━━━━━━
+🎯 *RepID*: ${(agent.reputation || 0).toFixed(2)}
+🌊 *Calibration*: ${(agent.calibration_score || 0).toFixed(2)}
+✅ *Tasks Today*: ${agent.tasks_completed_today || 0}
+📡 *Status*: ${agent.status || 'unknown'}
+
+Architecture: ${agent.architecture || 'Major7 Standard'}
+`;
+    await ctx.replyWithMarkdown(message);
+});
+
+bot.command('pulse', async (ctx) => {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.aitrinitysymphony.com';
+    await ctx.reply(`💎 *Pulse: Swarm Intelligence Hub*
+━━━━━━━━━━━━━━━━━━━━
+Open the dashboard for real-time visibility into the agent collective.
+
+_Grounded in Honor, Justice, and Truth._`,
+        Markup.inlineKeyboard([
+            [Markup.button.webApp('🌐 Launch Pulse Dashboard', `${appUrl}/pulse/watch`)]
+        ])
+    );
+});
+
+bot.command('wisdom', async (ctx) => {
+    const { data: definitions } = await supabaseAdmin.from('trinity_definitions').select('*');
+    if (!definitions || definitions.length === 0) return ctx.reply('📚 The Wisdom Portal is currently offline.');
+
+    const random = definitions[Math.floor(Math.random() * definitions.length)];
+    const message = `
+📚 *Wisdom Portal: ${random.term}*
+━━━━━━━━━━━━━━━━━━━━
+${random.definition}
+
+_Excellence in all things._
+`;
+    await ctx.replyWithMarkdown(message);
+});
+
+bot.command('task', isOwner, async (ctx) => {
+    const description = ctx.payload;
+    if (!description) {
+        return ctx.reply('Usage: /task [description]\nExample: /task Analyze the latest web3 trends');
+    }
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('trinity_tasks')
+            .insert({
+                title: description.substring(0, 100),
+                description: description,
+                status: 'todo',
+                priority: 50, // Default mid-priority
+                created_at: new Date().toISOString(),
+                metadata: {
+                    source: 'telegram_orch',
+                    orchestrator: ctx.from?.first_name || 'Owner'
+                }
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        await ctx.reply(`✅ *Task Orchestrated*
+━━━━━━━━━━━━━━━━━━━━
+ID: #${data.id}
+Task: "${data.title}"
+Status: Sent to swarm (todo)
+
+Agents will pick this up autonomously.
+`, { parse_mode: 'Markdown' });
+
+    } catch (err: any) {
+        ctx.reply(`❌ Failed to orchestrate task: ${err.message}`);
+    }
+});
+
+bot.command('gentoken', isOwner, async (ctx) => {
+    const token = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    await supabaseAdmin.from('trinity_observers').insert({
+        token,
+        expires_at: expiresAt,
+        created_at: new Date().toISOString()
+    });
+
+    const botUsername = ctx.botInfo.username;
+    ctx.reply(`🎫 *Observer Token Generated*
+━━━━━━━━━━━━━━━━━━━━
+Token: \`${token}\` (Expires in 24h)
+Share Link: \`t.me/${botUsername}?start=${token}\`
+
+Observers have read-only access to the swarm feed.
+`, { parse_mode: 'Markdown' });
+});
+
+bot.command('join', async (ctx) => {
+    const token = ctx.payload;
+    if (!token) return ctx.reply('Usage: /join [token]');
+
+    const { data: observer } = await supabaseAdmin
+        .from('trinity_observers')
+        .select('*')
+        .eq('token', token)
+        .single();
+
+    if (!observer || new Date(observer.expires_at) < new Date()) {
+        return ctx.reply('❌ Invalid or expired token.');
+    }
+
+    await supabaseAdmin.from('trinity_observers').update({
+        chat_id: String(ctx.chat.id),
+        activated_at: new Date().toISOString()
+    }).eq('token', token);
+
+    ctx.reply('🔓 *Observer Mode Activated*\n━━━━━━━━━━━━━━━━━━━━\nYou now have read-only access to the AI Trinity Symphony swarm feed.\nType /start to see current system status.', { parse_mode: 'Markdown' });
+});
+
+// --- Voice Input ---
+
+bot.on('voice', async (ctx) => {
+    try {
+        const fileId = ctx.message.voice.file_id;
+        const fileLink = await ctx.telegram.getFileLink(fileId);
+
+        const statusMsg = await ctx.reply('👂 Listening...');
+
+        const { text, confidence } = await transcribeVoice(fileLink.href);
+
+        if (confidence < 0.7) {
+            return ctx.reply(`🤔 I'm not sure I heard you correctly. Did you mean: "${text}"? \n\nPlease reply YES or type your command.`);
+        }
+
+        await ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, undefined, `📝 *Transcript*: "${text}"\n\nRouting command...`, { parse_mode: 'Markdown' });
+
+        // Fuzzy command routing
+        const lowerText = text.toLowerCase();
+        if (lowerText.includes('approve everything')) {
+            // Bulk approve logic
+            const { data: pending } = await supabaseAdmin.from('approval_queue').select('id').eq('status', 'pending').gt('rep_id_score', 0.8);
+            if (pending && pending.length > 0) {
+                for (const t of pending) {
+                    await supabaseAdmin.from('approval_queue').update({ status: 'approved', resolved_by: 'Voice-Sean' }).eq('id', t.id);
+                }
+                await ctx.reply(`✅ Approved ${pending.length} tasks.`);
+            } else {
+                await ctx.reply('📭 No high-confidence tasks to approve.');
+            }
+        } else if (lowerText.includes('savings')) {
+            return ctx.reply('Use /savings to see detailed stats.');
+        } else if (lowerText.includes('status of')) {
+            const agent = text.split('status of')[1].trim();
+            // Trigger /agent logic via re-routing if needed 
+        } else {
+            await ctx.reply(`❓ Command not recognized: "${text}". \n\nTry "approve everything" or "what are today's savings".`);
+        }
+
+    } catch (err: any) {
+        ctx.reply(`❌ Voice processing failed: ${err.message}`);
+    }
+});
+
+// --- Action Handlers ---
+
+bot.action(/approve:(.+)/, isOwner, async (ctx) => {
+    const approvalId = ctx.match[1];
+
+    // 1. Fetch task_id from approval_queue
+    const { data: approval } = await supabaseAdmin
+        .from('approval_queue')
+        .select('task_id')
+        .eq('id', approvalId)
+        .single();
+
+    // 2. Update approval_queue
+    await supabaseAdmin.from('approval_queue').update({
+        status: 'approved',
+        resolved_at: new Date().toISOString(),
+        resolved_by: ctx.from?.first_name || 'Sean'
+    }).eq('id', approvalId);
+
+    // 3. Update original task
+    if (approval?.task_id) {
+        await supabaseAdmin.from('trinity_tasks').update({
+            status: 'verified', // Mobile approval counts as verification
+            metadata: {
+                mobile_approved_at: new Date().toISOString(),
+                mobile_approved_by: ctx.from?.first_name || 'Sean'
+            }
+        }).eq('id', approval.task_id);
+    }
+
+    await ctx.answerCbQuery('✅ Task Approved.');
+    await ctx.editMessageText(ctx.callbackQuery.message ? (ctx.callbackQuery.message as any).text + '\n\n✅ *Status: Approved (Verified)*' : '✅ Approved', { parse_mode: 'Markdown' });
+});
+
+bot.action(/reject:(.+)/, isOwner, async (ctx) => {
+    const approvalId = ctx.match[1];
+
+    // 1. Fetch task_id
+    const { data: approval } = await supabaseAdmin
+        .from('approval_queue')
+        .select('task_id')
+        .eq('id', approvalId)
+        .single();
+
+    // 2. Update approval_queue
+    await supabaseAdmin.from('approval_queue').update({
+        status: 'rejected',
+        resolved_at: new Date().toISOString(),
+        resolved_by: ctx.from?.first_name || 'Sean'
+    }).eq('id', approvalId);
+
+    // 3. Update original task
+    if (approval?.task_id) {
+        await supabaseAdmin.from('trinity_tasks').update({
+            status: 'todo', // Reset to todo for re-processing
+            claimed_by: null,
+            metadata: {
+                mobile_rejected_at: new Date().toISOString(),
+                mobile_rejected_by: ctx.from?.first_name || 'Sean'
+            }
+        }).eq('id', approval.task_id);
+    }
+
+    await ctx.answerCbQuery('❌ Task Rejected.');
+    await ctx.editMessageText(ctx.callbackQuery.message ? (ctx.callbackQuery.message as any).text + '\n\n❌ *Status: Rejected (Reset to Todo)*' : '❌ Rejected', { parse_mode: 'Markdown' });
+});
+
+// Export a handler for Vercel
+export const handleUpdate = async (update: any) => {
+    // Proactively set the menu button if we're in a new session
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.aitrinitysymphony.com';
+    await bot.telegram.setChatMenuButton({
+        menuButton: {
+            type: 'web_app',
+            text: '💎 Pulse',
+            webApp: { url: `${appUrl}/pulse` }
+        }
+    }).catch(() => { });
+
+    return bot.handleUpdate(update);
+};

@@ -3,6 +3,7 @@ console.log("### ACTIVE SOURCE: lib/agent/ConstitutionalAgent.ts ###");
 console.log("###################################################");
 import * as fs from 'fs';
 import { supabaseAdmin as supabase } from '../supabase';
+import { ApprovalQueue } from '../approvalQueue';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
 import { SwarmOrchestrator, SwarmState } from './SwarmOrchestrator';
@@ -23,6 +24,7 @@ import { LLMService } from '@/lib/memory/ShimiTree';
 import { VeritasConverter } from './VeritasConverter';
 import { TIMLManager, TIMLAllocation } from './TIMLManager';
 import { SBFAOperator, SBFAInput, SBFAResult } from './SBFAOperator';
+import { HITLDispatcher } from '../hitl/HITLDispatcher';
 // import { HyperDAG } from './HyperDAG';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
@@ -41,18 +43,22 @@ const LLM_TIERS: Record<string, number> = {
     'openai': 3     // Tier 3: Elite (GPT-4o)
 };
 
-const PROVIDERS: Record<string, ProviderConfig> = {
-    openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1/chat/completions', envKey: 'OPENAI_API_KEY', model: 'gpt-4o', tier: 'paid', priority: 3 },
-    anthropic: { name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1/messages', envKey: 'ANTHROPIC_API_KEY', model: 'claude-3-5-sonnet-20241022', tier: 'paid', priority: 3, isAnthropic: true },
-    gemini: { name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', envKey: 'GEMINI_API_KEY', model: 'gemini-1.5-flash-latest', tier: 'free', priority: 2, isGemini: true },
-    deepseek: { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/chat/completions', envKey: 'DEEPSEEK_API_KEY', model: 'deepseek-chat', tier: 'free', priority: 1 },
-    siliconflow: { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.com/v1/chat/completions', envKey: 'SILICONFLOW_API_KEY', model: 'deepseek-ai/DeepSeek-V3', tier: 'free', priority: 1 },
-    deepinfra: { name: 'DeepInfra', baseUrl: 'https://api.deepinfra.com/v1/openai/chat/completions', envKey: 'DEEPINFRA_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 1 },
-    grok: { name: 'Grok', baseUrl: 'https://api.x.ai/v1/chat/completions', envKey: 'GROK_API_KEY', model: 'grok-3', tier: 'free', priority: 2 },
-    cerebras: { name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1/chat/completions', envKey: 'CEREBRAS_API_KEY', model: 'llama3.1-8b', tier: 'free', priority: 1 },
-    sambanova: { name: 'SambaNova', baseUrl: 'https://api.sambanova.ai/v1/chat/completions', envKey: 'SAMBANOVA_API_KEY', model: 'Meta-Llama-3.1-70B-Instruct', tier: 'free', priority: 1 },
-    together: { name: 'Together', baseUrl: 'https://api.together.xyz/v1/chat/completions', envKey: 'TOGETHER_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 2 },
-    openrouter: { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1/chat/completions', envKey: 'OPENROUTER_API_KEY', model: 'deepseek/deepseek-chat', tier: 'paid', priority: 3 }
+const GOLDEN_RATIO_THRESHOLD = 0.61803398875;
+const VERITAS_MIN_SAMPLES = 10;
+const PYRO_DISAGREEMENT_THRESHOLD = 1.2; // ITCM: Inter-Temporal Consensus Margin
+
+const PROVIDERS: Record<string, ProviderConfig & { region?: string; endpoint_group?: string }> = {
+    openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1/chat/completions', envKey: 'OPENAI_API_KEY', model: 'gpt-4o', tier: 'paid', priority: 3, region: 'us-east-1' },
+    anthropic: { name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1/messages', envKey: 'ANTHROPIC_API_KEY', model: 'claude-3-5-sonnet-20241022', tier: 'paid', priority: 3, isAnthropic: true, region: 'us-east-1' },
+    gemini: { name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', envKey: 'GEMINI_API_KEY', model: 'gemini-1.5-flash-latest', tier: 'free', priority: 2, isGemini: true, region: 'us-west-1' },
+    deepseek: { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/chat/completions', envKey: 'DEEPSEEK_API_KEY', model: 'deepseek-chat', tier: 'free', priority: 1, region: 'cn-east' },
+    siliconflow: { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.com/v1/chat/completions', envKey: 'SILICONFLOW_API_KEY', model: 'deepseek-ai/DeepSeek-V3', tier: 'free', priority: 1, region: 'cn-west' },
+    deepinfra: { name: 'DeepInfra', baseUrl: 'https://api.deepinfra.com/v1/openai/chat/completions', envKey: 'DEEPINFRA_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 1, region: 'us-west-2' },
+    grok: { name: 'Grok', baseUrl: 'https://api.x.ai/v1/chat/completions', envKey: 'GROK_API_KEY', model: 'grok-3', tier: 'free', priority: 2, region: 'us-east-1' },
+    cerebras: { name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1/chat/completions', envKey: 'CEREBRAS_API_KEY', model: 'llama3.1-8b', tier: 'free', priority: 1, region: 'us-west-1' },
+    sambanova: { name: 'SambaNova', baseUrl: 'https://api.sambanova.ai/v1/chat/completions', envKey: 'SAMBANOVA_API_KEY', model: 'Meta-Llama-3.1-70B-Instruct', tier: 'free', priority: 1, region: 'us-east-1' },
+    together: { name: 'Together', baseUrl: 'https://api.together.xyz/v1/chat/completions', envKey: 'TOGETHER_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 2, region: 'us-west-2' },
+    openrouter: { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1/chat/completions', envKey: 'OPENROUTER_API_KEY', model: 'deepseek/deepseek-chat', tier: 'paid', priority: 3, region: 'global' }
 };
 
 // ============================================
@@ -249,7 +255,7 @@ export class ConstitutionalAgent {
         // PATENT-PENDING: MULTIPLICATIVE_GNN_O(LOG_N) TRUST_SCALING
         const rawName = config.name || 'UNKNOWN';
         this.name = this.resolveLegacyName(rawName);
-        this.wisdom = AGENT_WISDOM[this.name] || AGENT_WISDOM.HDM;
+        this.wisdom = AGENT_WISDOM[this.name] || AGENT_WISDOM['trinity-hdm'];
         this.groupName = this.wisdom.squad || 'UNKNOWN';
         this.squad = (this.wisdom.squad as any) || 'UNKNOWN';
         this.version = CONSTITUTION.VERSION;
@@ -418,54 +424,152 @@ export class ConstitutionalAgent {
         }
     }
 
-    async updateReputation(success: boolean, targetAgent?: string, overrideDelta?: number) {
-        // [PHASE 10] TARGETED REPID UPDATE
-        const name = targetAgent || this.name;
-
-        // ELITE ADAPTIVE REPID: Infuse Golden Ratio (φ=1.618) & Peer Weights
-        const phi = 1.61803398875;
-        const peerProduct = 1.25;
-        const delta = overrideDelta !== undefined ? overrideDelta : (success ? 1 : -5);
-
-        // Fetch current score if not self
-        let currentScore = this.reputationScore;
-        let currentTasksCompleted = this.tasksCompleted;
-
-        if (targetAgent && targetAgent !== this.name) {
+    /**
+     * [PHASE P4] 3nd-Tier Contrarian Value Score (CVS)
+     * Increments the CVS for an agent that successfully identified a vulnerability as Judas.
+     */
+    async incrementJudasCVS(agentName: string) {
+        try {
             const { data } = await this.supabase
                 .from('trinity_agent_registry')
-                .select('reputation_score, tasks_completed')
-                .eq('agent_name', targetAgent)
+                .select('last_judas_activations, contrarian_value_score')
+                .eq('agent_name', agentName)
                 .single();
+
             if (data) {
-                currentScore = data.reputation_score;
-                currentTasksCompleted = data.tasks_completed;
+                const activations = (data.last_judas_activations || 0) + 1;
+                // CVS = confirmed_vulnerabilities / total_judas_activations
+                // For simplicity, we increment CVS by a small factor on successful Judas activation
+                const newCVS = Math.min(2.0, (data.contrarian_value_score || 1.0) + 0.05);
+
+                await this.supabase.from('trinity_agent_registry').update({
+                    last_judas_activations: activations,
+                    contrarian_value_score: newCVS
+                }).eq('agent_name', agentName);
             }
+        } catch (e) {
+            console.warn(`[REPID] Failed to increment CVS for ${agentName}`);
+        }
+    }
+
+    /**
+     * [PHASE P4] calculateWSCE
+     * Weighted Squared Calibration Error over the last N outcomes.
+     */
+    private calculateWSCE(samples: any[]): number {
+        if (!samples || samples.length === 0) return 1.0;
+
+        // samples contain: { score (0 or 100), metadata: { confidence (0.0 to 1.0) } }
+        let totalError = 0;
+        let count = 0;
+
+        for (const s of samples) {
+            const confidence = s.metadata?.confidence;
+            if (confidence === undefined) continue;
+
+            const outcome = s.score >= 50 ? 1 : 0;
+            totalError += Math.pow(confidence - outcome, 2);
+            count++;
         }
 
-        let score = currentScore + delta;
+        return count > 0 ? totalError / count : 1.0;
+    }
 
-        // O(log n) convergence via multiplicative RepID agg – Provisional Aug 17, 2025
-        if (success) {
-            score = Math.pow(Math.max(1, score) * peerProduct, 1 / phi) * phi;
+    /**
+     * [PHASE P4] ragContradictionBoost
+     * If RAG retrieves contradicting evidence, boost uncertainty/u-gate by 0.15.
+     */
+    async ragContradictionBoost(query: string, claim: string): Promise<number> {
+        try {
+            const context = await this.memoryManager.recall(query, 5);
+            if (!context || context.includes("[xMEMORY HIERARCHICAL CONTEXT]")) return 0;
+
+            // Simplified contradiction check: Does the context contain "contrary", "counter", "contradict", "not" etc.
+            // In a full implementation, we'd use an LLM or NLI model here.
+            const lowerContext = context.toLowerCase();
+            const lowerClaim = claim.toLowerCase();
+
+            const contradictionKeywords = ['however', 'but', 'contradict', 'contrary', 'error', 'wrong', 'false', 'incorrect'];
+            const hasKeyword = contradictionKeywords.some(k => lowerContext.includes(k));
+
+            if (hasKeyword && lowerContext.length > 50) {
+                console.log(`[xMEMORY] 🚨 Contradiction alert detected in context. Applying u-boost (0.15).`);
+                return 0.15;
+            }
+        } catch (e) {
+            console.warn(`[xMEMORY] Contradiction boost failed:`, e);
         }
+        return 0;
+    }
 
-        const finalScore = Math.max(0, Math.min(100, score));
+    async updateReputation(success: boolean, targetAgent?: string, overrideDelta?: number, confidence?: number) {
+        // [PHASE P4] 3-TIER REPID SYNTHESIS
+        const name = targetAgent || this.name;
+        const conf = confidence !== undefined ? confidence : (success ? 0.9 : 0.1);
 
-        // Update local if self
+        // 1. Log outcome to Benchmark table for history
+        try {
+            await this.supabase.from('trinity_agent_benchmarks').insert({
+                agent_name: name,
+                benchmark_type: 'calibration_run',
+                metric_name: 'outcome',
+                score: success ? 100 : 0,
+                metadata: { confidence: conf, timestamp: new Date().toISOString() }
+            });
+        } catch (e) { console.warn(`[REPID] Benchmark log failed:`, e); }
+
+        // 2. Fetch last 100 samples for this agent
+        const { data: samples } = await this.supabase
+            .from('trinity_agent_benchmarks')
+            .select('score, metadata')
+            .eq('agent_name', name)
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+        // 3. Compute Tiers
+        const wsce = this.calculateWSCE(samples || []);
+        const tier1_calibration = 1 - wsce; // 60%
+
+        const accuracy = samples && samples.length > 0
+            ? samples.reduce((acc, s) => acc + (s.score / 100), 0) / samples.length
+            : (success ? 1.0 : 0.0);
+        const tier2_accuracy = accuracy; // 25%
+
+        // 4. Fetch CVS and compute final Tier 3
+        const { data: registry } = await this.supabase
+            .from('trinity_agent_registry')
+            .select('contrarian_value_score, reputation_score, last_active')
+            .eq('agent_name', name)
+            .single();
+
+        const tier3_cvs = registry?.contrarian_value_score || 1.0; // 15%
+
+        // 5. Synthesis: RepID = (0.6 * T1) + (0.25 * T2) + (0.15 * T3) * 100
+        const repIdScore = ((0.6 * tier1_calibration) + (0.25 * tier2_accuracy) + (0.15 * Math.min(1.0, tier3_cvs / 2.0))) * 100;
+
+        // [PHASE M] RepID Time Decay (Prevent "Coasting")
+        const AGE_DECAY = 0.98; // 2% decay per day of inactivity
+        const lastActiveTs = registry?.last_active ? new Date(registry.last_active).getTime() : Date.now();
+        const daysSinceActive = (Date.now() - lastActiveTs) / 86400000;
+        const decayedScore = repIdScore * Math.pow(AGE_DECAY, daysSinceActive);
+
+        const finalScore = Math.max(30, Math.min(100, decayedScore)); // Floor at 30
+
+        // Sync local if self
         if (!targetAgent || targetAgent === this.name) {
             this.reputationScore = finalScore;
             if (success) this.tasksCompleted++;
         }
 
-        // Commit to Ledger
+        // Commit to Ledger with new Tier metrics
         await this.supabase.from('trinity_agent_registry').update({
             reputation_score: finalScore,
-            tasks_completed: success ? currentTasksCompleted + 1 : currentTasksCompleted,
+            calibration_score_wsce: wsce,
+            tasks_completed: success ? (registry?.tasks_completed || 0) + 1 : (registry?.tasks_completed || 0),
             last_active: new Date().toISOString()
         }).eq('agent_name', name);
 
-        // [PHASE 30] ERC-8004 REPUTATION SYNC (Token-Bound Identity)
+        // [PHASE 30] ERC-8004 REPUTATION SYNC
         try {
             await ERC8004Bridge.syncReputation(name, finalScore);
         } catch (e) {
@@ -474,6 +578,51 @@ export class ConstitutionalAgent {
 
         // 🧠 ANFIS FEEDBACK LOOP (Truth-Seeking)
         await this.callAnfisReward(success);
+    }
+
+    /**
+     * [PHASE P4] logCost
+     * Logs the actual cost of an LLM call and calculates savings versus a weighted market baseline.
+     */
+    async logCost(taskId: string | number, result: LLMResult) {
+        if (!result.cost || result.cost <= 0) return;
+
+        try {
+            // FrugalGPT Baseline (Claude's Formula): 60% GPT4-T, 20% Sonnet, 20% Llama70B
+            // Input/Output average ~ $6.72 / 1M tokens
+            const baselineRate = 6.72 / 1000000;
+            const totalTokens = (result.usage?.prompt_tokens || 0) + (result.usage?.completion_tokens || 0);
+            const baselineCost = totalTokens * baselineRate;
+            const actualCost = result.cost;
+
+            const savingsPct = baselineCost > 0 ? ((baselineCost - actualCost) / baselineCost) * 100 : 0;
+
+            const savingsAttribution = {
+                compression_savings_usd: 0, // Placeholder for compression logic
+                routing_savings_usd: actualCost < (baselineCost * 0.5) ? (baselineCost * 0.3) : 0,
+                arbitrage_savings_usd: actualCost < (baselineCost * 0.2) ? (baselineCost * 0.5) : 0,
+                tier_savings_usd: actualCost < 0.001 ? baselineCost * 0.9 : 0,
+                baseline_cost_usd: baselineCost,
+                actual_cost_usd: actualCost,
+                total_savings_pct: Math.max(0, savingsPct),
+                baseline_method: "weighted_market_avg"
+            };
+
+            await this.supabase.from('trinity_cost_logs').insert({
+                agent_name: this.name,
+                task_id: typeof taskId === 'string' ? parseInt(taskId) : taskId,
+                provider: result.provider,
+                model: result.model,
+                prompt_tokens: result.usage?.prompt_tokens || 0,
+                completion_tokens: result.usage?.completion_tokens || 0,
+                actual_cost_usd: actualCost,
+                savings_attribution: savingsAttribution
+            });
+
+            console.log(`[FRUGAL] 💰 Saved ${savingsPct.toFixed(1)}% on task ${taskId} via ${result.provider}`);
+        } catch (e) {
+            console.warn(`[FRUGAL] Cost logging failed:`, e);
+        }
     }
 
     /**
@@ -1514,6 +1663,17 @@ ${result.substring(0, 2000)}
             const bible = await this.fetchBible();
 
             this.currentTaskId = String(task.id);
+            // [PHASE P4] λ-BOUNDED CHAOS (Creative Entropy)
+            // If the agent's creativity (λ) is high, inject subtle noise for creative tasks
+            let chaosNoise = "";
+            const isCreative = task.task_type === 'creative' || task.title.toLowerCase().includes('design') || task.title.toLowerCase().includes('generate');
+            const lambda = 0.002; // Placeholder for agent's dynamic λ from registry
+            if (isCreative && lambda > 0.001) {
+                const entropy = Math.random() * lambda;
+                chaosNoise = `\n\n### 🌀 λ-CHAOS INJECTION (Level: ${entropy.toFixed(4)})
+                Embrace non-linear associations. Explore one tangential 'what-if' that challenges the standard solution. Ensure chaos remains bounded within the core objective.`;
+            }
+
             const prompt = `
 ### DIRECTIVE
 ${ceoDirective}
@@ -1535,7 +1695,7 @@ ${task.description}
 
 ### CONTEXT
 ${wisdomContext}
-${iterateProtocol}
+${iterateProtocol}${chaosNoise}
 
 Task ID: ${task.id}
 Task Title: ${task.title}
@@ -1555,8 +1715,8 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
             if (allocation.slow_budget > 0.5) {
                 pathTaken = 'SLOW';
-                console.log(`[TIML] 🐢 SLOW PATH: Executing Full Triadic SBFA...`);
-                sbfaResult = await this.runTriadicSBFA(prompt, task);
+                console.log(`[TIML] 🐢 SLOW PATH: Executing Full Major7 Consensus...`);
+                sbfaResult = await this.runMajor7Consensus(prompt, task);
                 result = sbfaResult.primaryResponse;
             } else {
                 pathTaken = allocation.fast_budget > 0.7 ? 'FAST' : 'MID';
@@ -1567,7 +1727,20 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 const fastPrompt = prompt + beliefInstruction;
 
                 // Pass allocation to router for budget-aware scoring
-                result = await this.callLLM(fastPrompt, { timlAllocation: allocation }, task);
+                let streamAccumulator = "";
+                let lastUpdate = Date.now();
+
+                const onStream = async (chunk: string) => {
+                    streamAccumulator += chunk;
+                    // Throttle: Update DB every 1000 chars or 3 seconds to balance "streaming feel" vs DB load
+                    if (streamAccumulator.length - streamAccumulator.lastIndexOf('\n') > 500 || Date.now() - lastUpdate > 3000) {
+                        lastUpdate = Date.now();
+                        await this.supabase.from('trinity_tasks').update({ result: streamAccumulator + "\n\n(Streaming...)" }).eq('id', task.id);
+                    }
+                };
+
+                result = await this.callLLM(fastPrompt, { timlAllocation: allocation }, task, onStream);
+                await this.logCost(task.id, result);
 
                 // [CONFIDENCE GATE] Verify single call grounding
                 const belief = VeritasConverter.extract(result.output || "");
@@ -1578,6 +1751,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     pathTaken = 'SLOW';
                     sbfaResult = await this.runTriadicSBFA(prompt, task);
                     result = sbfaResult.primaryResponse;
+                    await this.logCost(task.id, result);
                 }
             }
 
@@ -1812,6 +1986,44 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 throw new Error(`Database Update Failed: ${doneError.message}`);
             }
 
+            // [PHASE M] MOBILE COCKPIT INTEGRATION
+            const SAFE_DOMAINS = new Set(['creative', 'technical', 'general']);
+            const SAFE_REP_MIN = 90; // RepID is 0-100 here
+            const SAFE_U_MAX = 0.05;
+
+            const isHighConfidence = (
+                finalScore > SAFE_REP_MIN &&
+                (evaluation.score / 100) > 0.9 && // Evaluation score as confidence proxy
+                SAFE_DOMAINS.has(task.domain || 'general') &&
+                (task as any).vulnerability_type !== 'EMERGENT'
+            );
+
+            if (isHighConfidence) {
+                console.log(`[COCKPIT] 🚀 High Confidence Auto-Approval for Task ${task.id}`);
+                await this.supabase.from('trinity_tasks').update({
+                    status: 'verified',
+                    metadata: {
+                        ...(JSON.parse(JSON.stringify(task.metadata || '{}'))),
+                        auto_approved: true,
+                        auto_approved_at: new Date().toISOString()
+                    }
+                }).eq('id', task.id);
+            } else {
+                console.log(`[COCKPIT] 📱 Pushing Task ${task.id} to Mobile Approval Queue...`);
+                await ApprovalQueue.push({
+                    task_id: String(task.id),
+                    agent_id: this.name,
+                    task_type: task.task_type || 'general',
+                    output_summary: result.output.substring(0, 500),
+                    full_output: result.output,
+                    rep_id_score: finalScore / 100, // Normalize for Bot display if needed
+                    wsce_score: evaluation.score / 100,
+                    u_score: evaluation.score > 90 ? 0.05 : 0.2, // Match marking logic
+                    cost_saved: (result as any).savings_attribution?.total_savings_usd || 0,
+                    domain: task.domain
+                });
+            }
+
             // Log Benchmark Score if applicable (Training Loop)
             // 3. LOG BENCHMARK & RESILIENCE PULSE
             await this.logBenchmark(task, evaluation.score);
@@ -1821,7 +2033,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             await this.generateInsight(task, result.output);
 
             this.sessionMetrics.tasksCompleted++;
-            await this.updateReputation(evaluation.score > 0.6);
+            await this.updateReputation(evaluation.score > 0.6, undefined, undefined, evaluation.score / 100);
 
             // ERC-8004 & HyperDAG INTEROP: Bridge to Sovereign Audit Trail
             await this.integrateErc8004(task.id, result.output, evaluation.score);
@@ -1924,6 +2136,29 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
         // 3. Periodic Retrospective (All Agents)
         if (Math.random() < 0.1) {
             await this.retrospective();
+        }
+
+        // [PHASE P4] σ_u ANTI-PARKING VARIANCE GATE
+        try {
+            const { data: recentTasks } = await this.supabase
+                .from('trinity_tasks')
+                .select('belief, uncertainty')
+                .eq('claimed_by', this.name)
+                .order('completed_at', { ascending: false })
+                .limit(10);
+
+            if (recentTasks && recentTasks.length >= 5) {
+                const beliefs = recentTasks.map(t => t.belief || 0.5);
+                const mean = beliefs.reduce((a, b) => a + b, 0) / beliefs.length;
+                const variance = beliefs.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / beliefs.length;
+
+                if (variance < 0.05) {
+                    console.log(`[GENESIS] 🛑 Anti-Parking Gate Triggered (Variance: ${variance.toFixed(4)}). Forcing WAKE: Exploration...`);
+                    await this.spawnMaintenanceTask(`WAKE: EXPLORATION. Agent belief in ${this.squad} has stalled (σ_u < 0.05). Search for counter-inductive evidence.`);
+                }
+            }
+        } catch (e) {
+            console.warn(`[GENESIS] Variance gate check failed.`, e);
         }
 
         // 4. Proactive Market Seeding (Genesis)
@@ -2100,7 +2335,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             if (parentId) {
                 const isApproved = evaluation.score > 0.5;
 
-                // 2/3 BFT Consensus Logic – Provisional Aug 17, 2025
+                // [PHASE P1] GOLDEN RATIO BFT CONSENSUS (61.8%)
                 const { data: parentTask, error } = await this.supabase
                     .from('trinity_tasks')
                     .select('*')
@@ -2121,13 +2356,27 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     agent: this.name,
                     reputation: this.reputationScore,
                     approved: isApproved,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
+                    // [PHASE P1] Confidence tagging for WSCE calibration
+                    confidence: evaluation.score / 100
                 });
 
-                if (newVerifyCount >= 2 && isApproved) {
+                // [PHASE P2] ITCM COLLUSION DETECTION
+                const creatorProvider = (parentTask.metadata as any)?.provider_used;
+                const verifierProvider = this.availableProviders[0]; // Simplified check
+                const isCollusionRisk = creatorProvider === verifierProvider && isApproved;
+
+                if (isCollusionRisk && Math.random() < 0.2) {
+                    console.log(`[VERIFY] 🕵️ ITCM Collusion Alert: Creator and Verifier used same provider (${creatorProvider}). Demoting confidence.`);
+                    evaluation.score *= 0.85; // Penalty for lack of diversity
+                }
+
+                const approvalRatio = signatures.filter(s => s.approved).length / signatures.length;
+                const minSignatures = parentTask.task_type === 'meta' ? 1 : 2;
+
+                if (signatures.length >= minSignatures && approvalRatio >= GOLDEN_RATIO_THRESHOLD) {
                     newStatus = 'verified';
-                    console.log(`[VERIFY] 🏆 Task ${parentId} reached 2/3 BFT consensus. Status -> VERIFIED.`);
-                    // [ANTIGRAVITY] Verifer gets credit for successful consensus work
+                    console.log(`[VERIFY] 🏆 Task ${parentId} reached Golden Ratio consensus (${(approvalRatio * 100).toFixed(1)}%). Status -> VERIFIED.`);
                     await this.updateReputation(true);
                 } else if (isApproved) {
                     // Credit for the work of verifying, even if consensus isn't reached yet
@@ -2710,8 +2959,77 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
 
     async semanticRag(query: string): Promise<string> {
         console.log(`[DAG] 🧠 Performing Semantic RAG for: ${query.substring(0, 50)}...`);
-        // Placeholder for future GraphRAG / Merkle-DAG context extraction
-        return "[DAG_CONTEXT_STUB]";
+        try {
+            const context = await this.memoryManager.recall(query, 5);
+            return context || "[NO_CONTEXT_FOUND]";
+        } catch (e) {
+            console.error(`[DAG] ❌ Semantic RAG failed:`, (e as Error).message);
+            return "[ERROR_RECALLING_CONTEXT]";
+        }
+    }
+
+    /**
+     * [PHASE P4] evaluateJudasVulnerabilities
+     * Evaluates a dissenting opinion (Judas) using the 8-category taxonomy.
+     * Incorporates dynamic weights from trinity_domain_priors.
+     */
+    async evaluateJudasVulnerabilities(judasOutput: string, domain: string = 'general'): Promise<any> {
+        console.log(`[JUDICIARY] ⚖️ Evaluating Judas output in domain ${domain}...`);
+
+        // 1. Fetch Dynamic Weights from Supabase
+        let weights: Record<string, number> = {
+            logical_fallacy: 1.0,
+            missing_counterexample: 1.0,
+            false_dichotomy: 1.0,
+            anchoring: 1.0,
+            domain_boundary: 1.0,
+            temporal_staleness: 1.0,
+            shared_training_bias: 1.0,
+            emergent: 1.0
+        };
+
+        try {
+            const { data } = await this.supabase
+                .from('trinity_domain_priors')
+                .select('virtue_weights')
+                .eq('domain', domain)
+                .single();
+            if (data && data.virtue_weights) {
+                weights = { ...weights, ...data.virtue_weights };
+            }
+        } catch (e) { console.warn(`[JUDICIARY] Failed to fetch priors for ${domain}. Using defaults.`); }
+
+        // 2. Perform Taxonomy Analysis (Simplified NLP/Keyword approach)
+        const scores: Record<string, number> = {};
+        const lower = judasOutput.toLowerCase();
+
+        const patterns = {
+            logical_fallacy: ['fallacy', 'non-sequitur', 'circular', 'ad hominem'],
+            missing_counterexample: ['counterexample', 'contradicts', 'ignoring', 'exception'],
+            false_dichotomy: ['dichotomy', 'binary', 'oversimplification', 'other options'],
+            anchoring: ['anchor', 'fixated', 'initial value', 'biased by'],
+            domain_boundary: ['boundary', 'misapplied', 'contextual limit', 'out of scope'],
+            temporal_staleness: ['stale', 'outdated', 'cutoff', 'since then', 'new version'],
+            shared_training_bias: ['bias', 'dataset', 'common error', 'training data overlap']
+        };
+
+        let maxScore = 0;
+        for (const [key, keywords] of Object.entries(patterns)) {
+            const matches = keywords.filter(k => lower.includes(k)).length;
+            scores[key] = (matches * 0.4) * (weights[key] || 1.0);
+            maxScore = Math.max(maxScore, scores[key]);
+        }
+
+        // 3. [BATCH 2] EMERGENT CATEGORY
+        // Triggered when no other category achieves fragility score > 0.4 but the agent is confident in a mismatch
+        if (maxScore < 0.4) {
+            console.log(`[JUDICIARY] 🌌 Low taxonomy match. Checking for EMERGENT patterns...`);
+            scores['emergent'] = 0.5 * (weights['emergent'] || 1.0);
+        } else {
+            scores['emergent'] = 0;
+        }
+
+        return { scores, top_vulnerability: Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b) };
     }
 
     async gnnAnomalyDetection(action: string, metadata: any): Promise<boolean> {
@@ -3129,7 +3447,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         }
     }
 
-    async callLLM(prompt: string, options: any = {}, task?: Task): Promise<LLMResult> {
+    async callLLM(prompt: string, options: any = {}, task?: Task, onStream?: (chunk: string) => void): Promise<LLMResult> {
         if (this.availableProviders.length === 0) {
             console.warn(`[${this.name}] No LLM Providers detected.`);
             return { output: "Simulation: All LLM providers are unavailable." };
@@ -3246,7 +3564,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey} (Tier: ${providerInfo?.tier || '?'}${forcedModel ? `, Specialized: ${forcedModel}` : ''})...`);
 
                     const providerResult = await Promise.race([
-                        this.callSpecificProvider(providerKey, prompt, openAiTools, forcedModel || undefined),
+                        this.callSpecificProvider(providerKey, prompt, openAiTools, forcedModel || undefined, onStream),
                         new Promise<null>((_, reject) => setTimeout(() => reject(new Error('PROVIDER_STALL')), 120000))
                     ]);
 
@@ -3365,7 +3683,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         };
     }
 
-    async callSpecificProvider(provider: string, prompt: string, tools: any[], modelOverride?: string): Promise<LLMResult> {
+    async callSpecificProvider(provider: string, prompt: string, tools: any[], modelOverride?: string, onStream?: (chunk: string) => void): Promise<LLMResult> {
         const bible = await this.fetchBible();
         const systemPrompt = `You are ${this.name}. ${CONSTITUTION.ARTICLE_MINUS_1.text}\n\nCONTEXT:\n${bible}`;
 
@@ -3375,9 +3693,9 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         );
 
         let providerPromise: Promise<LLMResult>;
-        if (provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools);
-        else if (provider === 'anthropic') providerPromise = this.callAnthropic(systemPrompt, prompt, tools);
-        else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt, tools);
+        if (provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools, onStream);
+        else if (provider === 'anthropic') providerPromise = this.callAnthropic(systemPrompt, prompt, tools, onStream);
+        else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt, tools, onStream);
         else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt, tools);
         else if (provider === 'groq') providerPromise = this.callGroq(systemPrompt, prompt, tools);
         else if (provider === 'fireworks') providerPromise = this.callOpenAICompatible('https://api.fireworks.ai/inference/v1/chat/completions', process.env.FIREWORKS_API_KEY!, 'accounts/fireworks/models/llama-v3p3-70b-instruct', systemPrompt, prompt, tools);
@@ -3414,7 +3732,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         return Promise.race([providerPromise, timeoutPromise]);
     }
 
-    async callOpenAI(systemPrompt: string, prompt: string, tools: any[]): Promise<LLMResult> {
+    async callOpenAI(systemPrompt: string, prompt: string, tools: any[], onStream?: (chunk: string) => void): Promise<LLMResult> {
         const apiKey = process.env.OPENAI_API_KEY;
         const messages: any[] = [
             { role: 'system', content: systemPrompt },
@@ -3436,7 +3754,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         model: 'gpt-4o',
                         messages,
                         tools: tools.length > 0 ? tools : undefined,
-                        tool_choice: tools.length > 0 ? 'auto' : undefined
+                        tool_choice: tools.length > 0 ? 'auto' : undefined,
+                        stream: !!onStream
                     })
                 });
 
@@ -3447,6 +3766,32 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     console.error(`[${this.name}] ❌ OpenAI Error (${response.status}):`, errText);
                     throw new Error(`OpenAI Error: ${errText}`);
                 }
+
+                if (onStream && response.body) {
+                    let fullText = "";
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                        for (const line of lines) {
+                            const message = line.replace(/^data: /, '');
+                            if (message === '[DONE]') break;
+                            try {
+                                const parsed = JSON.parse(message);
+                                const delta = parsed.choices[0]?.delta?.content || "";
+                                if (delta) {
+                                    fullText += delta;
+                                    onStream(delta);
+                                }
+                            } catch (e) { }
+                        }
+                    }
+                    return { output: fullText, artifactLinks: artifactLinks };
+                }
+
                 const data = await response.json();
                 if (data.error) throw new Error(`OpenAI Error: ${JSON.stringify(data.error)}`);
                 if (!data.choices || data.choices.length === 0) throw new Error("OpenAI returned no choices");
@@ -3490,7 +3835,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         throw new Error("Max tool recursion");
     }
 
-    async callAnthropic(systemPrompt: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+    async callAnthropic(systemPrompt: string, prompt: string, tools: any[] = [], onStream?: (chunk: string) => void): Promise<LLMResult> {
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) throw new Error("ANTHROPIC_API_KEY is missing");
 
@@ -3510,7 +3855,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 system: systemPrompt,
                 messages,
                 max_tokens: 4000,
-                tools: anthropicTools.length > 0 ? anthropicTools : undefined
+                tools: anthropicTools.length > 0 ? anthropicTools : undefined,
+                stream: !!onStream
             };
 
             const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -3523,11 +3869,37 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 body: JSON.stringify(body)
             });
 
-            const data = await response.json();
             if (!response.ok || data.error) {
                 console.error(`[${this.name}] ❌ Anthropic Error (${response.status}):`, JSON.stringify(data.error || data));
                 throw new Error(`Anthropic Error: ${JSON.stringify(data.error || data)}`);
             }
+
+            if (onStream && response.body) {
+                let fullText = "";
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                    for (const line of lines) {
+                        if (line.startsWith('data:')) {
+                            try {
+                                const parsed = JSON.parse(line.substring(5));
+                                if (parsed.type === 'content_block_delta') {
+                                    const delta = parsed.delta?.text || "";
+                                    fullText += delta;
+                                    onStream(delta);
+                                }
+                            } catch (e) { }
+                        }
+                    }
+                }
+                return { output: fullText, artifactLinks: artifactLinks };
+            }
+
+            const data = await response.json();
 
             const message = data;
             messages.push({ role: 'assistant', content: message.content });
@@ -3560,12 +3932,13 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         throw new Error("Max tool recursion");
     }
 
-    async callGemini(systemPrompt: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
+    async callGemini(systemPrompt: string, prompt: string, tools: any[] = [], onStream?: (chunk: string) => void): Promise<LLMResult> {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) throw new Error("GEMINI_API_KEY is missing");
 
         const model = 'gemini-1.5-flash-latest';
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const method = onStream ? 'streamGenerateContent' : 'generateContent';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${method}?key=${apiKey}`;
 
         // Gemini Tools Schema
         const geminiTools = tools.length > 0 ? [{
@@ -3593,6 +3966,33 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+            if (onStream && response.body) {
+                let fullText = "";
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                    for (const line of lines) {
+                        try {
+                            const cleanLine = line.replace(/^,/, '').trim();
+                            if (!cleanLine || cleanLine === '[' || cleanLine === ']') continue;
+                            const parsed = JSON.parse(cleanLine);
+                            const delta = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                            if (delta) {
+                                fullText += delta;
+                                onStream(delta);
+                            }
+                        } catch (e) { }
+                    }
+                }
+                return { output: fullText, artifactLinks: artifactLinks };
+            }
 
             const data = await response.json();
             if (data.error) throw new Error(`Gemini Error: ${JSON.stringify(data.error)}`);
@@ -3900,39 +4300,56 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     result: `[SOS] ${errorCode}: ${details}. Requested intercession from ${this.squad} peers.`
                 }).eq('id', task.id);
 
-                // [PHASE 13] HITL BRIDGE: Dispatch to Telegram
+                // [ANTIGRAVITY] Wire to Telegram HITL Bridge
                 try {
-                    const { HITLDispatcher } = await import('../hitl/HITLDispatcher');
                     await HITLDispatcher.dispatchToHITL({
-                        taskId: task.id,
+                        taskId: typeof task.id === 'string' ? parseInt(task.id) : task.id,
                         agentId: this.name,
-                        agentRepId: this.reputationScore.toString(),
-                        missionSummary: task.title + ': ' + (task.description || '').slice(0, 400),
-                        confidenceScore: (this as any).currentConfidence || 0.5,
-                        spiScore: (this as any).latestSPi || 0,
+                        agentRepId: String(this.reputationScore.toFixed(2)),
+                        missionSummary: task.description || 'No mission summary provided.',
+                        confidenceScore: 0.5, // Default for SOS
+                        spiScore: 0, // Default for SOS
                         escalationReason: `${errorCode}: ${details}`
                     });
+                    console.log(`[${this.name}] 🌉 HITL Dispatch successful for task ${task.id}`);
                 } catch (hitlError: any) {
-                    console.error(`[${this.name}] ⚠️ HITL Dispatch Failed:`, hitlError.message);
+                    console.error(`[${this.name}] ❌ HITL Dispatch failed:`, hitlError.message);
                 }
             }
-        } catch (e) {
-            console.error(`[${this.name}] ❌ Failed to emit SOS:`, (e as Error).message);
+
+            // [PHASE 13] HITL BRIDGE: Dispatch to Telegram
+            try {
+                const { HITLDispatcher } = await import('../hitl/HITLDispatcher');
+                await HITLDispatcher.dispatchToHITL({
+                    taskId: task.id,
+                    agentId: this.name,
+                    agentRepId: this.reputationScore.toString(),
+                    missionSummary: task.title + ': ' + (task.description || '').slice(0, 400),
+                    confidenceScore: (this as any).currentConfidence || 0.5,
+                    spiScore: (this as any).latestSPi || 0,
+                    escalationReason: `${errorCode}: ${details}`
+                });
+            } catch (hitlError: any) {
+                console.error(`[${this.name}] ⚠️ HITL Dispatch Failed:`, hitlError.message);
+            }
         }
+        } catch(e) {
+        console.error(`[${this.name}] ❌ Failed to emit SOS:`, (e as Error).message);
     }
+}
 
     /**
      * [ANTIFRAGILE] Safety Run: Attempt the task with a guaranteed/free provider
      * if the primary tiers are failing or exhausted.
      */
-    private async runSafetyRun(task: Task, originalError: string): Promise<LLMResult | null> {
-        console.log(`[${this.name}] 🛡️ Triggering Safety Run for task ${task.id}...`);
+    private async runSafetyRun(task: Task, originalError: string): Promise < LLMResult | null > {
+    console.log(`[${this.name}] 🛡️ Triggering Safety Run for task ${task.id}...`);
 
-        const safetyProviders = ['deepseek', 'gemini', 'groq', 'sambanova'].filter(p => this.availableProviders.includes(p));
-        if (safetyProviders.length === 0) return null;
+    const safetyProviders = ['deepseek', 'gemini', 'groq', 'sambanova'].filter(p => this.availableProviders.includes(p));
+    if(safetyProviders.length === 0) return null;
 
-        const safetyProvider = safetyProviders[0];
-        const safetyPrompt = `
+    const safetyProvider = safetyProviders[0];
+    const safetyPrompt = `
 [EMERGENCY SAFETY RUN]
 The primary processing unit hit an error: ${originalError}
 Please complete the following task with reduced complexity but high reliability.
@@ -3942,100 +4359,192 @@ Original Task: ${task.title}
 ${task.description}
 `;
 
-        try {
-            return await this.callSpecificProvider(safetyProvider, safetyPrompt, [], undefined);
-        } catch (e) {
-            console.error(`[${this.name}] ❌ Safety Run failed:`, (e as Error).message);
-            return null;
-        }
+    try {
+        return await this.callSpecificProvider(safetyProvider, safetyPrompt, [], undefined);
+    } catch(e) {
+        console.error(`[${this.name}] ❌ Safety Run failed:`, (e as Error).message);
+        return null;
     }
+}
 
     // ============================================
     // ARBITRAGE & MANAGER HELPERS
     // ============================================
 
-    async isCircuitOpen(provider: string): Promise<boolean> {
-        const breaker = (this as any).circuitBreakers.get(provider);
-        if (!breaker) return false;
-        if (breaker.failures < 3) return false;
-        const now = Date.now();
-        if (now - breaker.lastFailure > 300000) { // 5 min reset
-            (this as any).circuitBreakers.delete(provider);
-            return false;
-        }
-        return true;
+    async isCircuitOpen(provider: string): Promise < boolean > {
+    const breaker = (this as any).circuitBreakers.get(provider);
+    if(!breaker) return false;
+    if(breaker.failures < 3) return false;
+    const now = Date.now();
+    if(now - breaker.lastFailure > 300000) { // 5 min reset
+    (this as any).circuitBreakers.delete(provider);
+    return false;
+}
+return true;
     }
 
-    async checkProviderLimit(provider: string): Promise<boolean> {
-        if (!this.redis) return true;
-        try {
-            const limit = (this as any).arbitrageConfig?.providers?.[provider]?.daily_token_limit || 1000000;
-            const key = `ratelimit:${provider}:${new Date().toISOString().split('T')[0]}`;
-            const current = await this.redis.get(key);
-            if (current && parseInt(current as string) > limit) {
-                console.log(`[${this.name}] ⚠️ ${provider} limit reached (${current}/${limit})`);
-                return false;
-            }
-            await this.redis.incr(key);
-            // @ts-ignore
-            if (!current) await this.redis.expire(key, 86400);
-            return true;
+    async checkProviderLimit(provider: string): Promise < boolean > {
+    if(!this.redis) return true;
+    try {
+        const limit = (this as any).arbitrageConfig?.providers?.[provider]?.daily_token_limit || 1000000;
+        const key = `ratelimit:${provider}:${new Date().toISOString().split('T')[0]}`;
+        const current = await this.redis.get(key);
+        if(current && parseInt(current as string) > limit) {
+    console.log(`[${this.name}] ⚠️ ${provider} limit reached (${current}/${limit})`);
+    return false;
+}
+await this.redis.incr(key);
+// @ts-ignore
+if (!current) await this.redis.expire(key, 86400);
+return true;
         } catch (e) {
-            return true;
-        }
+    return true;
+}
     }
 
     async markProviderFailure(provider: string) {
-        const breaker = (this as any).circuitBreakers.get(provider) || { failures: 0, lastFailure: 0 };
-        breaker.failures++;
-        breaker.lastFailure = Date.now();
-        (this as any).circuitBreakers.set(provider, breaker);
-        console.warn(`[${this.name}] 🚨 Provider ${provider} failure #${breaker.failures}`);
+    const breaker = (this as any).circuitBreakers.get(provider) || { failures: 0, lastFailure: 0 };
+    breaker.failures++;
+    breaker.lastFailure = Date.now();
+    (this as any).circuitBreakers.set(provider, breaker);
+    console.warn(`[${this.name}] 🚨 Provider ${provider} failure #${breaker.failures}`);
+}
+
+    async delegateToTool(toolName: string, taskContext: string): Promise < string > {
+    console.log(`[MANAGER] 💼 Delegating to ${toolName}...`);
+    try {
+        const result = await mcpManager.routeToolCall(toolName, { context: taskContext });
+        return result;
+    } catch(e: any) {
+        console.error(`[MANAGER] ❌ Delegation failed:`, e.message);
+        return `Error during tool delegation to ${toolName}: ${e.message}`;
+    }
+}
+
+    async callSambanova(system: string, prompt: string): Promise < LLMResult > {
+    return this.callOpenAICompatible('https://api.sambanova.ai/v1/chat/completions', process.env.SAMBANOVA_API_KEY!, 'Llama-3.1-405B-Instruct', system, prompt, []);
+}
+
+    async runMajor7Consensus(prompt: string, task: Task): Promise < SBFAResult & { primaryResponse: any; judasAgent?: string } > {
+    const roles = [
+        { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Primary data capture." },
+        { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty. High-level integration." },
+        { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique. Search for hidden flaws." },
+        { id: 'SEVENTH', prompt: "SEVENTH ROLE: Long-tail Calibration. Focus on extreme edge cases." }
+    ];
+
+    console.log(`[SYMPHONY] 🎻 Executing Major7 (4-Agent) Parallel Dispatch...`);
+
+    const responses = await Promise.all(roles.map(async (role) => {
+        const roleStartTime = Date.now();
+        const rolePrompt = `${prompt}\n\nMANDATORY ROLE INSTRUCTION: ${role.prompt}\n\nYou MUST include a belief vector in your response in the format: <belief>[p_success, p_partial, p_failure]</belief>.`;
+        const response = await this.callLLM(rolePrompt, {}, task);
+        const latency = (Date.now() - roleStartTime) / 1000;
+        const belief = VeritasConverter.extract(response.output || "");
+        const cost = response.usage?.total_tokens || 0;
+
+        return { role: role.id, response, latency, belief, cost };
+    }));
+
+    const sbfaInput: SBFAInput = {
+        beliefs: responses.map(r => r.belief),
+        latencies: responses.map(r => r.latency),
+        costs: responses.map(r => r.cost)
+    };
+
+    const sbfaResult = SBFAOperator.process(sbfaInput);
+
+    // [PHASE P1] GOLDEN RATIO BFT THRESHOLD
+    // Override status based on 61.8% consensus rule
+    const maxProb = Math.max(...sbfaResult.aggregatedBelief);
+    const symphonyStatus = maxProb >= GOLDEN_RATIO_THRESHOLD ? 'COLLAPSE' : 'ABSTAIN';
+
+    // [PHASE P1] JUDAS AGENT DISCOVERY (Highest KL Divergence)
+    // We re-calculate KL per agent to find the outlier
+    const meanDist = [0, 0, 0];
+    responses.forEach(r => {
+        for (let j = 0; j < 3; j++) meanDist[j] += r.belief[j];
+    });
+    for(let j = 0; j < 3; j++) meanDist[j] /= responses.length;
+
+const kl = (p: number[], q: number[]) => {
+    let sum = 0;
+    for (let i = 0; i < 3; i++) {
+        const pi = Math.max(p[i], 1e-12);
+        const qi = Math.max(q[i], 1e-12);
+        sum += pi * Math.log(pi / qi);
+    }
+    return sum;
+};
+
+let maxKL = -1;
+let judasAgentIndex = -1;
+responses.forEach((r, idx) => {
+    const d = kl(r.belief, meanDist);
+    if (d > maxKL) {
+        maxKL = d;
+        judasAgentIndex = idx;
+    }
+});
+const judasAgent = responses[judasAgentIndex]?.role || 'NONE';
+const approvalRatio = responses.filter(r => r.belief[0] > 0.5).length / responses.length;
+
+console.log(`[SYMPHONY] 🎼 Consensus Level: ${(maxProb * 100).toFixed(1)}% | Status: ${symphonyStatus} | Judas: ${judasAgent}`);
+
+// [PHASE P1] PERSISTENT CALIBRATION LOGGING
+await this.log('calibration_audit', `Major7 Consensus: ${symphonyStatus} (Judas: ${judasAgent})`, {
+    taskId: task.id,
+    maxProb,
+    judasAgent,
+    disagreement: sbfaResult.disagreement,
+    symphonyStatus,
+    approvalRatio
+});
+
+const primaryResponse = responses.find(r => r.role === 'ROOT')?.response || responses[0].response;
+
+// [PHASE P2] PYRO DYNAMIC HITL ESCALATION
+if (sbfaResult.disagreement >= PYRO_DISAGREEMENT_THRESHOLD || (symphonyStatus === 'ABSTAIN' && maxProb < 0.4)) {
+    console.log(`[SYMPHONY] 🔥 PYRO ESCALATION: Extreme disagreement detected (${sbfaResult.disagreement.toFixed(2)}). Triggering HITL...`);
+    await this.emitHelpRequest(task, 'BIT_FLIP_DETECTED', `Symphony Consensus Failure. Disagreement: ${sbfaResult.disagreement.toFixed(2)}. Judas: ${judasAgent}. Consensus failed Golden Ratio (Max: ${(maxProb * 100).toFixed(1)}%).`);
+}
+
+return {
+    ...sbfaResult,
+    status: symphonyStatus as any,
+    primaryResponse,
+    judasAgent
+};
     }
 
-    async delegateToTool(toolName: string, taskContext: string): Promise<string> {
-        console.log(`[MANAGER] 💼 Delegating to ${toolName}...`);
-        try {
-            const result = await mcpManager.routeToolCall(toolName, { context: taskContext });
-            return result;
-        } catch (e: any) {
-            console.error(`[MANAGER] ❌ Delegation failed:`, e.message);
-            return `Error during tool delegation to ${toolName}: ${e.message}`;
-        }
-    }
+    async runTriadicSBFA(prompt: string, task: Task): Promise < SBFAResult & { primaryResponse: any } > {
+    const roles = [
+        { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Focus on verifiable facts and primary data." },
+        { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty Impact. Focus on high-level integration and alignment with Trinity goals." },
+        { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique & Edge Cases. Search for flaws, risks, and potential failures." }
+    ];
 
-    async callSambanova(system: string, prompt: string): Promise<LLMResult> {
-        return this.callOpenAICompatible('https://api.sambanova.ai/v1/chat/completions', process.env.SAMBANOVA_API_KEY!, 'Llama-3.1-405B-Instruct', system, prompt, []);
-    }
+    const triadResponses = await Promise.all(roles.map(async (role) => {
+        const roleStartTime = Date.now();
+        const rolePrompt = `${prompt}\n\nMANDATORY ROLE INSTRUCTION: ${role.prompt}\n\nYou MUST include a belief vector in your response in the format: <belief>[p_success, p_partial, p_failure]</belief>.`;
+        // Triadic ALWAYS uses Elite/Balanced routing (slow path)
+        const response = await this.callLLM(rolePrompt, {}, task);
+        const latency = (Date.now() - roleStartTime) / 1000;
+        const belief = VeritasConverter.extract(response.output || "");
+        const cost = response.usage?.total_tokens || 0;
 
-    async runTriadicSBFA(prompt: string, task: Task): Promise<SBFAResult & { primaryResponse: any }> {
-        const roles = [
-            { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Focus on verifiable facts and primary data." },
-            { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty Impact. Focus on high-level integration and alignment with Trinity goals." },
-            { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique & Edge Cases. Search for flaws, risks, and potential failures." }
-        ];
+        return { role: role.id, response, latency, belief, cost };
+    }));
 
-        const triadResponses = await Promise.all(roles.map(async (role) => {
-            const roleStartTime = Date.now();
-            const rolePrompt = `${prompt}\n\nMANDATORY ROLE INSTRUCTION: ${role.prompt}\n\nYou MUST include a belief vector in your response in the format: <belief>[p_success, p_partial, p_failure]</belief>.`;
-            // Triadic ALWAYS uses Elite/Balanced routing (slow path)
-            const response = await this.callLLM(rolePrompt, {}, task);
-            const latency = (Date.now() - roleStartTime) / 1000;
-            const belief = VeritasConverter.extract(response.output || "");
-            const cost = response.usage?.total_tokens || 0;
+    const sbfaInput: SBFAInput = {
+        beliefs: triadResponses.map(r => r.belief),
+        latencies: triadResponses.map(r => r.latency),
+        costs: triadResponses.map(r => r.cost)
+    };
 
-            return { role: role.id, response, latency, belief, cost };
-        }));
+    const sbfaResult = SBFAOperator.process(sbfaInput);
+    const primaryResponse = triadResponses.find(r => r.role === 'ROOT')?.response || triadResponses[0].response;
 
-        const sbfaInput: SBFAInput = {
-            beliefs: triadResponses.map(r => r.belief),
-            latencies: triadResponses.map(r => r.latency),
-            costs: triadResponses.map(r => r.cost)
-        };
-
-        const sbfaResult = SBFAOperator.process(sbfaInput);
-        const primaryResponse = triadResponses.find(r => r.role === 'ROOT')?.response || triadResponses[0].response;
-
-        return { ...sbfaResult, primaryResponse };
-    }
+    return { ...sbfaResult, primaryResponse };
+}
 }

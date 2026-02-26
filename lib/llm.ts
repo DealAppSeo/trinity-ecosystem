@@ -16,6 +16,7 @@ export interface LLMRequest {
     role?: string; // For tool permissions
     tools?: boolean; // Enable tools?
     task?: Task; // Context for routing
+    onStream?: (chunk: string) => void; // Optional streaming callback
 }
 
 export interface LLMResult {
@@ -122,11 +123,41 @@ async function callOpenAI(request: LLMRequest, model: string): Promise<LLMResult
             model,
             messages,
             tools: openAiTools.length > 0 ? openAiTools : undefined,
-            tool_choice: openAiTools.length > 0 ? 'auto' : undefined
+            tool_choice: openAiTools.length > 0 ? 'auto' : undefined,
+            stream: !!request.onStream
         })
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+    if (request.onStream && response.body) {
+        let fullText = "";
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            for (const line of lines) {
+                const message = line.replace(/^data: /, '');
+                if (message === '[DONE]') break;
+                try {
+                    const parsed = JSON.parse(message);
+                    const delta = parsed.choices[0]?.delta?.content || "";
+                    if (delta) {
+                        fullText += delta;
+                        request.onStream(delta);
+                    }
+                } catch (e) {
+                    // Ignore parsing errors for partial chunks
+                }
+            }
+        }
+        return { output: fullText };
+    }
+
     const data = await response.json();
     return { output: data.choices[0].message.content, toolCalls: data.choices[0].message.tool_calls?.length || 0 };
 }
@@ -146,11 +177,39 @@ async function callAnthropic(request: LLMRequest, model: string): Promise<LLMRes
             model,
             system: request.systemPrompt,
             messages: [{ role: 'user', content: request.userPrompt }],
-            max_tokens: 4000
+            max_tokens: 4000,
+            stream: !!request.onStream
         })
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+    if (request.onStream && response.body) {
+        let fullText = "";
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            for (const line of lines) {
+                if (line.startsWith('data:')) {
+                    try {
+                        const parsed = JSON.parse(line.substring(5));
+                        if (parsed.type === 'content_block_delta') {
+                            const delta = parsed.delta?.text || "";
+                            fullText += delta;
+                            request.onStream(delta);
+                        }
+                    } catch (e) { }
+                }
+            }
+        }
+        return { output: fullText };
+    }
+
     const data = await response.json();
     return { output: data.content[0].text };
 }
@@ -159,7 +218,8 @@ async function callGemini(request: LLMRequest, model: string): Promise<LLMResult
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("Gemini Key missing");
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const method = request.onStream ? 'streamGenerateContent' : 'generateContent';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${method}?key=${apiKey}`;
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,6 +229,36 @@ async function callGemini(request: LLMRequest, model: string): Promise<LLMResult
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+    if (request.onStream && response.body) {
+        let fullText = "";
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            // Gemini stream is a JSON array of objects, but delivered in chunks that might be partial
+            // Simplistic parsing for now, better to use a proper JSON stream parser
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            for (const line of lines) {
+                try {
+                    // Gemini stream chunks start with a comma in later versions or are full JSON objects
+                    const cleanLine = line.replace(/^,/, '').trim();
+                    if (!cleanLine || cleanLine === '[' || cleanLine === ']') continue;
+                    const parsed = JSON.parse(cleanLine);
+                    const delta = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    if (delta) {
+                        fullText += delta;
+                        request.onStream(delta);
+                    }
+                } catch (e) { }
+            }
+        }
+        return { output: fullText };
+    }
+
     const data = await response.json();
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
         throw new Error('Gemini returned empty or blocked content');

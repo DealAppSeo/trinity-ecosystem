@@ -49,8 +49,8 @@ export class HITLDispatcher {
                             ],
                             [
                                 {
-                                    text: '🌐 LAUNCH CONTROLLER',
-                                    web_app: { url: `https://app.aitrinitysymphony.com/pulse/tasks?id=${payload.taskId}` }
+                                    text: '🌐 OPEN IN CONDUCTOR',
+                                    web_app: { url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.aitrinitysymphony.com'}/pulse/tasks?id=${payload.taskId}` }
                                 }
                             ]
                         ]
