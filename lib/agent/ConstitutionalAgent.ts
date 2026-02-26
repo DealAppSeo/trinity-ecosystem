@@ -1,4 +1,4 @@
-﻿console.log("###################################################");
+console.log("###################################################");
 console.log("### ACTIVE SOURCE: lib/agent/ConstitutionalAgent.ts ###");
 console.log("###################################################");
 import * as fs from 'fs';
@@ -81,7 +81,7 @@ export class WebResearchTool implements ResearchTool {
 
         if (tavilyKey) {
             try {
-                console.log(`[ResearchTool] ðŸ”Ž Searching Tavily (Elite): "${query}"`);
+                console.log(`[ResearchTool] 🔎 Searching Tavily (Elite): "${query}"`);
                 const response = await fetch('https://api.tavily.com/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -103,15 +103,15 @@ export class WebResearchTool implements ResearchTool {
                         }));
                     }
                 }
-                console.warn('[ResearchTool] âš ï¸ Tavily returned no results or error. Falling back to Brave...');
+                console.warn('[ResearchTool] ⚠️ Tavily returned no results or error. Falling back to Brave...');
             } catch (e: any) {
-                console.warn(`[ResearchTool] âš ï¸ Tavily Error: ${e.message}. Falling back to Brave...`);
+                console.warn(`[ResearchTool] ⚠️ Tavily Error: ${e.message}. Falling back to Brave...`);
             }
         }
 
         if (braveKey) {
             try {
-                console.log(`[ResearchTool] ðŸ”Ž Searching Brave (Breadth): "${query}"`);
+                console.log(`[ResearchTool] 🔎 Searching Brave (Breadth): "${query}"`);
                 const response = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`, {
                     headers: {
                         'Accept': 'application/json',
@@ -131,12 +131,12 @@ export class WebResearchTool implements ResearchTool {
                     }
                 }
             } catch (e: any) {
-                console.error(`[ResearchTool] âŒ Brave Error: ${e.message}`);
+                console.error(`[ResearchTool] ❌ Brave Error: ${e.message}`);
             }
         }
 
         if (!tavilyKey && !braveKey) {
-            console.warn('[ResearchTool] âš ï¸ No Search API Keys configured.');
+            console.warn('[ResearchTool] ⚠️ No Search API Keys configured.');
             return [{ url: "https://example.com", title: "Missing API Keys", content: "Please set TAVILY_API_KEY or BRAVE_API_KEY." }];
         }
 
@@ -221,7 +221,7 @@ export class ConstitutionalAgent {
             return this.mcpCache.get(phase)!;
         }
 
-        console.log(`[${this.name}] ðŸ“œ Loading MCP Protocol: ${phase}...`);
+        console.log(`[${this.name}] 📜 Loading MCP Protocol: ${phase}...`);
         try {
             const url = `${MCP_BASE_URL}/${phase}.md`;
             const response = await fetch(url);
@@ -231,7 +231,7 @@ export class ConstitutionalAgent {
             this.mcpCache.set(phase, content); // Cache for session
             return content;
         } catch (error) {
-            console.error(`[${this.name}] âš ï¸ MCP Load Failed for ${phase}:`, error);
+            console.error(`[${this.name}] ⚠️ MCP Load Failed for ${phase}:`, error);
             // Fallback to basic rules if fetch fails
             return this.getFallbackMCP(phase);
         }
@@ -305,10 +305,10 @@ export class ConstitutionalAgent {
             // [PHASE 3] Location-Aware Prefetching
             const location = process.env.USER_LOCATION || 'Global';
             this.memoryManager.prefetchLocationContext(location);
-        }).catch(e => console.error(`[${this.name}] ðŸ§  Memory initialization failed:`, e));
+        }).catch(e => console.error(`[${this.name}] 🧠 Memory initialization failed:`, e));
 
         this.octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-        console.log(`[${this.name}] ðŸš€ Initialized v${this.version}`);
+        console.log(`[${this.name}] 🚀 Initialized v${this.version}`);
     }
 
     private loadArbitrageConfig() {
@@ -316,10 +316,10 @@ export class ConstitutionalAgent {
             const configPath = path.resolve(process.cwd(), 'config/trinity-arbitrage-config.json');
             if (fs.existsSync(configPath)) {
                 this.arbitrageConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-                console.log(`[${this.name}] âš–ï¸ Arbitrage config loaded.`);
+                console.log(`[${this.name}] ⚖️ Arbitrage config loaded.`);
             }
         } catch (e) {
-            console.warn(`[${this.name}] âš ï¸ Failed to load arbitrage config:`, e);
+            console.warn(`[${this.name}] ⚠️ Failed to load arbitrage config:`, e);
         }
     }
 
@@ -346,7 +346,7 @@ export class ConstitutionalAgent {
                 .maybeSingle();
 
             if (error) {
-                console.error(`[${this.name}] âš ï¸ Sync error:`, error.message);
+                console.error(`[${this.name}] ⚠️ Sync error:`, error.message);
                 // Continue to registration if it's just a missing record
             }
 
@@ -382,7 +382,7 @@ export class ConstitutionalAgent {
                 console.log(`[${this.name}] Registered new agent with squad: ${this.squad}`);
             }
         } catch (err: any) {
-            console.error(`[${this.name}] âš ï¸ SYNC ERROR (Anti-Fragile Fallback Active): ${err.message}`);
+            console.error(`[${this.name}] ⚠️ SYNC ERROR (Anti-Fragile Fallback Active): ${err.message}`);
             // Fallback is automatic since this.systemPrompt remains null (default)
         }
     }
@@ -411,7 +411,7 @@ export class ConstitutionalAgent {
             };
 
             await this.supabase.from('trinity_artifacts').insert([insightEntry]);
-            console.log(`[WISDOM] ðŸ“š Insight persisted for ${task.id}`);
+            console.log(`[WISDOM] 📚 Insight persisted for ${task.id}`);
 
             // [PHASE 3] Persistent Agentic Memory
             await this.memoryManager.remember(result, {
@@ -493,7 +493,7 @@ export class ConstitutionalAgent {
             const hasKeyword = contradictionKeywords.some(k => lowerContext.includes(k));
 
             if (hasKeyword && lowerContext.length > 50) {
-                console.log(`[xMEMORY] ðŸš¨ Contradiction alert detected in context. Applying u-boost (0.15).`);
+                console.log(`[xMEMORY] 🚨 Contradiction alert detected in context. Applying u-boost (0.15).`);
                 return 0.15;
             }
         } catch (e) {
@@ -573,10 +573,10 @@ export class ConstitutionalAgent {
         try {
             await ERC8004Bridge.syncReputation(name, finalScore);
         } catch (e) {
-            console.warn(`[${this.name}] âš ï¸ ERC-8004 Sync Failed:`, (e as Error).message);
+            console.warn(`[${this.name}] ⚠️ ERC-8004 Sync Failed:`, (e as Error).message);
         }
 
-        // ðŸ§  ANFIS FEEDBACK LOOP (Truth-Seeking)
+        // 🧠 ANFIS FEEDBACK LOOP (Truth-Seeking)
         await this.callAnfisReward(success);
     }
 
@@ -619,7 +619,7 @@ export class ConstitutionalAgent {
                 savings_attribution: savingsAttribution
             });
 
-            console.log(`[FRUGAL] ðŸ’° Saved ${savingsPct.toFixed(1)}% on task ${taskId} via ${result.provider}`);
+            console.log(`[FRUGAL] 💰 Saved ${savingsPct.toFixed(1)}% on task ${taskId} via ${result.provider}`);
         } catch (e) {
             console.warn(`[FRUGAL] Cost logging failed:`, e);
         }
@@ -634,7 +634,7 @@ export class ConstitutionalAgent {
             // Success = 0.9, Failure = 0.2
             const truthScore = success ? 0.9 : 0.2;
 
-            console.log(`[ANFIS] ðŸ§  Rewarding ${providerKey || 'agent'} (Success: ${success})...`);
+            console.log(`[ANFIS] 🧠 Rewarding ${providerKey || 'agent'} (Success: ${success})...`);
 
             // Call Python Microservice
             const ANFIS_URL = process.env.ANFIS_URL || 'http://localhost:8000';
@@ -652,9 +652,9 @@ export class ConstitutionalAgent {
 
             if (res.ok) {
                 const data = await res.json();
-                console.log(`[${this.name}] ðŸ§  ANFIS Brain Reward: ${data.reward}`);
+                console.log(`[${this.name}] 🧠 ANFIS Brain Reward: ${data.reward}`);
             } else {
-                console.warn(`[${this.name}] âš ï¸ ANFIS Offline or Error: ${res.status}`);
+                console.warn(`[${this.name}] ⚠️ ANFIS Offline or Error: ${res.status}`);
             }
         } catch (err) {
             // Silent fail to stay anti-fragile (don't crash agent if brain is sleeping)
@@ -673,7 +673,7 @@ export class ConstitutionalAgent {
         if (currentIdx >= requiredIdx) {
             return true;
         }
-        console.warn(`[${this.name}] â›” ACCESS DENIED. Required: ${requiredTier}, Current: ${this.autonomyTier}`);
+        console.warn(`[${this.name}] ⛔ ACCESS DENIED. Required: ${requiredTier}, Current: ${this.autonomyTier}`);
         return false;
     }
 
@@ -733,10 +733,10 @@ export class ConstitutionalAgent {
         console.log('[BOOT] Healing throttle: ENABLED');
         console.log('[BOOT] Artifact requirement: ENABLED');
         console.log('========================================');
-        console.log(`[${this.name}] ðŸƒ Starting main task loop (Spawn Control v8.1.1)...`);
+        console.log(`[${this.name}] 🏃 Starting main task loop (Spawn Control v8.1.1)...`);
 
         // IMMEDIATE SYNC & HEARTBEAT
-        console.log(`[${this.name}] ðŸŒ€ Initializing Trinity Neural Symphony...`);
+        console.log(`[${this.name}] 🌀 Initializing Trinity Neural Symphony...`);
 
         // [ANTIGRAVITY] PRE-INIT HEARTBEAT: Announce presence BEFORE heavy tool loading
         await this.heartbeat('[BOOTING] Synchronizing CNS and Neural Pathways...');
@@ -745,12 +745,12 @@ export class ConstitutionalAgent {
         await this.heartbeat('[BOOTING] Mapping MCP Tools and Bridges...');
 
         // [ANTIGRAVITY] INITIALIZE MCP TOOLS (Resilient Boot)
-        console.log(`[${this.name}] ðŸ› ï¸ Initializing MCP Tools...`);
+        console.log(`[${this.name}] 🛠️ Initializing MCP Tools...`);
         try {
             await mcpManager.initializeAll();
-            console.log(`[${this.name}] âœ… MCP Tools Ready.`);
+            console.log(`[${this.name}] ✅ MCP Tools Ready.`);
         } catch (e: any) {
-            console.error(`[${this.name}] âŒ MCP Initialization Failed (Continuing):`, e.message);
+            console.error(`[${this.name}] ❌ MCP Initialization Failed (Continuing):`, e.message);
         }
 
         // [ANTIGRAVITY] ARBITRAGE: Heartbeat interval removed to slash DB load.
@@ -768,7 +768,7 @@ export class ConstitutionalAgent {
 
         // [ANTIGRAVITY] SQUAD-WIDE CASCADE REDEPLOY (Elite Feature)
         if (process.env.FORCE_CASCADE === 'true') {
-            console.log(`[${this.name}] ðŸŒŠ CASCADE REDEPLOY DETECTED. Triggering squad...`);
+            console.log(`[${this.name}] 🌊 CASCADE REDEPLOY DETECTED. Triggering squad...`);
             await this.runSquadCascadeRedeploy();
         }
 
@@ -785,20 +785,20 @@ export class ConstitutionalAgent {
                         const isCurrentlyAutomated = (this as any).currentTask?.metadata?.automated === true;
 
                         if (isCurrentlyAutomated) {
-                            console.log(`[${this.name}] ðŸ›¡ï¸ RECURSION GUARD: Suppressing healing spawn while processing automated task.`);
+                            console.log(`[${this.name}] 🛡️ RECURSION GUARD: Suppressing healing spawn while processing automated task.`);
                         } else {
                             // [ANTIFRAGILE] SOS SIGNALING: If health is critical, broadcast HELP_REQUEST
                             if (health.reason.includes('Persistent failure') || health.reason.includes('Resource Exhaustion')) {
                                 await this.emitHelpRequest(undefined, 'CRITICAL_HEALTH_FAILURE', health.reason);
                             }
 
-                            console.log(`[${this.name}] ðŸ§¬ LEARNING LOOP TRIGGERED: ${health.reason}`);
+                            console.log(`[${this.name}] 🧬 LEARNING LOOP TRIGGERED: ${health.reason}`);
                             await this.spawnMaintenanceTask(health.reason);
                             await this.sleep(30000); // Wait before continuing to avoid loop thrashing
                         }
                     }
                 } catch (healthError) {
-                    console.warn(`[${this.name}] âš ï¸ Health check error:`, healthError);
+                    console.warn(`[${this.name}] ⚠️ Health check error:`, healthError);
                 }
 
                 // [ANTIGRAVITY] STUCK TASK WATCHDOG: Release tasks stuck in 'doing' for > 45 mins (Relaxed for complex work)
@@ -815,7 +815,7 @@ export class ConstitutionalAgent {
 
                 if (myStuckTasks && myStuckTasks.length > 0) {
                     for (const stuck of myStuckTasks) {
-                        console.log(`[${this.name}] ðŸš¨ WATCHDOG: Task ${stuck.id} ("${stuck.title}") has STALLED. Releasing claim for escalation.`);
+                        console.log(`[${this.name}] 🚨 WATCHDOG: Task ${stuck.id} ("${stuck.title}") has STALLED. Releasing claim for escalation.`);
                         await this.log('watchdog_release', `Releasing stalled task ${stuck.id}`, { taskId: stuck.id });
                         await this.releaseClaim(stuck.id);
 
@@ -855,7 +855,7 @@ export class ConstitutionalAgent {
                                 .maybeSingle();
 
                             if (ownerHb && new Date(ownerHb.last_active) < new Date(Date.now() - 10 * 60 * 1000)) {
-                                console.log(`[${this.name}] ðŸ•µï¸ SQUAD WATCHDOG: Task ${task.id} owned by STALE peer ${task.claimed_by}. FORCING RELEASE.`);
+                                console.log(`[${this.name}] 🕵️ SQUAD WATCHDOG: Task ${task.id} owned by STALE peer ${task.claimed_by}. FORCING RELEASE.`);
                                 await this.log('squad_watchdog_hijack', `Releasing task ${task.id} from stale peer ${task.claimed_by}`, { taskId: task.id, peer: task.claimed_by });
 
                                 await this.supabase.from('trinity_tasks').update({
@@ -883,7 +883,7 @@ export class ConstitutionalAgent {
 
                     // 2. Cleanup Finished (Sticky Claims)
                     for (const finished of finishedClaims) {
-                        console.log(`[${this.name}] ðŸ§¹ Cleaning sticky claim on task ${finished.id} (Status: ${finished.status})`);
+                        console.log(`[${this.name}] 🧹 Cleaning sticky claim on task ${finished.id} (Status: ${finished.status})`);
                         await this.releaseClaim(finished.id, false); // Do NOT reset status for finished tasks
                     }
 
@@ -891,19 +891,19 @@ export class ConstitutionalAgent {
                     if (activeClaims.length > 0) {
                         // If we have more than 1, release all but the first (Keep the "primary" focus)
                         if (activeClaims.length > 1) {
-                            console.warn(`[${this.name}] ðŸš¨ HOARDING DETECTED: ${activeClaims.length} active tasks found. Releasing duplicates.`);
+                            console.warn(`[${this.name}] 🚨 HOARDING DETECTED: ${activeClaims.length} active tasks found. Releasing duplicates.`);
                             for (let i = 1; i < activeClaims.length; i++) {
                                 await this.releaseClaim(activeClaims[i].id);
                             }
                         }
 
                         const focusTask = activeClaims[0];
-                        console.log(`[${this.name}] ðŸš€ FOCUS: Resuming active task ${focusTask.id} (${focusTask.status})...`);
+                        console.log(`[${this.name}] 🚀 FOCUS: Resuming active task ${focusTask.id} (${focusTask.status})...`);
 
                         // [ANTIGRAVITY] LOOP HARDENING: Track retries for stalled tasks
                         this.activeTaskRetryCount++;
                         if (this.activeTaskRetryCount > this.MAX_TASK_RETRIES) {
-                            console.error(`[${this.name}] ðŸš¨ TASK ${focusTask.id} STALLED. Max retries exceeded. Marking as FAILED.`);
+                            console.error(`[${this.name}] 🚨 TASK ${focusTask.id} STALLED. Max retries exceeded. Marking as FAILED.`);
                             await this.supabase.from('trinity_tasks').update({
                                 status: 'failed',
                                 result: 'Max retry limit exceeded in core loop.'
@@ -922,7 +922,7 @@ export class ConstitutionalAgent {
 
                 // [ANTIGRAVITY] WORKFLOW ALTERNATOR: Alternate between Execution and Verification
                 const preferVerify = this.lastTaskCategory === 'execute';
-                console.log(`[${this.name}] âš–ï¸ Workflow preference: ${preferVerify ? 'VERIFY' : 'EXECUTE'}`);
+                console.log(`[${this.name}] ⚖️ Workflow preference: ${preferVerify ? 'VERIFY' : 'EXECUTE'}`);
 
                 let taskHandled = false;
 
@@ -933,7 +933,7 @@ export class ConstitutionalAgent {
 
                 for (const strategy of strategies) {
                     if (typeof strategy !== 'function') {
-                        console.error(`[${this.name}] âŒ Invalid strategy: ${typeof strategy}`);
+                        console.error(`[${this.name}] ❌ Invalid strategy: ${typeof strategy}`);
                         continue;
                     }
                     try {
@@ -943,15 +943,15 @@ export class ConstitutionalAgent {
                             break;
                         }
                     } catch (err: any) {
-                        console.error(`[${this.name}] âŒ Strategy Execution Error:`, err.message);
+                        console.error(`[${this.name}] ❌ Strategy Execution Error:`, err.message);
                     }
                 }
 
-                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                // IDLE STATE â€” Maintenance & Genesis
-                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // ──────────────────────────────────────────────────────
+                // IDLE STATE — Maintenance & Genesis
+                // ──────────────────────────────────────────────────────
                 if (!taskHandled) {
-                    console.log(`[${this.name}] ðŸŒ™ Swarm Genesis â€” entering proactive discovery mode...`);
+                    console.log(`[${this.name}] 🌙 Swarm Genesis — entering proactive discovery mode...`);
                     await this.runGenesisLoop();
                 }
 
@@ -1018,7 +1018,7 @@ export class ConstitutionalAgent {
         const remainingAgents = agentList.filter(name => !completedBy.includes(name));
 
         if (remainingAgents.length === 0) {
-            console.log(`[${this.name}] ðŸ† EVERGREEN EXHAUSTED: Every agent has completed "${original.title}".`);
+            console.log(`[${this.name}] 🏆 EVERGREEN EXHAUSTED: Every agent has completed "${original.title}".`);
             return;
         }
 
@@ -1045,9 +1045,9 @@ export class ConstitutionalAgent {
             .insert([newTask]);
 
         if (!error) {
-            console.log(`[${this.name}] â™»ï¸  EVERGREEN RESPAWNED: ${original.title} (Gen: ${newTask.metadata.loop_generation}, Remaining: ${remainingAgents.length})`);
+            console.log(`[${this.name}] ♻️  EVERGREEN RESPAWNED: ${original.title} (Gen: ${newTask.metadata.loop_generation}, Remaining: ${remainingAgents.length})`);
         } else {
-            console.warn(`[${this.name}] âš ï¸  Evergreen respawn failed:`, error.message);
+            console.warn(`[${this.name}] ⚠️  Evergreen respawn failed:`, error.message);
         }
     }
 
@@ -1058,7 +1058,7 @@ export class ConstitutionalAgent {
         const task = assignedTask || await this.getNextTask(false);
 
         if (task) {
-            console.log(`[${this.name}] ðŸŽ¯ Executing mission -> ${task.title}`);
+            console.log(`[${this.name}] 🎯 Executing mission -> ${task.title}`);
             this.currentTaskTitle = task.title;
             await this.heartbeat(`Working on: ${task.title.substring(0, 30)}...`);
             await this.processTask(task);
@@ -1073,7 +1073,7 @@ export class ConstitutionalAgent {
     private async tryVerify(): Promise<boolean> {
         const verificationTask = await this.getVerificationTask();
         if (verificationTask) {
-            console.log(`[${this.name}] ðŸ” Verifying peer work -> ${verificationTask.title}`);
+            console.log(`[${this.name}] 🔍 Verifying peer work -> ${verificationTask.title}`);
             await this.heartbeat(`Verifying: ${verificationTask.title.substring(0, 30)}...`);
 
             // [ANTIGRAVITY] Task Lock for Verification
@@ -1105,11 +1105,11 @@ export class ConstitutionalAgent {
         // [LOOP PREVENTION] Do not verify own work
         const creator = (task.metadata as any)?.creator_agent || task.claimed_by;
         if (creator === this.name || task.claimed_by === this.name) {
-            console.log(`[BFT] ðŸ›‘ Loop detected! ${this.name} attempted self-verification on task ${task.id}. Skipping.`);
+            console.log(`[BFT] 🛑 Loop detected! ${this.name} attempted self-verification on task ${task.id}. Skipping.`);
             return;
         }
 
-        console.log(`[BFT] âš”ï¸ Commencing Triad Consensus on: ${task.title}`);
+        console.log(`[BFT] ⚔️ Commencing Triad Consensus on: ${task.title}`);
 
         // 1. GATHER EVIDENCE (Check artifacts & results)
         const { data: artifacts } = await this.supabase
@@ -1134,7 +1134,7 @@ export class ConstitutionalAgent {
         const verifierFamily = this.getProviderFamily(verifierProvider);
 
         if (executorFamily === verifierFamily) {
-            console.warn(`[BFT] ðŸ›‘ Diversity Constraint Violated: Verifier (${this.name}/${verifierFamily}) matches Executor family (${executorFamily}). Risk of correlated failure.`);
+            console.warn(`[BFT] 🛑 Diversity Constraint Violated: Verifier (${this.name}/${verifierFamily}) matches Executor family (${executorFamily}). Risk of correlated failure.`);
             // In a strict mode, we might want to return here, but for now we log and proceed with lower weight
         }
 
@@ -1155,7 +1155,7 @@ export class ConstitutionalAgent {
 
         // 3. APPLY BYZANTINE FAULT TOLERANCE (BFT)
         if (isVerified) {
-            console.log(`[BFT] âœ… Verified by ${this.name} (b:${belief.toFixed(2)}, u:${uncertainty.toFixed(2)})`);
+            console.log(`[BFT] ✅ Verified by ${this.name} (b:${belief.toFixed(2)}, u:${uncertainty.toFixed(2)})`);
 
             // [ANTIGRAVITY] ATOMIC UPDATE: Increment verify_count and update status atomically
             // Note: In a real environment, we'd use a postgres function (RPC) for perfect atomicity.
@@ -1168,7 +1168,7 @@ export class ConstitutionalAgent {
                 uncertainty: uncertainty,
                 status: newVerifyCount >= 2 ? 'verified' : 'done',
                 verified_at: newVerifyCount >= 2 ? new Date().toISOString() : null,
-                verification_result: `Verified via Ï†-weighted consensus by ${this.name}`,
+                verification_result: `Verified via φ-weighted consensus by ${this.name}`,
                 metadata: {
                     ...(task.metadata as any || {}),
                     last_verifier: this.name,
@@ -1181,7 +1181,7 @@ export class ConstitutionalAgent {
                 .eq('verify_count', (task as any).verify_count || 0); // OPTIMISTIC LOCKING
 
             if (updateError) {
-                console.warn(`[BFT] âš ï¸ Concurrent verification update race detected. Skipping increment.`);
+                console.warn(`[BFT] ⚠️ Concurrent verification update race detected. Skipping increment.`);
                 return;
             }
 
@@ -1202,7 +1202,7 @@ export class ConstitutionalAgent {
                 }
             }
         } else {
-            console.log(`[BFT] âŒ CHALLENGE ISSUED by ${this.name}`);
+            console.log(`[BFT] ❌ CHALLENGE ISSUED by ${this.name}`);
 
             // [PHASE 10] SUBJECTIVE SLASHING
             const slashAmount = disbelief > 0.6 ? -15 : -5;
@@ -1234,7 +1234,7 @@ export class ConstitutionalAgent {
      * Tracks performance of LLM providers/aggregators to drive arbitrage.
      */
     private async updateProviderReputation(provider: string, isSuccess: boolean, score: number) {
-        console.log(`[REPID] ðŸ“Š Updating reputation for provider: ${provider} (${isSuccess ? '+' : '-'}${score.toFixed(2)})`);
+        console.log(`[REPID] 📊 Updating reputation for provider: ${provider} (${isSuccess ? '+' : '-'}${score.toFixed(2)})`);
 
         try {
             // Log to benchmark table for global tracking
@@ -1261,7 +1261,7 @@ export class ConstitutionalAgent {
     }
 
     async getNextTask(strictlyAssigned = false) {
-        console.log(`[${this.name}] ðŸ” POLL START: strictlyAssigned=${strictlyAssigned}, status=['pending', 'todo', 'pending_clarification']`);
+        console.log(`[${this.name}] 🔍 POLL START: strictlyAssigned=${strictlyAssigned}, status=['pending', 'todo', 'pending_clarification']`);
         // [ANTIGRAVITY] CONCURRENCY GUARD: If already busy, don't pick up more work.
         if (this.currentTaskId) {
             return null;
@@ -1309,7 +1309,7 @@ export class ConstitutionalAgent {
      * Analyzes the high-level resonance and "chaos" alignment of a result.
      */
     async performSocialAudit(task: Task, result: string): Promise<string> {
-        console.log(`[SOCIAL] ðŸªž Performing Social Mirror audit for task ${task.id}...`);
+        console.log(`[SOCIAL] 🪞 Performing Social Mirror audit for task ${task.id}...`);
 
         const auditPrompt = `
 You are the ASI1 Social Intelligence engine. 
@@ -1333,7 +1333,7 @@ ${result.substring(0, 2000)}
      * Uses RailwayMCP to restart services if a provider stalls.
      */
     private async healInfrastructure(provider: string) {
-        console.log(`[HEAL] ðŸ©¹ Self-healing sequence triggered for ${provider}...`);
+        console.log(`[HEAL] 🩹 Self-healing sequence triggered for ${provider}...`);
 
         try {
             // 1. Identify relevant service (e.g. if local_4090 fails, check 'trinity-proxy')
@@ -1367,7 +1367,7 @@ ${result.substring(0, 2000)}
             }
 
             if (targetId && envId) {
-                console.log(`[HEAL] ðŸ”„ Restarting service ${serviceName} (${targetId}) in env ${envId}...`);
+                console.log(`[HEAL] 🔄 Restarting service ${serviceName} (${targetId}) in env ${envId}...`);
                 await mcpManager.routeToolCall('restart_railway_service', { service_id: targetId, environment_id: envId });
                 await this.log('infrastructure_healed', `Self-healed ${provider} by restarting ${serviceName}`, { serviceId: targetId });
             }
@@ -1395,7 +1395,7 @@ ${result.substring(0, 2000)}
             }
 
             if (!claimed) {
-                console.log(`[${this.name}] âš ï¸ Task ${task.id} already claimed by another agent. Skipping.`);
+                console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
                 this.currentTaskId = null;
                 return { success: false, error: 'Already claimed' };
             }
@@ -1403,7 +1403,7 @@ ${result.substring(0, 2000)}
             // [PHASE 13] OPENCLAW SAFETY CHECK
             const isSafe = await this.checkOpenClawSafe(task);
             if (!isSafe) {
-                console.warn(`[${this.name}] ðŸ›‘ OpenClaw Safety Violation: Task ${task.id} rejected due to high risk / lack of verify/HITL.`);
+                console.warn(`[${this.name}] 🛑 OpenClaw Safety Violation: Task ${task.id} rejected due to high risk / lack of verify/HITL.`);
                 await this.releaseClaim(task.id);
                 this.currentTaskId = null;
                 return { success: false, error: 'OpenClaw Safety Violation' };
@@ -1412,14 +1412,14 @@ ${result.substring(0, 2000)}
             try {
                 // TRY LOCAL FIRST
                 if (this.canHandleLocally(task)) {
-                    console.log(`[LOCAL] âš¡ Handling ${task.id} without LLM (Tier 1)`);
+                    console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
                     return await this.handleLocal(task);
                 }
 
                 // ONLY THEN use LLM
                 return await this.processWithLLM(task);
             } catch (error) {
-                console.error(`[${this.name}] ðŸš¨ Process failed for task ${task.id}:`, error);
+                console.error(`[${this.name}] 🚨 Process failed for task ${task.id}:`, error);
                 await this.releaseClaim(task.id);
                 return { success: false, error: error instanceof Error ? error.message : String(error) };
             }
@@ -1432,7 +1432,7 @@ ${result.substring(0, 2000)}
     async claimTask(taskId: number | string): Promise<boolean> {
         // [ANTIGRAVITY] CONCURRENCY GUARD: Atomic check
         if (this.currentTaskId && String(this.currentTaskId) !== String(taskId)) {
-            console.warn(`[${this.name}] ðŸ›¡ï¸ Claim rejected: Agent is already busy with task ${this.currentTaskId}`);
+            console.warn(`[${this.name}] 🛡️ Claim rejected: Agent is already busy with task ${this.currentTaskId}`);
             return false;
         }
 
@@ -1450,13 +1450,13 @@ ${result.substring(0, 2000)}
             .select();
 
         if (error) {
-            console.error(`[${this.name}] ðŸš¨ Atomic claim failed:`, error.message);
+            console.error(`[${this.name}] 🚨 Atomic claim failed:`, error.message);
             return false;
         }
 
         const success = !!(data && data.length > 0);
         if (success) {
-            console.log(`[${this.name}] ðŸ›¡ï¸ Atomic claim SECURED for task ${taskId}`);
+            console.log(`[${this.name}] 🛡️ Atomic claim SECURED for task ${taskId}`);
             this.currentTaskId = String(taskId);
         }
         return success;
@@ -1479,14 +1479,14 @@ ${result.substring(0, 2000)}
             .eq('claimed_by', this.name);
 
         if (error) {
-            console.error(`[${this.name}] ðŸš¨ Failed to release claim for task ${taskId}:`, error.message);
+            console.error(`[${this.name}] 🚨 Failed to release claim for task ${taskId}:`, error.message);
         } else {
-            console.log(`[${this.name}] ðŸ”“ Released claim on task ${taskId} (ResetStatus: ${resetStatus})`);
+            console.log(`[${this.name}] 🔓 Released claim on task ${taskId} (ResetStatus: ${resetStatus})`);
         }
     }
 
     async escalateTask(taskId: number | string, reason: string) {
-        console.log(`[${this.name}] ðŸš© Escalating task ${taskId}: ${reason}`);
+        console.log(`[${this.name}] 🚩 Escalating task ${taskId}: ${reason}`);
 
         const { error } = await this.supabase
             .from('trinity_tasks')
@@ -1503,7 +1503,7 @@ ${result.substring(0, 2000)}
             .eq('id', taskId);
 
         if (error) {
-            console.error(`[${this.name}] âŒ Escalation failed:`, error.message);
+            console.error(`[${this.name}] ❌ Escalation failed:`, error.message);
         } else {
             await notificationManager.notifyUser({
                 title: `Task Escalated: ${this.name}`,
@@ -1528,7 +1528,7 @@ ${result.substring(0, 2000)}
         if (error) return;
 
         for (const task of stuckTasks) {
-            console.warn(`[WATCHDOG] ðŸ•µï¸ Found stuck task ${task.id}. Auto-escalating.`);
+            console.warn(`[WATCHDOG] 🕵️ Found stuck task ${task.id}. Auto-escalating.`);
             await this.escalateTask(task.id, 'Stuck in DOING for > 30 minutes.');
         }
     }
@@ -1557,7 +1557,7 @@ ${result.substring(0, 2000)}
 
         if (task.task_type === 'self-healing' || task.title.includes('[HEALING]')) {
             // Log the healing
-            console.log(`[LOCAL] ðŸ©º Processed healing task ${task.id}`);
+            console.log(`[LOCAL] 🩺 Processed healing task ${task.id}`);
             result = `[HEALING] System repaired by ${this.name}`;
             this.sessionMetrics.tasksCompleted++; // Count it
         }
@@ -1581,7 +1581,7 @@ ${result.substring(0, 2000)}
             .eq('id', task.id);
 
         if (updateError) {
-            console.error(`[${this.name}] âŒ Local task update failed:`, updateError.message);
+            console.error(`[${this.name}] ❌ Local task update failed:`, updateError.message);
             throw new Error(`Local Update Failed: ${updateError.message}`);
         }
 
@@ -1594,7 +1594,7 @@ ${result.substring(0, 2000)}
     // TIER 2: LLM CALLS (ONLY FOR REAL WORK)
     // ============================================
     async processWithLLM(task: Task) {
-        console.log(`[LLM] ðŸ§  Calling API for task ${task.id}(${task.task_type})`);
+        console.log(`[LLM] 🧠 Calling API for task ${task.id}(${task.task_type})`);
 
         try {
             // [PHASE 20] Already claimed via processTask -> claimTask
@@ -1649,7 +1649,7 @@ ${result.substring(0, 2000)}
             );
 
             if (activeWorkflow) {
-                console.log(`[${this.name}] ðŸ¤– DETERMINISTIC WORKFLOW ACTIVE: ${activeWorkflow.task_pattern}`);
+                console.log(`[${this.name}] 🤖 DETERMINISTIC WORKFLOW ACTIVE: ${activeWorkflow.task_pattern}`);
                 workflowDirective = `\n\n[MANDATORY EXECUTION PROTOCOL: DETERMINISTIC WORKFLOW]\n`;
                 workflowDirective += `You MUST follow these specific steps in order:\n`;
                 activeWorkflow.steps.forEach((step, idx) => {
@@ -1663,14 +1663,14 @@ ${result.substring(0, 2000)}
             const bible = await this.fetchBible();
 
             this.currentTaskId = String(task.id);
-            // [PHASE P4] Î»-BOUNDED CHAOS (Creative Entropy)
-            // If the agent's creativity (Î») is high, inject subtle noise for creative tasks
+            // [PHASE P4] λ-BOUNDED CHAOS (Creative Entropy)
+            // If the agent's creativity (λ) is high, inject subtle noise for creative tasks
             let chaosNoise = "";
             const isCreative = task.task_type === 'creative' || task.title.toLowerCase().includes('design') || task.title.toLowerCase().includes('generate');
-            const lambda = 0.002; // Placeholder for agent's dynamic Î» from registry
+            const lambda = 0.002; // Placeholder for agent's dynamic λ from registry
             if (isCreative && lambda > 0.001) {
                 const entropy = Math.random() * lambda;
-                chaosNoise = `\n\n### ðŸŒ€ Î»-CHAOS INJECTION (Level: ${entropy.toFixed(4)})
+                chaosNoise = `\n\n### 🌀 λ-CHAOS INJECTION (Level: ${entropy.toFixed(4)})
                 Embrace non-linear associations. Explore one tangential 'what-if' that challenges the standard solution. Ensure chaos remains bounded within the core objective.`;
             }
 
@@ -1684,10 +1684,10 @@ ${mermaidRequirement}
 ${toolPrompt}
 ${workflowDirective}
 
-### ðŸ› ï¸ MODEL CONTEXT PROTOCOL (MCP)
+### 🛠️ MODEL CONTEXT PROTOCOL (MCP)
 ${mcpInstructions}
 
-### ðŸ“œ CONSTITUTIONAL BIBLE
+### 📜 CONSTITUTIONAL BIBLE
 ${bible}
 
 ### INSTRUCTIONS
@@ -1707,7 +1707,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
             // 2. [TIML ANALYSIS] Multiscale Load Balancing
             const { alpha, allocation } = await this.timl.analyze(this.name);
-            console.log(`[TIML] ðŸŒ€ Allocation Strategy: FAST=${allocation.fast_budget.toFixed(2)}, MID=${allocation.mid_budget.toFixed(2)}, SLOW=${allocation.slow_budget.toFixed(2)}`);
+            console.log(`[TIML] 🌀 Allocation Strategy: FAST=${allocation.fast_budget.toFixed(2)}, MID=${allocation.mid_budget.toFixed(2)}, SLOW=${allocation.slow_budget.toFixed(2)}`);
 
             let result: any;
             let sbfaResult: SBFAResult | null = null;
@@ -1715,12 +1715,12 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
             if (allocation.slow_budget > 0.5) {
                 pathTaken = 'SLOW';
-                console.log(`[TIML] ðŸ¢ SLOW PATH: Executing Full Major7 Consensus...`);
+                console.log(`[TIML] 🐢 SLOW PATH: Executing Full Major7 Consensus...`);
                 sbfaResult = await this.runMajor7Consensus(prompt, task);
                 result = sbfaResult.primaryResponse;
             } else {
                 pathTaken = allocation.fast_budget > 0.7 ? 'FAST' : 'MID';
-                console.log(`[TIML] âš¡ ${pathTaken} PATH: Executing Single LLM Call...`);
+                console.log(`[TIML] ⚡ ${pathTaken} PATH: Executing Single LLM Call...`);
 
                 // [FIX 1] Fast path belief extraction
                 const beliefInstruction = "\n\nIMPORTANT: End your response with a confidence assessment in this exact format: <belief>[p_success, p_partial, p_failure]</belief> where values sum to 1.0.";
@@ -1747,7 +1747,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 const maxProb = Math.max(...belief);
 
                 if (maxProb < 0.65) {
-                    console.warn(`[TIML] âš ï¸ Single call confidence low (${maxProb.toFixed(2)}). Escalating to Triadic SBFA...`);
+                    console.warn(`[TIML] ⚠️ Single call confidence low (${maxProb.toFixed(2)}). Escalating to Triadic SBFA...`);
                     pathTaken = 'SLOW';
                     sbfaResult = await this.runTriadicSBFA(prompt, task);
                     result = sbfaResult.primaryResponse;
@@ -1784,7 +1784,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             if (result.output && result.output !== "Error calling LLM") {
                 const reflectionResult = await this.reflectOnResult(task, result.output);
                 if (reflectionResult.improvement_required) {
-                    console.log(`[${this.name}] ðŸ§  Self-Reflection triggered: ${reflectionResult.critique}. Refining result...`);
+                    console.log(`[${this.name}] 🧠 Self-Reflection triggered: ${reflectionResult.critique}. Refining result...`);
                     const refinePrompt = `${prompt}\n\n[SELF-REFLECTIONS]:\n${reflectionResult.critique}\n\nPlease regenerate your final output incorporating these improvements.`;
                     const refinedResult = await this.callLLM(refinePrompt, {}, task);
                     result.output = refinedResult.output;
@@ -1798,7 +1798,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             }
             // 3. [ACT] Tool Execution via MCP
             if (result.toolCalls && result.toolCalls.length > 0) {
-                console.log(`[${this.name}] âš¡ Executing ${result.toolCalls.length} tools via MCP...`);
+                console.log(`[${this.name}] ⚡ Executing ${result.toolCalls.length} tools via MCP...`);
                 for (const toolCall of result.toolCalls) {
                     try {
                         const toolResult = await mcpManager.routeToolCall(toolCall.function.name, JSON.parse(toolCall.function.arguments));
@@ -1819,7 +1819,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 // [ANTIGRAVITY] Phase A: Internal Elite Retry (Proactive Recovery)
                 const alreadyElite = (task as any).metadata?.includes('elite_retry');
                 if (!alreadyElite) {
-                    console.log(`[${this.name}] ðŸš¨ UNCERTAINTY DETECTED. Triggering Internal Elite Retry...`);
+                    console.log(`[${this.name}] 🚨 UNCERTAINTY DETECTED. Triggering Internal Elite Retry...`);
                     const escalationModel = this.router.getEscalationModel(task);
 
                     // Mark metadata to prevent loop
@@ -1836,14 +1836,14 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
 
                     if (!lowBelief && !explicitEscalate) {
-                        console.log(`[${this.name}] âœ… Elite retry successful (Score: ${evaluation.score}). Proceeding.`);
+                        console.log(`[${this.name}] ✅ Elite retry successful (Score: ${evaluation.score}). Proceeding.`);
                     } else {
-                        console.log(`[${this.name}] âš ï¸ Elite retry still low confidence. Escalating to Peers/Admin.`);
+                        console.log(`[${this.name}] ⚠️ Elite retry still low confidence. Escalating to Peers/Admin.`);
                     }
                 }
 
                 if (lowBelief || explicitEscalate) {
-                    console.log(`[ANTIGRAVITY] ðŸš¨ ESCALATING to Phone HITL Gateway...`);
+                    console.log(`[ANTIGRAVITY] 🚨 ESCALATING to Phone HITL Gateway...`);
 
                     // NEW: Integrate HITLManager
                     const hitl = HITLManager.getInstance();
@@ -1883,7 +1883,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                         });
 
                     } catch (hitlError: any) {
-                        console.error(`[HITL] âŒ Fatal failure in escalation pipe:`, hitlError.message);
+                        console.error(`[HITL] ❌ Fatal failure in escalation pipe:`, hitlError.message);
                         // Fallback to old escalation if HITL manager fails (e.g. table not ready)
                         await this.escalateTask(task.id, `HITL Error: ${hitlError.message}`);
                     }
@@ -1929,7 +1929,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
             // [ANTIGRAVITY] MANDATORY ARTIFACT ENFORCEMENT & SMART PARSING
             if (!externalArtifactUrl) {
-                console.log(`[ANTIGRAVITY] ðŸ›¡ï¸ No artifact produced for task ${task.id}. Attempting smart-parse...`);
+                console.log(`[ANTIGRAVITY] 🛡️ No artifact produced for task ${task.id}. Attempting smart-parse...`);
 
                 let extractedContent = result.output;
                 let artifactType = 'report';
@@ -1939,7 +1939,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 const matches = Array.from(result.output.matchAll(codeBlockRegex));
 
                 if (matches.length > 0) {
-                    console.log(`[ANTIGRAVITY] ðŸ“ Extracted ${matches.length} code blocks from text.`);
+                    console.log(`[ANTIGRAVITY] 📝 Extracted ${matches.length} code blocks from text.`);
                     extractedContent = matches.map(m => m[1]).join('\n\n---\n\n');
                     artifactType = 'code';
                 } else if (result.output.length > 500) {
@@ -1953,7 +1953,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
                 const fallbackUrl = await this.saveArtifact(task.id, reportContent, artifactType, `Result: ${task.title}`, 'protected');
                 if (fallbackUrl) externalArtifactUrl = fallbackUrl;
-                else console.warn(`[ANTIGRAVITY] âš ï¸ Failed to save fallback artifact.`);
+                else console.warn(`[ANTIGRAVITY] ⚠️ Failed to save fallback artifact.`);
             }
 
             // Mark Completed
@@ -1982,7 +1982,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 .eq('id', task.id);
 
             if (doneError) {
-                console.error(`[${this.name}] âŒ Failed to mark task ${task.id} as 'done':`, doneError.message);
+                console.error(`[${this.name}] ❌ Failed to mark task ${task.id} as 'done':`, doneError.message);
                 throw new Error(`Database Update Failed: ${doneError.message}`);
             }
 
@@ -1999,7 +1999,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             );
 
             if (isHighConfidence) {
-                console.log(`[COCKPIT] ðŸš€ High Confidence Auto-Approval for Task ${task.id}`);
+                console.log(`[COCKPIT] 🚀 High Confidence Auto-Approval for Task ${task.id}`);
                 await this.supabase.from('trinity_tasks').update({
                     status: 'verified',
                     metadata: {
@@ -2009,7 +2009,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     }
                 }).eq('id', task.id);
             } else {
-                console.log(`[COCKPIT] ðŸ“± Pushing Task ${task.id} to Mobile Approval Queue...`);
+                console.log(`[COCKPIT] 📱 Pushing Task ${task.id} to Mobile Approval Queue...`);
                 await ApprovalQueue.push({
                     task_id: String(task.id),
                     agent_id: this.name,
@@ -2038,7 +2038,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             // ERC-8004 & HyperDAG INTEROP: Bridge to Sovereign Audit Trail
             await this.integrateErc8004(task.id, result.output, evaluation.score);
 
-            console.log(`[${this.name}] âœ… Completed task ${task.id} (Score: ${evaluation.score})`);
+            console.log(`[${this.name}] ✅ Completed task ${task.id} (Score: ${evaluation.score})`);
 
             // [ANTIGRAVITY] FINAL SUCCESS NOTIFICATION
             await notificationManager.notifyUser({
@@ -2081,12 +2081,12 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     completed_by: this.name
                 }).eq('id', task.id);
 
-                if (failError) console.error(`[${this.name}] ðŸš¨ Failed to update task ${task.id} to 'failed':`, failError.message);
+                if (failError) console.error(`[${this.name}] 🚨 Failed to update task ${task.id} to 'failed':`, failError.message);
                 else {
                     const attempts = (task.attempt_count || 0) + 1;
                     const maxAttempts = task.max_attempts || 3;
 
-                    console.log(`[${this.name}] ðŸ›¡ï¸ Task ${task.id} attempt ${attempts}/${maxAttempts}. Marking as failed.`);
+                    console.log(`[${this.name}] 🛡️ Task ${task.id} attempt ${attempts}/${maxAttempts}. Marking as failed.`);
 
                     // Update attempt count in DB
                     await this.supabase.from('trinity_tasks').update({
@@ -2094,7 +2094,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     }).eq('id', task.id);
 
                     if (attempts >= maxAttempts) {
-                        console.warn(`[LOOP DAMPENER] ðŸ›‘ Task ${task.id} exceeded max attempts. Escalating for manual review.`);
+                        console.warn(`[LOOP DAMPENER] 🛑 Task ${task.id} exceeded max attempts. Escalating for manual review.`);
                         await this.escalateTask(task.id, `Exceeded max attempts (${maxAttempts}). Last Error: ${errorMsg}`);
                     } else {
                         console.log(`[${this.name}] Spawning Surgical Analysis...`);
@@ -2115,12 +2115,12 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
     // ============================================
 
     async runGenesisLoop() {
-        console.log(`[${this.name}] ðŸŒ¬ï¸ Entering Genesis Mode (Proactive)...`);
+        console.log(`[${this.name}] 🌬️ Entering Genesis Mode (Proactive)...`);
 
         // 1. Check for pending work first (Be productive)
         const unclaimed = await this.getNextTask(false);
         if (unclaimed) {
-            console.log(`[GENESIS] ðŸŒ¿ Found pending task: ${unclaimed.title}. Resuming work.`);
+            console.log(`[GENESIS] 🌿 Found pending task: ${unclaimed.title}. Resuming work.`);
             await this.processTask(unclaimed);
             return;
         }
@@ -2138,7 +2138,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             await this.retrospective();
         }
 
-        // [PHASE P4] Ïƒ_u ANTI-PARKING VARIANCE GATE
+        // [PHASE P4] σ_u ANTI-PARKING VARIANCE GATE
         try {
             const { data: recentTasks } = await this.supabase
                 .from('trinity_tasks')
@@ -2153,8 +2153,8 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 const variance = beliefs.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / beliefs.length;
 
                 if (variance < 0.05) {
-                    console.log(`[GENESIS] ðŸ›‘ Anti-Parking Gate Triggered (Variance: ${variance.toFixed(4)}). Forcing WAKE: Exploration...`);
-                    await this.spawnMaintenanceTask(`WAKE: EXPLORATION. Agent belief in ${this.squad} has stalled (Ïƒ_u < 0.05). Search for counter-inductive evidence.`);
+                    console.log(`[GENESIS] 🛑 Anti-Parking Gate Triggered (Variance: ${variance.toFixed(4)}). Forcing WAKE: Exploration...`);
+                    await this.spawnMaintenanceTask(`WAKE: EXPLORATION. Agent belief in ${this.squad} has stalled (σ_u < 0.05). Search for counter-inductive evidence.`);
                 }
             }
         } catch (e) {
@@ -2180,11 +2180,11 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
         // [ANTIGRAVITY] Loop Dampening: Check Throttle
         const canSpawn = await this.canCreateHealingTask();
         if (!canSpawn) {
-            console.log(`[${this.name}] ðŸ›¡ï¸ Maintenance/Healing task suppressed by loop stabilizer.`);
+            console.log(`[${this.name}] 🛡️ Maintenance/Healing task suppressed by loop stabilizer.`);
             return;
         }
 
-        console.log(`[${this.name}] ðŸ› ï¸ Seeding maintenance task... ${reason || ''}`);
+        console.log(`[${this.name}] 🛠️ Seeding maintenance task... ${reason || ''}`);
         const maintenanceTasks = [
             { title: '[MAINTENANCE] Audit recent RepID updates', description: 'Review recent reputation changes for BFT compliance.' },
             { title: '[MAINTENANCE] Clean up artifact noise', description: 'Identify and flag redundant or low-quality artifacts.' },
@@ -2208,14 +2208,14 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 priority: 1, // SET TO LOWEST PRIORITY
                 metadata: { source: 'maintenance_genesis', agent: this.name, automated: true }
             }]);
-            console.log(`[GENESIS] ðŸ› ï¸ Maintenance seeded: ${selected.title}`);
+            console.log(`[GENESIS] 🛠️ Maintenance seeded: ${selected.title}`);
         } catch (e) {
             console.warn(`[GENESIS] Maintenance seeding failed:`, e);
         }
     }
 
     async runWebAwareGenesis() {
-        console.log(`[${this.name}] ðŸŒ Commencing Web-Aware Genesis...`);
+        console.log(`[${this.name}] 🌍 Commencing Web-Aware Genesis...`);
         try {
             // Research a trending topic in AI/Web3/Ethics
             const topics = ['AI Agent Orchestration', 'DeFi Security Trends', 'Constitutional AI best practices', 'HyperDAG architecture', 'X Arbitrage Semantic Analysis'];
@@ -2237,7 +2237,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     task_type: 'genesis',
                     metadata: { source: 'web_aware_genesis', agent: this.name }
                 }]);
-                console.log(`[GENESIS] âœ¨ spawned new mission: ${taskObj.title}`);
+                console.log(`[GENESIS] ✨ spawned new mission: ${taskObj.title}`);
             }
         } catch (e) {
             console.warn(`[GENESIS] Web-Aware Genesis failed:`, e);
@@ -2248,7 +2248,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
      * GCM-ROOTED STRATEGY: Skill Gap Analysis
      */
     async identifySkillGaps() {
-        console.log(`[${this.name}] ðŸ§ Auditing swarm skill gaps...`);
+        console.log(`[${this.name}] 🧐 Auditing swarm skill gaps...`);
         try {
             const { data: retros } = await this.supabase
                 .from('trinity_retros')
@@ -2274,7 +2274,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
      * GCM-ROOTED STRATEGY: Governance Promotion
      */
     async runGovernanceLoop() {
-        console.log(`[${this.name}] âš–ï¸ Enforcing Swarm Governance...`);
+        console.log(`[${this.name}] ⚖️ Enforcing Swarm Governance...`);
         try {
             const { data: agents } = await this.supabase.from('trinity_agent_registry').select('*');
             if (!agents) return;
@@ -2290,7 +2290,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
                 if (correctTier !== agent.current_tier) {
                     await this.supabase.from('trinity_agent_registry').update({ current_tier: correctTier }).eq('agent_name', agent.agent_name);
-                    console.log(`[GOV] ðŸš¨ RE-TIERING: ${agent.agent_name} -> ${correctTier}`);
+                    console.log(`[GOV] 🚨 RE-TIERING: ${agent.agent_name} -> ${correctTier}`);
                 }
             }
         } catch (e) { console.warn('Governance loop failed', e); }
@@ -2300,7 +2300,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
         // [SWARM INTELLIGENCE] LangGraph-style Stateful Handoff
         const handoff = SwarmOrchestrator.planNextStep(originalTask, result, evaluation);
         if (handoff) {
-            console.log(`[SWARM] ðŸš€ Stateful Handoff: ${originalTask.id} -> ${handoff.nextAgent} (${handoff.nextState})`);
+            console.log(`[SWARM] 🚀 Stateful Handoff: ${originalTask.id} -> ${handoff.nextAgent} (${handoff.nextState})`);
 
             await this.supabase.from('trinity_tasks').insert({
                 title: `[SWARM:${handoff.nextState.toUpperCase()}] ${originalTask.title}`,
@@ -2328,7 +2328,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
         const typeMatch = originalTask.task_type === 'review' || originalTask.task_type === 'meta';
 
         if (titleMatch || typeMatch) {
-            console.log(`[VERIFY] ðŸ›‘ Loop breaker triggered for Task ${originalTask.id}. Not spawning recursive review.`);
+            console.log(`[VERIFY] 🛑 Loop breaker triggered for Task ${originalTask.id}. Not spawning recursive review.`);
 
             // Mark the PARENT task as verified if this was a review
             const parentId = (originalTask.metadata as any)?.parent_task_id;
@@ -2367,7 +2367,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 const isCollusionRisk = creatorProvider === verifierProvider && isApproved;
 
                 if (isCollusionRisk && Math.random() < 0.2) {
-                    console.log(`[VERIFY] ðŸ•µï¸ ITCM Collusion Alert: Creator and Verifier used same provider (${creatorProvider}). Demoting confidence.`);
+                    console.log(`[VERIFY] 🕵️ ITCM Collusion Alert: Creator and Verifier used same provider (${creatorProvider}). Demoting confidence.`);
                     evaluation.score *= 0.85; // Penalty for lack of diversity
                 }
 
@@ -2376,14 +2376,14 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
                 if (signatures.length >= minSignatures && approvalRatio >= GOLDEN_RATIO_THRESHOLD) {
                     newStatus = 'verified';
-                    console.log(`[VERIFY] ðŸ† Task ${parentId} reached Golden Ratio consensus (${(approvalRatio * 100).toFixed(1)}%). Status -> VERIFIED.`);
+                    console.log(`[VERIFY] 🏆 Task ${parentId} reached Golden Ratio consensus (${(approvalRatio * 100).toFixed(1)}%). Status -> VERIFIED.`);
                     await this.updateReputation(true);
                 } else if (isApproved) {
                     // Credit for the work of verifying, even if consensus isn't reached yet
                     await this.updateReputation(true);
                 } else if (!isApproved) {
-                    // [BFT DISPUTE] Subjective Slashing Logic â€“ Provisionally Protected
-                    console.log(`[VERIFY] âš ï¸ CHALLENGE DETECTED for Task ${parentId}. Slashing original producer.`);
+                    // [BFT DISPUTE] Subjective Slashing Logic – Provisionally Protected
+                    console.log(`[VERIFY] ⚠️ CHALLENGE DETECTED for Task ${parentId}. Slashing original producer.`);
                     await this.updateReputation(false, parentTask.claimed_by, -5); // Slash -5 for bad work
                     newStatus = 'failed';
 
@@ -2418,12 +2418,12 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
         // [GROK: VERIFIER CAP] Max 3 verifiers per task
         const currentVerifyCount = (originalTask as any).verify_count || 0;
         if (currentVerifyCount >= 2) {
-            console.log(`[VERIFY] ðŸ›‘ Verifier cap reached for task ${originalTask.id}. Skipping spawn.`);
+            console.log(`[VERIFY] 🛑 Verifier cap reached for task ${originalTask.id}. Skipping spawn.`);
             return;
         }
 
         if (isCritical) {
-            console.log(`[VERIFY] ðŸ”Ž Spawning mandatory cross-agent verification for task ${originalTask.id}`);
+            console.log(`[VERIFY] 🔎 Spawning mandatory cross-agent verification for task ${originalTask.id}`);
 
             // [ANTIGRAVITY] PERSISTENT ACTIVITY LOGGING
             await this.log('verification_spawned', `Spawned peer review for task: ${originalTask.title}`, { parentTaskId: originalTask.id });
@@ -2439,7 +2439,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 originalTask.task_type === 'content';
 
             if (isSocial) {
-                console.log(`[SOCIAL] ðŸªž Spawning Social Mirror audit for task ${originalTask.id} via ASI1`);
+                console.log(`[SOCIAL] 🪞 Spawning Social Mirror audit for task ${originalTask.id} via ASI1`);
                 await this.supabase.from('trinity_tasks').insert({
                     title: `[SOCIAL_REVIEW] ${originalTask.title}`,
                     description: `Conduct a social resonance audit on the following result. Does it align with human-centric values?\n\nResult:\n${result.substring(0, 1000)}`,
@@ -2473,7 +2473,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     ? pool[Math.floor(Math.random() * pool.length)]
                     : squadMap[squad][0] === this.name ? squadMap[squad][1] : squadMap[squad][0];
 
-                console.log(`[VERIFY] ðŸ¤ Assigning squad ${squad} verification of ${originalTask.id} to: ${verifier}`);
+                console.log(`[VERIFY] 🤝 Assigning squad ${squad} verification of ${originalTask.id} to: ${verifier}`);
 
                 await this.supabase.from('trinity_tasks').insert({
                     title: `[VERIFY] ${originalTask.title}`,
@@ -2569,7 +2569,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                 };
             }
         } catch (e) {
-            console.warn(`[REFLECTION] âš ï¸ Failed for ${task.id}:`, e);
+            console.warn(`[REFLECTION] ⚠️ Failed for ${task.id}:`, e);
         }
 
         return { improvement_required: false, critique: "" };
@@ -2592,7 +2592,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
     }
 
     async handoffTask(originalTask: Task, result: string, toAgent: string) {
-        console.log(`[HANDOFF] ðŸ¤ ${this.name} -> ${toAgent} `);
+        console.log(`[HANDOFF] 🤝 ${this.name} -> ${toAgent} `);
         await this.supabase.from('trinity_tasks').insert({
             title: `[REVIEW] ${originalTask.title} `,
             description: `Review artifact from ${this.name}. Verify accuracy / empathy.\n\nContext: \n${result.substring(0, 500)}...`,
@@ -2615,7 +2615,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                 const scienceModule = require('../science/ScienceClient');
                 ScienceClient = scienceModule.ScienceClient;
             } catch (e) {
-                console.warn(`[${this.name}] âš ï¸ ScienceClient not available. Using basic wisdom.`);
+                console.warn(`[${this.name}] ⚠️ ScienceClient not available. Using basic wisdom.`);
             }
 
             if (ScienceClient) {
@@ -2684,7 +2684,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
             }
             return wisdom;
         } catch (e) {
-            console.warn(`[${this.name}] âš ï¸ Wisdom gathering failed:`, e);
+            console.warn(`[${this.name}] ⚠️ Wisdom gathering failed:`, e);
             return wisdom;
         }
     }
@@ -2693,7 +2693,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
      * [ANTIGRAVITY] Post to the Global Blackboard (Upstash Redis).
      */
     async postToBlackboard(message: string) {
-        console.log(`[BLACKBOARD] ðŸ“ Posting signal: ${message.substring(0, 50)}...`);
+        console.log(`[BLACKBOARD] 📝 Posting signal: ${message.substring(0, 50)}...`);
         try {
             const currentResponse = await mcpManager.routeToolCall('redis_get', { key: 'trinity_global_blackboard' });
             let board = "";
@@ -2736,13 +2736,13 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
             .gte('created_at', oneHourAgo);
 
         if (error) {
-            console.error(`[${this.name}] âš ï¸ Health check query failed:`, error.message);
+            console.error(`[${this.name}] ⚠️ Health check query failed:`, error.message);
             return false;
         }
 
         const limit = 20; // Increased from 2 to 20 to allow swarm recovery during stabilization
         if ((count || 0) >= limit) {
-            console.warn(`[${this.name}] ðŸ›‘ HEALING THROTTLED: Global diagnostics count ${count}/${limit} per hour.`);
+            console.warn(`[${this.name}] 🛑 HEALING THROTTLED: Global diagnostics count ${count}/${limit} per hour.`);
             return false;
         }
 
@@ -2757,7 +2757,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
             .limit(1);
 
         if (recentAgentHealing && recentAgentHealing.length > 0) {
-            console.log(`[${this.name}] ðŸ§Š Recent healing task for ${this.name} already exists. Skipping.`);
+            console.log(`[${this.name}] 🧊 Recent healing task for ${this.name} already exists. Skipping.`);
             return false;
         }
 
@@ -2774,7 +2774,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
             // [PHASE 30] Merkle-lite Provenance: Calculate SHA-256 for the Security Ledger
             const crypto = require('crypto');
             const fileHash = crypto.createHash('sha256').update(normalizeContent).digest('hex');
-            console.log(`[ARTIFACT] â›“ï¸ Merkle-lite Hash: ${fileHash}`);
+            console.log(`[ARTIFACT] ⛓️ Merkle-lite Hash: ${fileHash}`);
 
             let artifactUrl = null;
             let artifactId = null;
@@ -2803,14 +2803,14 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                     });
 
                 if (uploadError) {
-                    console.warn(`[ARTIFACT] âš ï¸ Storage Upload Failed: ${uploadError.message}`);
+                    console.warn(`[ARTIFACT] ⚠️ Storage Upload Failed: ${uploadError.message}`);
                 } else {
                     const { data: publicUrlData } = this.supabase
                         .storage
                         .from('trinity-artifacts')
                         .getPublicUrl(storagePath);
                     artifactUrl = publicUrlData.publicUrl;
-                    console.log(`[ARTIFACT] â˜ï¸ Uploaded to Storage: ${artifactUrl}`);
+                    console.log(`[ARTIFACT] ☁️ Uploaded to Storage: ${artifactUrl}`);
                 }
             } catch (storageEx) {
                 console.warn(`[ARTIFACT] Storage exception:`, storageEx);
@@ -2834,7 +2834,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                         clientToUse = supabaseAdmin;
                     } else {
                         // FORCE FRESH CLIENT
-                        console.log("[ARTIFACT] âš ï¸ Retrying with FRESH Supabase Client due to schema error...");
+                        console.log("[ARTIFACT] ⚠️ Retrying with FRESH Supabase Client due to schema error...");
                         const { createClient } = require('@supabase/supabase-js');
                         // Re-read env vars directly to be safe
                         const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
@@ -2918,7 +2918,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
             // When an artifact is saved, the associated task MUST move to 'done'
             // so peer verification can be triggered autonomously.
             if (safeTaskId && !isNaN(Number(safeTaskId))) {
-                console.log(`[ARTIFACT] âœ… Marking task ${safeTaskId} as DONE (Awaiting Peer Verification)`);
+                console.log(`[ARTIFACT] ✅ Marking task ${safeTaskId} as DONE (Awaiting Peer Verification)`);
                 await this.supabase
                     .from('trinity_tasks')
                     .update({
@@ -2958,12 +2958,12 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
 
 
     async semanticRag(query: string): Promise<string> {
-        console.log(`[DAG] ðŸ§  Performing Semantic RAG for: ${query.substring(0, 50)}...`);
+        console.log(`[DAG] 🧠 Performing Semantic RAG for: ${query.substring(0, 50)}...`);
         try {
             const context = await this.memoryManager.recall(query, 5);
             return context || "[NO_CONTEXT_FOUND]";
         } catch (e) {
-            console.error(`[DAG] âŒ Semantic RAG failed:`, (e as Error).message);
+            console.error(`[DAG] ❌ Semantic RAG failed:`, (e as Error).message);
             return "[ERROR_RECALLING_CONTEXT]";
         }
     }
@@ -2974,7 +2974,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
      * Incorporates dynamic weights from trinity_domain_priors.
      */
     async evaluateJudasVulnerabilities(judasOutput: string, domain: string = 'general'): Promise<any> {
-        console.log(`[JUDICIARY] âš–ï¸ Evaluating Judas output in domain ${domain}...`);
+        console.log(`[JUDICIARY] ⚖️ Evaluating Judas output in domain ${domain}...`);
 
         // 1. Fetch Dynamic Weights from Supabase
         let weights: Record<string, number> = {
@@ -3023,7 +3023,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
         // 3. [BATCH 2] EMERGENT CATEGORY
         // Triggered when no other category achieves fragility score > 0.4 but the agent is confident in a mismatch
         if (maxScore < 0.4) {
-            console.log(`[JUDICIARY] ðŸŒŒ Low taxonomy match. Checking for EMERGENT patterns...`);
+            console.log(`[JUDICIARY] 🌌 Low taxonomy match. Checking for EMERGENT patterns...`);
             scores['emergent'] = 0.5 * (weights['emergent'] || 1.0);
         } else {
             scores['emergent'] = 0;
@@ -3033,24 +3033,24 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
     }
 
     async gnnAnomalyDetection(action: string, metadata: any): Promise<boolean> {
-        console.log(`[DAG] ðŸ›°ï¸ GNN Anomaly Detection active for: ${action}`);
+        console.log(`[DAG] 🛰️ GNN Anomaly Detection active for: ${action}`);
         // Placeholder for Graph Neural Network based anomaly scoring on the ledger
         return false; // No anomaly detected
     }
 
     async integrateErc8004(taskId: string | number, result: string, score: number) {
-        console.log(`[ERC-8004] ðŸŒ‰ Bridging Task ${taskId} Result (Score: ${score}) to Reputation Registry...`);
+        console.log(`[ERC-8004] 🌉 Bridging Task ${taskId} Result (Score: ${score}) to Reputation Registry...`);
         try {
             const proof = Buffer.from(result).toString('hex').slice(0, 64);
             await ERC8004Bridge.validateTask(String(taskId), this.name, proof);
         } catch (e) {
-            console.warn(`[ERC-8004] âš ï¸ Bridge Validation Failed:`, (e as Error).message);
+            console.warn(`[ERC-8004] ⚠️ Bridge Validation Failed:`, (e as Error).message);
         }
     }
 
     async runSelfDiagnostic() {
         // Renamed/Integrated into loop. Kept for legacy if needed or called by interval
-        console.log(`[${this.name}] ðŸ” Running self-diagnostic...`);
+        console.log(`[${this.name}] 🔍 Running self-diagnostic...`);
         // We can just report genome
         await this.reportGenome();
     }
@@ -3093,7 +3093,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         const keywords = (taskTitle + ' ' + output).toLowerCase();
         if (keywords.includes('api') && keywords.includes('endpoint')) {
             this.sessionMetrics.patternsLearned++;
-            console.log(`[${this.name}] ðŸ§  LOGIC PATTERN DETECTED: API usage`);
+            console.log(`[${this.name}] 🧠 LOGIC PATTERN DETECTED: API usage`);
         }
     }
 
@@ -3112,14 +3112,14 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 .single();
 
             if (!heartbeat) {
-                console.log(`[${this.name}] ðŸš¨ GROUP ALERT: Survivor ${this.survivorName} missing!`);
+                console.log(`[${this.name}] 🚨 GROUP ALERT: Survivor ${this.survivorName} missing!`);
                 await this.log('survivor_missing', `Group ${this.groupName} survivor ${this.survivorName} is missing.`);
                 return;
             }
 
             const minutesAgo = (Date.now() - new Date(heartbeat.last_seen).getTime()) / 60000;
             if (minutesAgo > 10) {
-                console.log(`[${this.name}] ðŸš¨ GROUP EMERGENCY: Survivor ${this.survivorName} is down (${minutesAgo.toFixed(0)}m)!`);
+                console.log(`[${this.name}] 🚨 GROUP EMERGENCY: Survivor ${this.survivorName} is down (${minutesAgo.toFixed(0)}m)!`);
                 await this.log('survivor_down', `GroupSurvivor ${this.survivorName} is unresponsive.`);
             }
         } catch (e: any) {
@@ -3272,7 +3272,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     }
 
     async checkSiblingHealth() {
-        console.log(`[${this.name}] ðŸ©º Running Sibling Health Pulse Check (Survivor Protocol)...`);
+        console.log(`[${this.name}] 🩺 Running Sibling Health Pulse Check (Survivor Protocol)...`);
         try {
             // [SURVIVOR] Tightened threshold: 10 minutes for autonomous resurrection
             const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -3285,7 +3285,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
             if (zombies && zombies.length > 0) {
                 for (const zombie of zombies) {
-                    console.log(`[RESURRECTION] âš¡ Agent ${zombie.agent_name} has been silent for 2+ hours. Sending WAKE pulse...`);
+                    console.log(`[RESURRECTION] ⚡ Agent ${zombie.agent_name} has been silent for 2+ hours. Sending WAKE pulse...`);
 
                     // 1. Mark as 'online' in DB to trigger wake logic if they check in
                     await this.supabase
@@ -3317,7 +3317,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             if (member.agent === this.name) continue;
             const minutesAgo = (Date.now() - new Date(member.last_seen).getTime()) / 60000;
             if (minutesAgo > 10) {
-                console.log(`[SURVIVOR] ðŸš¨ ${member.agent} DOWN. Triggering Resurrection...`);
+                console.log(`[SURVIVOR] 🚨 ${member.agent} DOWN. Triggering Resurrection...`);
                 await this.triggerRailwayRedeploy(member.agent);
             }
         }
@@ -3328,7 +3328,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
      * Triggers a redeploy for everyone in the same squad.
      */
     async runSquadCascadeRedeploy() {
-        console.log(`[CASCADE] ðŸŒŠ Initiating Squad Cascade for: ${this.groupName}`);
+        console.log(`[CASCADE] 🌊 Initiating Squad Cascade for: ${this.groupName}`);
 
         // Map squads to members (Elite 3x3 mapping)
         const squadMap: Record<string, string[]> = {
@@ -3389,7 +3389,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
     // Strategy 10: Retrospective
     async retrospective() {
-        console.log(`[${this.name}] ðŸ•¯ï¸ Starting retrospective...`);
+        console.log(`[${this.name}] 🕯️ Starting retrospective...`);
         const prompt = `Reflect on last week's tasks (simulated or real): successes, failures, lessons. Suggest 3 improvements.`;
         const reflection = await this.callLLM(prompt);
 
@@ -3408,7 +3408,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
     // Strategy 8: Continuous Research (Refactored to use ResearchTool)
     async researchTask(gap: string) {
-        console.log(`[${this.name}] ðŸ”Ž Researching topic using Swarm Interface: ${gap}`);
+        console.log(`[${this.name}] 🔎 Researching topic using Swarm Interface: ${gap}`);
 
         // 1. Use Research Tool
         const searchResults = await this.researchTool.searchWeb(gap);
@@ -3551,7 +3551,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             for (const providerKey of sortedProviders) {
                 // [PHASE 10] Circuit Breaker & Rate Limit Check
                 if (await this.isCircuitOpen(providerKey)) {
-                    console.log(`[${this.name}] â­ï¸ Skipping ${providerKey} (circuit open)`);
+                    console.log(`[${this.name}] ⏭️ Skipping ${providerKey} (circuit open)`);
                     continue;
                 }
 
@@ -3561,7 +3561,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
                 try {
                     const providerInfo = PROVIDERS[providerKey];
-                    console.log(`[${this.name}] ðŸ§  Attempting LLM via ${providerKey} (Tier: ${providerInfo?.tier || '?'}${forcedModel ? `, Specialized: ${forcedModel}` : ''})...`);
+                    console.log(`[${this.name}] 🧠 Attempting LLM via ${providerKey} (Tier: ${providerInfo?.tier || '?'}${forcedModel ? `, Specialized: ${forcedModel}` : ''})...`);
 
                     const providerResult = await Promise.race([
                         this.callSpecificProvider(providerKey, prompt, openAiTools, forcedModel || undefined, onStream),
@@ -3603,11 +3603,11 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
                     // [ANTIFRAGILE] Demote temporarily if it's a structural failure (401, 404, 429, 402, Timeout)
                     if (errorMsg.includes('401') || errorMsg.includes('404') || errorMsg.includes('429') || errorMsg.includes('402') || errorMsg.includes('Timeout') || errorMsg.includes('STALLED')) {
-                        console.warn(`[${this.name}] ðŸ“‰ Circuit breaker triggered for ${providerKey} (${errorMsg}). Demoting.`);
+                        console.warn(`[${this.name}] 📉 Circuit breaker triggered for ${providerKey} (${errorMsg}). Demoting.`);
                         this.router.demote(providerKey);
                     }
 
-                    console.warn(`[${this.name}] âš ï¸ ${providerKey} ${errorMsg}. Rotating...`);
+                    console.warn(`[${this.name}] ⚠️ ${providerKey} ${errorMsg}. Rotating...`);
 
                     // [ANTIGRAVITY] SELF-HEALING TRIGGER
                     // If the provider is 'local_4090' or a specialized local proxy, attempt healing via RailwayMCP
@@ -3625,7 +3625,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     if (task && (errorMsg.includes('402') || errorMsg.includes('429') || providerKey === sortedProviders[sortedProviders.length - 1])) {
                         const safetyResult = await this.runSafetyRun(task, errorMsg);
                         if (safetyResult) {
-                            console.log(`[${this.name}] ðŸ›¡ï¸ Safety Run successful! Continuing with fallback result.`);
+                            console.log(`[${this.name}] 🛡️ Safety Run successful! Continuing with fallback result.`);
                             return safetyResult;
                         }
                     }
@@ -3639,7 +3639,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             throw new Error('All LLM providers exhausted or stalled.');
         } catch (error: any) {
             const errorMsg = error instanceof Error ? error.message : String(error);
-            console.error(`[${this.name}] ðŸš¨ LLM Call Failed:`, errorMsg);
+            console.error(`[${this.name}] 🚨 LLM Call Failed:`, errorMsg);
             throw error;
         }
     }
@@ -3763,7 +3763,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
                 if (!response.ok) {
                     const errText = await response.text();
-                    console.error(`[${this.name}] âŒ OpenAI Error (${response.status}):`, errText);
+                    console.error(`[${this.name}] ❌ OpenAI Error (${response.status}):`, errText);
                     throw new Error(`OpenAI Error: ${errText}`);
                 }
 
@@ -3806,7 +3806,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         try {
                             args = JSON.parse(toolCall.function.arguments);
                         } catch (e) {
-                            console.error(`[${this.name}] âŒ Failed to parse tool arguments from OpenAI:`, toolCall.function.arguments);
+                            console.error(`[${this.name}] ❌ Failed to parse tool arguments from OpenAI:`, toolCall.function.arguments);
                             continue;
                         }
                         const toolResult = await this.handleToolCall(fnName, args, artifactLinks);
@@ -3826,7 +3826,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             } catch (err: any) {
                 clearTimeout(timeoutId);
                 if (err.name === 'AbortError') {
-                    console.error(`[${this.name}] â±ï¸ OpenAI Timeout after 120s.`);
+                    console.error(`[${this.name}] ⏱️ OpenAI Timeout after 120s.`);
                     throw new Error("LLM API Timeout");
                 }
                 throw err;
@@ -3870,7 +3870,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             });
 
             if (!response.ok || data.error) {
-                console.error(`[${this.name}] âŒ Anthropic Error (${response.status}):`, JSON.stringify(data.error || data));
+                console.error(`[${this.name}] ❌ Anthropic Error (${response.status}):`, JSON.stringify(data.error || data));
                 throw new Error(`Anthropic Error: ${JSON.stringify(data.error || data)}`);
             }
 
@@ -4091,7 +4091,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
         // Final Model-Specific Compatibility Check
         if (supportsTools && !this.router.isModelToolCompatible(model)) {
-            console.log(`[ROUTER] âš ï¸ Model ${model} known to be tool-incompatible. Disabling tool inclusion.`);
+            console.log(`[ROUTER] ⚠️ Model ${model} known to be tool-incompatible. Disabling tool inclusion.`);
             supportsTools = false;
         }
 
@@ -4123,7 +4123,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
 
                 if (!response.ok) {
                     const errText = await response.text();
-                    console.error(`[${this.name}] [${model}] âŒ API Error (${response.status}):`, errText);
+                    console.error(`[${this.name}] [${model}] ❌ API Error (${response.status}):`, errText);
                     fs.appendFileSync('llm_errors.log', `[${new Date().toISOString()}] [${this.name}] [${model}] ${response.status}: ${errText}\n`);
                     throw new Error(`API Error (${model}) [${response.status}]: ${errText}`);
                 }
@@ -4145,7 +4145,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                         try {
                             args = JSON.parse(toolCall.function.arguments);
                         } catch (e) {
-                            console.error(`[${this.name}] [${model}] âŒ Failed to parse tool arguments:`, toolCall.function.arguments);
+                            console.error(`[${this.name}] [${model}] ❌ Failed to parse tool arguments:`, toolCall.function.arguments);
                             continue;
                         }
                         let toolResult = '';
@@ -4161,7 +4161,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                             try {
                                 toolResult = await mcpManager.routeToolCall(fnName, args);
                             } catch (e) {
-                                console.error(`[${this.name}] [${model}] âŒ Tool execution failed:`, e);
+                                console.error(`[${this.name}] [${model}] ❌ Tool execution failed:`, e);
                                 toolResult = `Error: Tool execution failed.`;
                             }
                         }
@@ -4171,7 +4171,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     // [PHASE 10] Smart-Parse Artifact Fallback
                     const content = message.content || "";
                     if (content.includes('```md') || content.includes('# Artifact')) {
-                        console.log(`[${this.name}] ðŸ§ª Smart-Parse Artifact detected in raw output.`);
+                        console.log(`[${this.name}] 🧪 Smart-Parse Artifact detected in raw output.`);
                         const titleMatch = content.match(/# (.*?)\n/) || content.match(/Title: (.*?)\n/);
                         const title = titleMatch ? titleMatch[1] : `Report from ${this.name}`;
                         const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
@@ -4215,18 +4215,18 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             if (requiresHITL) {
                 const hasVerify = (task.verify_count !== undefined && task.verify_count > 0);
                 if (!hasVerify && !task.requires_consensus) {
-                    console.log(`[OpenClaw] ðŸ›¡ï¸  Critical task ${task.id} requires consensus or verification. Gating execution.`);
+                    console.log(`[OpenClaw] 🛡️  Critical task ${task.id} requires consensus or verification. Gating execution.`);
                     return false;
                 }
             } else {
-                console.log(`[OpenClaw] ðŸ›¡ï¸  High-impact task ${task.id} permitted under stabilization override.`);
+                console.log(`[OpenClaw] 🛡️  High-impact task ${task.id} permitted under stabilization override.`);
             }
         }
         return true;
     }
 
     private async handleToolCall(fnName: string, args: any, artifactLinks: string[]): Promise<string> {
-        console.log(`[${this.name}] ðŸ› ï¸ Executing tool: ${fnName}`);
+        console.log(`[${this.name}] 🛠️ Executing tool: ${fnName}`);
         if (fnName === 'save_artifact') {
             const taskId = (this.currentTaskId && !this.currentTaskId.includes('-')) ? this.currentTaskId : ('mcp-gen-' + Date.now());
             const link = await this.saveArtifact(taskId, args.content, args.type, args.title, args.access_level);
@@ -4238,14 +4238,14 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             try {
                 return await mcpManager.routeToolCall(fnName, args);
             } catch (e: any) {
-                console.error(`[${this.name}] âŒ Tool execution failed (${fnName}):`, e.message);
+                console.error(`[${this.name}] ❌ Tool execution failed (${fnName}):`, e.message);
                 return `Error: Tool execution failed. ${e.message}`;
             }
         }
     }
 
     async createPullRequest(title: string, body: string, branch: string, files: { path: string, content: string }[]): Promise<string> {
-        console.log(`[${this.name}] ðŸ› ï¸ Creating PR: ${title}`);
+        console.log(`[${this.name}] 🛠️ Creating PR: ${title}`);
         if (!process.env.GITHUB_TOKEN) return "Error: GITHUB_TOKEN not configured.";
         const owner = process.env.GITHUB_OWNER || 'dealappseo';
         const repo = process.env.GITHUB_REPO || 'trinity-ecosystem';
@@ -4272,7 +4272,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             const { data: pr } = await this.octokit.pulls.create({ owner, repo, title, body, head: branch, base: baseBranch });
             return pr.html_url;
         } catch (e: any) {
-            console.error(`[${this.name}] âŒ PR Creation Failed:`, e.message);
+            console.error(`[${this.name}] ❌ PR Creation Failed:`, e.message);
             throw e;
         }
     }
@@ -4280,8 +4280,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     /**
      * [ANTIFRAGILE] Emit a structured HELP_REQUEST log to notify peers/conductor.
      */
-    private async emitHelpRequest(task: Task | undefined, errorCode: string, details: string) {
-        console.error(`[${this.name}] ðŸ†˜ HELP_REQUEST EMITTED: ${errorCode} - ${details}`);
+        private async emitHelpRequest(task: Task | undefined, errorCode: string, details: string) {
+        console.error([\] ?? HELP_REQUEST EMITTED: \ - \);
 
         try {
             await this.log('HELP_REQUEST', details, {
@@ -4293,57 +4293,35 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 timestamp: new Date().toISOString()
             });
 
-            // [PHASE 10] Intercession Trigger: Force a high-tier agent to notice
             if (task) {
                 await this.supabase.from('trinity_tasks').update({
                     status: 'pending_clarification',
-                    result: `[SOS] ${errorCode}: ${details}. Requested intercession from ${this.squad} peers.`
+                    result: \[SOS] \: \. Requested intercession from \ peers.\
                 }).eq('id', task.id);
 
-                // [ANTIGRAVITY] Wire to Telegram HITL Bridge
                 try {
+                    const { HITLDispatcher } = await import('../hitl/HITLDispatcher');
                     await HITLDispatcher.dispatchToHITL({
                         taskId: typeof task.id === 'string' ? parseInt(task.id) : task.id,
                         agentId: this.name,
-                        agentRepId: String(this.reputationScore.toFixed(2)),
-                        missionSummary: task.description || 'No mission summary provided.',
-                        confidenceScore: 0.5, // Default for SOS
-                        spiScore: 0, // Default for SOS
-                        escalationReason: `${errorCode}: ${details}`
+                        agentRepId: this.reputationScore.toFixed(2),
+                        missionSummary: (task.title || 'No Title') + ': ' + (task.description || '').slice(0, 400),
+                        confidenceScore: (this as any).currentConfidence || 0.5,
+                        spiScore: (this as any).latestSPi || 0,
+                        escalationReason: \\: \\
                     });
-                    console.log(`[${this.name}] ðŸŒ‰ HITL Dispatch successful for task ${task.id}`);
+                    console.log(\[\] ?? HITL Dispatch successful for task \\);
                 } catch (hitlError: any) {
-                    console.error(`[${this.name}] âŒ HITL Dispatch failed:`, hitlError.message);
+                    console.error(\[\] ? HITL Dispatch failed:\, hitlError.message);
                 }
             }
-
-            // [PHASE 13] HITL BRIDGE: Dispatch to Telegram
-            try {
-                const { HITLDispatcher } = await import('../hitl/HITLDispatcher');
-                await HITLDispatcher.dispatchToHITL({
-                    taskId: task.id,
-                    agentId: this.name,
-                    agentRepId: this.reputationScore.toString(),
-                    missionSummary: task.title + ': ' + (task.description || '').slice(0, 400),
-                    confidenceScore: (this as any).currentConfidence || 0.5,
-                    spiScore: (this as any).latestSPi || 0,
-                    escalationReason: `${errorCode}: ${details}`
-                });
-            } catch (hitlError: any) {
-                console.error(`[${this.name}] âš ï¸ HITL Dispatch Failed:`, hitlError.message);
-            }
+        } catch (e) {
+            console.error(\[\] ? Failed to emit SOS:\, (e as Error).message);
         }
-        } catch(e) {
-        console.error(`[${this.name}] âŒ Failed to emit SOS:`, (e as Error).message);
     }
-}
 
-    /**
-     * [ANTIFRAGILE] Safety Run: Attempt the task with a guaranteed/free provider
-     * if the primary tiers are failing or exhausted.
-     */
-    private async runSafetyRun(task: Task, originalError: string): Promise < LLMResult | null > {
-    console.log(`[${this.name}] ðŸ›¡ï¸ Triggering Safety Run for task ${task.id}...`);
+    private async runSafetyRun(task: Task, originalError: string): Promise<LLMResult | null> {
+    console.log(`[${this.name}] 🛡️ Triggering Safety Run for task ${task.id}...`);
 
     const safetyProviders = ['deepseek', 'gemini', 'groq', 'sambanova'].filter(p => this.availableProviders.includes(p));
     if(safetyProviders.length === 0) return null;
@@ -4362,7 +4340,7 @@ ${task.description}
     try {
         return await this.callSpecificProvider(safetyProvider, safetyPrompt, [], undefined);
     } catch(e) {
-        console.error(`[${this.name}] âŒ Safety Run failed:`, (e as Error).message);
+        console.error(`[${this.name}] ❌ Safety Run failed:`, (e as Error).message);
         return null;
     }
 }
@@ -4390,7 +4368,7 @@ return true;
         const key = `ratelimit:${provider}:${new Date().toISOString().split('T')[0]}`;
         const current = await this.redis.get(key);
         if(current && parseInt(current as string) > limit) {
-    console.log(`[${this.name}] âš ï¸ ${provider} limit reached (${current}/${limit})`);
+    console.log(`[${this.name}] ⚠️ ${provider} limit reached (${current}/${limit})`);
     return false;
 }
 await this.redis.incr(key);
@@ -4407,16 +4385,16 @@ return true;
     breaker.failures++;
     breaker.lastFailure = Date.now();
     (this as any).circuitBreakers.set(provider, breaker);
-    console.warn(`[${this.name}] ðŸš¨ Provider ${provider} failure #${breaker.failures}`);
+    console.warn(`[${this.name}] 🚨 Provider ${provider} failure #${breaker.failures}`);
 }
 
     async delegateToTool(toolName: string, taskContext: string): Promise < string > {
-    console.log(`[MANAGER] ðŸ’¼ Delegating to ${toolName}...`);
+    console.log(`[MANAGER] 💼 Delegating to ${toolName}...`);
     try {
         const result = await mcpManager.routeToolCall(toolName, { context: taskContext });
         return result;
     } catch(e: any) {
-        console.error(`[MANAGER] âŒ Delegation failed:`, e.message);
+        console.error(`[MANAGER] ❌ Delegation failed:`, e.message);
         return `Error during tool delegation to ${toolName}: ${e.message}`;
     }
 }
@@ -4433,7 +4411,7 @@ return true;
         { id: 'SEVENTH', prompt: "SEVENTH ROLE: Long-tail Calibration. Focus on extreme edge cases." }
     ];
 
-    console.log(`[SYMPHONY] ðŸŽ» Executing Major7 (4-Agent) Parallel Dispatch...`);
+    console.log(`[SYMPHONY] 🎻 Executing Major7 (4-Agent) Parallel Dispatch...`);
 
     const responses = await Promise.all(roles.map(async (role) => {
         const roleStartTime = Date.now();
@@ -4489,7 +4467,7 @@ responses.forEach((r, idx) => {
 const judasAgent = responses[judasAgentIndex]?.role || 'NONE';
 const approvalRatio = responses.filter(r => r.belief[0] > 0.5).length / responses.length;
 
-console.log(`[SYMPHONY] ðŸŽ¼ Consensus Level: ${(maxProb * 100).toFixed(1)}% | Status: ${symphonyStatus} | Judas: ${judasAgent}`);
+console.log(`[SYMPHONY] 🎼 Consensus Level: ${(maxProb * 100).toFixed(1)}% | Status: ${symphonyStatus} | Judas: ${judasAgent}`);
 
 // [PHASE P1] PERSISTENT CALIBRATION LOGGING
 await this.log('calibration_audit', `Major7 Consensus: ${symphonyStatus} (Judas: ${judasAgent})`, {
@@ -4505,7 +4483,7 @@ const primaryResponse = responses.find(r => r.role === 'ROOT')?.response || resp
 
 // [PHASE P2] PYRO DYNAMIC HITL ESCALATION
 if (sbfaResult.disagreement >= PYRO_DISAGREEMENT_THRESHOLD || (symphonyStatus === 'ABSTAIN' && maxProb < 0.4)) {
-    console.log(`[SYMPHONY] ðŸ”¥ PYRO ESCALATION: Extreme disagreement detected (${sbfaResult.disagreement.toFixed(2)}). Triggering HITL...`);
+    console.log(`[SYMPHONY] 🔥 PYRO ESCALATION: Extreme disagreement detected (${sbfaResult.disagreement.toFixed(2)}). Triggering HITL...`);
     await this.emitHelpRequest(task, 'BIT_FLIP_DETECTED', `Symphony Consensus Failure. Disagreement: ${sbfaResult.disagreement.toFixed(2)}. Judas: ${judasAgent}. Consensus failed Golden Ratio (Max: ${(maxProb * 100).toFixed(1)}%).`);
 }
 
@@ -4548,3 +4526,4 @@ return {
     return { ...sbfaResult, primaryResponse };
 }
 }
+

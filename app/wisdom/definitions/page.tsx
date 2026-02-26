@@ -1,66 +1,130 @@
 'use client';
 
 import { Card } from '@/components/ui/Card';
-import { BookOpen, Shield, Cpu, Zap, Network, Globe, Lock } from 'lucide-react';
+import {
+    BookOpen, Shield, Cpu, Zap, Network, Globe, Lock,
+    Flame, Activity, Scale, Compass, Key, FastForward,
+    Repeat, Music, Sparkles, Fingerprint, Coins, Database, EyeOff
+} from 'lucide-react';
 
 const GLOSSARY_CATEGORIES = [
     {
-        title: 'Core Architecture',
+        title: 'Symphony Orchestration',
         items: [
             {
+                term: 'Major7 Team Synergy',
+                definition: 'A 4-agent parallel dispatch model (Root, Third, Fifth, Seventh) that creates harmonic reasoning paths for complex problem-solving, verifying results through spectral diversity.',
+                icon: <Music className="text-violet-400" />
+            },
+            {
+                term: 'Golden Ratio BFT',
+                definition: 'A consensus threshold of 61.8% (1/phi) used to determine truth-state collapse in multi-agent environments, providing a mathematically robust alternative to simple majorities.',
+                icon: <Scale className="text-cyan-400" />
+            },
+            {
                 term: '3x3+3 BFT Model',
-                definition: 'A three-tiered neural swarm structure: 3 Core Orchestrators (Strategists), 3 Specialty Squads (Execution), and 3 Sovereign Validators (Truth-Checkers). Truth is verified through a 2/3 Byzantine Fault Tolerant consensus.',
-                icon: <Network className="text-violet-400" />
+                definition: 'A three-tiered neural swarm structure: 3 Core Orchestrators (Strategists), 3 Specialty Squads (Execution), and 3 Sovereign Validators (Truth-Checkers).',
+                icon: <Network className="text-blue-400" />
+            },
+            {
+                term: 'Pyro Dynamic Escalation',
+                definition: 'An automated emergency trigger that escalates tasks to Human-In-The-Loop (HITL) oversight when extreme disagreement or consensus failure is detected.',
+                icon: <Flame className="text-orange-400" />
             },
             {
                 term: 'Heterogeneous LLM Protocol',
                 definition: 'Cross-verifying results between disparate model families (Anthropic, OpenAI, Google, OSS) to eliminate systematic bias and vendor lock-in.',
-                icon: <Zap className="text-cyan-400" />
-            },
-            {
-                term: 'SLM Cluster Optimization',
-                definition: 'Utilizing Small Language Models (e.g., Phi-4-Mini, Gemma-2-2B) for pre-filtering and low-risk tasks, reducing compute costs by 30-50% without quality loss.',
-                icon: <Cpu className="text-blue-400" />
+                icon: <Zap className="text-yellow-400" />
             }
         ]
     },
     {
-        title: 'Identity & Truth',
+        title: 'Sovereign Identity',
         items: [
             {
                 term: 'DBT to SBT Conversion',
-                definition: 'The transition from a Digital Bound Token (at onboarding) to a Soulbound Token (SBT) upon successful 4-Factor Authentication. SBTs carry permanent, non-transferable reputation.',
+                definition: 'The transition from a Digital Bound Token (at onboarding) to a Soulbound Token (SBT) upon successful verification, carrying permanent, non-transferable reputation.',
                 icon: <Lock className="text-emerald-400" />
             },
             {
                 term: '4-Factor Authentication (4FA)',
-                definition: 'Verification via Knowledge (Secret), Possession (Device), Biometric (Local-only hash), and Context (Behavioral patterns) to establish undeniable Proof of Life (POL).',
+                definition: 'Verification via Knowledge (Secret), Possession (Device), Biometric (Hash), and Context (Behavior) to establish undeniable Proof of Life (POL).',
                 icon: <Shield className="text-emerald-500" />
             },
             {
                 term: 'ZKP RepID',
-                definition: 'Zero-Knowledge Proof Reputation Identity. Proving an agent or user is trustworthy (e.g., "Accuracy > 95%") without revealing the underlying private data or logs.',
-                icon: <Globe className="text-violet-500" />
+                definition: 'Zero-Knowledge Proof Reputation Identity. Proving trustworthiness (e.g., "Accuracy > 95%") without revealing underlying private data or mission logs.',
+                icon: <EyeOff className="text-violet-500" />
+            },
+            {
+                term: 'Judas Agent Discovery',
+                definition: 'The identification of the most adversarial or outlier reasoning path in a consensus team using KL divergence audits to detect subtle hallucinations.',
+                icon: <Compass className="text-red-400" />
+            },
+            {
+                term: 'Proof of Life (POL)',
+                definition: 'A biometric-first verification standard that ensures every critical action in the Trinity ecosystem originates from a verified human consciousness.',
+                icon: <Fingerprint className="text-cyan-500" />
             }
         ]
     },
     {
-        title: 'Memory & Intelligence',
+        title: 'Integrity & Calibration',
+        items: [
+            {
+                term: 'RepID Calibration Rewards',
+                definition: 'Incentives provided to agents that maintain high within-subject confidence error (WSCE) calibration, discouraging over-confident hallucinations.',
+                icon: <Coins className="text-amber-400" />
+            },
+            {
+                term: 'Veritas Belief Vectors',
+                definition: 'A standardized 3-dimensional probability distribution [p_success, p_partial, p_failure] used for mathematical belief aggregation across the swarm.',
+                icon: <Activity className="text-rose-400" />
+            },
+            {
+                term: 'S(pi) Functional Terms',
+                definition: 'A multi-variable performance metric aggregating loss, disagreement, cost, and latency into a single quality-of-decision score.',
+                icon: <FastForward className="text-blue-500" />
+            },
+            {
+                term: 'ITCM Consensus Margin',
+                definition: 'Inter-Temporal Consensus Margin. A metric measuring the stability of truth-states over time to detect gradual reasoning decay or "bit-flips".',
+                icon: <Repeat className="text-indigo-400" />
+            },
+            {
+                term: 'SLM Cluster Optimization',
+                definition: 'Utilizing clusters of Small Language Models (e.g., Phi, Gemma) for pre-filtering and low-risk analysis, reducing compute costs by up to 50%.',
+                icon: <Cpu className="text-zinc-400" />
+            }
+        ]
+    },
+    {
+        title: 'Universal Memory',
         items: [
             {
                 term: 'Merkle HyperDAG',
-                definition: 'A content-addressed Directed Acyclic Graph providing tamper-proof provenance for every agent thought, decision, and artifact.',
-                icon: <Network className="text-amber-400" />
+                definition: 'A content-addressed Directed Acyclic Graph providing tamper-proof provenance for every agent thought, decision, and generated artifact.',
+                icon: <Network className="text-amber-500" />
             },
             {
                 term: 'GNN Semantic RAG',
-                definition: 'Retrieval-Augmented Generation powered by Graph Neural Networks. It maps relationships between themes and episodes across missions, ensuring the swarm never loses context.',
-                icon: <BookOpen className="text-cyan-400" />
+                definition: 'Retrieval-Augmented Generation powered by Graph Neural Networks, mapping complex relationships between themes and episodes across missions.',
+                icon: <BookOpen className="text-sky-400" />
             },
             {
                 term: 'ANFIS/LASSO Routing',
-                definition: 'Adaptive Neuro-Fuzzy Inference with LASSO feature selection. Dynamically routes tasks to the most efficient LLM based on risk, cost, and complexity.',
-                icon: <Zap className="text-blue-500" />
+                definition: 'Adaptive Neuro-Fuzzy Inference with LASSO feature selection. Dynamically routes tasks to the most efficient LLM based on risk and complexity.',
+                icon: <Zap className="text-blue-400" />
+            },
+            {
+                term: 'Evergreen Genesis Loop',
+                definition: 'An autonomous proactive cycle where agents identify market gaps and seed their own productive missions based on web-aware trends.',
+                icon: <Sparkles className="text-purple-400" />
+            },
+            {
+                term: 'Cognitive Sovereignty Bridge',
+                definition: 'The protocol ensuring that agent actions strictly adhere to the Trinity Constitution while maintaining operational autonomy from central authority.',
+                icon: <Globe className="text-emerald-400" />
             }
         ]
     }

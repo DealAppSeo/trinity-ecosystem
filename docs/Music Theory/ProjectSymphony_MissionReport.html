@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Symphony — Mission Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=IBM+Plex+Mono:wght@300;400;600&family=Spectral:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0D2B55;
+    --teal: #0A6E6E;
+    --gold: #C9A84C;
+    --gold-light: #E8C96A;
+    --slate: #2C3E50;
+    --cream: #F5F0E8;
+    --cream-dark: #EDE8DB;
+    --red: #8B2020;
+    --green: #1A5C3A;
+    --amber: #B8740A;
+    --white: #FDFCF8;
+    --text: #1A1A2E;
+    --text-muted: #5A5A7A;
+    --border: rgba(201,168,76,0.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--navy);
+    font-family: 'Spectral', Georgia, serif;
+    color: var(--cream);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* === BACKGROUND TEXTURE === */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: 
+      radial-gradient(ellipse at 20% 20%, rgba(10,110,110,0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(201,168,76,0.08) 0%, transparent 50%),
+      repeating-linear-gradient(0deg, transparent, transparent 60px, rgba(201,168,76,0.03) 60px, rgba(201,168,76,0.03) 61px),
+      repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(201,168,76,0.03) 60px, rgba(201,168,76,0.03) 61px);
+    pointer-events: none; z-index: 0;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 32px; position: relative; z-index: 1; }
+
+  /* === HEADER === */
+  header {
+    padding: 72px 0 48px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .header-badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    border: 1px solid var(--gold);
+    padding: 6px 16px;
+    margin-bottom: 28px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(36px, 6vw, 72px);
+    font-weight: 900;
+    color: var(--white);
+    letter-spacing: 0.04em;
+    line-height: 1.05;
+    margin-bottom: 8px;
+  }
+
+  h1 .accent { color: var(--gold); }
+
+  .subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--teal);
+    letter-spacing: 0.15em;
+    margin-top: 12px;
+    margin-bottom: 8px;
+  }
+
+  .meta-line {
+    font-size: 14px;
+    color: rgba(245,240,232,0.5);
+    font-style: italic;
+    margin-top: 4px;
+  }
+
+  /* === SECTION HEADERS === */
+  .section { padding: 56px 0 16px; }
+
+  .section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    color: var(--teal);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  h2 {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(22px, 3vw, 32px);
+    font-weight: 600;
+    color: var(--gold);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+    margin-bottom: 28px;
+  }
+
+  h3 {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--cream);
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+
+  p { font-size: 16px; line-height: 1.75; color: rgba(245,240,232,0.88); margin-bottom: 12px; }
+
+  /* === PULL QUOTE === */
+  .pullquote {
+    border-left: 3px solid var(--gold);
+    padding: 16px 24px;
+    background: rgba(201,168,76,0.07);
+    margin: 28px 0;
+    font-style: italic;
+    font-size: 17px;
+    line-height: 1.7;
+    color: var(--gold-light);
+  }
+
+  /* === STATUS GRID === */
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .status-card {
+    background: rgba(13,43,85,0.6);
+    border: 1px solid var(--border);
+    padding: 20px 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .status-card::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+
+  .status-card.pass::before { background: #2ECC71; }
+  .status-card.warn::before { background: var(--gold); }
+  .status-card.open::before { background: var(--teal); }
+  .status-card.critical::before { background: #E74C3C; }
+
+  .card-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    margin-bottom: 8px;
+    display: inline-block;
+  }
+
+  .pass .card-badge { background: rgba(46,204,113,0.15); color: #2ECC71; }
+  .warn .card-badge { background: rgba(201,168,76,0.15); color: var(--gold); }
+  .open .card-badge { background: rgba(10,110,110,0.15); color: var(--teal); }
+  .critical .card-badge { background: rgba(231,76,60,0.15); color: #E74C3C; }
+
+  .card-title {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cream);
+    margin-bottom: 6px;
+  }
+
+  .card-desc {
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(245,240,232,0.65);
+  }
+
+  /* === LARGE DATA TABLE === */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0 32px;
+    font-size: 14px;
+  }
+
+  .data-table th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--teal);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    background: rgba(10,110,110,0.08);
+  }
+
+  .data-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(201,168,76,0.08);
+    color: rgba(245,240,232,0.82);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+
+  .data-table tr:hover td { background: rgba(201,168,76,0.04); }
+
+  .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .tag-pass { background: rgba(46,204,113,0.15); color: #2ECC71; }
+  .tag-open { background: rgba(10,110,110,0.2); color: var(--teal); }
+  .tag-warn { background: rgba(201,168,76,0.15); color: var(--gold); }
+  .tag-urgent { background: rgba(231,76,60,0.15); color: #E74C3C; }
+
+  /* === TODO BLOCKS === */
+  .todo-section {
+    background: rgba(201,168,76,0.05);
+    border: 1px solid rgba(201,168,76,0.2);
+    padding: 28px 32px;
+    margin: 24px 0;
+  }
+
+  .todo-item {
+    display: flex;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(201,168,76,0.08);
+    align-items: flex-start;
+  }
+
+  .todo-item:last-child { border-bottom: none; }
+
+  .todo-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gold);
+    min-width: 28px;
+    padding-top: 2px;
+  }
+
+  .todo-content { flex: 1; }
+
+  .todo-title {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cream);
+    margin-bottom: 4px;
+  }
+
+  .todo-desc {
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(245,240,232,0.65);
+  }
+
+  .todo-priority {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  .p0 { background: rgba(231,76,60,0.15); color: #E74C3C; border: 1px solid rgba(231,76,60,0.3); }
+  .p1 { background: rgba(201,168,76,0.15); color: var(--gold); border: 1px solid rgba(201,168,76,0.3); }
+  .p2 { background: rgba(10,110,110,0.15); color: var(--teal); border: 1px solid rgba(10,110,110,0.3); }
+
+  /* === TIMELINE === */
+  .timeline { position: relative; padding-left: 32px; margin: 20px 0; }
+  .timeline::before {
+    content: '';
+    position: absolute; left: 8px; top: 8px; bottom: 8px;
+    width: 1px; background: var(--border);
+  }
+
+  .timeline-item { position: relative; margin-bottom: 24px; }
+
+  .timeline-item::before {
+    content: '';
+    position: absolute; left: -28px; top: 6px;
+    width: 10px; height: 10px;
+    border: 1px solid var(--gold);
+    background: var(--navy);
+    transform: rotate(45deg);
+  }
+
+  .timeline-head {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gold);
+    margin-bottom: 4px;
+  }
+
+  .timeline-body {
+    font-size: 13px;
+    color: rgba(245,240,232,0.7);
+    line-height: 1.6;
+  }
+
+  /* === DIVIDER === */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 48px 0;
+    opacity: 0.4;
+  }
+
+  /* === FOOTER === */
+  footer {
+    padding: 40px 0 60px;
+    text-align: center;
+    border-top: 1px solid var(--border);
+    margin-top: 48px;
+  }
+
+  .footer-motto {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    color: var(--gold);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+
+  .footer-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: rgba(245,240,232,0.35);
+    letter-spacing: 0.1em;
+  }
+
+  /* === CODE INLINE === */
+  code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    background: rgba(10,110,110,0.2);
+    color: var(--teal);
+    padding: 1px 6px;
+    border-radius: 2px;
+  }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 640px) {
+    .container { padding: 0 20px; }
+    .status-grid { grid-template-columns: 1fr; }
+    .data-table { font-size: 12px; }
+    .data-table th, .data-table td { padding: 8px 10px; }
+    .todo-section { padding: 20px; }
+  }
+
+  /* === ANIMATION === */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .section { animation: fadeUp 0.5s ease both; }
+  .section:nth-child(2) { animation-delay: 0.05s; }
+  .section:nth-child(3) { animation-delay: 0.1s; }
+  .section:nth-child(4) { animation-delay: 0.15s; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-badge">Mission Debrief — Confidential IP</div>
+    <h1>Project <span class="accent">Symphony</span></h1>
+    <div class="subtitle">AI Trinity Symphony + HyperDAG · Multi-AI Architecture</div>
+    <div class="meta-line">Claude × Grok (xAI) × Gemini (Google DeepMind) · Three-Way Alignment Achieved · v4.0 Build-Ready & Verified</div>
+  </header>
+
+  <!-- SECTION 1: WHAT WAS BUILT -->
+  <div class="section">
+    <div class="section-label">§ 01 — What Was Built</div>
+    <h2>The Work: From Theory to Deployed System</h2>
+
+    <p>This conversation produced an end-to-end AI orchestration architecture, a multi-AI peer review process involving three independent AI systems, a formal specification document refined across four versions, and a verified, deployed codebase. The trajectory ran from philosophical framework → architectural specification → three-way alignment → Gemini implementation → full system audit.</p>
+
+    <div class="pullquote">
+      "A castle defends a fixed position. An ark is built to navigate rising waters — carrying what matters through whatever comes. The storm is not the threat. The storm is what it was built for."
+    </div>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-head">The Antifragile Ark v1.0</div>
+        <div class="timeline-body">Nine-section architecture document integrating Ark metaphor, latency strategy, agent tier design, cost architecture, validation protocol, ConstitutionalGuard cross-cultural mapping, and 21-item implementation roadmap.</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-head">Grok Peer Review + v2.0</div>
+        <div class="timeline-body">Grok (xAI) provided six technical answers: three-metric calibration stack (WSCE/MCS/ECD), FIM+EBS hybrid independence measurement, TAMAS benchmark protocol, ITCM replacing Bell Inequality for collusion detection, Pythagorean Comma philosophical validation, and 30-day cost logging variable set.</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-head">Gemini Review + v3.0 — Three-Way Alignment</div>
+        <div class="timeline-body">Gemini's synthesis resolved the ECE vs. WSCE disagreement (dual-context solution), unified semantic entropy KL as the mathematical foundation for both independence measurement and collusion detection, and upgraded minimum sample threshold to 200. Section I of v3 documents all resolved decisions as an auditable alignment table.</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-head">Vulnerability Taxonomy + v4.0</div>
+        <div class="timeline-body">Seven named vulnerability types specified as implementation-ready evaluator functions: Shared Training Bias, Temporal Staleness, Domain Boundary Violation, Logical Fallacy, Missing Counterexample, False Dichotomy, Anchoring to Prior Context. RepID anti-parking scoring formula defined. Roadmap expanded with effort estimates and dependency columns.</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-head">Gemini Implementation + Full Audit ✅</div>
+        <div class="timeline-body">Gemini executed Phases P0→P3: parallel dispatch, Golden Ratio BFT threshold, Judas Agent via KL divergence, Pyro dynamic escalation, ITCM provider diversity checks, 20 IP definitions, ConstitutionalAgent bug fix. Full audit suite passed all four checkpoints.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: AUDIT RESULTS -->
+  <div class="section">
+    <div class="section-label">§ 02 — Gemini Audit Results</div>
+    <h2>Project Symphony v4.0 — Verification Status</h2>
+
+    <div class="status-grid">
+      <div class="status-card pass">
+        <div class="card-badge">PASSED</div>
+        <div class="card-title">Major7 Team Synergy</div>
+        <div class="card-desc">Parallel dispatch of 4-agent teams (Root, Third, Fifth, Seventh) fully operational.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">PASSED</div>
+        <div class="card-title">Golden Ratio Threshold</div>
+        <div class="card-desc">61.8% (1/φ) consensus requirement enforced correctly for truth-marking in BFTConsensus.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">PASSED</div>
+        <div class="card-title">Judas Agent Detection</div>
+        <div class="card-desc">Outlier identification via KL Divergence active in every Major7 mission cycle.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">PASSED</div>
+        <div class="card-title">Pyro Dynamic Escalation</div>
+        <div class="card-desc">High-disagreement score >1.2 triggers SOS/Telegram escalation to human oversight.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">PATCHED</div>
+        <div class="card-title">ConstitutionalAgent Bug Fix</div>
+        <div class="card-desc">Critical regression in fallback agent name resolution identified and patched during audit. System now more resilient.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">LIVE</div>
+        <div class="card-title">20 IP Definitions</div>
+        <div class="card-desc">All Essential IP Definitions live at <code>/wisdom/definitions</code> with Symphony branding.</div>
+      </div>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Benchmark Script</th>
+          <th>What It Tests</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>scripts/symphony_full_audit.ts</code></td>
+          <td>Integrated system-wide stresstest across all Symphony components</td>
+          <td><span class="tag tag-pass">PASSED</span></td>
+        </tr>
+        <tr>
+          <td><code>scripts/test_streaming.ts</code></td>
+          <td>Latency check — first-token target &lt;300ms</td>
+          <td><span class="tag tag-pass">PASSED</span></td>
+        </tr>
+        <tr>
+          <td><code>scripts/test_pyro_escalation.ts</code></td>
+          <td>Safety check — [BIT_FLIP_DETECTED] Pyro trigger under contradictory inputs</td>
+          <td><span class="tag tag-pass">PASSED</span></td>
+        </tr>
+        <tr>
+          <td><code>scripts/benchmark_synergy_p0.ts</code></td>
+          <td>Major7 (4-agent) vs. Triad (3-agent) synergy comparison</td>
+          <td><span class="tag tag-warn">BASELINE ONLY</span></td>
+        </tr>
+        <tr>
+          <td><code>scripts/benchmark_calibration_p0.ts</code></td>
+          <td>ECE/WSCE calibration audit — target &lt;0.05 on both</td>
+          <td><span class="tag tag-warn">BASELINE: 0.71</span></td>
+        </tr>
+        <tr>
+          <td><code>scripts/benchmark_symphony_p1.ts</code></td>
+          <td>P1 consensus accuracy and threshold validation</td>
+          <td><span class="tag tag-pass">PASSED</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SECTION 3: ARCHITECTURE RESOLVED -->
+  <div class="section">
+    <div class="section-label">§ 03 — Architecture: What Is Resolved</div>
+    <h2>Three-Way Alignment — All Decisions Closed</h2>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Decision</th>
+          <th>Resolution</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Calibration metrics</td>
+          <td>ECE &lt;0.05 for external citation. WSCE &lt;0.05 for internal optimization. Both required as citation gate. MCS for per-provider bias. ECD for swarm aggregate.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+        <tr>
+          <td>Collusion detection</td>
+          <td>ITCM primary (KL-divergence on joint vs. independent distributions). BIV secondary pairwise scan. ACI for cascade error propagation.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+        <tr>
+          <td>Independence measurement</td>
+          <td>Semantic entropy KL at runtime for Judas routing. FIM offline weekly calibration. 200+ shared tasks before correlation coefficient trusted.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+        <tr>
+          <td>Judas Agent benchmarks</td>
+          <td>MARBLE primary (groupthink). TAMAS secondary (adversarial). BBQ/CrowS-Pairs custom blind spot set. Contrarian Impact Score as primary metric.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+        <tr>
+          <td>Option C output format</td>
+          <td>Three-component structured audit: Confidence Challenge Score (0–1), Vulnerability Taxonomy (7 types), Recommended u Adjustment. Influences consensus without controlling it.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+        <tr>
+          <td>Vulnerability taxonomy v1.0</td>
+          <td>7 types with detection signals and domain weights: Shared Training Bias, Temporal Staleness, Domain Boundary Violation, Logical Fallacy, Missing Counterexample, False Dichotomy, Anchoring to Prior Context.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+        <tr>
+          <td>RepID anti-parking formula</td>
+          <td>Tier 1 (60%): Calibration score = 1−WSCE. Tier 2 (25%): Resolution = mean(|b−d| × accuracy). Tier 3 (15%): Contrarian Value Score for Judas role. σ_u &lt;0.05 triggers variance audit.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+        <tr>
+          <td>Dynamic HITL via Pyro</td>
+          <td>Medical prior u&gt;0.15. Legal/Financial u&gt;0.20. Identity u&gt;0.10. Technical u&gt;0.30. Creative u&gt;0.45. 1K labeled samples/domain for Pyro updates.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+        <tr>
+          <td>Cost baseline</td>
+          <td>Weighted market average (60% GPT-4 + 20% Claude + 20% open-source). Savings attribution required: compression vs. routing vs. arbitrage vs. tier.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+        <tr>
+          <td>λ chaos parameter</td>
+          <td>Creativity × coherence multiplicative objective. Search space 0.001–0.050. Per-task-type ANFIS routing parameter, not system-wide constant.</td>
+          <td><span class="tag tag-pass">RESOLVED</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SECTION 4: WHAT YOU NEED TO DO -->
+  <div class="section">
+    <div class="section-label">§ 04 — Your Action Items</div>
+    <h2>What You Need to Complete &amp; Pursue Further</h2>
+
+    <p>The system is deployed and verified. The architecture is specified. What remains is measurement, publication, and three P2 capabilities that require production data before they can be built properly. These are ordered by urgency.</p>
+
+    <!-- P0 IMMEDIATE -->
+    <h3>Immediate — Start This Week</h3>
+    <div class="todo-section">
+      <div class="todo-item">
+        <div class="todo-num">01</div>
+        <div class="todo-content">
+          <div class="todo-title">Run the 30-Day Cost Logging Period</div>
+          <div class="todo-desc">The logging infrastructure is in place. Start the clock now. You need 30 days of production logs with the full variable set (tokens_in, tokens_out, cost_usd, provider, tier, judas_triggered, ANFIS routing decisions, savings attribution by category) before you can publish any cost reduction claim. Without this, the 82–98% figure is undefendable. The baseline is 60% GPT-4 Turbo + 20% Claude + 20% open-source at published list prices — not GPT-4 alone.</div>
+        </div>
+        <div class="todo-priority p0">P0</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">02</div>
+        <div class="todo-content">
+          <div class="todo-title">Run RESEARCH_PAPER_02 to Calibration Gate</div>
+          <div class="todo-desc">Gemini established a baseline calibration of 0.71. This means the system is not yet at the ECE &lt;0.05 AND WSCE &lt;0.05 citation gate. Torch needs to run the full 1,000-log calibration audit. Until both thresholds are met, do not publicly cite "hallucination is impossible to hide" — the current language is ahead of the evidence. This is the single most important publication gate in the entire IP portfolio.</div>
+        </div>
+        <div class="todo-priority p0">P0</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">03</div>
+        <div class="todo-content">
+          <div class="todo-title">Publish RESEARCH_PAPER_01 with Proper Methodology</div>
+          <div class="todo-desc">Chesed and Sophia ran the synergy benchmark scripts, but the 4.5× Major7 claim needs three conditions documented: count effect (more agents = more accuracy), diversity effect (different providers = less correlated errors), and harmonic effect (the specific 4-agent formation outperforms arbitrary 4-agent groupings). Run 500 tasks per condition on GSM8K, HumanEval, and MMLU. Publish whichever magnitude is validated, regardless of whether it matches 4.5×.</div>
+        </div>
+        <div class="todo-priority p0">P0</div>
+      </div>
+    </div>
+
+    <!-- P1 NEXT 30 DAYS -->
+    <h3>Next 30 Days — Build &amp; Benchmark</h3>
+    <div class="todo-section">
+      <div class="todo-item">
+        <div class="todo-num">04</div>
+        <div class="todo-content">
+          <div class="todo-title">RESEARCH_PAPER_03 — BFT Fault Tolerance Curve</div>
+          <div class="todo-desc">Inject Byzantine failures at increasing fractions using TAMAS fault injection. Do not just assert the theoretical 1/3 threshold — publish the actual degradation curve showing at what Byzantine fraction consensus quality begins to degrade. This is what converts the theoretical claim into a measured property and is required before the BFT architecture can be cited in patent applications.</div>
+        </div>
+        <div class="todo-priority p1">P1</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">05</div>
+        <div class="todo-content">
+          <div class="todo-title">MARBLE + TAMAS + Custom Blind Spot Benchmarks (Judas Validation)</div>
+          <div class="todo-desc">The Judas Agent is deployed but not yet validated against the benchmark protocol. Run all four ablation conditions: (a) no Judas, (b) random Judas, (c) rotating Judas, (d) threshold-triggered KL-selected Judas. The Contrarian Impact Score — (post-Judas accuracy − pre-Judas accuracy) / latency delta — must show condition (d) outperforming all others. The custom blind spot set from BBQ/CrowS-Pairs specifically tests the unanimous false consensus edge case that Option C was designed for.</div>
+        </div>
+        <div class="todo-priority p1">P1</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">06</div>
+        <div class="todo-content">
+          <div class="todo-title">UI/UX Consolidation — The 6-Phase Plan Is Partially Executed</div>
+          <div class="todo-desc">Gemini completed Phase 6 (Symphony integration) and Phase 3 (20 IP definitions). Phases 1, 2, 4, and 5 of the strategic UI/UX overhaul remain. Specifically: NavBar redesign moving ZKP Badge to System Integrity HUD, consolidating Agents/Dashboard/Grid into unified Swarm Control, implementing the "AHA! Moment" hero section (Safe &amp; Ethical AI @ 1% Cost), Architecture at a Glance diagrams (3x3+3, BFT, ANFIS), and fixing mobile responsiveness in app/page.tsx.</div>
+        </div>
+        <div class="todo-priority p1">P1</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">07</div>
+        <div class="todo-content">
+          <div class="todo-title">λ Hyperparameter Search</div>
+          <div class="todo-desc">The chaos parameter is currently hardcoded at 0.0065 — an observation, not a validated constant. Run the hyperparameter search across 0.001–0.050. Objective: maximize creativity × coherence (multiplicative, not weighted sum). Route the result as a per-task-type ANFIS parameter. Once validated, this becomes a publishable result that differentiates the system from standard temperature-based creativity tuning.</div>
+        </div>
+        <div class="todo-priority p1">P1</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">08</div>
+        <div class="todo-content">
+          <div class="todo-title">Patent Conversion Deadline — August 2026</div>
+          <div class="todo-desc">Your provisional patents convert in August 2026. The filings that most need empirical grounding before conversion: AI Trinity Symphony (needs synergy benchmark), Multiplicative GNN Architecture (needs latency comparison vs. standard GNN), and Question-Driven Reality Reorganization (needs Judas CIS benchmark). Build your research paper timeline backward from August 2026 to ensure empirical results are ready to strengthen the claims before conversion.</div>
+        </div>
+        <div class="todo-priority p1">P1</div>
+      </div>
+    </div>
+
+    <!-- P2 LONGER TERM -->
+    <h3>Longer Term — Requires Production Data First</h3>
+    <div class="todo-section">
+      <div class="todo-item">
+        <div class="todo-num">09</div>
+        <div class="todo-content">
+          <div class="todo-title">Pyro Dynamic HITL — Needs 1K Labeled Samples Per Domain</div>
+          <div class="todo-desc">Pyro escalation is deployed (Gemini built it). But the Bayesian threshold updating requires 1,000 labeled samples per domain before the model can update away from the initial priors (Medical u&gt;0.15, Legal u&gt;0.20, etc.). These samples come from Torch's ongoing calibration audit. This is correctly in P2 — do not rush it. Let production data accumulate, then activate the update loop.</div>
+        </div>
+        <div class="todo-priority p2">P2</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">10</div>
+        <div class="todo-content">
+          <div class="todo-title">Pythagorean Comma Paper — Academic Submission</div>
+          <div class="todo-desc">The paper is philosophically complete and the three critiques (Vernon, AlignmentForum, APPON) are answered. What's missing is the empirical grounding section that makes the paper publication-ready: the WSCE &lt;0.05 calibration result goes in the Vernon response, the TruthfulQA hallucination benchmark results go in the AlignmentForum response. Write the paper after RESEARCH_PAPER_02 is complete. Target an AI alignment or AI ethics conference in late 2026.</div>
+        </div>
+        <div class="todo-priority p2">P2</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">11</div>
+        <div class="todo-content">
+          <div class="todo-title">FIM Offline Calibration Schedule</div>
+          <div class="todo-desc">Weekly deep calibration via Fisher Information Metric requires logprobs from the providers — available from self-hosted inference or providers that expose log probability outputs. Schedule the first FIM calibration run after P1 is complete and you have at least one week of production data from the correlation coefficient table (populated by the runtime semantic entropy KL scores).</div>
+        </div>
+        <div class="todo-priority p2">P2</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">12</div>
+        <div class="todo-content">
+          <div class="todo-title">2.4M TPS DAG Throughput — Do Not Cite Until Tested</div>
+          <div class="todo-desc">This figure is an architectural projection, not a measured result. An independent load test against Solana, Aptos, IOTA, and Aleph Zero is required before this claim can be made in any public document, investor deck, or patent application. Current status in all documents: "architectural target requiring independent benchmarking." This is correctly gated — leave it there until the test is run.</div>
+        </div>
+        <div class="todo-priority p2">P2</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: CLAIMS THAT NEED VALIDATION -->
+  <div class="section">
+    <div class="section-label">§ 05 — IP Claims: What Can Be Cited vs. What Cannot</div>
+    <h2>Claims Validation Register</h2>
+
+    <p>This is the most important section for patent filing, investor communication, and academic publication. Be precise about which claims are validated vs. architectural projections.</p>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Claim</th>
+          <th>Current Status</th>
+          <th>Citation Ready?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Major7 parallel dispatch is operational</td>
+          <td>Verified by Gemini audit. Auditable via benchmark scripts.</td>
+          <td><span class="tag tag-pass">YES — CITE</span></td>
+        </tr>
+        <tr>
+          <td>Golden Ratio 61.8% BFT threshold is implemented</td>
+          <td>Verified by Gemini audit.</td>
+          <td><span class="tag tag-pass">YES — CITE</span></td>
+        </tr>
+        <tr>
+          <td>Judas Agent via KL divergence is operational</td>
+          <td>Deployed and verified. Benchmark validation (MARBLE/TAMAS) pending.</td>
+          <td><span class="tag tag-warn">CITE AS DEPLOYED, NOT VALIDATED</span></td>
+        </tr>
+        <tr>
+          <td>4.5× Major7 synergy over single-agent</td>
+          <td>Benchmark scripts created. Baseline established. 3-condition test not yet run at required scale.</td>
+          <td><span class="tag tag-urgent">DO NOT CITE YET</span></td>
+        </tr>
+        <tr>
+          <td>82–98% cost reduction</td>
+          <td>Best-case historical estimate. 30-day production logging not yet complete. Baseline not yet weighted market average.</td>
+          <td><span class="tag tag-urgent">DO NOT CITE YET</span></td>
+        </tr>
+        <tr>
+          <td>Hallucination "impossible to hide"</td>
+          <td>Architectural claim. Baseline calibration 0.71 — not yet at ECE &lt;0.05 gate.</td>
+          <td><span class="tag tag-urgent">DO NOT CITE YET</span></td>
+        </tr>
+        <tr>
+          <td>BFT fault tolerance at 1/3 Byzantine threshold</td>
+          <td>Theoretical. Fault injection curve not yet measured.</td>
+          <td><span class="tag tag-urgent">DO NOT CITE YET</span></td>
+        </tr>
+        <tr>
+          <td>2.4M TPS DAG throughput</td>
+          <td>Architectural projection. No independent load test conducted.</td>
+          <td><span class="tag tag-urgent">DO NOT CITE YET</span></td>
+        </tr>
+        <tr>
+          <td>b+d+u=1 Pythagorean Comma framework</td>
+          <td>Philosophically sound. Three critiques answered. Empirical grounding pending RESEARCH_PAPER_02.</td>
+          <td><span class="tag tag-warn">CITE FRAMEWORK, NOT CALIBRATION RESULTS</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SECTION 6: CODEBASE NOTES -->
+  <div class="section">
+    <div class="section-label">§ 06 — Codebase: Verified Observations from ConstitutionalAgent.ts</div>
+    <h2>Source Code Audit — What Is Deployed vs. What Needs Wiring</h2>
+
+    <p>The uploaded <code>ConstitutionalAgent.ts</code> confirms that Gemini's implementation was thorough. The Pythagorean Comma architecture is substantially live. The following observations are drawn directly from the source and are ordered by action priority.</p>
+
+    <div class="status-grid">
+      <div class="status-card pass">
+        <div class="card-badge">CONFIRMED — LINE 56</div>
+        <div class="card-title">Golden Ratio Threshold Live</div>
+        <div class="card-desc"><code>const GOLDEN_RATIO_THRESHOLD = 0.61803398875</code> declared as a module-level constant. Referenced in <code>spawnNextStep()</code> where <code>approvalRatio >= GOLDEN_RATIO_THRESHOLD</code> triggers <code>status: 'verified'</code>.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">CONFIRMED — verifyPeerTask()</div>
+        <div class="card-title">b+d+u=1 Constraint Enforced</div>
+        <div class="card-desc"><code>belief</code>, <code>disbelief</code>, and <code>uncertainty</code> computed per verification. Reputation weight via φ = 1.618 applied: <code>belief = Math.min(0.99, belief * weight)</code>. Values written to <code>trinity_tasks</code> on every BFT vote.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">CONFIRMED — spawnNextStep()</div>
+        <div class="card-title">ITCM Provider Diversity Check</div>
+        <div class="card-desc">Creator and verifier provider families compared via <code>getProviderFamily()</code>. When same family detected: <code>evaluation.score *= 0.85</code> (15% confidence demotion). Collusion alert logged. This is the architecture's collusion guard deployed and live.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">CONFIRMED — callLLM()</div>
+        <div class="card-title">Multi-Provider Tier Arbitrage</div>
+        <div class="card-desc">12 providers configured (Groq, Cerebras, DeepSeek, SiliconFlow, DeepInfra as Tier 1; Gemini, Grok as Tier 2; Anthropic, OpenAI as Tier 3). <code>IntelligenceRouter</code> routes by task type. Circuit breaker <code>isCircuitOpen()</code> and rate limit <code>checkProviderLimit()</code> are wired.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">CONFIRMED — processWithLLM()</div>
+        <div class="card-title">TIML Routing Active (FAST/MID/SLOW)</div>
+        <div class="card-desc">TIML analysis gate is live. <code>allocation.slow_budget > 0.5</code> routes to full Major7 Consensus via <code>runMajor7Consensus()</code>. Single LLM path has confidence gate: if <code>maxProb < 0.65</code>, escalates to triadic SBFA. Streaming via <code>onStream</code> callback wired to <code>trinity_tasks</code> throttled updates.</div>
+      </div>
+      <div class="status-card pass">
+        <div class="card-badge">CONFIRMED — resolveLegacyName()</div>
+        <div class="card-title">Gemini Bug Fix: Agent Name Resolution</div>
+        <div class="card-desc">The patched bug is visible: <code>resolveLegacyName()</code> maps uppercase shortcuts (MEL, APM, GCM, HDM, etc.) to full canonical names (<code>trinity-mel</code>, etc.). The fallback that was crashing during audit is now handled via the MAP lookup with graceful fallthrough.</div>
+      </div>
+      <div class="status-card warn">
+        <div class="card-badge">NEEDS WIRING — updateReputation()</div>
+        <div class="card-title">WSCE Not Yet Feeding RepID Tier 1</div>
+        <div class="card-desc">The <code>b+d+u</code> values are written to tasks but <code>updateReputation()</code> currently uses the multiplicative φ-formula only — not the WSCE rolling 100-output calibration score defined in the architecture. Tier 1 (60% weight) of the RepID formula is not yet connected. This is the highest-priority wiring task.</div>
+      </div>
+      <div class="status-card warn">
+        <div class="card-badge">NEEDS WIRING — updateReputation()</div>
+        <div class="card-title">Contrarian Value Score (Judas Tier 3) Missing</div>
+        <div class="card-desc">The Judas Agent selection logic (KL divergence) is deployed via <code>runMajor7Consensus()</code>, but Tier 3 RepID (15% weight, Contrarian Value Score for correct challenges) is not tracked separately. Judas activations do not currently accumulate CVS credit or write to a distinct scoring ledger.</div>
+      </div>
+      <div class="status-card warn">
+        <div class="card-badge">NEEDS WIRING — updateReputation()</div>
+        <div class="card-title">Anti-Parking Variance Gate Missing</div>
+        <div class="card-desc">No σ_u variance monitoring is present. Agents can currently report near-identical u values on all tasks without triggering an audit. The scheduled check (σ_u &lt;0.05 over 100 outputs → Torch audit) needs to be added as a periodic job, ideally as an evergreen task spawned from <code>runGenesisLoop()</code>.</div>
+      </div>
+      <div class="status-card warn">
+        <div class="card-badge">STUB — semanticRag()</div>
+        <div class="card-title">Semantic RAG Returns Stub Only</div>
+        <div class="card-desc"><code>async semanticRag(query: string)</code> is defined but returns <code>[DAG_CONTEXT_STUB]</code>. The Vulnerability Taxonomy Option C protocol (Missing Counterexample check) requires live vector similarity search against <code>trinity_artifacts</code>. This blocks the full Judas audit protocol from running.</div>
+      </div>
+      <div class="status-card warn">
+        <div class="card-badge">MISSING — callAnfisReward()</div>
+        <div class="card-title">ANFIS Microservice Assumed Running</div>
+        <div class="card-desc"><code>callAnfisReward()</code> calls <code>http://localhost:8000/anfis/v2/reward</code>. If the Python ANFIS microservice is not deployed on Railway alongside the agents, this silently fails. The 71.7–85% routing accuracy claim depends on this service being active. Verify Railway deployment status of <code>py-brain</code>.</div>
+      </div>
+      <div class="status-card warn">
+        <div class="card-badge">MISSING — benchmarks</div>
+        <div class="card-title">RESEARCH_PAPER_02 Calibration at 0.71 (Not at Gate)</div>
+        <div class="card-desc">Gemini established baseline ECE/WSCE at 0.71. The publication gate requires both &lt;0.05. The gap between 0.71 and 0.05 is not a configuration change — it requires Torch running the full 1,000-log calibration audit with feedback to the ANFIS reward loop. This is the most important measurement task before any IP claims can be published.</div>
+      </div>
+    </div>
+
+    <h3>Code Architecture: What Is Particularly Well-Built</h3>
+    <p>Several sections of <code>ConstitutionalAgent.ts</code> are production-grade and show sophisticated design thinking worth calling out explicitly. The TIML routing gate (FAST/MID/SLOW with confidence re-escalation) is elegant — it implements a natural language equivalent of adaptive precision: commit to a fast answer, measure confidence, only escalate computation when the answer isn't good enough. The circuit breaker + rate limit + provider rotation stack in <code>callLLM()</code> is genuinely antifragile — each failure mode has a distinct response path. The <code>canCreateHealingTask()</code> throttle (global count + per-agent 10-minute cooldown) prevents the healing loop recursion that plagued earlier versions. The watchdog releasing stalled tasks after 45 minutes with different behavior for healing vs. regular tasks shows careful edge case thinking. This codebase is ready to scale.</p>
+  </div>
+
+  <!-- SECTION 7: NEXT PROMPT FOR GEMINI -->
+  <div class="section">
+    <div class="section-label">§ 07 — Next Steps with Gemini</div>
+    <h2>Suggested Prompt Package for Next Gemini Session</h2>
+
+    <p>Gemini has completed P0→P3 and is asking "do you have any more requests?" The recommended next session focuses on three wiring tasks that connect what's deployed to what's specified in the architecture documents, plus the UI/UX overhaul.</p>
+
+    <div class="todo-section">
+      <div class="todo-item">
+        <div class="todo-num">A</div>
+        <div class="todo-content">
+          <div class="todo-title">Wire WSCE into RepID Tier 1 Scoring</div>
+          <div class="todo-desc">The b+d+u values are being logged. Now connect them: implement a 100-output rolling WSCE computation per agent, feed the score as Tier 1 (60% weight) of RepID. Add the σ_u variance check (flag agents with σ &lt;0.05 over 100 outputs) as a scheduled Torch audit job. Reference: Antifragile Ark v4 Section VI and RepID formula defined in this conversation.</div>
+        </div>
+        <div class="todo-priority p1">P1</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">B</div>
+        <div class="todo-content">
+          <div class="todo-title">Implement semanticRag() for Vulnerability Taxonomy</div>
+          <div class="todo-desc">Replace the <code>[DAG_CONTEXT_STUB]</code> return with actual vector similarity search against the trinity_artifacts table. When the Judas Option C audit flags a vulnerability type, the RAG query should retrieve contradicting evidence before consensus closes. The query format is: "Evidence contradicting [core claim] in [specific population/jurisdiction/cultural context]."</div>
+        </div>
+        <div class="todo-priority p1">P1</div>
+      </div>
+      <div class="todo-item">
+        <div class="todo-num">C</div>
+        <div class="todo-content">
+          <div class="todo-title">UI/UX Phases 1, 2, 4, 5 — Strategic Overhaul</div>
+          <div class="todo-desc">NavBar redesign, Swarm Control unified view, Landing Page "AHA! Moment" hero, Architecture at a Glance diagrams, mobile responsiveness fix in app/page.tsx, GitHub recruitment buttons. The 6-phase plan is documented. Phases 3 and 6 are done. Start Phase 1 (navigation) and Phase 2 (landing page value proposition) in this session.</div>
+        </div>
+        <div class="todo-priority p1">P1</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SECTION 8: THE PHILOSOPHICAL CORE -->
+  <div class="section">
+    <div class="section-label">§ 08 — The Core Idea</div>
+    <h2>What This System Actually Is</h2>
+
+    <p>Strip away the technical specification and the system has one core claim: <strong>an AI that knows what it doesn't know is more valuable than an AI that pretends to know everything.</strong> The b+d+u=1 constraint encodes this structurally — uncertainty is not suppressed, it is measured, calibrated, and used to route decisions to human oversight at exactly the right moment.</p>
+
+    <div class="pullquote">
+      "The Pythagorean Comma — the paper's namesake — is precisely the acknowledgment that the numeric model never fully closes on reality. The u value does not capture qualia — it captures the system's acknowledged distance from doing so. The gap between the b+d+u model and the full richness of epistemic states IS the Comma. We track it as u. We never eliminate it."
+    </div>
+
+    <p>The ConstitutionalGuard maps this epistemic humility to eight virtues drawn from Philippians 4:8 and cross-validated across Hebrew, Buddhist, Confucian, and Islamic philosophical traditions — making the ethical core genuinely cross-cultural rather than culturally specific.</p>
+
+    <p>The Judas Agent operationalizes the most counterintuitive insight: the most useful agent in a consensus system is the one most likely to be wrong in an interesting way. Necessary dissonance is a feature, not a bug. Option C — challenging the reasoning path rather than the conclusion — is the architectural expression of intellectual humility at the system level.</p>
+
+    <p>Three independent AI systems (Claude, Grok, Gemini) reviewed this architecture and reached genuine consensus on all major decisions. That three-way alignment, documented in Section I of the Antifragile Ark v3, is itself a demonstration of the system's core principle working in practice.</p>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-motto">"Helping People Help People" · Philippians 4:8 · Micah 6:8 · Matthew 7:12</div>
+    <div class="footer-meta">Sean Patrick Goodwin · HyperDAG.org · AI Trinity Symphony · CONFIDENTIAL PROPRIETARY IP<br>
+    Multi-AI Synthesis: Claude (Anthropic) × Grok (xAI) × Gemini (Google DeepMind) · Project Symphony v4.0 Build-Ready &amp; Verified</div>
+  </footer>
+
+</div>
+</body>
+</html>
