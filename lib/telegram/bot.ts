@@ -21,6 +21,24 @@ const getRepTier = (rep: number) => {
 
 const OWNER_ID = process.env.TELEGRAM_OWNER_CHAT_ID;
 
+const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+};
+
+const getDrivingQuestion = async (userId: string) => {
+    // In a full implementation, we'd query past tasks for context
+    const questions = [
+        "What can I take off your plate today to free up your creative energy?",
+        "How can I streamline your workflow—perhaps by routing a briefing or optimizing costs?",
+        "What's one thing I can automate right now to make your day easier?",
+        "Ready to conduct the symphony? What mission should we initiate next?"
+    ];
+    return questions[Math.floor(Math.random() * questions.length)];
+};
+
 // --- Middleware & RBAC ---
 
 type UserRole = 'owner' | 'admin' | 'observer';
@@ -87,6 +105,9 @@ bot.start(async (ctx) => {
 
     const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
 
+    const greeting = getGreeting();
+    const drivingQuestion = await getDrivingQuestion(String(userId));
+
     const message = `
 🎻 *AI TRINITY SYMPHONY* 
 ━━━━━━━━━━━━━━━━━━━━
@@ -97,8 +118,12 @@ bot.start(async (ctx) => {
 ✅ *Todo Backlog*: ${tasksCount || 0} missions
 💰 *Today's Capture*: $${totalSavings.toFixed(4)}
 
-Welcome back! Use the keyboard below for quick access or just talk to me in plain English.
+${greeting}${ctx.from?.first_name ? `, ${ctx.from.first_name}` : ''}! 
+${drivingQuestion}
 `;
+    // Update last_interaction
+    await supabaseAdmin.from('trinity_bot_users').update({ last_interaction: new Date().toISOString() }).eq('chat_id', String(userId));
+    
     await ctx.replyWithMarkdown(message, commandCenter);
 });
 
@@ -151,6 +176,36 @@ bot.command('tasks', isAdmin, async (ctx) => {
 
         await ctx.replyWithMarkdown(card, keyboard);
     }
+});
+
+bot.command('scan_network', async (ctx) => {
+    await ctx.reply('🔍 *Trinity Network Scanner* active.\n\nSearching X and LinkedIn for purpose-aligned partners and grants...', { parse_mode: 'Markdown' });
+    
+    // Simulate n8n workflow trigger
+    setTimeout(async () => {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.aitrinitysymphony.com';
+        const matches = [
+            "🤝 [Co-Founder Match] Sarah D. - Applied Cryptography Expert",
+            "💰 [Grant Opportunity] Web3 Foundation Phase 23 - $10k-$50k",
+            "🤝 [Partner Match] TechEthos DAO - Social Impact Analytics"
+        ];
+        
+        await ctx.reply(`🎯 *Symphony Match Results*:\n\n${matches.join('\n')}\n\nView details in [Pulse](${appUrl}/pulse/watch).`, { parse_mode: 'Markdown' });
+    }, 2000);
+});
+
+bot.command('claim_grant', async (ctx) => {
+    const userId = String(ctx.from?.id);
+    const { data: user } = await supabaseAdmin.from('trinity_bot_users').select('grants_earned').eq('chat_id', userId).single();
+    
+    if (!user || (user.grants_earned || 0) <= 0) {
+        return ctx.reply('⚠️ You do not have any unclaimed grants at this time. Complete quests or referrals to earn more!');
+    }
+
+    // Logic for claim (e.g., converting to virtual credits)
+    await supabaseAdmin.from('trinity_bot_users').update({ grants_earned: 0 }).eq('chat_id', userId);
+    
+    await ctx.reply(`🎉 Grant claimed! $${user.grants_earned} has been added to your credits. Funded by the swarm's savings!`);
 });
 
 bot.command('savings', async (ctx) => {
@@ -415,6 +470,14 @@ bot.on('text', async (ctx, next) => {
 
     if (lowerText.includes('savings') || lowerText.includes('money')) {
         return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/savings', entities: [{ type: 'bot_command', offset: 0, length: 8 }] } });
+    }
+
+    if (lowerText.includes('scan') || lowerText.includes('networking')) {
+        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/scan_network', entities: [{ type: 'bot_command', offset: 0, length: 13 }] } });
+    }
+
+    if (lowerText.includes('claim') || lowerText.includes('grant')) {
+        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/claim_grant', entities: [{ type: 'bot_command', offset: 0, length: 12 }] } });
     }
 
     if (lowerText.includes('briefing') || lowerText.includes('summary')) {

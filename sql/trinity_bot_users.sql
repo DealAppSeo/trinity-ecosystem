@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS public.trinity_bot_users (
     username TEXT,
     role TEXT NOT NULL DEFAULT 'observer' CHECK (role IN ('owner', 'admin', 'observer')),
     preferences JSONB DEFAULT '{"priority": "balanced", "budget_limit": null}'::jsonb,
+    grants_earned NUMERIC DEFAULT 0,
+    last_interaction TIMESTAMPTZ DEFAULT now(),
     granted_by TEXT DEFAULT 'system',
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
