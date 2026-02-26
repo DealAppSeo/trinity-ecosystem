@@ -54,6 +54,21 @@ const isObserver = hasRole(['owner', 'admin', 'observer']);
 // --- Commands ---
 
 bot.start(async (ctx) => {
+    const startPayload = (ctx as any).startPayload; // Deep link param
+    const userId = ctx.from?.id;
+
+    if (startPayload && startPayload.startsWith('ref_')) {
+        const referrerId = startPayload.replace('ref_', '');
+        console.log(`[Referral] User ${userId} joined via referrer ${referrerId}`);
+        // Log referral for reward processing later
+        await supabaseAdmin.from('trinity_referrals').insert({
+            referrer_id: referrerId,
+            referee_id: String(userId),
+            status: 'pending',
+            created_at: new Date().toISOString()
+        });
+    }
+
     const { count: tasksCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'todo');
     const { count: pendingApprovals } = await supabaseAdmin.from('approval_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending');
 
@@ -359,9 +374,8 @@ bot.on('text', async (ctx, next) => {
     if (lowerText.startsWith('task') || lowerText.startsWith('mission') || lowerText.startsWith('can you')) {
         // Redirect to task creation logic
         const mission = text.replace(/^(task|mission|can you)\s*/i, '');
-        ctx.payload = mission;
         // @ts-ignore - Manually trigger the command handler for /task
-        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: `/task ${mission}`, entities: [{ type: 'bot_command', offset: 0, length: 5 }] } });
+        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: `/task ${mission}`, entities: [{ type: 'bot_command', offset: 0, length: 5 }] } } as any);
     }
 
     if (lowerText.includes('status') || lowerText.includes('how is the swarm')) {
@@ -499,7 +513,7 @@ export const handleUpdate = async (update: any) => {
         menuButton: {
             type: 'web_app',
             text: '💎 Pulse',
-            webApp: { url: `${appUrl}/pulse` }
+            web_app: { url: `${appUrl}/pulse` }
         }
     }).catch(() => { });
 
