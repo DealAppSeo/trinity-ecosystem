@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.trinity_bot_users (
     chat_id TEXT NOT NULL UNIQUE,
     username TEXT,
     role TEXT NOT NULL DEFAULT 'observer' CHECK (role IN ('owner', 'admin', 'observer')),
+    preferences JSONB DEFAULT '{"priority": "balanced", "budget_limit": null}'::jsonb,
     granted_by TEXT DEFAULT 'system',
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()

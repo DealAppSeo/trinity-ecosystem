@@ -51,6 +51,12 @@ const isOwner = hasRole(['owner']);
 const isAdmin = hasRole(['owner', 'admin']);
 const isObserver = hasRole(['owner', 'admin', 'observer']);
 
+// --- Keyboard Config ---
+const commandCenter = Markup.keyboard([
+    ['📊 Status', '📈 Briefing'],
+    ['➕ New Mission', '💎 Pulse']
+]).resize();
+
 // --- Commands ---
 
 bot.start(async (ctx) => {
@@ -91,9 +97,16 @@ bot.start(async (ctx) => {
 ✅ *Todo Backlog*: ${tasksCount || 0} missions
 💰 *Today's Capture*: $${totalSavings.toFixed(4)}
 
-Use /tasks to review the queue or /briefing for an executive summary.
+Welcome back! Use the keyboard below for quick access or just talk to me in plain English.
 `;
-    await ctx.replyWithMarkdown(message);
+    await ctx.replyWithMarkdown(message, commandCenter);
+});
+
+bot.command('commands', async (ctx) => {
+    await ctx.reply('🕹️ *Trinity Command Center* active.', {
+        parse_mode: 'Markdown',
+        ...commandCenter
+    });
 });
 
 bot.command('tasks', isAdmin, async (ctx) => {
@@ -371,6 +384,24 @@ bot.on('text', async (ctx, next) => {
     const lowerText = text.toLowerCase();
 
     // Quick heuristic routing (Personal Assistant Mode)
+    if (lowerText === '📊 status') {
+        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/start', entities: [{ type: 'bot_command', offset: 0, length: 6 }] } });
+    }
+    if (lowerText === '📈 briefing') {
+        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/briefing', entities: [{ type: 'bot_command', offset: 0, length: 9 }] } });
+    }
+    if (lowerText === '➕ new mission') {
+        return ctx.reply('🚀 Ready for a new mission. Type: `/task [description]`', { parse_mode: 'Markdown' });
+    }
+    if (lowerText === '💎 pulse') {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.aitrinitysymphony.com';
+        return ctx.reply('💎 Opening Pulse Dashboard...', {
+            reply_markup: {
+                inline_keyboard: [[{ text: 'Launch Pulse', web_app: { url: `${appUrl}/pulse` } }]]
+            }
+        });
+    }
+
     if (lowerText.startsWith('task') || lowerText.startsWith('mission') || lowerText.startsWith('can you')) {
         // Redirect to task creation logic
         const mission = text.replace(/^(task|mission|can you)\s*/i, '');

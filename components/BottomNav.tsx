@@ -20,6 +20,7 @@ export function BottomNav() {
         { path: '/pulse/tasks', icon: Grid, label: 'Tasks', color: 'text-violet-400', glow: 'bg-violet-400/20' },
         { path: '/pulse/directives', icon: Lightbulb, label: 'Directives', color: 'text-amber-400', glow: 'bg-amber-400/20' },
         { path: '/pulse/agents', icon: Users, label: 'Swarm', color: 'text-blue-400', glow: 'bg-blue-400/20' },
+        { path: '/pulse/settings', icon: LayoutGrid, label: 'Settings', color: 'text-zinc-400', glow: 'bg-zinc-400/20' },
     ];
 
     return (
