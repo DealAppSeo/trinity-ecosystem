@@ -20,14 +20,14 @@ export default function middleware(request: NextRequest) {
     // --- 1. SUBDOMAIN ROUTING (From Legacy Proxy) ---
     if (hostname.startsWith('controller.')) {
         if (pathname === '/') {
-            return NextResponse.rewrite(new URL('/pulse/conductor', request.url));
+            return NextResponse.rewrite(new URL('/pulse/watch', request.url));
         }
     }
 
     // --- 1.5 REDUNDANT ROUTE CONSOLIDATION ---
-    const redundantPulseRoutes = ['/pulse/dashboard', '/pulse/agents', '/pulse/watch', '/pulse/sandbox'];
+    const redundantPulseRoutes = ['/pulse/dashboard', '/pulse/agents', '/pulse/sandbox'];
     if (redundantPulseRoutes.includes(pathname)) {
-        return NextResponse.redirect(new URL('/pulse/conductor', request.url));
+        return NextResponse.redirect(new URL('/pulse/watch', request.url));
     }
 
     // 2. AUTHENTICATION & PROTECTION (From Legacy Middleware) ---

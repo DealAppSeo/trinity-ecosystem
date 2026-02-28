@@ -44,7 +44,7 @@ export default async function LandingPage() {
               <Network className="w-5 h-5" /> Join the GitHub
             </Button>
           </Link>
-          <Link href="/pulse/conductor" className="w-full">
+          <Link href="/pulse/watch" className="w-full">
             <Button variant="secondary" className="w-full text-lg py-7 border-white/10 hover:bg-white/5 flex items-center justify-center gap-2">
               <ChevronRight className="w-5 h-5" /> Launch Controller
             </Button>

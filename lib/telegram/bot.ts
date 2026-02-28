@@ -39,99 +39,92 @@ const getDrivingQuestion = async (userId: string) => {
     return questions[Math.floor(Math.random() * questions.length)];
 };
 
-// --- Handlers ---
-
-const handleStart = async (ctx: Context) => {
-    const startPayload = (ctx as any).startPayload || (ctx.message as any)?.text?.split(' ')[1];
-    const userId = ctx.from?.id;
-
-    if (startPayload && startPayload.startsWith('ref_')) {
-        const referrerId = startPayload.replace('ref_', '');
-        console.log(`[Referral] User ${userId} joined via referrer ${referrerId}`);
-        await supabaseAdmin.from('trinity_referrals').insert({
-            referrer_id: referrerId,
-            referee_id: String(userId),
-            status: 'pending',
-            created_at: new Date().toISOString()
-        });
+/**
+ * Proactively alert the owner about high-confidence swarm findings.
+ * Used by the [SYSTEM] Pattern & Anomaly Detection mission.
+ */
+export const sendIntelligenceAlert = async (alert: {
+    title: string;
+    description: string;
+    confidence: number;
+    algorithms: string[];
+    opportunity?: string;
+}) => {
+    if (!OWNER_ID) {
+        console.warn('[Alert] No OWNER_ID configured. Alert suppressed.');
+        return;
     }
 
-    const { count: tasksCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'todo');
-    const { count: pendingApprovals } = await supabaseAdmin.from('approval_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-
-    const today = new Date().toISOString().split('T')[0];
-    const { data: savingsData } = await supabaseAdmin.from('trinity_cost_logs').select('savings_attribution').gte('created_at', today);
-    const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
-
-    const greeting = getGreeting();
-    const drivingQuestion = await getDrivingQuestion(String(userId));
-
+    const uLabel = alert.confidence > 0.9 ? '💎 HIGH FIDELITY' : '📡 SWARM SIGNAL';
     const message = `
-🎻 *AI TRINITY SYMPHONY* 
+${uLabel}: *${alert.title}*
 ━━━━━━━━━━━━━━━━━━━━
-🌐 *Environment*: Production (Cloud)
-🚀 *System Status*: Online & Synchronized
-🤖 *Swarm Health*: 12 Active Agents
-⏳ *Pending Tasks*: ${pendingApprovals || 0} approvals out
-✅ *Todo Backlog*: ${tasksCount || 0} missions
-💰 *Today's Capture*: $${totalSavings.toFixed(4)}
+📝 ${alert.description}
 
-${greeting}${ctx.from?.first_name ? `, ${ctx.from.first_name}` : ''}! 
-${drivingQuestion}
+🎯 *Confidence*: ${(alert.confidence * 100).toFixed(1)}%
+🧠 *Hybrid Stack*: ${alert.algorithms.join(', ')}
+${alert.opportunity ? `\n💰 *Opportunity*: ${alert.opportunity}` : ''}
+
+_Alert triggered by [SYSTEM] Anomaly Detection_
 `;
-    await supabaseAdmin.from('trinity_bot_users').update({ last_interaction: new Date().toISOString() }).eq('chat_id', String(userId));
-    return ctx.replyWithMarkdown(message, commandCenter);
-};
 
-const handleSavings = async (ctx: Context) => {
-    const today = new Date().toISOString().split('T')[0];
-    const { data: savingsData } = await supabaseAdmin.from('trinity_cost_logs').select('savings_attribution, model_used').gte('created_at', today);
-    const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
-    const routes = (savingsData || []).reduce((acc: any, row) => {
-        acc[row.model_used] = (acc[row.model_used] || 0) + row.savings_attribution;
-        return acc;
-    }, {});
-    const topRoutes = Object.entries(routes).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3);
-
-    const message = `
-💎 *Cost Savings Report*
-━━━━━━━━━━━━━━━━━━━━
-📅 *Today's Alpha*: $${totalSavings.toFixed(4)}
-📉 *Avg Baseline*: $6.72 / 1M tokens
-📈 *Est. Monthly Yield*: $${(totalSavings * 30).toFixed(2)}
-
-🚀 *Top Performing Routes*:
-${topRoutes.map(([model, savings]: any) => `• *${model}*: $${savings.toFixed(4)}`).join('\n')}
-
-_Trinity is currently operating at ~92% cost efficiency via multi-provider arbitrage._
-`;
-    return ctx.replyWithMarkdown(message, commandCenter);
-};
-
-const handleBriefing = async (ctx: Context) => {
     try {
+        await bot.telegram.sendMessage(OWNER_ID, message, { parse_mode: 'Markdown' });
+        console.log(`[Alert] Intelligence alert sent to ${OWNER_ID}`);
+    } catch (err) {
+        console.error('[Alert] Failed to send alert:', err);
+    }
+};
+
+// --- Handlers ---
+
+const handleHealth = async (ctx: Context) => {
+    try {
+        const userId = ctx.from?.id;
         const today = new Date().toISOString().split('T')[0];
-        const { count: completedCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'verified').gte('created_at', today);
-        const { count: activeCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).in('status', ['doing', 'in_progress', 'running']);
+
+        // 1. Fetch Stats
+        const { count: tasksCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'todo');
+        const { count: pendingApprovals } = await supabaseAdmin.from('approval_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+        const { count: completedToday } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'verified').gte('created_at', today);
+
+        // 2. Fetch Savings
         const { data: savingsData } = await supabaseAdmin.from('trinity_cost_logs').select('savings_attribution').gte('created_at', today);
         const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
 
+        // 3. Fetch Active Operations (Visibility requirement)
+        const { data: activeOps } = await supabaseAdmin
+            .from('trinity_tasks')
+            .select('agent_id, task_type, metadata')
+            .in('status', ['doing', 'in_progress', 'running'])
+            .limit(5);
+
+        const greeting = getGreeting();
+        const drivingQuestion = await getDrivingQuestion(String(userId));
+
+        const activeOpsList = activeOps && activeOps.length > 0
+            ? activeOps.map(op => `• *${op.agent_id}*: Processing ${op.task_type}`).join('\n')
+            : '• All agents on standby.';
+
         const message = `
-📊 *EXECUTIVE BRIEFING: ${today}* 
+🎻 *SYMPHONY HEALTH*
 ━━━━━━━━━━━━━━━━━━━━
-🚀 *Swarm Velocity*: ${completedCount || 0} tasks completed today.
-⚡ *Active Cycles*: ${activeCount || 0} agents currently processing.
-💰 *Alpha Capture*: $${totalSavings.toFixed(4)} saved via arbitrage.
-🛡️ *Integrity*: 99.8% 
+📊 *Today's Alpha*: $${totalSavings.toFixed(4)}
+⚡ *Swarm Velocity*: ${completedToday || 0} tasks verified
+⏳ *Action Required*: ${pendingApprovals || 0} approvals
+✅ *Todo Backlog*: ${tasksCount || 0} missions
 
-*Strategic Outlook*:
-The swarm is operating at peak efficiency. Optimization of high-tier routing is recommended for the next 4 hours.
+🚀 *Active Operations*:
+${activeOpsList}
 
-_Built for Sovereignty and Truth._
+${greeting}${ctx.from?.first_name ? `, ${ctx.from.first_name}` : ''}!
+${drivingQuestion}
 `;
+        await supabaseAdmin.from('trinity_bot_users').update({ last_interaction: new Date().toISOString() }).eq('chat_id', String(userId));
         return ctx.replyWithMarkdown(message, commandCenter);
     } catch (err: any) {
-        return ctx.reply(`❌ Briefing failed: ${err.message}`);
+        console.error('[Health] Failed:', err);
+        return ctx.reply(`❌ System Health check failed: ${err.message}`);
     }
 };
 
@@ -167,17 +160,19 @@ const isObserver = hasRole(['owner', 'admin', 'observer']);
 
 // --- Keyboard Config ---
 const commandCenter = Markup.keyboard([
-    ['📊 Status', '📈 Briefing'],
-    ['➕ New Mission', '💎 Pulse']
+    ['📊 Health', '➕ Mission'],
+    ['💎 Pulse']
 ]).resize();
 
 // --- Commands ---
 
 // --- Commands ---
-bot.start(handleStart);
+bot.start(handleHealth);
+bot.command('health', handleHealth);
+bot.command('status', handleHealth);
+bot.command('briefing', handleHealth);
+bot.command('savings', handleHealth);
 bot.command('commands', async (ctx) => ctx.reply('🕹️ *Trinity Command Center* active.', { parse_mode: 'Markdown', ...commandCenter }));
-bot.command('savings', handleSavings);
-bot.command('briefing', handleBriefing);
 
 bot.command('tasks', isAdmin, async (ctx) => {
     const { data: pending, error } = await supabaseAdmin
@@ -253,39 +248,7 @@ bot.command('claim_grant', async (ctx) => {
     await ctx.reply(`🎉 Grant claimed! $${user.grants_earned} has been added to your credits. Funded by the swarm's savings!`);
 });
 
-bot.command('savings', async (ctx) => {
-    const today = new Date().toISOString().split('T')[0];
-    const { data: savingsData } = await supabaseAdmin
-        .from('trinity_cost_logs')
-        .select('savings_attribution, model_used')
-        .gte('created_at', today);
-
-    const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
-
-    // Find top routes (mock logic for now since we don't have a complex routing table yet)
-    const routes = (savingsData || []).reduce((acc: any, row) => {
-        acc[row.model_used] = (acc[row.model_used] || 0) + row.savings_attribution;
-        return acc;
-    }, {});
-
-    const topRoutes = Object.entries(routes)
-        .sort((a: any, b: any) => b[1] - a[1])
-        .slice(0, 3);
-
-    const message = `
-💎 *Cost Savings Report*
-━━━━━━━━━━━━━━━━━━━━
-📅 *Today's Alpha*: $${totalSavings.toFixed(4)}
-📉 *Avg Baseline*: $6.72 / 1M tokens
-📈 *Est. Monthly Yield*: $${(totalSavings * 30).toFixed(2)}
-
-🚀 *Top Performing Routes*:
-${topRoutes.map(([model, savings]: any) => `• *${model}*: $${savings.toFixed(4)}`).join('\n')}
-
-_Trinity is currently operating at ~92% cost efficiency via multi-provider arbitrage._
-`;
-    await ctx.replyWithMarkdown(message);
-});
+// Deprecated: Consolidated into handleHealth
 
 bot.command('agent', async (ctx) => {
     const agentName = ctx.payload;
@@ -441,39 +404,8 @@ bot.command('join', async (ctx) => {
 
 // --- Assistant Evolution: Executive Briefing ---
 
-bot.command('briefing', isAdmin, async (ctx) => {
-    try {
-        const today = new Date().toISOString().split('T')[0];
-
-        // 1. Task Throughput
-        const { count: completedCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'verified').gte('created_at', today);
-        const { count: activeCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).in('status', ['doing', 'in_progress', 'running']);
-
-        // 2. Financials
-        const { data: savingsData } = await supabaseAdmin.from('trinity_cost_logs').select('savings_attribution').gte('created_at', today);
-        const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
-
-        // 3. System Integrity (Mock for now, would check 'judas_detections')
-        const systemIntegrity = '99.8%';
-
-        const message = `
-📊 *EXECUTIVE BRIEFING: ${today}* 
-━━━━━━━━━━━━━━━━━━━━
-🚀 *Swarm Velocity*: ${completedCount || 0} tasks completed today.
-⚡ *Active Cycles*: ${activeCount || 0} agents currently processing.
-💰 *Alpha Capture*: $${totalSavings.toFixed(4)} saved via arbitrage.
-🛡️ *Integrity*: ${systemIntegrity} 
-
-*Strategic Outlook*:
-The swarm is operating at peak efficiency. Optimization of high-tier routing is recommended for the next 4 hours.
-
-_Built for Sovereignty and Truth._
-`;
-        await ctx.replyWithMarkdown(message);
-    } catch (err: any) {
-        ctx.reply(`❌ Briefing generation failed: ${err.message}`);
-    }
-});
+// --- Assistant Evolution: Executive Briefing ---
+// Deprecated: Consolidated into handleHealth
 
 // --- Assistant Evolution: NL Intent Routing ---
 
@@ -484,12 +416,11 @@ bot.on('text', async (ctx, next) => {
     const lowerText = text.toLowerCase();
     
     // Exact Keyboard Matches
-    if (lowerText.includes('📊 status')) return handleStart(ctx);
-    if (lowerText.includes('📈 briefing')) return handleBriefing(ctx);
-    if (lowerText.includes('➕ new mission')) return ctx.reply('🚀 Ready for a new mission. Type: `Task: [description]`', commandCenter);
+    if (lowerText.includes('📊 health')) return handleHealth(ctx);
+    if (lowerText.includes('➕ mission')) return ctx.reply('🚀 Ready for a new mission. Type: `Task: [description]`', commandCenter);
     if (lowerText.includes('💎 pulse')) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.aitrinitysymphony.com';
-        return ctx.reply('💎 Opening Pulse Dashboard...', Markup.inlineKeyboard([[Markup.button.webApp('Launch Pulse', `${appUrl}/pulse`)]]));
+        return ctx.reply('💎 Opening Pulse Dashboard...', Markup.inlineKeyboard([[Markup.button.webApp('Launch Pulse', `${appUrl}/pulse/watch`)]]));
     }
 
     // Intent Keywords
@@ -501,14 +432,11 @@ bot.on('text', async (ctx, next) => {
         return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: `/task ${mission}` } });
     }
 
-    if (lowerText.includes('status') || lowerText.includes('how is the swarm') || lowerText.includes('system status')) {
-        return handleStart(ctx);
+    if (lowerText.includes('status') || lowerText.includes('health') || lowerText.includes('doing') || lowerText.includes('how are we')) {
+        return handleHealth(ctx);
     }
-    if (lowerText.includes('savings') || lowerText.includes('money')) {
-        return handleSavings(ctx);
-    }
-    if (lowerText.includes('briefing') || lowerText.includes('summary')) {
-        return handleBriefing(ctx);
+    if (lowerText.includes('savings') || lowerText.includes('money') || lowerText.includes('briefing')) {
+        return handleHealth(ctx);
     }
 
     // Default: Chat feedback with keyboard

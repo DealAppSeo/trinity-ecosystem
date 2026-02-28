@@ -11,11 +11,13 @@ export default function PulseLayout({ children }: { children: React.ReactNode })
     const [showOnboarding, setShowOnboarding] = useState(false);
 
     useEffect(() => {
-        // 1. Check for first-run onboarding
+        // 1. Check for first-run onboarding (Disabled for Minimalist HUD)
+        /*
         const hasPriority = localStorage.getItem('trinity_priority');
         if (!hasPriority) {
             setShowOnboarding(true);
         }
+        */
 
         // 2. Telegram Theme Sync
         if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
