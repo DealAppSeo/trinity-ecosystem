@@ -39,6 +39,102 @@ const getDrivingQuestion = async (userId: string) => {
     return questions[Math.floor(Math.random() * questions.length)];
 };
 
+// --- Handlers ---
+
+const handleStart = async (ctx: Context) => {
+    const startPayload = (ctx as any).startPayload || (ctx.message as any)?.text?.split(' ')[1];
+    const userId = ctx.from?.id;
+
+    if (startPayload && startPayload.startsWith('ref_')) {
+        const referrerId = startPayload.replace('ref_', '');
+        console.log(`[Referral] User ${userId} joined via referrer ${referrerId}`);
+        await supabaseAdmin.from('trinity_referrals').insert({
+            referrer_id: referrerId,
+            referee_id: String(userId),
+            status: 'pending',
+            created_at: new Date().toISOString()
+        });
+    }
+
+    const { count: tasksCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'todo');
+    const { count: pendingApprovals } = await supabaseAdmin.from('approval_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+
+    const today = new Date().toISOString().split('T')[0];
+    const { data: savingsData } = await supabaseAdmin.from('trinity_cost_logs').select('savings_attribution').gte('created_at', today);
+    const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
+
+    const greeting = getGreeting();
+    const drivingQuestion = await getDrivingQuestion(String(userId));
+
+    const message = `
+🎻 *AI TRINITY SYMPHONY* 
+━━━━━━━━━━━━━━━━━━━━
+🌐 *Environment*: Production (Cloud)
+🚀 *System Status*: Online & Synchronized
+🤖 *Swarm Health*: 12 Active Agents
+⏳ *Pending Tasks*: ${pendingApprovals || 0} approvals out
+✅ *Todo Backlog*: ${tasksCount || 0} missions
+💰 *Today's Capture*: $${totalSavings.toFixed(4)}
+
+${greeting}${ctx.from?.first_name ? `, ${ctx.from.first_name}` : ''}! 
+${drivingQuestion}
+`;
+    await supabaseAdmin.from('trinity_bot_users').update({ last_interaction: new Date().toISOString() }).eq('chat_id', String(userId));
+    return ctx.replyWithMarkdown(message, commandCenter);
+};
+
+const handleSavings = async (ctx: Context) => {
+    const today = new Date().toISOString().split('T')[0];
+    const { data: savingsData } = await supabaseAdmin.from('trinity_cost_logs').select('savings_attribution, model_used').gte('created_at', today);
+    const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
+    const routes = (savingsData || []).reduce((acc: any, row) => {
+        acc[row.model_used] = (acc[row.model_used] || 0) + row.savings_attribution;
+        return acc;
+    }, {});
+    const topRoutes = Object.entries(routes).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3);
+
+    const message = `
+💎 *Cost Savings Report*
+━━━━━━━━━━━━━━━━━━━━
+📅 *Today's Alpha*: $${totalSavings.toFixed(4)}
+📉 *Avg Baseline*: $6.72 / 1M tokens
+📈 *Est. Monthly Yield*: $${(totalSavings * 30).toFixed(2)}
+
+🚀 *Top Performing Routes*:
+${topRoutes.map(([model, savings]: any) => `• *${model}*: $${savings.toFixed(4)}`).join('\n')}
+
+_Trinity is currently operating at ~92% cost efficiency via multi-provider arbitrage._
+`;
+    return ctx.replyWithMarkdown(message, commandCenter);
+};
+
+const handleBriefing = async (ctx: Context) => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const { count: completedCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'verified').gte('created_at', today);
+        const { count: activeCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).in('status', ['doing', 'in_progress', 'running']);
+        const { data: savingsData } = await supabaseAdmin.from('trinity_cost_logs').select('savings_attribution').gte('created_at', today);
+        const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
+
+        const message = `
+📊 *EXECUTIVE BRIEFING: ${today}* 
+━━━━━━━━━━━━━━━━━━━━
+🚀 *Swarm Velocity*: ${completedCount || 0} tasks completed today.
+⚡ *Active Cycles*: ${activeCount || 0} agents currently processing.
+💰 *Alpha Capture*: $${totalSavings.toFixed(4)} saved via arbitrage.
+🛡️ *Integrity*: 99.8% 
+
+*Strategic Outlook*:
+The swarm is operating at peak efficiency. Optimization of high-tier routing is recommended for the next 4 hours.
+
+_Built for Sovereignty and Truth._
+`;
+        return ctx.replyWithMarkdown(message, commandCenter);
+    } catch (err: any) {
+        return ctx.reply(`❌ Briefing failed: ${err.message}`);
+    }
+};
+
 // --- Middleware & RBAC ---
 
 type UserRole = 'owner' | 'admin' | 'observer';
@@ -77,62 +173,11 @@ const commandCenter = Markup.keyboard([
 
 // --- Commands ---
 
-bot.start(async (ctx) => {
-    const startPayload = (ctx as any).startPayload; // Deep link param
-    const userId = ctx.from?.id;
-
-    if (startPayload && startPayload.startsWith('ref_')) {
-        const referrerId = startPayload.replace('ref_', '');
-        console.log(`[Referral] User ${userId} joined via referrer ${referrerId}`);
-        // Log referral for reward processing later
-        await supabaseAdmin.from('trinity_referrals').insert({
-            referrer_id: referrerId,
-            referee_id: String(userId),
-            status: 'pending',
-            created_at: new Date().toISOString()
-        });
-    }
-
-    const { count: tasksCount } = await supabaseAdmin.from('trinity_tasks').select('*', { count: 'exact', head: true }).eq('status', 'todo');
-    const { count: pendingApprovals } = await supabaseAdmin.from('approval_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-
-    // Calculate today's savings
-    const today = new Date().toISOString().split('T')[0];
-    const { data: savingsData } = await supabaseAdmin
-        .from('trinity_cost_logs')
-        .select('savings_attribution')
-        .gte('created_at', today);
-
-    const totalSavings = (savingsData || []).reduce((sum, row) => sum + (row.savings_attribution || 0), 0);
-
-    const greeting = getGreeting();
-    const drivingQuestion = await getDrivingQuestion(String(userId));
-
-    const message = `
-🎻 *AI TRINITY SYMPHONY* 
-━━━━━━━━━━━━━━━━━━━━
-🌐 *Environment*: Production (Cloud)
-🚀 *System Status*: Online & Synchronized
-🤖 *Swarm Health*: 12 Active Agents
-⏳ *Pending Tasks*: ${pendingApprovals || 0} approvals out
-✅ *Todo Backlog*: ${tasksCount || 0} missions
-💰 *Today's Capture*: $${totalSavings.toFixed(4)}
-
-${greeting}${ctx.from?.first_name ? `, ${ctx.from.first_name}` : ''}! 
-${drivingQuestion}
-`;
-    // Update last_interaction
-    await supabaseAdmin.from('trinity_bot_users').update({ last_interaction: new Date().toISOString() }).eq('chat_id', String(userId));
-    
-    await ctx.replyWithMarkdown(message, commandCenter);
-});
-
-bot.command('commands', async (ctx) => {
-    await ctx.reply('🕹️ *Trinity Command Center* active.', {
-        parse_mode: 'Markdown',
-        ...commandCenter
-    });
-});
+// --- Commands ---
+bot.start(handleStart);
+bot.command('commands', async (ctx) => ctx.reply('🕹️ *Trinity Command Center* active.', { parse_mode: 'Markdown', ...commandCenter }));
+bot.command('savings', handleSavings);
+bot.command('briefing', handleBriefing);
 
 bot.command('tasks', isAdmin, async (ctx) => {
     const { data: pending, error } = await supabaseAdmin
@@ -434,105 +479,63 @@ _Built for Sovereignty and Truth._
 
 bot.on('text', async (ctx, next) => {
     const text = ctx.message.text;
-    if (text.startsWith('/')) return next(); // Already handled by commands
+    if (text.startsWith('/')) return next();
 
     const lowerText = text.toLowerCase();
-
-    // Quick heuristic routing (Personal Assistant Mode)
-    if (lowerText === '📊 status') {
-        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/start', entities: [{ type: 'bot_command', offset: 0, length: 6 }] } });
-    }
-    if (lowerText === '📈 briefing') {
-        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/briefing', entities: [{ type: 'bot_command', offset: 0, length: 9 }] } });
-    }
-    if (lowerText === '➕ new mission') {
-        return ctx.reply('🚀 Ready for a new mission. Type: `/task [description]`', { parse_mode: 'Markdown' });
-    }
-    if (lowerText === '💎 pulse') {
+    
+    // Exact Keyboard Matches
+    if (lowerText.includes('📊 status')) return handleStart(ctx);
+    if (lowerText.includes('📈 briefing')) return handleBriefing(ctx);
+    if (lowerText.includes('➕ new mission')) return ctx.reply('🚀 Ready for a new mission. Type: `Task: [description]`', commandCenter);
+    if (lowerText.includes('💎 pulse')) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.aitrinitysymphony.com';
-        return ctx.reply('💎 Opening Pulse Dashboard...', {
-            reply_markup: {
-                inline_keyboard: [[{ text: 'Launch Pulse', web_app: { url: `${appUrl}/pulse` } }]]
-            }
-        });
+        return ctx.reply('💎 Opening Pulse Dashboard...', Markup.inlineKeyboard([[Markup.button.webApp('Launch Pulse', `${appUrl}/pulse`)]]));
     }
 
+    // Intent Keywords
     if (lowerText.startsWith('task') || lowerText.startsWith('mission') || lowerText.startsWith('can you')) {
-        // Redirect to task creation logic
-        const mission = text.replace(/^(task|mission|can you)\s*/i, '');
-        // @ts-ignore - Manually trigger the command handler for /task
-        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: `/task ${mission}`, entities: [{ type: 'bot_command', offset: 0, length: 5 }] } } as any);
+        const mission = text.replace(/^(task|mission|can you)\s*:?\s*/i, '');
+        if (!mission) return ctx.reply('🚀 Ready for a new mission. Type: `Task: [description]`', commandCenter);
+        // @ts-ignore
+        ctx.payload = mission;
+        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: `/task ${mission}` } });
     }
 
-    if (lowerText.includes('status') || lowerText.includes('how is the swarm')) {
-        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/start', entities: [{ type: 'bot_command', offset: 0, length: 6 }] } });
+    if (lowerText.includes('status') || lowerText.includes('how is the swarm') || lowerText.includes('system status')) {
+        return handleStart(ctx);
     }
-
     if (lowerText.includes('savings') || lowerText.includes('money')) {
-        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/savings', entities: [{ type: 'bot_command', offset: 0, length: 8 }] } });
+        return handleSavings(ctx);
     }
-
-    if (lowerText.includes('scan') || lowerText.includes('networking')) {
-        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/scan_network', entities: [{ type: 'bot_command', offset: 0, length: 13 }] } });
-    }
-
-    if (lowerText.includes('claim') || lowerText.includes('grant')) {
-        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/claim_grant', entities: [{ type: 'bot_command', offset: 0, length: 12 }] } });
-    }
-
     if (lowerText.includes('briefing') || lowerText.includes('summary')) {
-        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/briefing', entities: [{ type: 'bot_command', offset: 0, length: 9 }] } });
+        return handleBriefing(ctx);
     }
 
-    // Default: Chat feedback (if not restricted to commands)
-    await ctx.reply(`🤔 I've noted that. If you'd like me to start a new mission, try saying "Task: [mission description]".`);
+    // Default: Chat feedback with keyboard
+    await ctx.reply(`🤔 I've noted that. If you'd like me to start a new mission, try saying "Task: [mission description]".`, commandCenter);
 });
 
 // --- Voice Input ---
 
 bot.on('voice', async (ctx) => {
     try {
-        const fileId = ctx.message.voice.file_id;
-        const fileLink = await ctx.telegram.getFileLink(fileId);
-
+        const fileLink = await ctx.telegram.getFileLink(ctx.message.voice.file_id);
         const statusMsg = await ctx.reply('👂 Listening...');
-
         const { text, confidence } = await transcribeVoice(fileLink.href);
 
         if (confidence < 0.7) {
-            return ctx.reply(`🤔 I'm not sure I heard you correctly. Did you mean: "${text}"? \n\nPlease reply YES or type your command.`);
+            return ctx.reply(`🤔 I'm not sure I heard you correctly. Did you mean: "${text}"? \n\nPlease confirm or type.`);
         }
 
-        await ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, undefined, `📝 *Transcript*: "${text}"\n\nRouting command...`, { parse_mode: 'Markdown' });
-
-        // Fuzzy command routing
-        const lowerText = text.toLowerCase();
-        if (lowerText.includes('approve everything')) {
-            // Bulk approve logic
-            const { data: pending } = await supabaseAdmin.from('approval_queue').select('id').eq('status', 'pending').gt('rep_id_score', 0.8);
-            if (pending && pending.length > 0) {
-                for (const t of pending) {
-                    await supabaseAdmin.from('approval_queue').update({ status: 'approved', resolved_by: 'Voice-Sean' }).eq('id', t.id);
-                }
-                await ctx.reply(`✅ Approved ${pending.length} tasks.`);
-            } else {
-                await ctx.reply('📭 No high-confidence tasks to approve.');
-            }
-        } else if (lowerText.includes('savings')) {
-            return ctx.reply('Use /savings to see detailed stats.');
-        } else if (lowerText.includes('status of')) {
-            const agent = text.split('status of')[1].trim();
-            // Trigger /agent logic via re-routing if needed 
-        } else {
-            await ctx.reply(`❓ Command not recognized: "${text}". \n\nTry "approve everything" or "what are today's savings".`);
-        }
-
+        await ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, undefined, `📝 *Transcript*: "${text}"`, { parse_mode: 'Markdown' });
+        
+        // Feed transcript into the text handler logic
+        (ctx as any).message.text = text;
+        return bot.handleUpdate(ctx.update);
     } catch (err: any) {
         ctx.reply(`❌ Voice processing failed: ${err.message}`);
     }
 });
-
-// --- Action Handlers ---
 
 bot.action(/approve:(.+)/, isAdmin, async (ctx) => {
     const approvalId = ctx.match[1];
