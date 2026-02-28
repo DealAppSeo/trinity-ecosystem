@@ -1073,39 +1073,39 @@
             <div class="field-row">
               <div class="field">
                 <label>Name</label>
-                <input type="text" placeholder="Your name" required>
+                <input type="text" id="dev-name" placeholder="Your name" required>
               </div>
               <div class="field">
                 <label>Email</label>
-                <input type="email" placeholder="dev@project.com" required>
+                <input type="email" id="dev-email" placeholder="dev@project.com" required>
               </div>
             </div>
             <div class="field">
               <label>GitHub Username</label>
               <div class="prefixed">
                 <span class="pfx pfx-dev">@</span>
-                <input type="text" placeholder="yourusername">
+                <input type="text" id="dev-github" placeholder="yourusername">
               </div>
             </div>
             <div class="field">
               <label>What are you building?</label>
-              <input type="text" placeholder="RAG pipeline, agent workflow, compliance tool, LLM app...">
+              <input type="text" id="dev-building" placeholder="RAG pipeline, agent workflow, compliance tool, LLM app...">
             </div>
             <div class="field">
               <label>Biggest pain right now (check all that apply)</label>
               <div class="checks">
-                <label class="check"><input type="checkbox"><span>Hallucinations with no detection mechanism</span></label>
-                <label class="check"><input type="checkbox"><span>Building confidence scoring / verification from scratch</span></label>
-                <label class="check"><input type="checkbox"><span>No audit trail on LLM outputs</span></label>
-                <label class="check"><input type="checkbox"><span>Cost of quality models at production scale</span></label>
-                <label class="check"><input type="checkbox"><span>Human-in-the-loop escalation logic</span></label>
-                <label class="check"><input type="checkbox"><span>Agent identity and inter-agent trust</span></label>
-                <label class="check"><input type="checkbox"><span>Context / memory across sessions</span></label>
+                <label class="check"><input type="checkbox" class="dev-pain" value="Hallucinations with no detection mechanism"><span>Hallucinations with no detection mechanism</span></label>
+                <label class="check"><input type="checkbox" class="dev-pain" value="Building confidence scoring / verification from scratch"><span>Building confidence scoring / verification from scratch</span></label>
+                <label class="check"><input type="checkbox" class="dev-pain" value="No audit trail on LLM outputs"><span>No audit trail on LLM outputs</span></label>
+                <label class="check"><input type="checkbox" class="dev-pain" value="Cost of quality models at production scale"><span>Cost of quality models at production scale</span></label>
+                <label class="check"><input type="checkbox" class="dev-pain" value="Human-in-the-loop escalation logic"><span>Human-in-the-loop escalation logic</span></label>
+                <label class="check"><input type="checkbox" class="dev-pain" value="Agent identity and inter-agent trust"><span>Agent identity and inter-agent trust</span></label>
+                <label class="check"><input type="checkbox" class="dev-pain" value="Context / memory across sessions"><span>Context / memory across sessions</span></label>
               </div>
             </div>
             <div class="field">
               <label>Anything else?</label>
-              <textarea rows="2" placeholder="Stack, use case, specific constraints..."></textarea>
+              <textarea rows="2" id="dev-notes" placeholder="Stack, use case, specific constraints..."></textarea>
             </div>
             <button type="submit" class="submit sub-dev">Request Developer Access →</button>
           </form>
@@ -1131,39 +1131,39 @@
             <div class="field-row">
               <div class="field">
                 <label>Name</label>
-                <input type="text" placeholder="Your name" required>
+                <input type="text" id="biz-name" placeholder="Your name" required>
               </div>
               <div class="field">
                 <label>Email</label>
-                <input type="email" placeholder="you@yourorg.com" required>
+                <input type="email" id="biz-email" placeholder="you@yourorg.com" required>
               </div>
             </div>
             <div class="field">
               <label>LinkedIn Profile</label>
               <div class="prefixed">
                 <span class="pfx pfx-biz" style="font-size:0.65rem;font-weight:700">in/</span>
-                <input type="text" placeholder="yourhandle">
+                <input type="text" id="biz-linkedin" placeholder="yourhandle">
               </div>
             </div>
             <div class="field">
               <label>Organization or Project</label>
-              <input type="text" placeholder="Nonprofit, startup, ministry, solo project...">
+              <input type="text" id="biz-org" placeholder="Nonprofit, startup, ministry, solo project...">
             </div>
             <div class="field">
               <label>What problem are you trying to solve?</label>
               <div class="checks">
-                <label class="check"><input type="checkbox"><span>AI gives me confident wrong answers I can't detect</span></label>
-                <label class="check"><input type="checkbox"><span>I re-explain my context every single session</span></label>
-                <label class="check"><input type="checkbox"><span>I can't tell which AI outputs to trust</span></label>
-                <label class="check"><input type="checkbox"><span>AI is too expensive for what I actually need</span></label>
-                <label class="check"><input type="checkbox"><span>I need AI automation without an engineering team</span></label>
-                <label class="check"><input type="checkbox"><span>I need AI for a nonprofit / ministry</span></label>
-                <label class="check"><input type="checkbox"><span>Compliance requirements make AI hard to use</span></label>
+                <label class="check"><input type="checkbox" class="biz-pain" value="AI gives me confident wrong answers I can't detect"><span>AI gives me confident wrong answers I can't detect</span></label>
+                <label class="check"><input type="checkbox" class="biz-pain" value="I re-explain my context every single session"><span>I re-explain my context every single session</span></label>
+                <label class="check"><input type="checkbox" class="biz-pain" value="I can't tell which AI outputs to trust"><span>I can't tell which AI outputs to trust</span></label>
+                <label class="check"><input type="checkbox" class="biz-pain" value="AI is too expensive for what I actually need"><span>AI is too expensive for what I actually need</span></label>
+                <label class="check"><input type="checkbox" class="biz-pain" value="I need AI automation without an engineering team"><span>I need AI automation without an engineering team</span></label>
+                <label class="check"><input type="checkbox" class="biz-pain" value="I need AI for a nonprofit / ministry"><span>I need AI for a nonprofit / ministry</span></label>
+                <label class="check"><input type="checkbox" class="biz-pain" value="Compliance requirements make AI hard to use"><span>Compliance requirements make AI hard to use</span></label>
               </div>
             </div>
             <div class="field">
               <label>Which plan interests you?</label>
-              <select>
+              <select id="biz-plan">
                 <option value="" disabled selected>Select a plan</option>
                 <option>MISSION — Free (nonprofit / ministry)</option>
                 <option>BYOK — $20/mo (bring your own API keys)</option>
@@ -1244,12 +1244,48 @@
   }
 
   // Form submit — viral loop
-  function submitForm(e, which) {
+  async function submitForm(e, which) {
     e.preventDefault();
-    const panel = document.getElementById('panel-'+which);
-    panel.querySelector('form').style.display = 'none';
-    document.getElementById('ok-'+which).classList.add('show');
-    document.getElementById('ok-'+which).scrollIntoView({ behavior:'smooth', block:'nearest' });
+    const btn = e.target.querySelector('button[type="submit"]');
+    const origBtnText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    const data = { type: which };
+    if (which === 'dev') {
+      data.name = document.getElementById('dev-name').value;
+      data.email = document.getElementById('dev-email').value;
+      data.github_username = document.getElementById('dev-github').value;
+      data.building_desc = document.getElementById('dev-building').value;
+      data.notes = document.getElementById('dev-notes').value;
+      data.pains = Array.from(document.querySelectorAll('.dev-pain:checked')).map(el => el.value);
+    } else {
+      data.name = document.getElementById('biz-name').value;
+      data.email = document.getElementById('biz-email').value;
+      data.linkedin_handle = document.getElementById('biz-linkedin').value;
+      data.org_name = document.getElementById('biz-org').value;
+      data.plan_choice = document.getElementById('biz-plan').value;
+      data.pains = Array.from(document.querySelectorAll('.biz-pain:checked')).map(el => el.value);
+    }
+
+    try {
+      const resp = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      if (!resp.ok) throw new Error('Submission failed');
+
+      const panel = document.getElementById('panel-' + which);
+      panel.querySelector('form').style.display = 'none';
+      document.getElementById('ok-' + which).classList.add('show');
+      document.getElementById('ok-' + which).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (err) {
+      alert('Error: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = origBtnText;
+    }
   }
 
   // Copy referral
