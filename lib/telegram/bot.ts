@@ -29,7 +29,32 @@ const getGreeting = () => {
 };
 
 const getDrivingQuestion = async (userId: string) => {
-    // In a full implementation, we'd query past tasks for context
+    try {
+        // [ANTIGRAVITY] CONTEXTUAL AWARENESS: Pull latest high-priority task for context
+        const { data: latestTask } = await supabaseAdmin
+            .from('trinity_tasks')
+            .select('title, status')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (latestTask) {
+            const contextMsg = latestTask.status === 'done' || latestTask.status === 'verified'
+                ? `I see we just finished "${latestTask.title}".`
+                : `Picking up from "${latestTask.title}" —`;
+            
+            const questions = [
+                `${contextMsg} what should be our next strategic move?`,
+                `${contextMsg} want me to scan for co-founders or grants related to this?`,
+                `${contextMsg} how can I further automate this workflow for you?`,
+                "Ready to conduct the symphony? What mission should we initiate next?"
+            ];
+            return questions[Math.floor(Math.random() * questions.length)];
+        }
+    } catch (e) {
+        console.warn('[Bot] Context fetch failed, using defaults.');
+    }
+
     const questions = [
         "What can I take off your plate today to free up your creative energy?",
         "How can I streamline your workflow—perhaps by routing a briefing or optimizing costs?",
@@ -161,7 +186,7 @@ const isObserver = hasRole(['owner', 'admin', 'observer']);
 // --- Keyboard Config ---
 const commandCenter = Markup.keyboard([
     ['📊 Health', '➕ Mission'],
-    ['💎 Pulse']
+    ['💎 Pulse', '💰 Grants']
 ]).resize();
 
 // --- Commands ---
@@ -219,19 +244,34 @@ bot.command('tasks', isAdmin, async (ctx) => {
 });
 
 bot.command('scan_network', async (ctx) => {
-    await ctx.reply('🔍 *Trinity Network Scanner* active.\n\nSearching X and LinkedIn for purpose-aligned partners and grants...', { parse_mode: 'Markdown' });
+    const topic = ctx.payload || 'Web3 and Purpose-Driven AI';
+    await ctx.reply(`🔍 *Trinity Network Scanner* active.\n\nSearching X and LinkedIn for partners and grants related to: "${topic}"...`, { parse_mode: 'Markdown' });
     
-    // Simulate n8n workflow trigger
-    setTimeout(async () => {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.aitrinitysymphony.com';
-        const matches = [
-            "🤝 [Co-Founder Match] Sarah D. - Applied Cryptography Expert",
-            "💰 [Grant Opportunity] Web3 Foundation Phase 23 - $10k-$50k",
-            "🤝 [Partner Match] TechEthos DAO - Social Impact Analytics"
-        ];
-        
-        await ctx.reply(`🎯 *Symphony Match Results*:\n\n${matches.join('\n')}\n\nView details in [Pulse](${appUrl}/pulse/watch).`, { parse_mode: 'Markdown' });
-    }, 2000);
+    try {
+        // [ANTIGRAVITY] TRIGGER AGENT MISSION
+        const { data: task, error } = await supabaseAdmin
+            .from('trinity_tasks')
+            .insert({
+                title: `[SOCIAL] Network Scan: ${topic}`,
+                description: `Scan X, LinkedIn, and Warpcast for mentions of "${topic}". Identify potential co-founders, grants, or high-value intros. Return ranked match cards with ANFIS scores.`,
+                status: 'todo',
+                priority: 80,
+                task_type: 'social_research',
+                metadata: {
+                    source: 'telegram_scan',
+                    topic: topic,
+                    initiator: ctx.from?.first_name || 'Owner'
+                }
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        await ctx.reply(`✅ *Mission Seeded*: Agent [SOCIAL] (Shofet/Veritas) is now hunting for yours. I'll alert you as soon as matches hit the dashboard.`);
+    } catch (err: any) {
+        await ctx.reply(`❌ Failed to seed network scan: ${err.message}`);
+    }
 });
 
 bot.command('claim_grant', async (ctx) => {
@@ -246,6 +286,31 @@ bot.command('claim_grant', async (ctx) => {
     await supabaseAdmin.from('trinity_bot_users').update({ grants_earned: 0 }).eq('chat_id', userId);
     
     await ctx.reply(`🎉 Grant claimed! $${user.grants_earned} has been added to your credits. Funded by the swarm's savings!`);
+});
+
+bot.command('grants', async (ctx) => {
+    try {
+        // [ANTIGRAVITY] Pull latest grant research
+        const { data: grants } = await supabaseAdmin
+            .from('trinity_tasks')
+            .select('title, result, metadata')
+            .ilike('title', '%grant%')
+            .order('created_at', { ascending: false })
+            .limit(3);
+
+        if (!grants || grants.length === 0) {
+            return ctx.reply('🔍 No active grant opportunities found in the current swarm cycle. Try /scan_network to initiate a new hunt.');
+        }
+
+        let message = `💰 *TRINITY GRANT HUD*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+        grants.forEach(g => {
+            message += `📍 *${g.title}*\n📝 ${g.result ? g.result.substring(0, 150) + '...' : 'Analysis in progress...'}\n\n`;
+        });
+
+        await ctx.replyWithMarkdown(message + `_Use /claim_grant if you have earned rewards._`);
+    } catch (e: any) {
+        await ctx.reply(`❌ Failed to fetch grants: ${e.message}`);
+    }
 });
 
 // Deprecated: Consolidated into handleHealth
@@ -437,6 +502,10 @@ bot.on('text', async (ctx, next) => {
     }
     if (lowerText.includes('savings') || lowerText.includes('money') || lowerText.includes('briefing')) {
         return handleHealth(ctx);
+    }
+    if (lowerText.includes('💰 grants')) {
+        // @ts-ignore
+        return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/grants' } });
     }
 
     // Default: Chat feedback with keyboard

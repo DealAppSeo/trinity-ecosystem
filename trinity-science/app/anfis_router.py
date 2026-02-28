@@ -58,9 +58,33 @@ rule2 = ctrl.Rule(truth_score['low'], reward['punish'])
 # 3. Complex Task + Medium Truth => Neutral (Forgiving of hardness)
 rule3 = ctrl.Rule(task_complexity['complex'] & truth_score['medium'], reward['neutral'])
 
-# Control System
-anfis_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
-anfis_sim = ctrl.ControlSystemSimulation(anfis_ctrl)
+# ==========================================
+# 2. CO-FOUNDER MATCHER (The Matchmaker)
+# ==========================================
+# Antecedents
+skill_gap = ctrl.Antecedent(np.arange(0, 1.1, 0.1), 'skill_gap') # 0 = exact match (redundant), 1 = perfect complement
+value_align = ctrl.Antecedent(np.arange(0, 1.1, 0.1), 'value_align') # 0 = clash, 1 = same purpose
+domain_overlap = ctrl.Antecedent(np.arange(0, 1.1, 0.1), 'domain_overlap')
+
+# Consequent
+match_score = ctrl.Consequent(np.arange(0, 101, 1), 'match_score')
+
+# Membership
+skill_gap.automf(3, names=['low', 'medium', 'high'])
+value_align.automf(3, names=['poor', 'fair', 'excellent'])
+domain_overlap.automf(3, names=['none', 'partial', 'broad'])
+match_score.automf(3, names=['pass', 'maybe', 'strong'])
+
+# Rules
+# 1. Excellent Value Alignment + High Skill Gap (Complementary) => Strong Match
+match_rule1 = ctrl.Rule(value_align['excellent'] & skill_gap['high'], match_score['strong'])
+# 2. Poor Value Alignment => Pass (Instant Rejection regardless of skills)
+match_rule2 = ctrl.Rule(value_align['poor'], match_score['pass'])
+# 3. Fair Value + Partial Domain => Maybe
+match_rule3 = ctrl.Rule(value_align['fair'] & domain_overlap['partial'], match_score['maybe'])
+
+match_ctrl = ctrl.ControlSystem([match_rule1, match_rule2, match_rule3])
+match_sim = ctrl.ControlSystemSimulation(match_ctrl)
 
 # ==========================================
 # MODELS
@@ -82,6 +106,18 @@ class SuggestionOutput(BaseModel):
 
 class ApproveInput(BaseModel):
     agent_id: str
+
+class MatchInput(BaseModel):
+    user_id: str
+    target_id: str
+    skills_s: float # skill similarity (inverse gap)
+    values_a: float # value alignment
+    domain_o: float # domain overlap
+
+class MatchOutput(BaseModel):
+    match_score: float
+    recommendation: str
+    reasoning: list[str]
 
 # ==========================================
 # ENDPOINTS
@@ -192,7 +228,41 @@ async def approve_suggestion(data: ApproveInput):
         print(f"❌ DB Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/reject")
+@router.post("/match", response_model=MatchOutput)
+async def match_partners(data: MatchInput):
+    """
+    ANFIS Partner Matcher: Ranks potential co-founders or collaborators.
+    """
+    try:
+        # Fuzzification
+        match_sim.input['skill_gap'] = 1.0 - data.skills_s # High gap is good (complementary)
+        match_sim.input['value_align'] = data.values_a
+        match_sim.input['domain_overlap'] = data.domain_o
+        
+        # Inference
+        match_sim.compute()
+        
+        # Defuzzification
+        score = match_sim.output['match_score']
+        
+        rec = "STRONG MATCH" if score > 75 else ("MAYBE" if score > 40 else "PASS")
+        reasons = []
+        if data.values_a > 0.8: reasons.append("Core value resonance detected.")
+        if (1.0 - data.skills_s) > 0.7: reasons.append("Highly complementary skillsets.")
+        if data.domain_o > 0.5: reasons.append("Solid shared domain context.")
+        
+        return MatchOutput(
+            match_score=score,
+            recommendation=rec,
+            reasoning=reasons
+        )
+    except Exception as e:
+        # Fallback if defuzzification fails (e.g. no rules fired)
+        return MatchOutput(
+            match_score=data.values_a * 100,
+            recommendation="MANUAL REVIEW",
+            reasoning=[f"Heuristic fallback: {str(e)}"]
+        )
 async def reject_suggestion(data: ApproveInput):
     """
     Rejects the pending suggestion.
