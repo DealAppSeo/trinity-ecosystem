@@ -17,6 +17,13 @@ export default function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const hostname = request.headers.get('host') || '';
 
+    // --- 0. LANDING PAGE ROUTING (aitrinitysymphony.com) ---
+    // Serves public/index.html (Waitlist v5) for the main landing domain.
+    const isLandingDomain = hostname === 'aitrinitysymphony.com' || hostname === 'www.aitrinitysymphony.com';
+    if (isLandingDomain && pathname === '/') {
+        return NextResponse.rewrite(new URL('/index.html', request.url));
+    }
+
     // --- 1. SUBDOMAIN ROUTING (From Legacy Proxy) ---
     if (hostname.startsWith('controller.')) {
         if (pathname === '/') {
