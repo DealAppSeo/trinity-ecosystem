@@ -49,6 +49,36 @@ export class NotificationManager {
     }
 
     /**
+     * Send a notification via Telegram bot.
+     */
+    async sendTelegram(message: string) {
+        const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+        const CHAT_ID = process.env.TELEGRAM_OWNER_CHAT_ID;
+
+        if (!BOT_TOKEN || !CHAT_ID) {
+            console.warn('[Notification] ⚠️ Telegram credentials missing. Notification suppressed.');
+            return false;
+        }
+
+        try {
+            const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: CHAT_ID,
+                    text: message,
+                    parse_mode: 'Markdown'
+                })
+            });
+            return response.ok;
+        } catch (e) {
+            console.error('[Notification] ❌ Telegram notification failed:', e);
+            return false;
+        }
+    }
+
+    /**
      * Notify the user via the system-wide Event Log and SMS if critical.
      */
     async notifyUser(payload: NotificationPayload) {
@@ -70,12 +100,13 @@ export class NotificationManager {
             console.error('[Notification] 🚨 Failed to log notification to DB:', e);
         }
 
-        // 2. Critical SMS Alert
+        // 2. Critical Alert (SMS & Telegram)
         if (payload.type === 'stuck' || payload.type === 'error') {
             const userPhone = process.env.USER_PHONE_NUMBER;
             if (userPhone) {
                 await this.sendSMS(userPhone, `⚠️ [TRINITY STUCK] ${payload.agentName}: ${payload.message}`);
             }
+            await this.sendTelegram(`🚨 *[TRINITY ${payload.type.toUpperCase()}]*\nAgent: \`${payload.agentName || 'SYSTEM'}\`\nMessage: ${payload.message}`);
         }
 
         // 3. Task Completion Success
@@ -84,6 +115,7 @@ export class NotificationManager {
             if (userPhone) {
                 await this.sendSMS(userPhone, `✅ [TRINITY DONE] ${payload.title}`);
             }
+            await this.sendTelegram(`✅ *[TRINITY SUCCESS]*\n${payload.title}\n\n${payload.message}`);
         }
     }
 }

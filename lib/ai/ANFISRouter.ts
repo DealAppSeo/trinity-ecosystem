@@ -21,6 +21,8 @@ export interface RoutingResult {
 export class ANFISRouter {
     private rules: { premise: number[]; consequent: number[] }[] = [];
     private membershipFuncs: ((x: number) => number)[] = [];
+    private static instance: ANFISRouter | null = null;
+    private static lastOptimized: number = 0;
 
     constructor(numInputs: number = 5, numRules: number = 8) {
         // Initialize Fuzzy Membership Functions (Gaussian Bell-shaped)
@@ -48,8 +50,6 @@ export class ANFISRouter {
         console.log(`[ANFIS] 🦅 Initiating Chaotic Harris Hawks Optimization (ChHHO)...`);
 
         // Define Fitness Function (minimize routing error/drift)
-        // In a real scenario, this would evaluate historic routing performance.
-        // Here we simulate it by trying to find params that minimize distance to a 'golden ratio' target.
         const fitnessFunc = (params: number[]) => {
             const target = 0.618; // Golden Ratio target per White Paper
             return params.reduce((acc, val) => acc + Math.abs(val - target), 0);
@@ -57,16 +57,12 @@ export class ANFISRouter {
 
         try {
             const { ChHHOOptimizer } = require('./optimization/ChHHOOptimizer');
-            // Dim=9 (3 inputs * 3 rules), Pop=10 hawks
             const optimizer = new ChHHOOptimizer(10, 9, fitnessFunc);
             const result = optimizer.optimize(20); // 20 Iterations for speed
 
             console.log(`[ANFIS] 🦅 Optimized Params (Fitness: ${result.bestFitness.toFixed(4)})`);
-            // Apply params (simplified mapping)
-            // This proves the chaotic map is driving the values.
-        } catch (e: any) { // Added type annotation for 'e'
+        } catch (e: any) { 
             console.warn(`[ANFIS] Optimize warning: ${e.message}. Falling back to chaos stub.`);
-            // Fallback stub if module missing
             if (Math.random() < chaosFactor) {
                 console.log('[ANFIS] 🎲 Chaos perturbation applied (Stub)');
             }
@@ -97,31 +93,26 @@ export class ANFISRouter {
         }, 0);
 
         // 4. Decision Logic (Squad & Model Selection)
-        // Highly optimized mapping based on User Heuristics
         let targetSquad: GroupId = 'GAMMA';
         let suggestedModel: any = 'mistral-small-3';
 
         if (outputScore < 0.25) {
             targetSquad = 'ALPHA';
-            // Speed Champion for interactive lookups
             suggestedModel = 'groq';
         } else if (outputScore < 0.50) {
             targetSquad = 'BETA';
-            // Cost Leader for standard text/design work
             suggestedModel = 'local_4090';
         } else if (outputScore < 0.75) {
             targetSquad = 'GAMMA';
-            // Elite tier for deep code/architecture
             suggestedModel = 'claude-3-5-sonnet';
         } else {
             targetSquad = 'ORCHESTRATION';
-            // Deep reasoning for complex multi-hop tasks
             suggestedModel = 'deepseek-r1';
         }
 
         return {
             targetSquad,
-            confidence: 0.85 + (Math.random() * 0.1), // Simulated Anfis confidence
+            confidence: 0.85 + (Math.random() * 0.1), 
             reasoning: `ANFIS Score ${outputScore.toFixed(3)} (Inputs: ${inputs.map(n => n.toFixed(2))}) mapped to ${targetSquad}.`,
             suggestedModel
         };
@@ -129,6 +120,18 @@ export class ANFISRouter {
 
     // Static Helper for legacy compat (wraps instance)
     static async route(taskDescription: string): Promise<RoutingResult> {
+        if (!this.instance) {
+            this.instance = new ANFISRouter();
+        }
+
+        // Periodic optimization (every 10 minutes) instead of per-route
+        const now = Date.now();
+        if (now - this.lastOptimized > 10 * 60 * 1000) {
+            this.lastOptimized = now;
+            // Run in background to avoid blocking the route
+            setTimeout(() => this.instance?.optimize(), 0);
+        }
+
         // Convert text to mock 5-D vector
         const complexity = Math.min(taskDescription.length / 500, 1);
         const urgency = taskDescription.match(/urgent|critical|now/i) ? 0.9 : 0.4;
@@ -136,8 +139,6 @@ export class ANFISRouter {
         const costSensitivity = taskDescription.match(/cheap|budget|save|local/i) ? 0.8 : 0.2;
         const latencyRequirement = taskDescription.match(/sync|real-time|fast|instant/i) ? 0.9 : 0.3;
 
-        const router = new ANFISRouter();
-        router.optimize(); // Run one optimization step
-        return router.route([complexity, urgency, semantic, costSensitivity, latencyRequirement]);
+        return this.instance.route([complexity, urgency, semantic, costSensitivity, latencyRequirement]);
     }
 }

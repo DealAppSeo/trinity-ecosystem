@@ -1,6 +1,8 @@
 import { Telegraf, Context, Markup } from 'telegraf';
 import { supabaseAdmin } from '../supabase';
 import { transcribeVoice } from './voice';
+import { AlphaTradeHandler } from './AlphaTradeHandler';
+import { StatusCommandHandler } from './StatusCommandHandler';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 export const bot = new Telegraf(BOT_TOKEN);
@@ -42,7 +44,7 @@ const getDrivingQuestion = async (userId: string) => {
             const contextMsg = latestTask.status === 'done' || latestTask.status === 'verified'
                 ? `I see we just finished "${latestTask.title}".`
                 : `Picking up from "${latestTask.title}" —`;
-            
+
             const questions = [
                 `${contextMsg} what should be our next strategic move?`,
                 `${contextMsg} want me to scan for co-founders or grants related to this?`,
@@ -194,9 +196,12 @@ const commandCenter = Markup.keyboard([
 // --- Commands ---
 bot.start(handleHealth);
 bot.command('health', handleHealth);
-bot.command('status', handleHealth);
-bot.command('briefing', handleHealth);
-bot.command('savings', handleHealth);
+bot.command('status', StatusCommandHandler.handleStatus);
+bot.command('alpha', (ctx) => AlphaTradeHandler.handleAlphaCommand(ctx));
+bot.command('portfolio', StatusCommandHandler.handlePortfolio);
+bot.command('pause', StatusCommandHandler.handlePause);
+bot.command('resume', StatusCommandHandler.handleResume);
+bot.command('wolf', StatusCommandHandler.handleWolf);
 bot.command('commands', async (ctx) => ctx.reply('🕹️ *Trinity Command Center* active.', { parse_mode: 'Markdown', ...commandCenter }));
 
 bot.command('tasks', isAdmin, async (ctx) => {
@@ -234,6 +239,11 @@ bot.command('tasks', isAdmin, async (ctx) => {
                 Markup.button.callback('↩️ Redirect', `redirect:${task.id}`)
             ],
             [
+                Markup.button.callback('⏫ High Uni', `prio_high:${task.task_id}`),
+                Markup.button.callback('⏬ Low Uni', `prio_low:${task.task_id}`),
+                Markup.button.callback('✏️ Re-Target', `edit_task:${task.task_id}`)
+            ],
+            [
                 Markup.button.callback('🔍 Full Output', `full:${task.id}`),
                 Markup.button.callback('🧠 Agent History', `history:${task.agent_id}`)
             ]
@@ -246,7 +256,7 @@ bot.command('tasks', isAdmin, async (ctx) => {
 bot.command('scan_network', async (ctx) => {
     const topic = ctx.payload || 'Web3 and Purpose-Driven AI';
     await ctx.reply(`🔍 *Trinity Network Scanner* active.\n\nSearching X and LinkedIn for partners and grants related to: "${topic}"...`, { parse_mode: 'Markdown' });
-    
+
     try {
         // [ANTIGRAVITY] TRIGGER AGENT MISSION
         const { data: task, error } = await supabaseAdmin
@@ -277,14 +287,14 @@ bot.command('scan_network', async (ctx) => {
 bot.command('claim_grant', async (ctx) => {
     const userId = String(ctx.from?.id);
     const { data: user } = await supabaseAdmin.from('trinity_bot_users').select('grants_earned').eq('chat_id', userId).single();
-    
+
     if (!user || (user.grants_earned || 0) <= 0) {
         return ctx.reply('⚠️ You do not have any unclaimed grants at this time. Complete quests or referrals to earn more!');
     }
 
     // Logic for claim (e.g., converting to virtual credits)
     await supabaseAdmin.from('trinity_bot_users').update({ grants_earned: 0 }).eq('chat_id', userId);
-    
+
     await ctx.reply(`🎉 Grant claimed! $${user.grants_earned} has been added to your credits. Funded by the swarm's savings!`);
 });
 
@@ -479,7 +489,7 @@ bot.on('text', async (ctx, next) => {
     if (text.startsWith('/')) return next();
 
     const lowerText = text.toLowerCase();
-    
+
     // Exact Keyboard Matches
     if (lowerText.includes('📊 health')) return handleHealth(ctx);
     if (lowerText.includes('➕ mission')) return ctx.reply('🚀 Ready for a new mission. Type: `Task: [description]`', commandCenter);
@@ -508,6 +518,10 @@ bot.on('text', async (ctx, next) => {
         return bot.handleUpdate({ ...ctx.update, message: { ...ctx.message, text: '/grants' } });
     }
 
+    // Default: Forward to AlphaTradeHandler text input if applicable
+    const handled = await AlphaTradeHandler.handleTextInput(ctx);
+    if (handled) return;
+
     // Default: Chat feedback with keyboard
     await ctx.reply(`🤔 I've noted that. If you'd like me to start a new mission, try saying "Task: [mission description]".`, commandCenter);
 });
@@ -525,7 +539,7 @@ bot.on('voice', async (ctx) => {
         }
 
         await ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, undefined, `📝 *Transcript*: "${text}"`, { parse_mode: 'Markdown' });
-        
+
         // Feed transcript into the text handler logic
         (ctx as any).message.text = text;
         return bot.handleUpdate(ctx.update);
@@ -597,6 +611,24 @@ bot.action(/reject:(.+)/, isAdmin, async (ctx) => {
 
     await ctx.answerCbQuery('❌ Task Rejected.');
     await ctx.editMessageText(ctx.callbackQuery.message ? (ctx.callbackQuery.message as any).text + '\n\n❌ *Status: Rejected (Reset to Todo)*' : '❌ Rejected', { parse_mode: 'Markdown' });
+});
+
+bot.action(/prio_high:(.+)/, isAdmin, async (ctx) => {
+    const taskId = ctx.match[1];
+    await supabaseAdmin.from('trinity_tasks').update({ priority: 100 }).eq('id', taskId);
+    await ctx.answerCbQuery('🚀 Priority set to HIGH (100).');
+});
+
+bot.action(/prio_low:(.+)/, isAdmin, async (ctx) => {
+    const taskId = ctx.match[1];
+    await supabaseAdmin.from('trinity_tasks').update({ priority: 10 }).eq('id', taskId);
+    await ctx.answerCbQuery('📉 Priority set to LOW (10).');
+});
+
+bot.action(/edit_task:(.+)/, isAdmin, async (ctx) => {
+    const taskId = ctx.match[1];
+    await ctx.reply(`✏️ *Editing Task #${taskId}*\n\nPlease reply to this message with the new description for the agent.`, { parse_mode: 'Markdown', reply_markup: { force_reply: true } });
+    await ctx.answerCbQuery();
 });
 
 // Export a handler for Vercel

@@ -1,1315 +1,2463 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Trinity Symphony — The Trust Layer for AI</title>
-<meta name="description" content="Stop building verification infrastructure yourself. 12 coordinated agents. BFT consensus. Built on ERC-8004. 60–80% cost reduction. The trust layer for AI.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,300;1,9..144,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --void:         #05050A;
-    --s1:           #0A0A12;
-    --s2:           #0F0F1A;
-    --s3:           #151522;
-    --white:        #EDE9E0;
-    --wd:           rgba(237,233,224,0.82);
-    --wf:           rgba(237,233,224,0.82);
-    --wff:          rgba(237,233,224,0.55);
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Trinity Symphony — The Trust Layer for AI</title>
+  <meta name="description"
+    content="Stop building verification infrastructure yourself. 12 coordinated agents. BFT consensus. Built on ERC-8004. 60–80% cost reduction. The trust layer for AI.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,300;1,9..144,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --void: #05050A;
+      --s1: #0A0A12;
+      --s2: #0F0F1A;
+      --s3: #151522;
+      --white: #EDE9E0;
+      --wd: rgba(237, 233, 224, 0.82);
+      --wf: rgba(237, 233, 224, 0.82);
+      --wff: rgba(237, 233, 224, 0.55);
 
-    /* dev — cool teal */
-    --dev:          #00BFA5;
-    --dev-d:        rgba(0,191,165,0.1);
-    --dev-b:        rgba(0,191,165,0.2);
+      /* dev — cool teal */
+      --dev: #00BFA5;
+      --dev-d: rgba(0, 191, 165, 0.1);
+      --dev-b: rgba(0, 191, 165, 0.2);
 
-    /* biz — warm gold */
-    --biz:          #E8A020;
-    --biz-d:        rgba(232,160,32,0.1);
-    --biz-b:        rgba(232,160,32,0.2);
+      /* biz — warm gold */
+      --biz: #E8A020;
+      --biz-d: rgba(232, 160, 32, 0.1);
+      --biz-b: rgba(232, 160, 32, 0.2);
 
-    /* ownership — violet */
-    --own:          #A78BFA;
-    --own-d:        rgba(167,139,250,0.1);
-    --own-b:        rgba(167,139,250,0.2);
+      /* ownership — violet */
+      --own: #A78BFA;
+      --own-d: rgba(167, 139, 250, 0.1);
+      --own-b: rgba(167, 139, 250, 0.2);
 
-    --border:       rgba(237,233,224,0.07);
-    --err:          #FF5A5A;
-    --ok:           #4ADE80;
-    --warn:         #FBB849;
-  }
+      --border: rgba(237, 233, 224, 0.07);
+      --err: #FF5A5A;
+      --ok: #4ADE80;
+      --warn: #FBB849;
+    }
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
-  body {
-    background: var(--void);
-    color: var(--white);
-    font-family: 'DM Sans', sans-serif;
-    overflow-x: hidden;
-  }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  /* grain */
-  body::before {
-    content: '';
-    position: fixed; inset: 0; z-index: 900; pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.032'/%3E%3C/svg%3E");
-    opacity: 0.6;
-  }
+    html {
+      scroll-behavior: smooth;
+    }
 
-  /* ── UTILS ── */
-  .mono { font-family: 'Space Mono', monospace; }
-  .serif { font-family: 'Fraunces', serif; }
+    body {
+      background: var(--void);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      overflow-x: hidden;
+    }
 
-  .eyebrow {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.24em;
-    text-transform: uppercase; margin-bottom: 0.9rem;
-  }
-  .ey-dev  { color: var(--dev); }
-  .ey-biz  { color: var(--biz); }
-  .ey-own  { color: var(--own); }
-  .ey-dim  { color: var(--wf); }
+    /* grain */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 900;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.032'/%3E%3C/svg%3E");
+      opacity: 0.6;
+    }
 
-  .h2 {
-    font-family: 'Fraunces', serif;
-    font-size: clamp(1.85rem, 3.2vw, 2.9rem);
-    font-weight: 500; line-height: 1.1; margin-bottom: 1.1rem;
-  }
-  .h2 em { font-style: italic; font-weight: 300; }
-  .h2 .dev-em { color: var(--dev); }
-  .h2 .biz-em { color: var(--biz); }
-  .h2 .own-em { color: var(--own); }
+    /* ── UTILS ── */
+    .mono {
+      font-family: 'Space Mono', monospace;
+    }
 
-  .body-text {
-    font-size: 0.95rem; color: var(--wd);
-    line-height: 1.8; max-width: 580px;
-  }
+    .serif {
+      font-family: 'Fraunces', serif;
+    }
 
-  .tag {
-    display: inline-block;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.58rem; letter-spacing: 0.16em;
-    text-transform: uppercase;
-    padding: 0.22rem 0.6rem;
-    border: 1px solid; margin-bottom: 0.5rem;
-  }
-  .tag-dev { color: var(--dev); border-color: var(--dev-b); background: var(--dev-d); }
-  .tag-biz { color: var(--biz); border-color: var(--biz-b); background: var(--biz-d); }
-  .tag-own { color: var(--own); border-color: var(--own-b); background: var(--own-d); }
+    .eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      margin-bottom: 0.9rem;
+    }
 
-  .pill {
-    display: inline-flex; align-items: center; gap: 0.4rem;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.1em;
-    padding: 0.18rem 0.55rem;
-    border: 1px solid var(--border);
-    color: var(--wf); margin-right: 0.4rem; margin-bottom: 0.4rem;
-  }
+    .ey-dev {
+      color: var(--dev);
+    }
 
-  /* reveal */
-  .r {
-    opacity: 0; transform: translateY(22px);
-    transition: opacity 0.6s ease, transform 0.6s ease;
-  }
-  .r.on { opacity: 1; transform: translateY(0); }
-  .r1 { transition-delay: 0.08s; }
-  .r2 { transition-delay: 0.16s; }
-  .r3 { transition-delay: 0.24s; }
-  .r4 { transition-delay: 0.32s; }
+    .ey-biz {
+      color: var(--biz);
+    }
 
-  @keyframes fadeUp {
-    from { opacity:0; transform:translateY(18px); }
-    to   { opacity:1; transform:translateY(0); }
-  }
-  @keyframes fadeIn {
-    from { opacity:0; } to { opacity:1; }
-  }
-  @keyframes blink {
-    0%,100%{opacity:1;} 50%{opacity:0.25;}
-  }
+    .ey-own {
+      color: var(--own);
+    }
 
-  /* ── NAV ── */
-  nav {
-    position: fixed; top:0; left:0; right:0; z-index:200;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 1.1rem 2.5rem;
-    background: rgba(5,5,10,0.92);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--border);
-  }
-  .nav-logo { display:flex; align-items:center; gap:0.7rem; text-decoration:none; }
-  .nav-orb {
-    width:30px; height:30px; border-radius:50%;
-    background: conic-gradient(from 200deg, var(--dev) 0%, var(--own) 40%, var(--biz) 70%, var(--dev) 100%);
-    display:flex; align-items:center; justify-content:center;
-  }
-  .nav-orb-inner {
-    width:18px; height:18px; border-radius:50%;
-    background: var(--void);
-  }
-  .nav-name {
-    font-family:'Space Mono',monospace;
-    font-size:0.7rem; letter-spacing:0.08em; line-height:1.3;
-  }
-  .nav-sub { font-size:0.58rem; color:var(--wf); letter-spacing:0.06em; }
-  .nav-status {
-    display:flex; align-items:center; gap:0.5rem;
-    font-family:'Space Mono',monospace;
-    font-size:0.58rem; letter-spacing:0.14em;
-    text-transform:uppercase; color:var(--wf);
-    border:1px solid var(--border); padding:0.28rem 0.7rem;
-  }
-  .live-dot {
-    width:6px; height:6px; border-radius:50%;
-    background:var(--dev); animation:blink 2s ease infinite;
-  }
+    .ey-dim {
+      color: var(--wf);
+    }
 
-  /* ── HERO SPLIT ── */
-  .hero {
-    min-height:100vh;
-    display:grid; grid-template-columns:1fr 1fr;
-    position:relative;
-  }
-  .hero-seam {
-    position:absolute; top:0; bottom:0; left:50%; width:1px;
-    background: linear-gradient(to bottom,
-      transparent 0%,
-      var(--border) 15%,
-      var(--border) 85%,
-      transparent 100%);
-    pointer-events:none; z-index:10;
-  }
-  .hero-or {
-    position:absolute; top:50%; left:50%;
-    transform:translate(-50%,-50%);
-    z-index:20;
-    background:var(--void);
-    border:1px solid var(--border);
-    width:36px; height:36px; border-radius:50%;
-    display:flex; align-items:center; justify-content:center;
-    font-family:'Space Mono',monospace;
-    font-size:0.6rem; color:var(--wf);
-    opacity:0; animation:fadeIn 0.8s ease 1.2s forwards;
-  }
+    .h2 {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(1.85rem, 3.2vw, 2.9rem);
+      font-weight: 500;
+      line-height: 1.1;
+      margin-bottom: 1.1rem;
+    }
 
-  .half {
-    display:flex; flex-direction:column;
-    justify-content:center; padding:8rem 4rem 5rem;
-    position:relative; overflow:hidden;
-    transition: background 0.5s ease;
-    cursor:pointer;
-  }
-  .half-dev { background: rgba(0,191,165,0.015); }
-  .half-biz { background: rgba(232,160,32,0.015); }
-  .half-dev:hover { background: rgba(0,191,165,0.035); }
-  .half-biz:hover { background: rgba(232,160,32,0.035); }
+    .h2 em {
+      font-style: italic;
+      font-weight: 300;
+    }
 
-  .half-glow {
-    position:absolute; pointer-events:none;
-    border-radius:50%;
-    filter:blur(80px);
-    transition:opacity 0.5s;
-  }
-  .half-dev .half-glow {
-    top:-10%; left:-10%; width:60%; height:60%;
-    background:radial-gradient(ellipse, rgba(0,191,165,0.1), transparent 70%);
-  }
-  .half-biz .half-glow {
-    bottom:-10%; right:-10%; width:60%; height:60%;
-    background:radial-gradient(ellipse, rgba(232,160,32,0.1), transparent 70%);
-  }
+    .h2 .dev-em {
+      color: var(--dev);
+    }
 
-  .half-h1 {
-    font-family:'Fraunces',serif;
-    font-size:clamp(1.9rem,3vw,2.7rem);
-    font-weight:500; line-height:1.08; margin-bottom:1.1rem;
-    opacity:0; animation:fadeUp 0.7s ease forwards;
-  }
-  .half-dev .half-h1 { animation-delay:0.35s; }
-  .half-biz .half-h1 { animation-delay:0.55s; }
-  .half-h1 em { font-style:italic; font-weight:300; }
-  .half-dev .half-h1 em { color:var(--dev); }
-  .half-biz .half-h1 em { color:var(--biz); }
+    .h2 .biz-em {
+      color: var(--biz);
+    }
 
-  .half-p {
-    font-size:0.88rem; color:var(--wd);
-    line-height:1.78; max-width:400px; margin-bottom:2rem;
-    opacity:0; animation:fadeUp 0.7s ease forwards;
-  }
-  .half-dev .half-p { animation-delay:0.45s; }
-  .half-biz .half-p { animation-delay:0.65s; }
+    .h2 .own-em {
+      color: var(--own);
+    }
 
-  .half-btn {
-    display:inline-flex; align-items:center; gap:0.55rem;
-    font-family:'Space Mono',monospace;
-    font-size:0.7rem; letter-spacing:0.1em; text-transform:uppercase;
-    padding:0.8rem 1.7rem; border:none; cursor:pointer;
-    text-decoration:none; transition:all 0.2s;
-    opacity:0; animation:fadeUp 0.7s ease forwards;
-    width:fit-content;
-  }
-  .half-dev .half-btn { background:var(--dev); color:var(--void); animation-delay:0.55s; }
-  .half-biz .half-btn { background:var(--biz); color:var(--void); animation-delay:0.75s; }
-  .half-btn:hover { filter:brightness(1.1); transform:translateY(-2px); }
-  .half-btn .arr { transition:transform 0.2s; }
-  .half-btn:hover .arr { transform:translateX(4px); }
+    .body-text {
+      font-size: 0.95rem;
+      color: var(--wd);
+      line-height: 1.8;
+      max-width: 580px;
+    }
 
-  .half-proof {
-    margin-top:2.2rem; display:flex; flex-direction:column; gap:0.5rem;
-    opacity:0; animation:fadeUp 0.7s ease forwards;
-  }
-  .half-dev .half-proof { animation-delay:0.65s; }
-  .half-biz .half-proof { animation-delay:0.85s; }
-  .proof-li {
-    display:flex; align-items:flex-start; gap:0.5rem;
-    font-size:0.77rem; color:var(--wf); line-height:1.5;
-  }
-  .proof-dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; margin-top:0.38rem; }
-  .half-dev .proof-dot { background:var(--dev); }
-  .half-biz .proof-dot { background:var(--biz); }
+    .tag {
+      display: inline-block;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      padding: 0.22rem 0.6rem;
+      border: 1px solid;
+      margin-bottom: 0.5rem;
+    }
 
-  /* ── STAT BAR ── */
-  .stat-bar {
-    background:var(--s1); border-top:1px solid var(--border);
-    border-bottom:1px solid var(--border);
-  }
-  .stat-inner {
-    max-width:1080px; margin:0 auto;
-    display:grid; grid-template-columns:repeat(6,1fr);
-  }
-  .stat-cell {
-    padding:1.4rem 1.5rem; text-align:center;
-    border-right:1px solid var(--border);
-  }
-  .stat-cell:last-child { border-right:none; }
-  .stat-val {
-    font-family:'Space Mono',monospace;
-    font-size:1.25rem; color:var(--dev);
-    display:block; margin-bottom:0.25rem;
-  }
-  .stat-lbl {
-    font-size:0.6rem; letter-spacing:0.12em;
-    text-transform:uppercase; color:var(--wff);
-  }
+    .tag-dev {
+      color: var(--dev);
+      border-color: var(--dev-b);
+      background: var(--dev-d);
+    }
 
-  /* ── SECTION PAD ── */
-  .pad { padding:6.5rem 2rem; }
-  .container { max-width:1080px; margin:0 auto; }
+    .tag-biz {
+      color: var(--biz);
+      border-color: var(--biz-b);
+      background: var(--biz-d);
+    }
 
-  /* ── LAYER INTRO ── */
-  .layer-intro {
-    display:grid; grid-template-columns:1fr 1fr;
-    gap:4rem; align-items:start; margin-bottom:4rem;
-  }
+    .tag-own {
+      color: var(--own);
+      border-color: var(--own-b);
+      background: var(--own-d);
+    }
 
-  /* ── CODE BLOCK ── */
-  .code-wrap {
-    background:var(--s2); border:1px solid var(--border);
-    padding:1.8rem 2rem; font-family:'Space Mono',monospace;
-    font-size:0.74rem; line-height:2; overflow-x:auto;
-    margin-bottom:3rem;
-  }
-  .cc  { color:rgba(0,191,165,0.38); }
-  .ck  { color:var(--dev); }
-  .cv  { color:var(--wd); }
-  .ce  { color:var(--err); }
-  .cw  { color:var(--warn); }
-  .cok { color:var(--ok); }
-  .cp  { color:var(--own); }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      padding: 0.18rem 0.55rem;
+      border: 1px solid var(--border);
+      color: var(--wf);
+      margin-right: 0.4rem;
+      margin-bottom: 0.4rem;
+    }
 
-  /* ── GRID CARDS ── */
-  .cards-2 {
-    display:grid; grid-template-columns:1fr 1fr;
-    gap:1px; background:var(--border); border:1px solid var(--border);
-  }
-  .cards-3 {
-    display:grid; grid-template-columns:repeat(3,1fr);
-    gap:1px; background:var(--border); border:1px solid var(--border);
-  }
-  .card {
-    background:var(--s1); padding:2.2rem 2rem;
-    position:relative; transition:background 0.25s;
-  }
-  .card:hover { background:var(--s2); }
-  .card-top {
-    position:absolute; top:0; left:0; right:0; height:2px;
-  }
-  .ct-dev { background:var(--dev); }
-  .ct-biz { background:var(--biz); }
-  .ct-own { background:var(--own); }
-  .ct-both { background:linear-gradient(90deg,var(--dev),var(--biz)); }
-  .ct-all  { background:linear-gradient(90deg,var(--dev),var(--own),var(--biz)); }
+    /* reveal */
+    .r {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
 
-  .card-num {
-    font-family:'Space Mono',monospace;
-    font-size:0.58rem; letter-spacing:0.2em;
-    color:var(--wff); margin-bottom:0.7rem;
-  }
-  .card-title {
-    font-family:'Fraunces',serif;
-    font-size:1rem; font-weight:500; line-height:1.2; margin-bottom:0.6rem;
-  }
-  .card-body { font-size:0.82rem; color:var(--wd); line-height:1.72; }
-  .card-chip {
-    display:inline-block; margin-top:0.9rem;
-    font-family:'Space Mono',monospace; font-size:0.58rem;
-    letter-spacing:0.1em; padding:0.18rem 0.5rem;
-    border:1px solid;
-  }
-  .chip-dev { color:var(--dev); border-color:var(--dev-b); background:var(--dev-d); }
-  .chip-biz { color:var(--biz); border-color:var(--biz-b); background:var(--biz-d); }
-  .chip-own { color:var(--own); border-color:var(--own-b); background:var(--own-d); }
+    .r.on {
+      opacity: 1;
+      transform: translateY(0);
+    }
 
-  /* ── PROOF METRICS ── */
-  .metrics {
-    display:grid; grid-template-columns:repeat(4,1fr);
-    gap:1px; background:var(--border); border:1px solid var(--border);
-    margin-top:4rem;
-  }
-  .metric {
-    background:var(--s1); padding:2rem 1.8rem; text-align:center;
-    transition:background 0.25s;
-  }
-  .metric:hover { background:var(--s2); }
-  .metric-n {
-    font-family:'Fraunces',serif;
-    font-size:2.6rem; color:var(--dev);
-    line-height:1; margin-bottom:0.4rem;
-  }
-  .metric-l { font-size:0.7rem; color:var(--wf); line-height:1.5; letter-spacing:0.04em; }
+    .r1 {
+      transition-delay: 0.08s;
+    }
 
-  /* ── ERC SECTION ── */
-  .erc-section { background:var(--s1); border-top:1px solid var(--border); }
-  .erc-inner {
-    display:grid; grid-template-columns:1fr 1fr;
-    gap:5rem; align-items:start;
-  }
-  .erc-logo-row {
-    display:flex; align-items:center; gap:0.7rem;
-    margin-bottom:1.5rem; flex-wrap:wrap;
-  }
-  .erc-badge {
-    font-family:'Space Mono',monospace;
-    font-size:0.62rem; letter-spacing:0.1em;
-    padding:0.3rem 0.7rem;
-    border:1px solid var(--own-b);
-    color:var(--own); background:var(--own-d);
-  }
-  .erc-author {
-    font-size:0.72rem; color:var(--wf);
-  }
-  .erc-cards {
-    display:flex; flex-direction:column; gap:1px;
-    border:1px solid var(--border); margin-top:2rem;
-  }
-  .erc-card {
-    background:var(--s2); padding:1.5rem 1.8rem;
-    transition:background 0.2s;
-  }
-  .erc-card:hover { background:var(--s3); }
-  .erc-card-title {
-    font-weight:600; font-size:0.88rem; margin-bottom:0.4rem;
-    display:flex; align-items:center; gap:0.6rem;
-  }
-  .erc-card-title span {
-    font-family:'Space Mono',monospace; font-size:0.6rem;
-    color:var(--own); letter-spacing:0.1em;
-  }
-  .erc-card-body { font-size:0.8rem; color:var(--wd); line-height:1.7; }
+    .r2 {
+      transition-delay: 0.16s;
+    }
 
-  /* problem/solution pairs */
-  .ps-list {
-    display:flex; flex-direction:column; gap:1px;
-    border:1px solid var(--border); margin-top:3rem;
-  }
-  .ps-row {
-    display:grid; grid-template-columns:1fr 1fr;
-    gap:0; background:var(--border);
-    transition:opacity 0.2s;
-  }
-  .ps-row:hover { opacity:0.9; }
-  .ps-cell {
-    padding:1.8rem 2rem;
-    position:relative;
-  }
-  .ps-problem {
-    background:var(--s1);
-    border-right:1px solid var(--border);
-  }
-  .ps-solution { background:var(--s2); }
-  .ps-label {
-    font-family:'Space Mono',monospace;
-    font-size:0.55rem; letter-spacing:0.2em;
-    text-transform:uppercase; margin-bottom:0.6rem;
-  }
-  .ps-problem .ps-label { color:var(--err); }
-  .ps-solution .ps-label { color:var(--ok); }
-  .ps-title { font-weight:600; font-size:0.88rem; margin-bottom:0.4rem; line-height:1.3; }
-  .ps-body { font-size:0.8rem; color:var(--wd); line-height:1.7; }
+    .r3 {
+      transition-delay: 0.24s;
+    }
 
-  /* ── SHARE NUDGE ── */
-  .share-nudge {
-    background:var(--own-d); border:1px solid var(--own-b);
-    padding:1.8rem 2rem; margin-top:3rem;
-    display:flex; align-items:center; gap:2rem; flex-wrap:wrap;
-  }
-  .share-nudge-text { flex:1; }
-  .share-nudge-h { font-weight:600; font-size:0.92rem; margin-bottom:0.3rem; }
-  .share-nudge-sub { font-size:0.8rem; color:var(--wd); }
-  .share-btn {
-    background:var(--own); color:var(--void);
-    border:none; cursor:pointer;
-    font-family:'Space Mono',monospace;
-    font-size:0.68rem; letter-spacing:0.1em; text-transform:uppercase;
-    padding:0.75rem 1.6rem; white-space:nowrap;
-    transition:all 0.2s;
-  }
-  .share-btn:hover { filter:brightness(1.1); }
+    .r4 {
+      transition-delay: 0.32s;
+    }
 
-  /* ── FORMS ── */
-  .forms-section { background:var(--void); border-top:1px solid var(--border); }
-  .forms-hdr { text-align:center; margin-bottom:3.5rem; }
-  .forms-hdr .h2 { font-size:clamp(1.6rem,2.6vw,2.3rem); }
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(18px);
+      }
 
-  .tabs {
-    display:flex; max-width:580px; margin:0 auto;
-    border:1px solid var(--border); border-bottom:none;
-  }
-  .tab {
-    flex:1; padding:0.95rem 1rem;
-    background:var(--s1); border:none; cursor:pointer;
-    font-family:'Space Mono',monospace;
-    font-size:0.67rem; letter-spacing:0.1em; text-transform:uppercase;
-    transition:all 0.2s; border-right:1px solid var(--border);
-    color:var(--wf);
-  }
-  .tab:last-child { border-right:none; }
-  .tab.dev-active { background:var(--dev-d); color:var(--dev); box-shadow:inset 0 -2px 0 var(--dev); }
-  .tab.biz-active { background:var(--biz-d); color:var(--biz); box-shadow:inset 0 -2px 0 var(--biz); }
-  .tab:not(.dev-active):not(.biz-active):hover { background:var(--s2); color:var(--wd); }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
 
-  .panels { max-width:580px; margin:0 auto; }
-  .panel {
-    display:none; background:var(--s1);
-    border:1px solid var(--border); padding:2.5rem 2.2rem;
-  }
-  .panel.show { display:block; }
-  .panel-dev { border-top:2px solid var(--dev); }
-  .panel-biz { border-top:2px solid var(--biz); }
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
 
-  .panel-eyebrow {
-    font-family:'Space Mono',monospace;
-    font-size:0.58rem; letter-spacing:0.2em;
-    text-transform:uppercase; margin-bottom:1.4rem;
-  }
-  .panel-dev .panel-eyebrow { color:var(--dev); }
-  .panel-biz .panel-eyebrow { color:var(--biz); }
+      to {
+        opacity: 1;
+      }
+    }
 
-  .field { margin-bottom:0.9rem; }
-  .field label {
-    display:block; font-family:'Space Mono',monospace;
-    font-size:0.58rem; letter-spacing:0.14em;
-    text-transform:uppercase; color:var(--wf);
-    margin-bottom:0.38rem;
-  }
-  .field input,
-  .field select,
-  .field textarea {
-    width:100%; background:var(--s2);
-    border:1px solid var(--border); color:var(--white);
-    padding:0.78rem 1rem;
-    font-family:'DM Sans',sans-serif; font-size:0.88rem;
-    outline:none; transition:border-color 0.2s;
-    -webkit-appearance:none; border-radius:0;
-  }
-  .field input::placeholder,
-  .field textarea::placeholder { color:var(--wff); }
-  .panel-dev .field input:focus,
-  .panel-dev .field select:focus,
-  .panel-dev .field textarea:focus { border-color:var(--dev); }
-  .panel-biz .field input:focus,
-  .panel-biz .field select:focus,
-  .panel-biz .field textarea:focus { border-color:var(--biz); }
-  .field-row { display:grid; grid-template-columns:1fr 1fr; gap:0.8rem; }
+    @keyframes blink {
 
-  .prefixed { position:relative; }
-  .pfx {
-    position:absolute; left:0.9rem; top:50%;
-    transform:translateY(-50%);
-    font-family:'Space Mono',monospace; font-size:0.78rem;
-    pointer-events:none;
-  }
-  .pfx-dev { color:var(--dev); }
-  .pfx-biz { color:var(--biz); }
-  .prefixed input { padding-left:2.4rem; }
+      0%,
+      100% {
+        opacity: 1;
+      }
 
-  .checks { display:flex; flex-direction:column; gap:0.48rem; margin-top:0.3rem; }
-  .check {
-    display:flex; align-items:flex-start; gap:0.65rem;
-    cursor:pointer; font-size:0.83rem; color:var(--wd); line-height:1.5;
-  }
-  .check input[type=checkbox] {
-    width:14px; height:14px; flex-shrink:0; margin-top:0.18rem;
-    padding:0; border-radius:0; cursor:pointer;
-  }
-  .panel-dev .check input[type=checkbox] { accent-color:var(--dev); }
-  .panel-biz .check input[type=checkbox] { accent-color:var(--biz); }
+      50% {
+        opacity: 0.25;
+      }
+    }
 
-  .submit {
-    width:100%; border:none; cursor:pointer;
-    font-family:'Space Mono',monospace;
-    font-size:0.74rem; letter-spacing:0.1em; text-transform:uppercase;
-    padding:1rem; margin-top:0.6rem; transition:all 0.2s;
-  }
-  .sub-dev { background:var(--dev); color:var(--void); }
-  .sub-biz { background:var(--biz); color:var(--void); }
-  .submit:hover { filter:brightness(1.1); transform:translateY(-1px); }
-  .submit:disabled { opacity:0.6; cursor:default; transform:none; }
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.1rem 2.5rem;
+      background: rgba(5, 5, 10, 0.92);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
 
-  /* success */
-  .success { display:none; text-align:center; padding:1.5rem 0; }
-  .success.show { display:block; }
-  .success-icon { font-size:2.2rem; margin-bottom:0.8rem; }
-  .success-h {
-    font-family:'Fraunces',serif; font-size:1.3rem;
-    font-weight:500; margin-bottom:0.5rem;
-  }
-  .success-sub { font-size:0.82rem; color:var(--wd); line-height:1.7; margin-bottom:1.5rem; }
-  .ref-box {
-    background:var(--s2); border:1px solid var(--border);
-    padding:1rem 1.2rem; text-align:left;
-  }
-  .ref-label {
-    font-family:'Space Mono',monospace; font-size:0.58rem;
-    letter-spacing:0.16em; text-transform:uppercase;
-    margin-bottom:0.5rem;
-  }
-  .panel-dev .ref-label { color:var(--dev); }
-  .panel-biz .ref-label { color:var(--biz); }
-  .ref-sub { font-size:0.78rem; color:var(--wd); margin-bottom:0.7rem; line-height:1.6; }
-  .ref-copy { display:flex; gap:0; }
-  .ref-url {
-    flex:1; background:var(--s3); border:1px solid var(--border);
-    color:var(--wf); padding:0.5rem 0.7rem; border-right:none;
-    font-family:'Space Mono',monospace; font-size:0.62rem;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  .ref-btn {
-    border:none; cursor:pointer; padding:0.5rem 0.9rem;
-    font-family:'Space Mono',monospace; font-size:0.62rem;
-    letter-spacing:0.08em; text-transform:uppercase;
-    transition:filter 0.2s; white-space:nowrap;
-  }
-  .panel-dev .ref-btn { background:var(--dev); color:var(--void); }
-  .panel-biz .ref-btn { background:var(--biz); color:var(--void); }
-  .ref-btn:hover { filter:brightness(1.1); }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      text-decoration: none;
+    }
 
-  /* ── FOOTER ── */
-  footer {
-    padding:2rem 2.5rem; border-top:1px solid var(--border);
-    background:var(--s1);
-    display:flex; align-items:center; justify-content:space-between;
-    flex-wrap:wrap; gap:1rem;
-  }
-  .footer-mission {
-    font-family:'Fraunces',serif; font-style:italic;
-    font-size:0.88rem; color:var(--wd);
-  }
-  .footer-meta {
-    font-family:'Space Mono',monospace;
-    font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase;
-    color:rgba(237,233,224,0.55);
-  }
+    .nav-orb {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: conic-gradient(from 200deg, var(--dev) 0%, var(--own) 40%, var(--biz) 70%, var(--dev) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-  /* ── RESPONSIVE ── */
-  @media(max-width:800px){
-    .hero { grid-template-columns:1fr; }
-    .hero-seam,.hero-or { display:none; }
-    .half { padding:5rem 1.8rem 3.5rem; }
-    .half-dev { border-bottom:1px solid var(--border); }
-    .stat-inner { grid-template-columns:1fr 1fr 1fr; }
-    .stat-cell:nth-child(4),.stat-cell:nth-child(5),.stat-cell:nth-child(6){ border-top:1px solid var(--border); }
-    .layer-intro { grid-template-columns:1fr; gap:2rem; }
-    .cards-2,.cards-3 { grid-template-columns:1fr; }
-    .metrics { grid-template-columns:1fr 1fr; }
-    .erc-inner { grid-template-columns:1fr; gap:3rem; }
-    .ps-row { grid-template-columns:1fr; }
-    .ps-problem { border-right:none; border-bottom:1px solid var(--border); }
-    .field-row { grid-template-columns:1fr; }
-    footer { flex-direction:column; text-align:center; }
-    nav { padding:0.9rem 1.2rem; }
-    .nav-status { display:none; }
-    section > .container > div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns:1fr !important; }
-  }
-</style>
+    .nav-orb-inner {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--void);
+    }
+
+    .nav-name {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      line-height: 1.3;
+    }
+
+    .nav-sub {
+      font-size: 0.58rem;
+      color: var(--wf);
+      letter-spacing: 0.06em;
+    }
+
+    .nav-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--wf);
+      border: 1px solid var(--border);
+      padding: 0.28rem 0.7rem;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--dev);
+      animation: blink 2s ease infinite;
+    }
+
+    /* ── HERO SPLIT ── */
+    .hero {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      position: relative;
+    }
+
+    .hero-seam {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 1px;
+      background: linear-gradient(to bottom,
+          transparent 0%,
+          var(--border) 15%,
+          var(--border) 85%,
+          transparent 100%);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .hero-or {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+      background: var(--void);
+      border: 1px solid var(--border);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--wf);
+      opacity: 0;
+      animation: fadeIn 0.8s ease 1.2s forwards;
+    }
+
+    .half {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 8rem 4rem 5rem;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.5s ease;
+      cursor: pointer;
+    }
+
+    .half-dev {
+      background: rgba(0, 191, 165, 0.015);
+    }
+
+    .half-biz {
+      background: rgba(232, 160, 32, 0.015);
+    }
+
+    .half-dev:hover {
+      background: rgba(0, 191, 165, 0.035);
+    }
+
+    .half-biz:hover {
+      background: rgba(232, 160, 32, 0.035);
+    }
+
+    .half-glow {
+      position: absolute;
+      pointer-events: none;
+      border-radius: 50%;
+      filter: blur(80px);
+      transition: opacity 0.5s;
+    }
+
+    .half-dev .half-glow {
+      top: -10%;
+      left: -10%;
+      width: 60%;
+      height: 60%;
+      background: radial-gradient(ellipse, rgba(0, 191, 165, 0.1), transparent 70%);
+    }
+
+    .half-biz .half-glow {
+      bottom: -10%;
+      right: -10%;
+      width: 60%;
+      height: 60%;
+      background: radial-gradient(ellipse, rgba(232, 160, 32, 0.1), transparent 70%);
+    }
+
+    .half-h1 {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(1.9rem, 3vw, 2.7rem);
+      font-weight: 500;
+      line-height: 1.08;
+      margin-bottom: 1.1rem;
+      opacity: 0;
+      animation: fadeUp 0.7s ease forwards;
+    }
+
+    .half-dev .half-h1 {
+      animation-delay: 0.35s;
+    }
+
+    .half-biz .half-h1 {
+      animation-delay: 0.55s;
+    }
+
+    .half-h1 em {
+      font-style: italic;
+      font-weight: 300;
+    }
+
+    .half-dev .half-h1 em {
+      color: var(--dev);
+    }
+
+    .half-biz .half-h1 em {
+      color: var(--biz);
+    }
+
+    .half-p {
+      font-size: 0.88rem;
+      color: var(--wd);
+      line-height: 1.78;
+      max-width: 400px;
+      margin-bottom: 2rem;
+      opacity: 0;
+      animation: fadeUp 0.7s ease forwards;
+    }
+
+    .half-dev .half-p {
+      animation-delay: 0.45s;
+    }
+
+    .half-biz .half-p {
+      animation-delay: 0.65s;
+    }
+
+    .half-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.8rem 1.7rem;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      opacity: 0;
+      animation: fadeUp 0.7s ease forwards;
+      width: fit-content;
+    }
+
+    .half-dev .half-btn {
+      background: var(--dev);
+      color: var(--void);
+      animation-delay: 0.55s;
+    }
+
+    .half-biz .half-btn {
+      background: var(--biz);
+      color: var(--void);
+      animation-delay: 0.75s;
+    }
+
+    .half-btn:hover {
+      filter: brightness(1.1);
+      transform: translateY(-2px);
+    }
+
+    .half-btn .arr {
+      transition: transform 0.2s;
+    }
+
+    .half-btn:hover .arr {
+      transform: translateX(4px);
+    }
+
+    .half-proof {
+      margin-top: 2.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      opacity: 0;
+      animation: fadeUp 0.7s ease forwards;
+    }
+
+    .half-dev .half-proof {
+      animation-delay: 0.65s;
+    }
+
+    .half-biz .half-proof {
+      animation-delay: 0.85s;
+    }
+
+    .proof-li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      font-size: 0.77rem;
+      color: var(--wf);
+      line-height: 1.5;
+    }
+
+    .proof-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 0.38rem;
+    }
+
+    .half-dev .proof-dot {
+      background: var(--dev);
+    }
+
+    .half-biz .proof-dot {
+      background: var(--biz);
+    }
+
+    /* ── STAT BAR ── */
+    .stat-bar {
+      background: var(--s1);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+    }
+
+    .stat-cell {
+      padding: 1.4rem 1.5rem;
+      text-align: center;
+      border-right: 1px solid var(--border);
+    }
+
+    .stat-cell:last-child {
+      border-right: none;
+    }
+
+    .stat-val {
+      font-family: 'Space Mono', monospace;
+      font-size: 1.25rem;
+      color: var(--dev);
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-lbl {
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--wff);
+    }
+
+    /* ── SECTION PAD ── */
+    .pad {
+      padding: 6.5rem 2rem;
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    /* ── LAYER INTRO ── */
+    .layer-intro {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: start;
+      margin-bottom: 4rem;
+    }
+
+    /* ── CODE BLOCK ── */
+    .code-wrap {
+      background: var(--s2);
+      border: 1px solid var(--border);
+      padding: 1.8rem 2rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.74rem;
+      line-height: 2;
+      overflow-x: auto;
+      margin-bottom: 3rem;
+    }
+
+    .cc {
+      color: rgba(0, 191, 165, 0.38);
+    }
+
+    .ck {
+      color: var(--dev);
+    }
+
+    .cv {
+      color: var(--wd);
+    }
+
+    .ce {
+      color: var(--err);
+    }
+
+    .cw {
+      color: var(--warn);
+    }
+
+    .cok {
+      color: var(--ok);
+    }
+
+    .cp {
+      color: var(--own);
+    }
+
+    /* ── GRID CARDS ── */
+    .cards-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+
+    .cards-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+
+    .card {
+      background: var(--s1);
+      padding: 2.2rem 2rem;
+      position: relative;
+      transition: background 0.25s;
+    }
+
+    .card:hover {
+      background: var(--s2);
+    }
+
+    .card-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+    }
+
+    .ct-dev {
+      background: var(--dev);
+    }
+
+    .ct-biz {
+      background: var(--biz);
+    }
+
+    .ct-own {
+      background: var(--own);
+    }
+
+    .ct-both {
+      background: linear-gradient(90deg, var(--dev), var(--biz));
+    }
+
+    .ct-all {
+      background: linear-gradient(90deg, var(--dev), var(--own), var(--biz));
+    }
+
+    .card-num {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      color: var(--wff);
+      margin-bottom: 0.7rem;
+    }
+
+    .card-title {
+      font-family: 'Fraunces', serif;
+      font-size: 1rem;
+      font-weight: 500;
+      line-height: 1.2;
+      margin-bottom: 0.6rem;
+    }
+
+    .card-body {
+      font-size: 0.82rem;
+      color: var(--wd);
+      line-height: 1.72;
+    }
+
+    .card-chip {
+      display: inline-block;
+      margin-top: 0.9rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.1em;
+      padding: 0.18rem 0.5rem;
+      border: 1px solid;
+    }
+
+    .chip-dev {
+      color: var(--dev);
+      border-color: var(--dev-b);
+      background: var(--dev-d);
+    }
+
+    .chip-biz {
+      color: var(--biz);
+      border-color: var(--biz-b);
+      background: var(--biz-d);
+    }
+
+    .chip-own {
+      color: var(--own);
+      border-color: var(--own-b);
+      background: var(--own-d);
+    }
+
+    /* ── PROOF METRICS ── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: 4rem;
+    }
+
+    .metric {
+      background: var(--s1);
+      padding: 2rem 1.8rem;
+      text-align: center;
+      transition: background 0.25s;
+    }
+
+    .metric:hover {
+      background: var(--s2);
+    }
+
+    .metric-n {
+      font-family: 'Fraunces', serif;
+      font-size: 2.6rem;
+      color: var(--dev);
+      line-height: 1;
+      margin-bottom: 0.4rem;
+    }
+
+    .metric-l {
+      font-size: 0.7rem;
+      color: var(--wf);
+      line-height: 1.5;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── ERC SECTION ── */
+    .erc-section {
+      background: var(--s1);
+      border-top: 1px solid var(--border);
+    }
+
+    .erc-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: start;
+    }
+
+    .erc-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .erc-badge {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid var(--own-b);
+      color: var(--own);
+      background: var(--own-d);
+    }
+
+    .erc-author {
+      font-size: 0.72rem;
+      color: var(--wf);
+    }
+
+    .erc-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      border: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    .erc-card {
+      background: var(--s2);
+      padding: 1.5rem 1.8rem;
+      transition: background 0.2s;
+    }
+
+    .erc-card:hover {
+      background: var(--s3);
+    }
+
+    .erc-card-title {
+      font-weight: 600;
+      font-size: 0.88rem;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .erc-card-title span {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--own);
+      letter-spacing: 0.1em;
+    }
+
+    .erc-card-body {
+      font-size: 0.8rem;
+      color: var(--wd);
+      line-height: 1.7;
+    }
+
+    /* problem/solution pairs */
+    .ps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      border: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    .ps-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      background: var(--border);
+      transition: opacity 0.2s;
+    }
+
+    .ps-row:hover {
+      opacity: 0.9;
+    }
+
+    .ps-cell {
+      padding: 1.8rem 2rem;
+      position: relative;
+    }
+
+    .ps-problem {
+      background: var(--s1);
+      border-right: 1px solid var(--border);
+    }
+
+    .ps-solution {
+      background: var(--s2);
+    }
+
+    .ps-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 0.6rem;
+    }
+
+    .ps-problem .ps-label {
+      color: var(--err);
+    }
+
+    .ps-solution .ps-label {
+      color: var(--ok);
+    }
+
+    .ps-title {
+      font-weight: 600;
+      font-size: 0.88rem;
+      margin-bottom: 0.4rem;
+      line-height: 1.3;
+    }
+
+    .ps-body {
+      font-size: 0.8rem;
+      color: var(--wd);
+      line-height: 1.7;
+    }
+
+    /* ── SHARE NUDGE ── */
+    .share-nudge {
+      background: var(--own-d);
+      border: 1px solid var(--own-b);
+      padding: 1.8rem 2rem;
+      margin-top: 3rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .share-nudge-text {
+      flex: 1;
+    }
+
+    .share-nudge-h {
+      font-weight: 600;
+      font-size: 0.92rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .share-nudge-sub {
+      font-size: 0.8rem;
+      color: var(--wd);
+    }
+
+    .share-btn {
+      background: var(--own);
+      color: var(--void);
+      border: none;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.75rem 1.6rem;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .share-btn:hover {
+      filter: brightness(1.1);
+    }
+
+    /* ── FORMS ── */
+    .forms-section {
+      background: var(--void);
+      border-top: 1px solid var(--border);
+    }
+
+    .forms-hdr {
+      text-align: center;
+      margin-bottom: 3.5rem;
+    }
+
+    .forms-hdr .h2 {
+      font-size: clamp(1.6rem, 2.6vw, 2.3rem);
+    }
+
+    .tabs {
+      display: flex;
+      max-width: 580px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-bottom: none;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 0.95rem 1rem;
+      background: var(--s1);
+      border: none;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.67rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: all 0.2s;
+      border-right: 1px solid var(--border);
+      color: var(--wf);
+    }
+
+    .tab:last-child {
+      border-right: none;
+    }
+
+    .tab.dev-active {
+      background: var(--dev-d);
+      color: var(--dev);
+      box-shadow: inset 0 -2px 0 var(--dev);
+    }
+
+    .tab.biz-active {
+      background: var(--biz-d);
+      color: var(--biz);
+      box-shadow: inset 0 -2px 0 var(--biz);
+    }
+
+    .tab:not(.dev-active):not(.biz-active):hover {
+      background: var(--s2);
+      color: var(--wd);
+    }
+
+    .panels {
+      max-width: 580px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      display: none;
+      background: var(--s1);
+      border: 1px solid var(--border);
+      padding: 2.5rem 2.2rem;
+    }
+
+    .panel.show {
+      display: block;
+    }
+
+    .panel-dev {
+      border-top: 2px solid var(--dev);
+    }
+
+    .panel-biz {
+      border-top: 2px solid var(--biz);
+    }
+
+    .panel-eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 1.4rem;
+    }
+
+    .panel-dev .panel-eyebrow {
+      color: var(--dev);
+    }
+
+    .panel-biz .panel-eyebrow {
+      color: var(--biz);
+    }
+
+    .field {
+      margin-bottom: 0.9rem;
+    }
+
+    .field label {
+      display: block;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--wf);
+      margin-bottom: 0.38rem;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      background: var(--s2);
+      border: 1px solid var(--border);
+      color: var(--white);
+      padding: 0.78rem 1rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+      border-radius: 0;
+    }
+
+    .field input::placeholder,
+    .field textarea::placeholder {
+      color: var(--wff);
+    }
+
+    .panel-dev .field input:focus,
+    .panel-dev .field select:focus,
+    .panel-dev .field textarea:focus {
+      border-color: var(--dev);
+    }
+
+    .panel-biz .field input:focus,
+    .panel-biz .field select:focus,
+    .panel-biz .field textarea:focus {
+      border-color: var(--biz);
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+    }
+
+    .prefixed {
+      position: relative;
+    }
+
+    .pfx {
+      position: absolute;
+      left: 0.9rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.78rem;
+      pointer-events: none;
+    }
+
+    .pfx-dev {
+      color: var(--dev);
+    }
+
+    .pfx-biz {
+      color: var(--biz);
+    }
+
+    .prefixed input {
+      padding-left: 2.4rem;
+    }
+
+    .checks {
+      display: flex;
+      flex-direction: column;
+      gap: 0.48rem;
+      margin-top: 0.3rem;
+    }
+
+    .check {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+      cursor: pointer;
+      font-size: 0.83rem;
+      color: var(--wd);
+      line-height: 1.5;
+    }
+
+    .check input[type=checkbox] {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      margin-top: 0.18rem;
+      padding: 0;
+      border-radius: 0;
+      cursor: pointer;
+    }
+
+    .panel-dev .check input[type=checkbox] {
+      accent-color: var(--dev);
+    }
+
+    .panel-biz .check input[type=checkbox] {
+      accent-color: var(--biz);
+    }
+
+    .submit {
+      width: 100%;
+      border: none;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.74rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 1rem;
+      margin-top: 0.6rem;
+      transition: all 0.2s;
+    }
+
+    .sub-dev {
+      background: var(--dev);
+      color: var(--void);
+    }
+
+    .sub-biz {
+      background: var(--biz);
+      color: var(--void);
+    }
+
+    .submit:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    .submit:disabled {
+      opacity: 0.6;
+      cursor: default;
+      transform: none;
+    }
+
+    /* success */
+    .success {
+      display: none;
+      text-align: center;
+      padding: 1.5rem 0;
+    }
+
+    .success.show {
+      display: block;
+    }
+
+    .success-icon {
+      font-size: 2.2rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .success-h {
+      font-family: 'Fraunces', serif;
+      font-size: 1.3rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+
+    .success-sub {
+      font-size: 0.82rem;
+      color: var(--wd);
+      line-height: 1.7;
+      margin-bottom: 1.5rem;
+    }
+
+    .ref-box {
+      background: var(--s2);
+      border: 1px solid var(--border);
+      padding: 1rem 1.2rem;
+      text-align: left;
+    }
+
+    .ref-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .panel-dev .ref-label {
+      color: var(--dev);
+    }
+
+    .panel-biz .ref-label {
+      color: var(--biz);
+    }
+
+    .ref-sub {
+      font-size: 0.78rem;
+      color: var(--wd);
+      margin-bottom: 0.7rem;
+      line-height: 1.6;
+    }
+
+    .ref-copy {
+      display: flex;
+      gap: 0;
+    }
+
+    .ref-url {
+      flex: 1;
+      background: var(--s3);
+      border: 1px solid var(--border);
+      color: var(--wf);
+      padding: 0.5rem 0.7rem;
+      border-right: none;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ref-btn {
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem 0.9rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: filter 0.2s;
+      white-space: nowrap;
+    }
+
+    .panel-dev .ref-btn {
+      background: var(--dev);
+      color: var(--void);
+    }
+
+    .panel-biz .ref-btn {
+      background: var(--biz);
+      color: var(--void);
+    }
+
+    .ref-btn:hover {
+      filter: brightness(1.1);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 2rem 2.5rem;
+      border-top: 1px solid var(--border);
+      background: var(--s1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-mission {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-size: 0.88rem;
+      color: var(--wd);
+    }
+
+    .footer-meta {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(237, 233, 224, 0.55);
+    }
+
+    /* coaching loop */
+    .coach-wrap {
+      background: var(--s1);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--biz);
+      padding: 2.5rem 2.2rem;
+      margin-bottom: 4rem;
+    }
+
+    .coach-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: start;
+    }
+
+    .coach-input-area {
+      position: relative;
+    }
+
+    .coach-results {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      opacity: 0;
+      transition: opacity 0.5s;
+      pointer-events: none;
+    }
+
+    .coach-results.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .coach-card {
+      background: var(--s2);
+      border: 1px solid var(--border);
+      padding: 1rem 1.2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .coach-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--c);
+    }
+
+    .coach-agent {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.4rem;
+      color: var(--c);
+    }
+
+    .coach-text {
+      font-size: 0.8rem;
+      line-height: 1.6;
+      color: var(--wd);
+    }
+
+    .coach-suggest {
+      font-size: 0.75rem;
+      color: var(--wf);
+      margin-top: 0.6rem;
+      padding-top: 0.6rem;
+      border-top: 1px solid var(--border);
+    }
+
+    /* swarm pulse */
+    .pulse-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 1rem;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--dev);
+      box-shadow: 0 0 10px var(--dev);
+      animation: pulse 2.5s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.4;
+        transform: scale(1.2);
+      }
+    }
+
+    @media(max-width:800px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-seam,
+      .hero-or {
+        display: none;
+      }
+
+      .half {
+        padding: 5rem 1.8rem 3.5rem;
+      }
+
+      .half-dev {
+        border-bottom: 1px solid var(--border);
+      }
+
+      .stat-inner {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+
+      .stat-cell:nth-child(4),
+      .stat-cell:nth-child(5),
+      .stat-cell:nth-child(6) {
+        border-top: 1px solid var(--border);
+      }
+
+      .layer-intro {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+
+      .cards-2,
+      .cards-3 {
+        grid-template-columns: 1fr;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .erc-inner {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+      }
+
+      .ps-row {
+        grid-template-columns: 1fr;
+      }
+
+      .ps-problem {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .coach-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+
+      .field-row {
+        grid-template-columns: 1fr;
+      }
+
+      footer {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      nav {
+        padding: 0.9rem 1.2rem;
+      }
+
+      .nav-status {
+        display: none;
+      }
+
+      section>.container>div[style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-<!-- NAV -->
-<nav>
-  <a class="nav-logo" href="#">
-    <div class="nav-orb"><div class="nav-orb-inner"></div></div>
-    <div>
-      <div class="nav-name">AI Trinity Symphony</div>
-      <div class="nav-sub">The Trust Layer for AI</div>
-    </div>
-  </a>
-  <div class="nav-status">
-    <div class="live-dot"></div>
-    12 agents · private beta
-  </div>
-</nav>
-
-<!-- ══ SPLIT HERO ══ -->
-<section class="hero" id="top">
-  <div class="hero-seam"></div>
-  <div class="hero-or">or</div>
-
-  <!-- DEV -->
-  <div class="half half-dev" onclick="go('dev')">
-    <div class="half-glow"></div>
-    <div class="tag tag-dev" style="opacity:0;animation:fadeIn 0.5s ease 0.2s forwards">For Developers</div>
-    <h1 class="half-h1">Stop building the<br><em>trust layer</em> yourself.</h1>
-    <p class="half-p">Every team building on raw LLMs is rebuilding the same verification infrastructure from scratch — confidence scoring, audit trails, retry logic, human escalation. We already built it. Battle-tested. Running at scale. Available as infrastructure built on <strong style="color:var(--dev)">ERC-8004</strong>.</p>
-    <a class="half-btn" href="#waitlist" onclick="event.stopPropagation();go('dev')">
-      Join with GitHub <span class="arr">→</span>
+  <!-- NAV -->
+  <nav>
+    <a class="nav-logo" href="#">
+      <div class="nav-orb">
+        <div class="nav-orb-inner"></div>
+      </div>
+      <div>
+        <div class="nav-name">AI Trinity Symphony</div>
+        <div class="nav-sub">The Trust Layer for AI</div>
+      </div>
     </a>
-    <div class="half-proof">
-      <div class="proof-li"><span class="proof-dot"></span><span>BFT consensus — Byzantine Fault Tolerant multi-agent verification</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>Every output: belief + disbelief + uncertainty (subjective logic triad)</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>Full audit trail — verified_by, repid_scores, consensus_method on every response</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>ANFIS routing — cheapest capable model per domain, learns over time</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>Built on ERC-8004 · portable agent identity · not locked to our infra</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>Multiple patents pending · 60–80% cost reduction</span></div>
+    <div class="nav-status">
+      <div class="live-dot"></div>
+      12 agents · private beta
     </div>
-    <a href="https://app.aitrinitysymphony.com" target="_blank" style="margin-top:1.4rem;font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--dev);letter-spacing:0.08em;text-decoration:none;opacity:0;animation:fadeUp 0.7s ease 0.8s forwards;display:block">
-      See full technical architecture → app.aitrinitysymphony.com
-    </a>
-  </div>
+  </nav>
 
-  <!-- BIZ -->
-  <div class="half half-biz" onclick="go('biz')">
-    <div class="half-glow"></div>
-    <div class="tag tag-biz" style="opacity:0;animation:fadeIn 0.5s ease 0.4s forwards">For Builders &amp; Organizations</div>
-    <h1 class="half-h1">AI that tells you<br>when it's <em>not sure</em>.</h1>
-    <p class="half-p">Confident wrong answers. Re-explaining your context every session. No way to know which outputs to trust. AI that agrees with everything you say. Trinity Symphony is 12 specialized agents that check each other's work, remember everything, and only ask for your input when your judgment actually matters.</p>
-    <a class="half-btn" href="#waitlist" onclick="event.stopPropagation();go('biz')">
-      Join with LinkedIn <span class="arr">→</span>
-    </a>
-    <div class="half-proof">
-      <div class="proof-li"><span class="proof-dot"></span><span>Near-zero hallucinations — squads of 3 agents verify every high-stakes output</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>Persistent memory — your context, goals, and history travel with every session</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>Built-in contrarian — structurally challenges every consensus answer</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>Manage your swarm from your phone · under 30 seconds avg review time</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>Free tier for nonprofits and ministries — genuinely free</span></div>
-      <div class="proof-li"><span class="proof-dot"></span><span>You own what your agents create · cryptographically provable</span></div>
-    </div>
-  </div>
-</section>
+  <!-- ══ SPLIT HERO ══ -->
+  <section class="hero" id="top">
+    <div class="hero-seam"></div>
+    <div class="hero-or">or</div>
 
-<!-- STAT BAR -->
-<div class="stat-bar r">
-  <div class="stat-inner">
-    <div class="stat-cell">
-      <span class="stat-val" id="ctr">$0</span>
-      <span class="stat-lbl">System Savings Today</span>
-    </div>
-    <div class="stat-cell" style="border-left:1px solid var(--dev-b)">
-      <span class="stat-val" style="color:var(--biz)">$340<span style="font-size:0.8rem">/mo</span><span style="font-size:0.6rem;color:var(--wff)">*</span></span>
-      <span class="stat-lbl">Avg Saved Per User</span>
-    </div>
-    <div class="stat-cell">
-      <span class="stat-val">60–80%</span>
-      <span class="stat-lbl">Cost Reduction</span>
-    </div>
-    <div class="stat-cell">
-      <span class="stat-val">12</span>
-      <span class="stat-lbl">Agents Running 24/7</span>
-    </div>
-    <div class="stat-cell">
-      <span class="stat-val" id="truths-ctr">12,402</span>
-      <span class="stat-lbl">Truths Verified</span>
-    </div>
-  </div>
-</div>
-<div style="text-align:right;padding:0.4rem 2rem;background:var(--s1);border-bottom:1px solid var(--border)">
-  <span style="font-family:'Space Mono',monospace;font-size:0.55rem;color:rgba(237,233,224,0.55);letter-spacing:0.08em">
-    * Based on 60–80% reduction applied to avg $450/mo single-model AI spend
-  </span>
-</div>
-
-<!-- ══ LAYER 1: TRUST ══ -->
-<section class="pad" style="background:var(--s1);border-top:1px solid var(--border)" id="trust">
-  <div class="container">
-    <div class="layer-intro r">
-      <div>
-        <div class="eyebrow ey-dev">Layer 01 — Trust</div>
-        <h2 class="h2">Every LLM gives you an answer.<br>None tell you <em class="dev-em">how wrong they might be</em>.</h2>
+    <!-- DEV -->
+    <div class="half half-dev" onclick="go('dev')">
+      <div class="half-glow"></div>
+      <div class="tag tag-dev" style="opacity:0;animation:fadeIn 0.5s ease 0.2s forwards">For Developers</div>
+      <h1 class="half-h1">Stop building the<br><em>trust layer</em> yourself.</h1>
+      <p class="half-p">Every team building on raw LLMs is rebuilding the same verification infrastructure from scratch
+        — confidence scoring, audit trails, retry logic, human escalation. We already built it. Battle-tested. Running
+        at scale. Available as infrastructure built on <strong style="color:var(--dev)">ERC-8004</strong>.</p>
+      <a class="half-btn" href="#waitlist" onclick="event.stopPropagation();go('dev')">
+        Join with GitHub <span class="arr">→</span>
+      </a>
+      <div class="half-proof">
+        <div class="proof-li"><span class="proof-dot"></span><span>BFT consensus — Byzantine Fault Tolerant multi-agent
+            verification</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>Every output: belief + disbelief + uncertainty
+            (subjective logic triad)</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>Full audit trail — verified_by, repid_scores,
+            consensus_method on every response</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>ANFIS routing — cheapest capable model per domain,
+            learns over time</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>Built on ERC-8004 · portable agent identity · not
+            locked to our infra</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>Multiple patents pending · 60–80% cost
+            reduction</span></div>
       </div>
-      <div>
-        <p class="body-text">Single-model AI has no epistemic architecture. It produces outputs — not confidence states. You can't query why an answer was generated, who verified it, or how certain the system actually is. You get text and a prayer.</p>
-      </div>
+      <a href="https://app.aitrinitysymphony.com" target="_blank"
+        style="margin-top:1.4rem;font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--dev);letter-spacing:0.08em;text-decoration:none;opacity:0;animation:fadeUp 0.7s ease 0.8s forwards;display:block">
+        See full technical architecture → app.aitrinitysymphony.com
+      </a>
     </div>
 
-    <!-- CODE COMPARISON -->
-    <div class="code-wrap r r1">
-      <div class="cc">// What every single LLM returns today</div>
-      <div><span class="ck">response</span>      <span class="cv">→</span> <span class="cv">"The statute requires a 30-day notice period."</span></div>
-      <div><span class="ck">confidence</span>    <span class="cv">→</span> <span class="ce">undefined</span></div>
-      <div><span class="ck">verified_by</span>   <span class="cv">→</span> <span class="ce">undefined</span></div>
-      <div><span class="ck">audit_trail</span>   <span class="cv">→</span> <span class="ce">undefined</span></div>
-      <div><span class="ck">contradictions</span><span class="cv">→</span> <span class="ce">undefined</span></div>
-      <div><span class="ck">escalate</span>      <span class="cv">→</span> <span class="ce">undefined  // you find out when it's too late</span></div>
-      <br>
-      <div class="cc">// What Trinity Symphony returns on every output</div>
-      <div><span class="ck">response</span>      <span class="cv">→</span> <span class="cv">"The statute requires a 30-day notice period."</span></div>
-      <div><span class="ck">belief</span>        <span class="cv">→</span> <span class="cok">0.84</span>   <span class="cc">// subjective logic triad — belief + disbelief + uncertainty = 1</span></div>
-      <div><span class="ck">disbelief</span>     <span class="cv">→</span> <span class="cok">0.09</span></div>
-      <div><span class="ck">uncertainty</span>   <span class="cv">→</span> <span class="cw">0.07</span>   <span class="cc">// auto-escalated to human if > 0.20</span></div>
-      <div><span class="ck">verified_by</span>   <span class="cv">→</span> <span class="cok">["trinity-veritas", "trinity-chesed", "trinity-shofet"]</span></div>
-      <div><span class="ck">repid_scores</span>  <span class="cv">→</span> <span class="cok">[0.93, 0.88, 0.91]</span>  <span class="cc">// earned reputation, not assumed</span></div>
-      <div><span class="ck">consensus</span>     <span class="cv">→</span> <span class="cok">"BFT_golden_ratio_61.8pct"</span></div>
-      <div><span class="ck">contradictions</span><span class="cv">→</span> <span class="cok">0</span></div>
-      <div><span class="ck">escalate</span>      <span class="cv">→</span> <span class="cok">false</span>  <span class="cc">// escalates automatically when it should</span></div>
+    <!-- BIZ -->
+    <div class="half half-biz" onclick="go('biz')">
+      <div class="half-glow"></div>
+      <div class="tag tag-biz" style="opacity:0;animation:fadeIn 0.5s ease 0.4s forwards">For Builders &amp;
+        Organizations</div>
+      <h1 class="half-h1">AI that tells you<br>when it's <em>not sure</em>.</h1>
+      <p class="half-p">Confident wrong answers. Re-explaining your context every session. No way to know which outputs
+        to trust. AI that agrees with everything you say. Trinity Symphony is 12 specialized agents that check each
+        other's work, remember everything, and only ask for your input when your judgment actually matters.</p>
+      <a class="half-btn" href="#waitlist" onclick="event.stopPropagation();go('biz')">
+        Join with LinkedIn <span class="arr">→</span>
+      </a>
+      <div class="half-proof">
+        <div class="proof-li"><span class="proof-dot"></span><span>Near-zero hallucinations — squads of 3 agents verify
+            every high-stakes output</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>Persistent memory — your context, goals, and history
+            travel with every session</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>Built-in contrarian — structurally challenges every
+            consensus answer</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>Manage your swarm from your phone · under 30 seconds
+            avg review time</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>Free tier for nonprofits and ministries — genuinely
+            free</span></div>
+        <div class="proof-li"><span class="proof-dot"></span><span>You own what your agents create · cryptographically
+            provable</span></div>
+      </div>
     </div>
+  </section>
 
-    <div class="cards-3 r r2">
-      <div class="card">
-        <div class="card-top ct-dev"></div>
-        <div class="card-num">01 — CONSENSUS</div>
-        <div class="card-title">Byzantine Fault Tolerant Verification</div>
-        <div class="card-body">Named after the Byzantine Generals Problem in distributed systems. Requires a supermajority of agents to independently agree before any output is verified. One compromised or hallucinating agent cannot corrupt the result. The architecture assumes failure and routes around it.</div>
-        <div class="card-chip chip-dev">BFT · 61.8% golden ratio threshold</div>
+  <!-- STAT BAR -->
+  <div class="stat-bar r">
+    <div class="stat-inner">
+      <div class="stat-cell">
+        <span class="stat-val" id="ctr">$0</span>
+        <span class="stat-lbl">System Savings Today</span>
       </div>
-      <div class="card">
-        <div class="card-top ct-both"></div>
-        <div class="card-num">02 — ADVERSARIAL</div>
-        <div class="card-title">The Pythagorean Comma — Built-In Contrarian</div>
-        <div class="card-body">A permanent adversarial agent whose only job is finding what's wrong with consensus outputs. Named after the musical dissonance that exposes the gap between perfect theory and reality. Sycophancy — AI agreeing with everything you say — is a design flaw. We engineer structurally against it.</div>
-        <div class="card-chip chip-biz">Anti-sycophancy · structural not optional</div>
+      <div class="stat-cell" style="border-left:1px solid var(--dev-b)">
+        <span class="stat-val" style="color:var(--biz)">$340<span style="font-size:0.8rem">/mo</span><span
+            style="font-size:0.6rem;color:var(--wff)">*</span></span>
+        <span class="stat-lbl">Avg Saved Per User</span>
       </div>
-      <div class="card">
-        <div class="card-top ct-dev"></div>
-        <div class="card-num">03 — REPUTATION</div>
-        <div class="card-title">RepID — Dynamic Agent Trust Scoring</div>
-        <div class="card-body">Every agent earns a 3-tier reputation score: calibration accuracy, factual accuracy, and contrarian value. Scores decay over time if not validated. An agent right 100 times loses trust if recent outputs drift. Trust is earned, tracked, and temporal — not assumed at instantiation.</div>
-        <div class="card-chip chip-dev">3-tier · decay-weighted · patent pending</div>
+      <div class="stat-cell">
+        <span class="stat-val">60–80%</span>
+        <span class="stat-lbl">Cost Reduction</span>
       </div>
-      <div class="card">
-        <div class="card-top ct-dev"></div>
-        <div class="card-num">04 — ROUTING</div>
-        <div class="card-title">ANFIS + LASSO Intelligent Routing</div>
-        <div class="card-body">Adaptive Neuro-Fuzzy Inference System combined with LASSO sparse optimization. Routes each query to the optimal model based on domain, complexity, and cost — using only the compute actually needed. Legal questions get different models than creative tasks. GNN Semantic RAG learns and improves routing over time.</div>
-        <div class="card-chip chip-dev">ANFIS · LASSO · SLM clustering · patent pending</div>
+      <div class="stat-cell">
+        <span class="stat-val">12</span>
+        <span class="stat-lbl">Agents Running 24/7</span>
       </div>
-      <div class="card">
-        <div class="card-top ct-both"></div>
-        <div class="card-num">05 — CALIBRATION</div>
-        <div class="card-title">WSCE Uncertainty Scoring</div>
-        <div class="card-body">Weighted Synthesis Coherence Equation. Every output carries a rolling confidence score calibrated against a 100-output window. The system detects overconfidence and self-corrects before bad outputs reach you. Uncertainty variance above threshold triggers exploration, not false certainty.</div>
-        <div class="card-chip chip-dev">WSCE · σ_u anti-parking gate</div>
-      </div>
-      <div class="card">
-        <div class="card-top ct-dev"></div>
-        <div class="card-num">06 — MEMORY</div>
-        <div class="card-title">GNN Semantic RAG — Graph Memory</div>
-        <div class="card-body">Forget simple vector search. Trinity Symphony uses Multi-Relational Graph Neural Networks for deep context that grows with every interaction. Actively flags when new information contradicts established context — adding uncertainty weight rather than silently accepting the contradiction. Your knowledge base becomes self-consistent and genuinely learns.</div>
-        <div class="card-chip chip-dev">GNN · Multi-Relational · ragContradictionBoost</div>
-      </div>
-
-      <div class="card">
-        <div class="card-top ct-own"></div>
-        <div class="card-num">07 — PROVENANCE</div>
-        <div class="card-title">Merkle HyperDAG — Tamper-Proof Audit Trail</div>
-        <div class="card-body">Every agent thought, decision, and output is anchored in a Merkle HyperDAG — a tamper-proof, append-only structure where provenance is cryptographically guaranteed. You can trace any output back to its origin. Nothing can be quietly revised after the fact. The truth of what happened is permanent.</div>
-        <div class="card-chip chip-own">Merkle HyperDAG · append-only · patent pending</div>
-      </div>
-
-      <div class="card">
-        <div class="card-top ct-own"></div>
-        <div class="card-num">08 — IDENTITY</div>
-        <div class="card-title">Zero-Knowledge RepID — Private Verifiable Trust</div>
-        <div class="card-body">Agent reputation scores are verified via zero-knowledge proofs — meaning the trust signal is publicly verifiable without exposing the underlying data. Your agents carry private, verifiable social proof across every interaction. Soulbound Token architecture ensures reputation is earned, non-transferable, and permanently linked to identity.</div>
-        <div class="card-chip chip-own">ZKP · Soulbound Tokens · non-transferable reputation</div>
-      </div>
-
-      <div class="card">
-        <div class="card-top ct-both"></div>
-        <div class="card-num">09 — PREDICTION</div>
-        <div class="card-title">Ripple Effect Protocol</div>
-        <div class="card-body">Most agent systems react to failures after they happen. Trinity Symphony predicts sensitivity cascades before they occur — modeling how a decision in one part of the swarm propagates across all 12 agents. The Ripple Effect Protocol maps interdependencies and flags high-risk actions before execution, not after.</div>
-        <div class="card-chip chip-dev">Swarm sensitivity mapping · pre-emptive risk scoring</div>
+      <div class="stat-cell">
+        <span class="stat-val" id="truths-ctr">12,402</span>
+        <span class="stat-lbl">Truths Verified</span>
       </div>
     </div>
   </div>
-</section>
-
-<!-- ══ LAYER 2: INTELLIGENCE ══ -->
-<section class="pad" style="background:var(--void);border-top:1px solid var(--border)" id="intelligence">
-  <div class="container">
-    <div class="layer-intro r">
-      <div>
-        <div class="eyebrow ey-biz">Layer 02 — Intelligence</div>
-        <h2 class="h2">It doesn't just answer.<br>It <em class="biz-em">learns what you need</em>.</h2>
-      </div>
-      <div>
-        <p class="body-text">Single models are stateless strangers. Every session starts from zero. Trinity Symphony builds a persistent intelligence layer around your work — your context, your preferences, your history, your best-performing routes — and gets faster and cheaper the longer you use it.</p>
-      </div>
-    </div>
-
-    <div class="cards-2 r r1">
-      <div class="card">
-        <div class="card-top ct-biz"></div>
-        <div class="card-num">01 — PERSISTENT STATE</div>
-        <div class="card-title">Context That Travels With You</div>
-        <div class="card-body">Your business context, communication style, ongoing projects, past decisions, and preferences persist across every session. Organize threads by topic, project, or output type. Pick up exactly where you left off. Never re-explain yourself again. The agents know your work — not just your last message.</div>
-        <div class="card-chip chip-biz">Persistent state · thread management · Supabase-backed</div>
-      </div>
-      <div class="card">
-        <div class="card-top ct-dev"></div>
-        <div class="card-num">02 — COST ARBITRAGE</div>
-        <div class="card-title">Free-Tier Intelligence at Scale</div>
-        <div class="card-body">ANFIS + LASSO routes every query to the cheapest capable model across Groq, Together.ai, DeepSeek, OpenRouter, and others in real time. The system tracks cost attribution on every LLM call, auto-switches on price variance above 10%, and surfaces your actual savings vs baseline. The 60–80% reduction is a live measured number — not a claim.</div>
-        <div class="card-chip chip-dev">FrugalGPT attribution · real-time arbitrage · BYOK compatible</div>
-      </div>
-      <div class="card">
-        <div class="card-top ct-biz"></div>
-        <div class="card-num">03 — COACHING</div>
-        <div class="card-title">AI That Teaches You as You Work</div>
-        <div class="card-body">Trinity Symphony shows you which prompts produce better results, which models work best for your specific use cases, and where your workflows are burning unnecessary cost. You get smarter alongside the system. Most AI tools make you dependent. This one makes you more capable.</div>
-        <div class="card-chip chip-biz">Real-time coaching · prompt optimization · workflow intelligence</div>
-      </div>
-      <div class="card">
-        <div class="card-top ct-both"></div>
-        <div class="card-num">04 — MOBILE COMMAND</div>
-        <div class="card-title">Your Swarm in Your Pocket</div>
-        <div class="card-body">Direct 12 agents from Telegram — voice or text. Approval cards surface high-stakes decisions in under 30 seconds. Live savings ticker. Stakeholder observer mode lets investors or partners watch the system work in real time without a slide deck. The conductor's baton is your phone.</div>
-        <div class="card-chip chip-biz">Telegram · voice input · observer mode · &lt;30s review</div>
-      </div>
-    </div>
+  <div style="text-align:right;padding:0.4rem 2rem;background:var(--s1);border-bottom:1px solid var(--border)">
+    <span
+      style="font-family:'Space Mono',monospace;font-size:0.55rem;color:rgba(237,233,224,0.55);letter-spacing:0.08em">
+      * Based on 60–80% reduction applied to avg $450/mo single-model AI spend
+    </span>
   </div>
-</section>
 
-<!-- ══ LAYER 3: OWNERSHIP ══ -->
-<section class="pad erc-section" id="ownership">
-  <div class="container">
-    <div class="layer-intro r">
-      <div>
-        <div class="eyebrow ey-own">Layer 03 — Ownership &amp; Accountability</div>
-        <h2 class="h2">When an agent acts,<br>who is <em class="own-em">responsible</em>?</h2>
-        <p class="body-text" style="margin-top:1rem">Who authorized it? Who owns what it created? How do you prove what happened — without exposing your data to do it? These aren't philosophical questions. They're the unsolved infrastructure problems of the agentic era. Trinity Symphony solves them at the protocol level.</p>
-
-        <div class="erc-logo-row" style="margin-top:1.5rem">
-          <div class="erc-badge">Built on ERC-8004</div>
-          <div class="erc-author">Co-authored by MetaMask · Ethereum Foundation · Google · Coinbase</div>
+  <!-- ══ LAYER 1: TRUST ══ -->
+  <section class="pad" style="background:var(--s1);border-top:1px solid var(--border)" id="trust">
+    <div class="container">
+      <div class="layer-intro r">
+        <div>
+          <div class="eyebrow ey-dev">Layer 01 — Trust</div>
+          <h2 class="h2">Every LLM gives you an answer.<br>None tell you <em class="dev-em">how wrong they might
+              be</em>.</h2>
         </div>
-        <p class="body-text">ERC-8004 is the emerging standard for trustless agent identity, reputation, and validation on Ethereum. Trinity Symphony is built on it — meaning your agents are portable, interoperable, and not locked to our infrastructure. Your RepID scores travel with your agents everywhere.</p>
+        <div>
+          <p class="body-text">Single-model AI has no epistemic architecture. It produces outputs — not confidence
+            states. You can't query why an answer was generated, who verified it, or how certain the system actually is.
+            You get text and a prayer.</p>
+        </div>
       </div>
 
-      <div>
-        <div class="erc-cards r r1">
-          <div class="erc-card">
-            <div class="erc-card-title">Identity Registry <span>ERC-721 based</span></div>
-            <div class="erc-card-body">Every Trinity Symphony agent has a cryptographic on-chain identity. Portable across chains. Transferable. Browsable in any ERC-721 compatible app. Your agents are real, verifiable entities — not ephemeral API calls.</div>
+      <!-- CODE COMPARISON -->
+      <div class="code-wrap r r1">
+        <div class="cc">// What every single LLM returns today</div>
+        <div><span class="ck">response</span> <span class="cv">→</span> <span class="cv">"The statute requires a 30-day
+            notice period."</span></div>
+        <div><span class="ck">confidence</span> <span class="cv">→</span> <span class="ce">undefined</span></div>
+        <div><span class="ck">verified_by</span> <span class="cv">→</span> <span class="ce">undefined</span></div>
+        <div><span class="ck">audit_trail</span> <span class="cv">→</span> <span class="ce">undefined</span></div>
+        <div><span class="ck">contradictions</span><span class="cv">→</span> <span class="ce">undefined</span></div>
+        <div><span class="ck">escalate</span> <span class="cv">→</span> <span class="ce">undefined // you find out when
+            it's too late</span></div>
+        <br>
+        <div class="cc">// What Trinity Symphony returns on every output</div>
+        <div><span class="ck">response</span> <span class="cv">→</span> <span class="cv">"The statute requires a 30-day
+            notice period."</span></div>
+        <div><span class="ck">belief</span> <span class="cv">→</span> <span class="cok">0.84</span> <span class="cc">//
+            subjective logic triad — belief + disbelief + uncertainty = 1</span></div>
+        <div><span class="ck">disbelief</span> <span class="cv">→</span> <span class="cok">0.09</span></div>
+        <div><span class="ck">uncertainty</span> <span class="cv">→</span> <span class="cw">0.07</span> <span
+            class="cc">// auto-escalated to human if > 0.20</span></div>
+        <div><span class="ck">verified_by</span> <span class="cv">→</span> <span class="cok">["trinity-veritas",
+            "trinity-chesed", "trinity-shofet"]</span></div>
+        <div><span class="ck">repid_scores</span> <span class="cv">→</span> <span class="cok">[0.93, 0.88, 0.91]</span>
+          <span class="cc">// earned reputation, not assumed</span></div>
+        <div><span class="ck">consensus</span> <span class="cv">→</span> <span
+            class="cok">"BFT_golden_ratio_61.8pct"</span></div>
+        <div><span class="ck">contradictions</span><span class="cv">→</span> <span class="cok">0</span></div>
+        <div><span class="ck">escalate</span> <span class="cv">→</span> <span class="cok">false</span> <span
+            class="cc">// escalates automatically when it should</span></div>
+      </div>
+
+      <div class="cards-3 r r2">
+        <div class="card">
+          <div class="card-top ct-dev"></div>
+          <div class="card-num">01 — CONSENSUS</div>
+          <div class="card-title">Byzantine Fault Tolerant Verification</div>
+          <div class="card-body">Named after the Byzantine Generals Problem in distributed systems. Requires a
+            supermajority of agents to independently agree before any output is verified. One compromised or
+            hallucinating agent cannot corrupt the result. The architecture assumes failure and routes around it.</div>
+          <div class="card-chip chip-dev">BFT · 61.8% golden ratio threshold</div>
+        </div>
+        <div class="card">
+          <div class="card-top ct-both"></div>
+          <div class="card-num">02 — ADVERSARIAL</div>
+          <div class="card-title">The Pythagorean Comma — Built-In Contrarian</div>
+          <div class="card-body">A permanent adversarial agent whose only job is finding what's wrong with consensus
+            outputs. Named after the musical dissonance that exposes the gap between perfect theory and reality.
+            Sycophancy — AI agreeing with everything you say — is a design flaw. We engineer structurally against it.
           </div>
-          <div class="erc-card">
-            <div class="erc-card-title">Reputation Registry <span>RepID layer</span></div>
-            <div class="erc-card-body">On-chain reputation signals — accuracy, uptime, success rate — composable with Trinity's 3-tier RepID scoring. Any smart contract can read your agents' reputation. Trust becomes programmable infrastructure.</div>
+          <div class="card-chip chip-biz">Anti-sycophancy · structural not optional</div>
+        </div>
+        <div class="card">
+          <div class="card-top ct-dev"></div>
+          <div class="card-num">03 — REPUTATION</div>
+          <div class="card-title">RepID — Dynamic Agent Trust Scoring</div>
+          <div class="card-body">Every agent earns a 3-tier reputation score: calibration accuracy, factual accuracy,
+            and contrarian value. Scores decay over time if not validated. An agent right 100 times loses trust if
+            recent outputs drift. Trust is earned, tracked, and temporal — not assumed at instantiation.</div>
+          <div class="card-chip chip-dev">3-tier · decay-weighted · patent pending</div>
+        </div>
+        <div class="card">
+          <div class="card-top ct-dev"></div>
+          <div class="card-num">04 — ROUTING</div>
+          <div class="card-title">ANFIS + LASSO Intelligent Routing</div>
+          <div class="card-body">Adaptive Neuro-Fuzzy Inference System combined with LASSO sparse optimization. Routes
+            each query to the optimal model based on domain, complexity, and cost — using only the compute actually
+            needed. Legal questions get different models than creative tasks. GNN Semantic RAG learns and improves
+            routing over time.</div>
+          <div class="card-chip chip-dev">ANFIS · LASSO · SLM clustering · patent pending</div>
+        </div>
+        <div class="card">
+          <div class="card-top ct-both"></div>
+          <div class="card-num">05 — CALIBRATION</div>
+          <div class="card-title">WSCE Uncertainty Scoring</div>
+          <div class="card-body">Weighted Synthesis Coherence Equation. Every output carries a rolling confidence score
+            calibrated against a 100-output window. The system detects overconfidence and self-corrects before bad
+            outputs reach you. Uncertainty variance above threshold triggers exploration, not false certainty.</div>
+          <div class="card-chip chip-dev">WSCE · σ_u anti-parking gate</div>
+        </div>
+        <div class="card">
+          <div class="card-top ct-dev"></div>
+          <div class="card-num">06 — MEMORY</div>
+          <div class="card-title">GNN Semantic RAG — Graph Memory</div>
+          <div class="card-body">Forget simple vector search. Trinity Symphony uses Multi-Relational Graph Neural
+            Networks for deep context that grows with every interaction. Actively flags when new information contradicts
+            established context — adding uncertainty weight rather than silently accepting the contradiction. Your
+            knowledge base becomes self-consistent and genuinely learns.</div>
+          <div class="card-chip chip-dev">GNN · Multi-Relational · ragContradictionBoost</div>
+        </div>
+
+        <div class="card">
+          <div class="card-top ct-own"></div>
+          <div class="card-num">07 — PROVENANCE</div>
+          <div class="card-title">Merkle HyperDAG — Tamper-Proof Audit Trail</div>
+          <div class="card-body">Every agent thought, decision, and output is anchored in a Merkle HyperDAG — a
+            tamper-proof, append-only structure where provenance is cryptographically guaranteed. You can trace any
+            output back to its origin. Nothing can be quietly revised after the fact. The truth of what happened is
+            permanent.</div>
+          <div class="card-chip chip-own">Merkle HyperDAG · append-only · patent pending</div>
+        </div>
+
+        <div class="card">
+          <div class="card-top ct-own"></div>
+          <div class="card-num">08 — IDENTITY</div>
+          <div class="card-title">Zero-Knowledge RepID — Private Verifiable Trust</div>
+          <div class="card-body">Agent reputation scores are verified via zero-knowledge proofs — meaning the trust
+            signal is publicly verifiable without exposing the underlying data. Your agents carry private, verifiable
+            social proof across every interaction. Soulbound Token architecture ensures reputation is earned,
+            non-transferable, and permanently linked to identity.</div>
+          <div class="card-chip chip-own">ZKP · Soulbound Tokens · non-transferable reputation</div>
+        </div>
+
+        <div class="card">
+          <div class="card-top ct-both"></div>
+          <div class="card-num">09 — PREDICTION</div>
+          <div class="card-title">Ripple Effect Protocol</div>
+          <div class="card-body">Most agent systems react to failures after they happen. Trinity Symphony predicts
+            sensitivity cascades before they occur — modeling how a decision in one part of the swarm propagates across
+            all 12 agents. The Ripple Effect Protocol maps interdependencies and flags high-risk actions before
+            execution, not after.</div>
+          <div class="card-chip chip-dev">Swarm sensitivity mapping · pre-emptive risk scoring</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ LAYER 2: INTELLIGENCE ══ -->
+  <section class="pad" style="background:var(--void);border-top:1px solid var(--border)" id="intelligence">
+    <div class="container">
+      <div class="layer-intro r">
+        <div>
+          <div class="eyebrow ey-biz">Layer 02 — Intelligence</div>
+          <h2 class="h2">It doesn't just answer.<br>It <em class="biz-em">learns what you need</em>.</h2>
+        </div>
+        <div>
+          <p class="body-text">Single models are stateless strangers. Every session starts from zero. Trinity Symphony
+            builds a persistent intelligence layer around your work — your context, your preferences, your history, your
+            best-performing routes — and gets faster and cheaper the longer you use it.</p>
+        </div>
+      </div>
+
+      <div class="cards-2 r r1">
+        <div class="card">
+          <div class="card-top ct-biz"></div>
+          <div class="card-num">01 — PERSISTENT STATE</div>
+          <div class="card-title">Context That Travels With You</div>
+          <div class="card-body">Your business context, communication style, ongoing projects, past decisions, and
+            preferences persist across every session. Organize threads by topic, project, or output type. Pick up
+            exactly where you left off. Never re-explain yourself again. The agents know your work — not just your last
+            message.</div>
+          <div class="card-chip chip-biz">Persistent state · thread management · Supabase-backed</div>
+        </div>
+        <div class="card">
+          <div class="card-top ct-dev"></div>
+          <div class="card-num">02 — COST ARBITRAGE</div>
+          <div class="card-title">Free-Tier Intelligence at Scale</div>
+          <div class="card-body">ANFIS + LASSO routes every query to the cheapest capable model across Groq,
+            Together.ai, DeepSeek, OpenRouter, and others in real time. The system tracks cost attribution on every LLM
+            call, auto-switches on price variance above 10%, and surfaces your actual savings vs baseline. The 60–80%
+            reduction is a live measured number — not a claim.</div>
+          <div class="card-chip chip-dev">FrugalGPT attribution · real-time arbitrage · BYOK compatible</div>
+        </div>
+        <div class="card">
+          <div class="card-top ct-biz"></div>
+          <div class="card-num">03 — COACHING</div>
+          <div class="card-title">AI That Teaches You as You Work</div>
+          <div class="card-body">Trinity Symphony shows you which prompts produce better results, which models work best
+            for your specific use cases, and where your workflows are burning unnecessary cost. You get smarter
+            alongside the system. Most AI tools make you dependent. This one makes you more capable.</div>
+          <div class="card-chip chip-biz">Real-time coaching · prompt optimization · workflow intelligence</div>
+        </div>
+        <div class="card">
+          <div class="card-top ct-both"></div>
+          <div class="card-num">04 — MOBILE COMMAND</div>
+          <div class="card-title">Your Swarm in Your Pocket</div>
+          <div class="card-body">Direct 12 agents from Telegram — voice or text. Approval cards surface high-stakes
+            decisions in under 30 seconds. Live savings ticker. Stakeholder observer mode lets investors or partners
+            watch the system work in real time without a slide deck. The conductor's baton is your phone.</div>
+          <div class="card-chip chip-biz">Telegram · voice input · observer mode · &lt;30s review</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ LAYER 3: OWNERSHIP ══ -->
+  <section class="pad erc-section" id="ownership">
+    <div class="container">
+      <div class="layer-intro r">
+        <div>
+          <div class="eyebrow ey-own">Layer 03 — Ownership &amp; Accountability</div>
+          <h2 class="h2">When an agent acts,<br>who is <em class="own-em">responsible</em>?</h2>
+          <p class="body-text" style="margin-top:1rem">Who authorized it? Who owns what it created? How do you prove
+            what happened — without exposing your data to do it? These aren't philosophical questions. They're the
+            unsolved infrastructure problems of the agentic era. Trinity Symphony solves them at the protocol level.</p>
+
+          <div class="erc-logo-row" style="margin-top:1.5rem">
+            <div class="erc-badge">Built on ERC-8004</div>
+            <div class="erc-author">Co-authored by MetaMask · Ethereum Foundation · Google · Coinbase</div>
           </div>
-          <div class="erc-card">
-            <div class="erc-card-title">Validation Registry <span>BFT + zkML hooks</span></div>
-            <div class="erc-card-body">Agents request validation. Validators respond with cryptographic proofs. The entire verification trail is on-chain and immutable. Compatible with stake-secured re-execution, zkML verifiers, and TEE oracles.</div>
+          <p class="body-text">ERC-8004 is the emerging standard for trustless agent identity, reputation, and
+            validation on Ethereum. Trinity Symphony is built on it — meaning your agents are portable, interoperable,
+            and not locked to our infrastructure. Your RepID scores travel with your agents everywhere.</p>
+        </div>
+
+        <div>
+          <div class="erc-cards r r1">
+            <div class="erc-card">
+              <div class="erc-card-title">Identity Registry <span>ERC-721 based</span></div>
+              <div class="erc-card-body">Every Trinity Symphony agent has a cryptographic on-chain identity. Portable
+                across chains. Transferable. Browsable in any ERC-721 compatible app. Your agents are real, verifiable
+                entities — not ephemeral API calls.</div>
+            </div>
+            <div class="erc-card">
+              <div class="erc-card-title">Reputation Registry <span>RepID layer</span></div>
+              <div class="erc-card-body">On-chain reputation signals — accuracy, uptime, success rate — composable with
+                Trinity's 3-tier RepID scoring. Any smart contract can read your agents' reputation. Trust becomes
+                programmable infrastructure.</div>
+            </div>
+            <div class="erc-card">
+              <div class="erc-card-title">Validation Registry <span>BFT + zkML hooks</span></div>
+              <div class="erc-card-body">Agents request validation. Validators respond with cryptographic proofs. The
+                entire verification trail is on-chain and immutable. Compatible with stake-secured re-execution, zkML
+                verifiers, and TEE oracles.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROBLEM/SOLUTION PAIRS -->
+      <div class="ps-list r r2">
+        <div class="ps-row">
+          <div class="ps-cell ps-problem">
+            <div class="ps-label">Problem</div>
+            <div class="ps-title">Who's responsible when an agent does something wrong?</div>
+            <div class="ps-body">Current agentic systems have no cryptographic chain of authorization. When an agent
+              takes an action — sends a message, makes a purchase, generates a contract — there's no immutable record
+              linking that action to the human who authorized it. Liability is ambiguous. Disputes become arguments over
+              editable logs.</div>
+          </div>
+          <div class="ps-cell ps-solution">
+            <div class="ps-label">Solution</div>
+            <div class="ps-title">Cryptographic authorization chain — you are always the principal</div>
+            <div class="ps-body">Every agent action is signed and linked to the authorizing human via ERC-8004 identity.
+              The chain of custody is cryptographically enforced, not just policy-enforced. You are always the
+              principal. Your agent is always the instrument. That relationship cannot be altered after the fact.</div>
+          </div>
+        </div>
+        <div class="ps-row">
+          <div class="ps-cell ps-problem">
+            <div class="ps-label">Problem</div>
+            <div class="ps-title">Who owns what AI agents create?</div>
+            <div class="ps-body">An agent writes your code, generates your report, drafts your contract. Platform terms
+              of service are ambiguous at best. There's no technical mechanism to prove provenance — only contract law,
+              which is slow and expensive. The value your agents create is yours in theory, disputed in practice.</div>
+          </div>
+          <div class="ps-cell ps-solution">
+            <div class="ps-label">Solution</div>
+            <div class="ps-title">Immutable output provenance — your creation, proven</div>
+            <div class="ps-body">Output provenance is written to the chain at creation time, linked to your agent
+              identity. You have a timestamped, immutable proof of creation. Not a claim. Not a ToS provision. A
+              cryptographic proof that your agents created it, under your authority, at a specific moment that cannot be
+              revised.</div>
+          </div>
+        </div>
+        <div class="ps-row">
+          <div class="ps-cell ps-problem">
+            <div class="ps-label">Problem</div>
+            <div class="ps-title">How do agents trust each other across organizational boundaries?</div>
+            <div class="ps-body">As AI agents proliferate, they need to transact with agents from other systems and
+              organizations. Today there's no standard for this. Each platform rolls its own. The result is brittle
+              integrations, no interoperability, and no way to verify that the agent you're dealing with is who it
+              claims to be.</div>
+          </div>
+          <div class="ps-cell ps-solution">
+            <div class="ps-label">Solution</div>
+            <div class="ps-title">ERC-8004 agent handshakes — portable reputation, verified identity</div>
+            <div class="ps-body">Every Trinity Symphony agent carries an ERC-8004 identity. Agent-to-agent handshakes
+              are verified through the Reputation Registry — RepID scores travel with the agent. Any system implementing
+              ERC-8004 can discover, evaluate, and transact with your agents. Open-ended agent economy, not walled
+              garden.</div>
+          </div>
+        </div>
+        <div class="ps-row">
+          <div class="ps-cell ps-problem">
+            <div class="ps-label">Problem</div>
+            <div class="ps-title">Regulated industries need audit trails — but audit trails expose data</div>
+            <div class="ps-body">Healthcare, legal, and financial workflows need provable compliance. But proving
+              compliance today means exposing the underlying data to auditors. The choice is compliance or privacy. You
+              can't have both — so regulated industries either accept the exposure or avoid AI altogether.</div>
+          </div>
+          <div class="ps-cell ps-solution">
+            <div class="ps-label">Solution</div>
+            <div class="ps-title">Privacy-preserving compliance via zkML verification</div>
+            <div class="ps-body">The ERC-8004 Validation Registry supports zkML verifiers — zero-knowledge machine
+              learning proofs. An agent can prove it followed the correct protocol without revealing the underlying
+              data. Compliance and privacy are no longer in conflict. The audit trail exists. The data stays private.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- share nudge -->
+      <div class="share-nudge r r3">
+        <div class="share-nudge-text">
+          <div class="share-nudge-h">Building something in the agentic trust layer space?</div>
+          <div class="share-nudge-sub">Share with your team. Every referral moves you forward in the waitlist — and
+            founding developers get direct Slack access to the team.</div>
+        </div>
+        <button class="share-btn" onclick="doShare()">Share &amp; Move Up →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROOF METRICS -->
+  <section class="pad" style="background:var(--void);border-top:1px solid var(--border)">
+    <div class="container">
+      <div class="r" style="text-align:center;margin-bottom:3rem">
+        <div class="eyebrow ey-dim" style="text-align:center">Measured, Not Claimed</div>
+        <h2 class="h2" style="text-align:center;max-width:500px;margin:0 auto">Numbers we can <em
+            class="dev-em">defend</em>.</h2>
+      </div>
+      <div class="metrics r r1">
+        <div class="metric">
+          <div class="metric-n">60–80%</div>
+          <div class="metric-l">Cost reduction vs<br>single-model API usage</div>
+        </div>
+        <div class="metric">
+          <div class="metric-n">12</div>
+          <div class="metric-l">Specialized agents<br>running 24/7</div>
+        </div>
+        <div class="metric">
+          <div class="metric-n">12,402</div>
+          <div class="metric-l">Truths verified<br>and anchored</div>
+        </div>
+        <div class="metric">
+          <div class="metric-n">3+</div>
+          <div class="metric-l">Patents pending across<br>core system components</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:1.5rem">
+        <span class="pill">ANFIS + LASSO</span>
+        <span class="pill">BFT Consensus</span>
+        <span class="pill">RepID System</span>
+        <span class="pill">GNN Semantic RAG</span>
+        <span class="pill">WSCE Calibration</span>
+        <span class="pill">ERC-8004 Identity</span>
+        <span class="pill">Merkle HyperDAG</span>
+        <span class="pill">ZKP RepID</span>
+        <span class="pill">Ripple Effect Protocol</span>
+        <span class="pill">Pythagorean Comma</span>
+        <span class="pill">Soulbound Tokens</span>
+        <span class="pill">Subjective Logic Triad</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ BRIDGE CTA ══ -->
+  <section style="background:var(--s1);border-top:1px solid var(--border);padding:3rem 2rem">
+    <div class="container">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:center" class="r">
+        <div>
+          <div class="eyebrow ey-dev">Go Deeper</div>
+          <h2 class="h2" style="font-size:clamp(1.4rem,2.2vw,2rem)">Ready for the full<br>technical architecture?</h2>
+          <p class="body-text" style="margin-top:0.8rem;font-size:0.88rem">3x3+3 tiered governance. BFT pseudocode.
+            Merkle HyperDAG provenance. Zero-Knowledge RepID. The complete deep tech stack — for builders who want to
+            understand exactly how it works before they commit.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;align-items:flex-start">
+          <a href="https://app.aitrinitysymphony.com" target="_blank" class="half-btn"
+            style="background:var(--dev);color:var(--void);opacity:1;animation:none;padding:0.85rem 1.8rem">
+            Launch Technical Overview <span class="arr">→</span>
+          </a>
+          <div style="font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--wff);letter-spacing:0.1em">
+            <span style="color:var(--dev)">ver 8.1.3</span> · truths verified: <span id="bridge-truths">12,402</span> ·
+            all systems normal
           </div>
         </div>
       </div>
     </div>
+  </section>
 
-    <!-- PROBLEM/SOLUTION PAIRS -->
-    <div class="ps-list r r2">
-      <div class="ps-row">
-        <div class="ps-cell ps-problem">
-          <div class="ps-label">Problem</div>
-          <div class="ps-title">Who's responsible when an agent does something wrong?</div>
-          <div class="ps-body">Current agentic systems have no cryptographic chain of authorization. When an agent takes an action — sends a message, makes a purchase, generates a contract — there's no immutable record linking that action to the human who authorized it. Liability is ambiguous. Disputes become arguments over editable logs.</div>
+  <!-- ══ PROMPT COACHING LOOP ══ -->
+  <section class="pad" style="background:var(--void);border-top:1px solid var(--border)">
+    <div class="container">
+      <div class="coach-wrap r">
+        <div style="margin-bottom:2rem">
+          <div class="eyebrow ey-biz">Interactive Preview — Layer 02</div>
+          <h2 class="h2">The Coaching Loop</h2>
+          <p class="body-text">See how the Trinity Triad (Veritas, Chesed, Nexus) refines your intent in real-time. Try
+            any prompt below.</p>
         </div>
-        <div class="ps-cell ps-solution">
-          <div class="ps-label">Solution</div>
-          <div class="ps-title">Cryptographic authorization chain — you are always the principal</div>
-          <div class="ps-body">Every agent action is signed and linked to the authorizing human via ERC-8004 identity. The chain of custody is cryptographically enforced, not just policy-enforced. You are always the principal. Your agent is always the instrument. That relationship cannot be altered after the fact.</div>
-        </div>
-      </div>
-      <div class="ps-row">
-        <div class="ps-cell ps-problem">
-          <div class="ps-label">Problem</div>
-          <div class="ps-title">Who owns what AI agents create?</div>
-          <div class="ps-body">An agent writes your code, generates your report, drafts your contract. Platform terms of service are ambiguous at best. There's no technical mechanism to prove provenance — only contract law, which is slow and expensive. The value your agents create is yours in theory, disputed in practice.</div>
-        </div>
-        <div class="ps-cell ps-solution">
-          <div class="ps-label">Solution</div>
-          <div class="ps-title">Immutable output provenance — your creation, proven</div>
-          <div class="ps-body">Output provenance is written to the chain at creation time, linked to your agent identity. You have a timestamped, immutable proof of creation. Not a claim. Not a ToS provision. A cryptographic proof that your agents created it, under your authority, at a specific moment that cannot be revised.</div>
-        </div>
-      </div>
-      <div class="ps-row">
-        <div class="ps-cell ps-problem">
-          <div class="ps-label">Problem</div>
-          <div class="ps-title">How do agents trust each other across organizational boundaries?</div>
-          <div class="ps-body">As AI agents proliferate, they need to transact with agents from other systems and organizations. Today there's no standard for this. Each platform rolls its own. The result is brittle integrations, no interoperability, and no way to verify that the agent you're dealing with is who it claims to be.</div>
-        </div>
-        <div class="ps-cell ps-solution">
-          <div class="ps-label">Solution</div>
-          <div class="ps-title">ERC-8004 agent handshakes — portable reputation, verified identity</div>
-          <div class="ps-body">Every Trinity Symphony agent carries an ERC-8004 identity. Agent-to-agent handshakes are verified through the Reputation Registry — RepID scores travel with the agent. Any system implementing ERC-8004 can discover, evaluate, and transact with your agents. Open-ended agent economy, not walled garden.</div>
-        </div>
-      </div>
-      <div class="ps-row">
-        <div class="ps-cell ps-problem">
-          <div class="ps-label">Problem</div>
-          <div class="ps-title">Regulated industries need audit trails — but audit trails expose data</div>
-          <div class="ps-body">Healthcare, legal, and financial workflows need provable compliance. But proving compliance today means exposing the underlying data to auditors. The choice is compliance or privacy. You can't have both — so regulated industries either accept the exposure or avoid AI altogether.</div>
-        </div>
-        <div class="ps-cell ps-solution">
-          <div class="ps-label">Solution</div>
-          <div class="ps-title">Privacy-preserving compliance via zkML verification</div>
-          <div class="ps-body">The ERC-8004 Validation Registry supports zkML verifiers — zero-knowledge machine learning proofs. An agent can prove it followed the correct protocol without revealing the underlying data. Compliance and privacy are no longer in conflict. The audit trail exists. The data stays private.</div>
+
+        <div class="coach-grid">
+          <div class="coach-input-area">
+            <div class="field">
+              <label>Input your intent</label>
+              <textarea id="coach-input" rows="4"
+                placeholder="e.g. How do I build a decentralized knowledge graph for my community?"></textarea>
+            </div>
+            <button class="submit sub-dev" id="btn-coach" onclick="runCoach()">Run Triad Review →</button>
+
+            <div class="pulse-wrap">
+              <div class="pulse-dot"></div>
+              <div class="nav-sub" id="online-stat">12 agents parsing live...</div>
+            </div>
+          </div>
+
+          <div class="coach-results" id="coach-output">
+            <div id="coach-cards">
+              <!-- results injected here -->
+            </div>
+            <div class="ref-box" style="margin-top:1rem">
+              <div class="ref-label">Refined Protocol</div>
+              <div class="ref-sub" id="refined-text" style="font-family:'Space Mono',monospace;font-size:0.75rem">Input
+                prompt to generate refinement...</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
+  </section>
 
-    <!-- share nudge -->
-    <div class="share-nudge r r3">
-      <div class="share-nudge-text">
-        <div class="share-nudge-h">Building something in the agentic trust layer space?</div>
-        <div class="share-nudge-sub">Share with your team. Every referral moves you forward in the waitlist — and founding developers get direct Slack access to the team.</div>
+  <!-- ══ WAITLIST FORMS ══ -->
+  <section class="pad forms-section" id="waitlist">
+    <div class="container">
+      <div class="forms-hdr r">
+        <div class="eyebrow ey-dim">Private Beta · 100 Founding Members</div>
+        <h2 class="h2">Tell us what you're building.<br><em>We'll tell you how we can help.</em></h2>
       </div>
-      <button class="share-btn" onclick="doShare()">Share &amp; Move Up →</button>
-    </div>
-  </div>
-</section>
 
-<!-- PROOF METRICS -->
-<section class="pad" style="background:var(--void);border-top:1px solid var(--border)">
-  <div class="container">
-    <div class="r" style="text-align:center;margin-bottom:3rem">
-      <div class="eyebrow ey-dim" style="text-align:center">Measured, Not Claimed</div>
-      <h2 class="h2" style="text-align:center;max-width:500px;margin:0 auto">Numbers we can <em class="dev-em">defend</em>.</h2>
-    </div>
-    <div class="metrics r r1">
-      <div class="metric">
-        <div class="metric-n">60–80%</div>
-        <div class="metric-l">Cost reduction vs<br>single-model API usage</div>
-      </div>
-      <div class="metric">
-        <div class="metric-n">12</div>
-        <div class="metric-l">Specialized agents<br>running 24/7</div>
-      </div>
-      <div class="metric">
-        <div class="metric-n">12,402</div>
-        <div class="metric-l">Truths verified<br>and anchored</div>
-      </div>
-      <div class="metric">
-        <div class="metric-n">3+</div>
-        <div class="metric-l">Patents pending across<br>core system components</div>
-      </div>
-    </div>
-    <div style="text-align:center;margin-top:1.5rem">
-      <span class="pill">ANFIS + LASSO</span>
-      <span class="pill">BFT Consensus</span>
-      <span class="pill">RepID System</span>
-      <span class="pill">GNN Semantic RAG</span>
-      <span class="pill">WSCE Calibration</span>
-      <span class="pill">ERC-8004 Identity</span>
-      <span class="pill">Merkle HyperDAG</span>
-      <span class="pill">ZKP RepID</span>
-      <span class="pill">Ripple Effect Protocol</span>
-      <span class="pill">Pythagorean Comma</span>
-      <span class="pill">Soulbound Tokens</span>
-      <span class="pill">Subjective Logic Triad</span>
-    </div>
-  </div>
-</section>
-
-<!-- ══ BRIDGE CTA ══ -->
-<section style="background:var(--s1);border-top:1px solid var(--border);padding:3rem 2rem">
-  <div class="container">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:center" class="r">
-      <div>
-        <div class="eyebrow ey-dev">Go Deeper</div>
-        <h2 class="h2" style="font-size:clamp(1.4rem,2.2vw,2rem)">Ready for the full<br>technical architecture?</h2>
-        <p class="body-text" style="margin-top:0.8rem;font-size:0.88rem">3x3+3 tiered governance. BFT pseudocode. Merkle HyperDAG provenance. Zero-Knowledge RepID. The complete deep tech stack — for builders who want to understand exactly how it works before they commit.</p>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:1rem;align-items:flex-start">
-        <a href="https://app.aitrinitysymphony.com" target="_blank" class="half-btn" style="background:var(--dev);color:var(--void);opacity:1;animation:none;padding:0.85rem 1.8rem">
-          Launch Technical Overview <span class="arr">→</span>
-        </a>
-        <div style="font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--wff);letter-spacing:0.1em">
-          <span style="color:var(--dev)">ver 8.1.3</span> · truths verified: <span id="bridge-truths">12,402</span> · all systems normal
+      <div class="r r1">
+        <div class="tabs">
+          <button class="tab dev-active" id="tab-dev" onclick="switchTab('dev')">⌥ &nbsp;Developer</button>
+          <button class="tab" id="tab-biz" onclick="switchTab('biz')">◈ &nbsp;Builder / Org</button>
         </div>
-      </div>
-    </div>
-  </div>
-</section>
 
-<!-- ══ WAITLIST FORMS ══ -->
-<section class="pad forms-section" id="waitlist">
-  <div class="container">
-    <div class="forms-hdr r">
-      <div class="eyebrow ey-dim">Private Beta · 100 Founding Members</div>
-      <h2 class="h2">Tell us what you're building.<br><em>We'll tell you how we can help.</em></h2>
-    </div>
+        <div class="panels">
 
-    <div class="r r1">
-      <div class="tabs">
-        <button class="tab dev-active" id="tab-dev" onclick="switchTab('dev')">⌥ &nbsp;Developer</button>
-        <button class="tab" id="tab-biz" onclick="switchTab('biz')">◈ &nbsp;Builder / Org</button>
-      </div>
-
-      <div class="panels">
-
-        <!-- DEV PANEL -->
-        <div class="panel panel-dev show" id="panel-dev">
-          <div class="panel-eyebrow">Developer Early Access</div>
-          <form onsubmit="submitForm(event,'dev')">
-            <div class="field-row">
+          <!-- DEV PANEL -->
+          <div class="panel panel-dev show" id="panel-dev">
+            <div class="panel-eyebrow">Developer Early Access</div>
+            <form onsubmit="submitForm(event,'dev')">
+              <div class="field-row">
+                <div class="field">
+                  <label>Name</label>
+                  <input type="text" id="dev-name" placeholder="Your name" required>
+                </div>
+                <div class="field">
+                  <label>Email</label>
+                  <input type="email" id="dev-email" placeholder="dev@project.com" required>
+                </div>
+              </div>
               <div class="field">
-                <label>Name</label>
-                <input type="text" id="dev-name" placeholder="Your name" required>
+                <label>GitHub Username</label>
+                <div class="prefixed">
+                  <span class="pfx pfx-dev">@</span>
+                  <input type="text" id="dev-github" placeholder="yourusername">
+                </div>
               </div>
               <div class="field">
-                <label>Email</label>
-                <input type="email" id="dev-email" placeholder="dev@project.com" required>
+                <label>What are you building?</label>
+                <input type="text" id="dev-building"
+                  placeholder="RAG pipeline, agent workflow, compliance tool, LLM app...">
               </div>
-            </div>
-            <div class="field">
-              <label>GitHub Username</label>
-              <div class="prefixed">
-                <span class="pfx pfx-dev">@</span>
-                <input type="text" id="dev-github" placeholder="yourusername">
+              <div class="field">
+                <label>Biggest pain right now (check all that apply)</label>
+                <div class="checks">
+                  <label class="check"><input type="checkbox" class="dev-pain"
+                      value="Hallucinations with no detection mechanism"><span>Hallucinations with no detection
+                      mechanism</span></label>
+                  <label class="check"><input type="checkbox" class="dev-pain"
+                      value="Building confidence scoring / verification from scratch"><span>Building confidence scoring
+                      / verification from scratch</span></label>
+                  <label class="check"><input type="checkbox" class="dev-pain"
+                      value="No audit trail on LLM outputs"><span>No audit trail on LLM outputs</span></label>
+                  <label class="check"><input type="checkbox" class="dev-pain"
+                      value="Cost of quality models at production scale"><span>Cost of quality models at production
+                      scale</span></label>
+                  <label class="check"><input type="checkbox" class="dev-pain"
+                      value="Human-in-the-loop escalation logic"><span>Human-in-the-loop escalation logic</span></label>
+                  <label class="check"><input type="checkbox" class="dev-pain"
+                      value="Agent identity and inter-agent trust"><span>Agent identity and inter-agent
+                      trust</span></label>
+                  <label class="check"><input type="checkbox" class="dev-pain"
+                      value="Context / memory across sessions"><span>Context / memory across sessions</span></label>
+                </div>
               </div>
-            </div>
-            <div class="field">
-              <label>What are you building?</label>
-              <input type="text" id="dev-building" placeholder="RAG pipeline, agent workflow, compliance tool, LLM app...">
-            </div>
-            <div class="field">
-              <label>Biggest pain right now (check all that apply)</label>
-              <div class="checks">
-                <label class="check"><input type="checkbox" class="dev-pain" value="Hallucinations with no detection mechanism"><span>Hallucinations with no detection mechanism</span></label>
-                <label class="check"><input type="checkbox" class="dev-pain" value="Building confidence scoring / verification from scratch"><span>Building confidence scoring / verification from scratch</span></label>
-                <label class="check"><input type="checkbox" class="dev-pain" value="No audit trail on LLM outputs"><span>No audit trail on LLM outputs</span></label>
-                <label class="check"><input type="checkbox" class="dev-pain" value="Cost of quality models at production scale"><span>Cost of quality models at production scale</span></label>
-                <label class="check"><input type="checkbox" class="dev-pain" value="Human-in-the-loop escalation logic"><span>Human-in-the-loop escalation logic</span></label>
-                <label class="check"><input type="checkbox" class="dev-pain" value="Agent identity and inter-agent trust"><span>Agent identity and inter-agent trust</span></label>
-                <label class="check"><input type="checkbox" class="dev-pain" value="Context / memory across sessions"><span>Context / memory across sessions</span></label>
+              <div class="field">
+                <label>Anything else?</label>
+                <textarea rows="2" id="dev-notes" placeholder="Stack, use case, specific constraints..."></textarea>
               </div>
-            </div>
-            <div class="field">
-              <label>Anything else?</label>
-              <textarea rows="2" id="dev-notes" placeholder="Stack, use case, specific constraints..."></textarea>
-            </div>
-            <button type="submit" class="submit sub-dev">Request Developer Access →</button>
-          </form>
-          <div class="success" id="ok-dev">
-            <div class="success-icon">⌬</div>
-            <div class="success-h">You're in the queue.</div>
-            <div class="success-sub">We'll reach out with API architecture docs and early access credentials. Developer founding members get direct Slack access to the team and early input on the ERC-8004 integration spec.</div>
-            <div class="ref-box">
-              <div class="ref-label">Move to the front</div>
-              <div class="ref-sub">Every developer you refer moves you one position forward.</div>
-              <div class="ref-copy">
-                <div class="ref-url">https://app.aitrinitysymphony.com?ref=dev</div>
-                <button class="ref-btn" onclick="copyRef(this,'https://app.aitrinitysymphony.com?ref=dev')">Copy</button>
+              <button type="submit" class="submit sub-dev">Request Developer Access →</button>
+            </form>
+            <div class="success" id="ok-dev">
+              <div class="success-icon">⌬</div>
+              <div class="success-h">You're in the queue.</div>
+              <div class="success-sub">We'll reach out with API architecture docs and early access credentials.
+                Developer founding members get direct Slack access to the team and early input on the ERC-8004
+                integration spec.</div>
+              <div class="ref-box">
+                <div class="ref-label">Move to the front</div>
+                <div class="ref-sub">Every developer you refer moves you one position forward.</div>
+                <div class="ref-copy">
+                  <div class="ref-url">https://app.aitrinitysymphony.com?ref=dev</div>
+                  <button class="ref-btn"
+                    onclick="copyRef(this,'https://app.aitrinitysymphony.com?ref=dev')">Copy</button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- BIZ PANEL -->
-        <div class="panel panel-biz" id="panel-biz">
-          <div class="panel-eyebrow">Builder / Organization Early Access</div>
-          <form onsubmit="submitForm(event,'biz')">
-            <div class="field-row">
-              <div class="field">
-                <label>Name</label>
-                <input type="text" id="biz-name" placeholder="Your name" required>
+          <!-- BIZ PANEL -->
+          <div class="panel panel-biz" id="panel-biz">
+            <div class="panel-eyebrow">Builder / Organization Early Access</div>
+            <form onsubmit="submitForm(event,'biz')">
+              <div class="field-row">
+                <div class="field">
+                  <label>Name</label>
+                  <input type="text" id="biz-name" placeholder="Your name" required>
+                </div>
+                <div class="field">
+                  <label>Email</label>
+                  <input type="email" id="biz-email" placeholder="you@yourorg.com" required>
+                </div>
               </div>
               <div class="field">
-                <label>Email</label>
-                <input type="email" id="biz-email" placeholder="you@yourorg.com" required>
+                <label>LinkedIn Profile</label>
+                <div class="prefixed">
+                  <span class="pfx pfx-biz" style="font-size:0.65rem;font-weight:700">in/</span>
+                  <input type="text" id="biz-linkedin" placeholder="yourhandle">
+                </div>
               </div>
-            </div>
-            <div class="field">
-              <label>LinkedIn Profile</label>
-              <div class="prefixed">
-                <span class="pfx pfx-biz" style="font-size:0.65rem;font-weight:700">in/</span>
-                <input type="text" id="biz-linkedin" placeholder="yourhandle">
+              <div class="field">
+                <label>Organization or Project</label>
+                <input type="text" id="biz-org" placeholder="Nonprofit, startup, ministry, solo project...">
               </div>
-            </div>
-            <div class="field">
-              <label>Organization or Project</label>
-              <input type="text" id="biz-org" placeholder="Nonprofit, startup, ministry, solo project...">
-            </div>
-            <div class="field">
-              <label>What problem are you trying to solve?</label>
-              <div class="checks">
-                <label class="check"><input type="checkbox" class="biz-pain" value="AI gives me confident wrong answers I can't detect"><span>AI gives me confident wrong answers I can't detect</span></label>
-                <label class="check"><input type="checkbox" class="biz-pain" value="I re-explain my context every single session"><span>I re-explain my context every single session</span></label>
-                <label class="check"><input type="checkbox" class="biz-pain" value="I can't tell which AI outputs to trust"><span>I can't tell which AI outputs to trust</span></label>
-                <label class="check"><input type="checkbox" class="biz-pain" value="AI is too expensive for what I actually need"><span>AI is too expensive for what I actually need</span></label>
-                <label class="check"><input type="checkbox" class="biz-pain" value="I need AI automation without an engineering team"><span>I need AI automation without an engineering team</span></label>
-                <label class="check"><input type="checkbox" class="biz-pain" value="I need AI for a nonprofit / ministry"><span>I need AI for a nonprofit / ministry</span></label>
-                <label class="check"><input type="checkbox" class="biz-pain" value="Compliance requirements make AI hard to use"><span>Compliance requirements make AI hard to use</span></label>
+              <div class="field">
+                <label>What problem are you trying to solve?</label>
+                <div class="checks">
+                  <label class="check"><input type="checkbox" class="biz-pain"
+                      value="AI gives me confident wrong answers I can't detect"><span>AI gives me confident wrong
+                      answers I can't detect</span></label>
+                  <label class="check"><input type="checkbox" class="biz-pain"
+                      value="I re-explain my context every single session"><span>I re-explain my context every single
+                      session</span></label>
+                  <label class="check"><input type="checkbox" class="biz-pain"
+                      value="I can't tell which AI outputs to trust"><span>I can't tell which AI outputs to
+                      trust</span></label>
+                  <label class="check"><input type="checkbox" class="biz-pain"
+                      value="AI is too expensive for what I actually need"><span>AI is too expensive for what I actually
+                      need</span></label>
+                  <label class="check"><input type="checkbox" class="biz-pain"
+                      value="I need AI automation without an engineering team"><span>I need AI automation without an
+                      engineering team</span></label>
+                  <label class="check"><input type="checkbox" class="biz-pain"
+                      value="I need AI for a nonprofit / ministry"><span>I need AI for a nonprofit /
+                      ministry</span></label>
+                  <label class="check"><input type="checkbox" class="biz-pain"
+                      value="Compliance requirements make AI hard to use"><span>Compliance requirements make AI hard to
+                      use</span></label>
+                </div>
               </div>
-            </div>
-            <div class="field">
-              <label>Which plan interests you?</label>
-              <select id="biz-plan">
-                <option value="" disabled selected>Select a plan</option>
-                <option>MISSION — Free (nonprofit / ministry)</option>
-                <option>BYOK — $20/mo (bring your own API keys)</option>
-                <option>STANDARD — $100/mo (managed infrastructure)</option>
-                <option>Not sure yet</option>
-              </select>
-            </div>
-            <button type="submit" class="submit sub-biz">Join the Waitlist →</button>
-          </form>
-          <div class="success" id="ok-biz">
-            <div class="success-icon">◈</div>
-            <div class="success-h">You're on the list.</div>
-            <div class="success-sub">We'll be in touch shortly. Founding members lock in lifetime pricing and get direct access to the team to make sure Trinity Symphony genuinely solves your problem — not just sells you a subscription.</div>
-            <div class="ref-box">
-              <div class="ref-label">Move to the front</div>
-              <div class="ref-sub">Know someone who needs this? Each referral moves you forward.</div>
-              <div class="ref-copy">
-                <div class="ref-url">https://app.aitrinitysymphony.com?ref=biz</div>
-                <button class="ref-btn" onclick="copyRef(this,'https://app.aitrinitysymphony.com?ref=biz')">Copy</button>
+              <div class="field">
+                <label>Which plan interests you?</label>
+                <select id="biz-plan">
+                  <option value="" disabled selected>Select a plan</option>
+                  <option>MISSION — Free (nonprofit / ministry)</option>
+                  <option>BYOK — $20/mo (bring your own API keys)</option>
+                  <option>STANDARD — $100/mo (managed infrastructure)</option>
+                  <option>Not sure yet</option>
+                </select>
+              </div>
+              <button type="submit" class="submit sub-biz">Join the Waitlist →</button>
+            </form>
+            <div class="success" id="ok-biz">
+              <div class="success-icon">◈</div>
+              <div class="success-h">You're on the list.</div>
+              <div class="success-sub">We'll be in touch shortly. Founding members lock in lifetime pricing and get
+                direct access to the team to make sure Trinity Symphony genuinely solves your problem — not just sells
+                you a subscription.</div>
+              <div class="ref-box">
+                <div class="ref-label">Move to the front</div>
+                <div class="ref-sub">Know someone who needs this? Each referral moves you forward.</div>
+                <div class="ref-copy">
+                  <div class="ref-url">https://app.aitrinitysymphony.com?ref=biz</div>
+                  <button class="ref-btn"
+                    onclick="copyRef(this,'https://app.aitrinitysymphony.com?ref=biz')">Copy</button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-      </div><!-- /panels -->
+        </div><!-- /panels -->
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- FOOTER -->
-<footer>
-  <div class="footer-mission">"Helping people help people — the last, the lost, and the least."</div>
-  <div class="footer-meta">Philippians 4:8 · Micah 6:8 · The Golden Rule · Multiple Patents Pending · © 2026 HyperDAG / Sean Patrick Goodwin</div>
-</footer>
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-mission">"Helping people help people — the last, the lost, and the least."</div>
+    <div class="footer-meta">Philippians 4:8 · Micah 6:8 · The Golden Rule · Multiple Patents Pending · © 2026 HyperDAG
+      / Sean Patrick Goodwin</div>
+  </footer>
 
-<script>
-  // Reveal on scroll
-  const obs = new IntersectionObserver(entries => {
-    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('on'); obs.unobserve(e.target); } });
-  }, { threshold: 0.07 });
-  document.querySelectorAll('.r').forEach(el => obs.observe(el));
+  <script>
+    // Reveal on scroll
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('on'); obs.unobserve(e.target); } });
+    }, { threshold: 0.07 });
+    document.querySelectorAll('.r').forEach(el => obs.observe(el));
 
-  // Savings counter
-  function animCount(el, target, ms) {
-    let v = 0; const step = target/(ms/16);
-    const t = setInterval(() => {
-      v = Math.min(v+step, target);
-      el.textContent = '$'+v.toFixed(2);
-      if(v>=target) clearInterval(t);
-    }, 16);
-  }
-  setTimeout(() => animCount(document.getElementById('ctr'), 47.23, 2200), 1500);
+    // Savings counter & Live Stats
+    let currentSavings = 0;
+    async function refreshStats() {
+      try {
+        const resp = await fetch('/api/stats');
+        const data = await resp.json();
 
-  // Truths verified counter — increments slowly to feel live
-  let truths = 12402;
-  function tickTruths() {
-    truths += Math.floor(Math.random() * 3);
-    const els = document.querySelectorAll('#truths-ctr, #bridge-truths');
-    els.forEach(el => { if(el) el.textContent = truths.toLocaleString(); });
-    setTimeout(tickTruths, 8000 + Math.random() * 7000);
-  }
-  setTimeout(tickTruths, 4000);
+        const ctr = document.getElementById('ctr');
+        const truthCtr = document.getElementById('truths-ctr');
+        const bridgeTruths = document.getElementById('bridge-truths');
+        const onlineStat = document.getElementById('online-stat');
+        const liveDotText = document.querySelector('.nav-status');
 
-  // Tab switch
-  function switchTab(which) {
-    document.getElementById('tab-dev').className = 'tab' + (which==='dev' ? ' dev-active' : '');
-    document.getElementById('tab-biz').className = 'tab' + (which==='biz' ? ' biz-active' : '');
-    document.getElementById('panel-dev').classList.toggle('show', which==='dev');
-    document.getElementById('panel-biz').classList.toggle('show', which==='biz');
-  }
+        if (data.system_savings !== undefined) {
+          animateValue(ctr, currentSavings, data.system_savings, 2000, '$');
+          currentSavings = data.system_savings;
+        }
 
-  // Hero click + scroll
-  function go(which) {
-    switchTab(which);
-    setTimeout(() => {
-      document.getElementById('waitlist').scrollIntoView({ behavior:'smooth' });
-    }, 60);
-  }
+        if (data.total_truths) {
+          const val = data.total_truths.toLocaleString();
+          if (truthCtr) truthCtr.textContent = val;
+          if (bridgeTruths) bridgeTruths.textContent = val;
+        }
 
-  // Form submit — viral loop
-  async function submitForm(e, which) {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    const origBtnText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Submitting...';
-
-    const data = { type: which };
-    if (which === 'dev') {
-      data.name = document.getElementById('dev-name').value;
-      data.email = document.getElementById('dev-email').value;
-      data.github_username = document.getElementById('dev-github').value;
-      data.building_desc = document.getElementById('dev-building').value;
-      data.notes = document.getElementById('dev-notes').value;
-      data.pains = Array.from(document.querySelectorAll('.dev-pain:checked')).map(el => el.value);
-    } else {
-      data.name = document.getElementById('biz-name').value;
-      data.email = document.getElementById('biz-email').value;
-      data.linkedin_handle = document.getElementById('biz-linkedin').value;
-      data.org_name = document.getElementById('biz-org').value;
-      data.plan_choice = document.getElementById('biz-plan').value;
-      data.pains = Array.from(document.querySelectorAll('.biz-pain:checked')).map(el => el.value);
+        if (data.online_agents !== undefined && onlineStat) {
+          onlineStat.textContent = `${data.online_agents} agents parsing live...`;
+        }
+      } catch (e) { console.error('Stats refresh failed', e); }
     }
 
-    try {
-      const resp = await fetch('/api/waitlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+    function animateValue(el, start, end, duration, prefix = '') {
+      if (!el) return;
+      let startTimestamp = null;
+      const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        const val = progress * (end - start) + start;
+        el.textContent = prefix + val.toFixed(2);
+        if (progress < 1) {
+          window.requestAnimationFrame(step);
+        }
+      };
+      window.requestAnimationFrame(step);
+    }
+
+    setInterval(refreshStats, 30000);
+    refreshStats();
+
+    // Prompt Coach Logic
+    async function runCoach() {
+      const input = document.getElementById('coach-input');
+      const btn = document.getElementById('btn-coach');
+      const output = document.getElementById('coach-output');
+      const cards = document.getElementById('coach-cards');
+      const refined = document.getElementById('refined-text');
+
+      if (!input.value.trim()) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Consulting Swarm...';
+      output.classList.remove('show');
+
+      try {
+        const resp = await fetch('/api/coach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: input.value })
+        });
+        const data = await resp.json();
+
+        cards.innerHTML = data.reviews.map(r => `
+        <div class="coach-card" style="--c: ${r.color}; margin-bottom: 1rem">
+          <div class="coach-agent">${r.agent} · ${r.virtue}</div>
+          <div class="coach-text">${r.critique}</div>
+          <div class="coach-suggest"><strong>Suggested:</strong> ${r.suggestion}</div>
+        </div>
+      `).join('');
+
+        refined.textContent = data.refined_prompt;
+        output.classList.add('show');
+        output.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      } catch (e) {
+        alert('Coach error: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Triad Review →';
+      }
+    }
+
+    // Tab switch
+    function switchTab(which) {
+      document.getElementById('tab-dev').className = 'tab' + (which === 'dev' ? ' dev-active' : '');
+      document.getElementById('tab-biz').className = 'tab' + (which === 'biz' ? ' biz-active' : '');
+      document.getElementById('panel-dev').classList.toggle('show', which === 'dev');
+      document.getElementById('panel-biz').classList.toggle('show', which === 'biz');
+    }
+
+    // Hero click + scroll
+    function go(which) {
+      switchTab(which);
+      setTimeout(() => {
+        document.getElementById('waitlist').scrollIntoView({ behavior: 'smooth' });
+      }, 60);
+    }
+
+    // Form submit — viral loop
+    async function submitForm(e, which) {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type="submit"]');
+      const origBtnText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+
+      const data = { type: which };
+      if (which === 'dev') {
+        data.name = document.getElementById('dev-name').value;
+        data.email = document.getElementById('dev-email').value;
+        data.github_username = document.getElementById('dev-github').value;
+        data.building_desc = document.getElementById('dev-building').value;
+        data.notes = document.getElementById('dev-notes').value;
+        data.pains = Array.from(document.querySelectorAll('.dev-pain:checked')).map(el => el.value);
+      } else {
+        data.name = document.getElementById('biz-name').value;
+        data.email = document.getElementById('biz-email').value;
+        data.linkedin_handle = document.getElementById('biz-linkedin').value;
+        data.org_name = document.getElementById('biz-org').value;
+        data.plan_choice = document.getElementById('biz-plan').value;
+        data.pains = Array.from(document.querySelectorAll('.biz-pain:checked')).map(el => el.value);
+      }
+
+      try {
+        const resp = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (!resp.ok) throw new Error('Submission failed');
+
+        const panel = document.getElementById('panel-' + which);
+        panel.querySelector('form').style.display = 'none';
+        document.getElementById('ok-' + which).classList.add('show');
+        document.getElementById('ok-' + which).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (err) {
+        alert('Error: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = origBtnText;
+      }
+    }
+
+    // Copy referral
+    function copyRef(btn, url) {
+      navigator.clipboard.writeText(url).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied';
+        setTimeout(() => btn.textContent = orig, 2000);
       });
-      
-      if (!resp.ok) throw new Error('Submission failed');
-
-      const panel = document.getElementById('panel-' + which);
-      panel.querySelector('form').style.display = 'none';
-      document.getElementById('ok-' + which).classList.add('show');
-      document.getElementById('ok-' + which).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    } catch (err) {
-      alert('Error: ' + err.message);
-      btn.disabled = false;
-      btn.textContent = origBtnText;
     }
-  }
 
-  // Copy referral
-  function copyRef(btn, url) {
-    navigator.clipboard.writeText(url).then(() => {
-      const orig = btn.textContent;
-      btn.textContent = '✓ Copied';
-      setTimeout(() => btn.textContent = orig, 2000);
-    });
-  }
-
-  // Share
-  function doShare() {
-    const text = 'AI Trinity Symphony is building the trust layer for AI — 12 agents, BFT consensus, built on ERC-8004, 60-80% cost reduction. Early access open now: https://aitrinitysymphony.com';
-    if(navigator.share) {
-      navigator.share({ title:'AI Trinity Symphony', text, url:'https://aitrinitysymphony.com' });
-    } else {
-      navigator.clipboard.writeText(text).then(() => {
-        const btn = event.target;
-        btn.textContent = '✓ Copied to clipboard';
-        setTimeout(() => btn.textContent = 'Share & Move Up →', 2500);
-      });
+    // Share
+    function doShare() {
+      const text = 'AI Trinity Symphony is building the trust layer for AI — 12 agents, BFT consensus, built on ERC-8004, 60-80% cost reduction. Early access open now: https://aitrinitysymphony.com';
+      if (navigator.share) {
+        navigator.share({ title: 'AI Trinity Symphony', text, url: 'https://aitrinitysymphony.com' });
+      } else {
+        navigator.clipboard.writeText(text).then(() => {
+          const btn = event.target;
+          btn.textContent = '✓ Copied to clipboard';
+          setTimeout(() => btn.textContent = 'Share & Move Up →', 2500);
+        });
+      }
     }
-  }
-</script>
+  </script>
 </body>
+
 </html>

@@ -1,4 +1,5 @@
 import { supabaseAdmin as supabase } from '../supabase';
+import { ASSET_CG_MAP } from '../constants';
 
 export interface PostmortemResult {
     cycleId: string;
@@ -9,24 +10,11 @@ export interface PostmortemResult {
 }
 
 export class MCLPostmortemHandler {
-    private static ASSET_MAP: Record<string, string> = {
-        'BTC': 'bitcoin',
-        'ETH': 'ethereum',
-        'BNB': 'binancecoin',
-        'SOL': 'solana',
-        'XRP': 'ripple',
-        'DOGE': 'dogecoin',
-        'ADA': 'cardano',
-        'AVAX': 'avalanche-2',
-        'TRX': 'tron',
-        'LINK': 'chainlink'
-    };
-
     /**
      * Fetches historical price for an asset at a specific timestamp from CoinGecko.
      */
     private static async getHistoricalPrice(asset: string, timestamp: string): Promise<number | null> {
-        const coinId = this.ASSET_MAP[asset.toUpperCase()];
+        const coinId = ASSET_CG_MAP[asset.toUpperCase()];
         if (!coinId) {
             console.error(`❌ [Postmortem] Unsupported asset: ${asset}`);
             return null;

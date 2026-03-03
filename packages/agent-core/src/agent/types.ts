@@ -20,6 +20,17 @@ export interface WisdomProfile {
     isScribe?: boolean;
 }
 
+export interface TaskMetadata {
+    confidence: number;
+    reasoning: string;
+    subjective_logic?: {
+        b: number; // belief
+        d: number; // disbelief
+        u: number; // uncertainty
+    };
+    [key: string]: any;
+}
+
 export interface ProviderConfig {
     name: string;
     baseUrl: string;

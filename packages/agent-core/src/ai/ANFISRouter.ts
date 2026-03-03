@@ -5,7 +5,7 @@ export interface RoutingResult {
     targetSquad: GroupId;
     confidence: number;
     reasoning: string;
-    suggestedModel?: 'grok-beta' | 'claude-3-5-sonnet' | 'gemini-1.5-pro';
+    suggestedModel?: 'grok-2' | 'claude-3-5-sonnet' | 'gemini-1.5-pro';
 }
 
 /**
@@ -103,7 +103,7 @@ export class ANFISRouter {
 
         if (outputScore < 0.33) {
             targetSquad = 'ALPHA'; // Truth
-            suggestedModel = 'grok-beta';
+            suggestedModel = 'grok-2';
         } else if (outputScore < 0.66) {
             targetSquad = 'BETA'; // Care
             suggestedModel = 'claude-3-5-sonnet';

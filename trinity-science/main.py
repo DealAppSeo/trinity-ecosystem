@@ -66,8 +66,23 @@ async def run_heartbeat():
         await asyncio.sleep(30)
 
 from app.anfis_router import router as anfis_router
+from models import MultiplicativeGNN
+import torch
 
-app = FastAPI(
+# Initialize GNN Model
+# 16 assets * 5 features per node = 80 input channels (approx for prototype)
+MODEL_PATH = "gnn_model.pth"
+gnn_model = MultiplicativeGNN(in_channels=80, hidden_channels=32, out_channels=1)
+
+if os.path.exists(MODEL_PATH):
+    try:
+        gnn_model.load_state_dict(torch.load(MODEL_PATH))
+        gnn_model.eval()
+        logger.info("GNN Model loaded successfully.")
+    except Exception as e:
+        logger.error(f"Failed to load GNN model: {e}")
+else:
+    logger.warning("No GNN model found at gnn_model.pth. Running with random weights.")
     title="Trinity Science Division",
     description="Python Microservice for GNN and ANFIS operations",
     version="0.1.0"
@@ -351,13 +366,31 @@ async def get_market_bids(data: MarketBidRequest):
 async def rank_gnn(data: GnnInput):
     logger.info(f"Received GNN rank request for {len(data.candidate_node_ids)} nodes")
     
-    # PHASE 2 TODO: Load PyTorch Geometric Model
-    # Stub: Return in original order with dummy scores
-    
-    return GnnOutput(
-        ranked_ids=data.candidate_node_ids,
-        scores=[0.9 - (i * 0.1) for i in range(len(data.candidate_node_ids))]
-    )
+    # Patent #2: Execute Geometric Mean Aggregation
+    try:
+        # Convert inputs to tensors
+        x = torch.tensor(data.task_embedding).view(1, -1).repeat(len(data.candidate_node_ids), 1)
+        # Create a simple star graph for ranking candidates against the task
+        edge_index = torch.tensor([[i for i in range(len(data.candidate_node_ids))], [0 for _ in range(len(data.candidate_node_ids))]], dtype=torch.long)
+        
+        with torch.no_state():
+            scores = gnn_model(x, edge_index).squeeze().tolist()
+            if not isinstance(scores, list):
+                scores = [scores]
+        
+        # Rank based on scores
+        ranked = [x for _, x in sorted(zip(scores, data.candidate_node_ids), reverse=True)]
+        
+        return GnnOutput(
+            ranked_ids=ranked,
+            scores=sorted(scores, reverse=True)
+        )
+    except Exception as e:
+        logger.error(f"GNN Inference Failed: {e}")
+        return GnnOutput(
+            ranked_ids=data.candidate_node_ids,
+            scores=[0.5] * len(data.candidate_node_ids)
+        )
 
 
 

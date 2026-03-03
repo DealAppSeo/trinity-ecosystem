@@ -40,11 +40,14 @@ export default function middleware(request: NextRequest) {
     // 2. AUTHENTICATION & PROTECTION (From Legacy Middleware) ---
 
     // Explicit Public Routes (Bypass All)
-    const isPublicRoute = 
-        pathname === '/health' || 
+    const isPublicRoute =
+        pathname === '/health' ||
         pathname === '/api/health' ||
         pathname.startsWith('/api/telegram') ||
-        pathname.startsWith('/api/bot');
+        pathname.startsWith('/api/bot') ||
+        pathname.startsWith('/api/waitlist') ||
+        pathname.startsWith('/api/stats') ||
+        pathname.startsWith('/api/coach');
     if (isPublicRoute) return NextResponse.next();
 
     // Define Protected Routes

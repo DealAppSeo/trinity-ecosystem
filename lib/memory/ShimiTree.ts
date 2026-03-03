@@ -189,4 +189,19 @@ export class ShimiTree {
         }
         return dotProduct; // Assuming normalized vectors for speed
     }
+
+    /**
+     * Patent #1: Merkle-DAG Leaf Extraction
+     * Recursively collects all entity IDs to build a state digest.
+     */
+    getAllLeafHashes(): string[] {
+        const hashes: string[] = [];
+        this.traverse(this.root, hashes);
+        return hashes;
+    }
+
+    private traverse(node: ShimiNode, hashes: string[]) {
+        node.entities.forEach(e => hashes.push(e.id));
+        node.children.forEach(c => this.traverse(c, hashes));
+    }
 }

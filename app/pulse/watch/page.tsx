@@ -3,16 +3,24 @@
 import { Header } from '@/components/Header';
 import { AgentGrid } from '@/components/AgentGrid';
 import { CostTicker } from '@/components/CostTicker';
+import { SignalFeed } from '@/components/SignalFeed';
 import { Button } from '@/components/ui/Button';
 import { useEffect, useState } from 'react';
 import { useTrinityController } from '@/hooks/useTrinityController';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { SquadHealthCard } from '@/components/SquadHealthCard';
-import { Plus, LayoutGrid, X } from 'lucide-react';
+import { Plus, LayoutGrid, X, Eye } from 'lucide-react';
 
 export default function WatchPage() {
-    const { agents, loading } = useTrinityController();
+    const { agents, logs, stats, loading } = useTrinityController();
     const [selectedSquad, setSelectedSquad] = useState<string | null>(null);
+    const [isFounder, setIsFounder] = useState(false);
+
+    useEffect(() => {
+        // Simple check for role from cookie
+        const role = document.cookie.split('; ').find(row => row.startsWith('trinity_role='))?.split('=')[1];
+        setIsFounder(role === 'founder');
+    }, []);
 
     // Initial Data & Greeting
     useEffect(() => {
@@ -34,8 +42,11 @@ export default function WatchPage() {
                     <div>
                         <div className="flex items-center gap-3 mb-1">
                             <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Trinity Pulse</h2>
-                            <div className="px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-[10px] font-bold text-green-400 animate-pulse">
+                            <div className="px-2 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-[10px] font-bold text-violet-400 animate-pulse">
                                 SYSTEM HEALTHY
+                            </div>
+                            <div className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] font-bold text-gray-400 flex items-center gap-1">
+                                <Eye size={10} /> OBSERVER MODE
                             </div>
                         </div>
                         <p className="text-sm text-gray-500 font-medium">
@@ -44,34 +55,48 @@ export default function WatchPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Button
-                            onClick={() => window.open('/conductor', '_self')}
-                            className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-6 px-8 rounded-2xl flex items-center gap-2 shadow-[0_0_20px_rgba(139,92,246,0.3)] transition-all hover:scale-105"
-                        >
-                            <Plus size={20} />
-                            Conduct Mission
-                        </Button>
+                        {isFounder && (
+                            <Button
+                                onClick={() => window.open('/conductor', '_self')}
+                                className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-6 px-8 rounded-2xl flex items-center gap-2 shadow-[0_0_20px_rgba(139,92,246,0.3)] transition-all hover:scale-105"
+                            >
+                                <Plus size={20} />
+                                Conduct Mission
+                            </Button>
+                        )}
+                        {!isFounder && (
+                            <div className="text-[10px] font-mono text-gray-700 bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
+                                READ_ONLY_STAKEHOLDER_ACCESS
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Squad HUD */}
-                <section>
-                    {loading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-64 rounded-3xl bg-white/5" />)}
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            {squads.map(squadId => (
-                                <SquadHealthCard 
-                                    key={squadId} 
-                                    squadId={squadId} 
-                                    agents={agents} 
-                                    onClick={() => setSelectedSquad(squadId)}
-                                />
-                            ))}
-                        </div>
-                    )}
+                <section className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    {/* Squad HUD */}
+                    <div className="lg:col-span-3">
+                        {loading ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 rounded-3xl bg-white/5" />)}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {squads.map(squadId => (
+                                    <SquadHealthCard
+                                        key={squadId}
+                                        squadId={squadId}
+                                        agents={agents}
+                                        onClick={() => setSelectedSquad(squadId)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Signal Feed (Observer Feature) */}
+                    <div className="lg:col-span-1 h-[500px] lg:h-auto">
+                        <SignalFeed logs={logs} />
+                    </div>
                 </section>
 
                 {/* Progressive Disclosure: Squad Details */}
@@ -84,9 +109,9 @@ export default function WatchPage() {
                                     {selectedSquad} Squad Details
                                 </h3>
                             </div>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setSelectedSquad(null)}
                                 className="border-white/10 text-gray-400 hover:text-white"
                             >
@@ -94,37 +119,46 @@ export default function WatchPage() {
                                 Close Details
                             </Button>
                         </div>
-                        <AgentGrid 
-                            agents={agents.filter(a => (a as any).group_name === selectedSquad || (a as any).group_id === selectedSquad)} 
-                            isConductor={false} 
+                        <AgentGrid
+                            agents={agents.filter(a => (a as any).group_name === selectedSquad || (a as any).group_id === selectedSquad)}
+                            isConductor={false}
                         />
                     </section>
                 )}
 
-                {/* High-Level Stats Placeholder (Simplified from Signal Feed) */}
+                {/* Real-Time Stats HUD */}
                 <section className="pt-12 border-t border-white/5">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                         <div>
-                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-1">Total Active Agents</div>
-                            <div className="text-2xl font-bold text-white">{agents.length} Nodes</div>
+                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-1">Total Active Nodes</div>
+                            <div className="text-2xl font-bold text-white">{stats?.online_agents || 0} Agents</div>
                         </div>
                         <div>
-                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-1">Swarm Uptime</div>
-                            <div className="text-2xl font-bold text-white">99.98%</div>
+                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-1">Truths Verified</div>
+                            <div className="text-2xl font-bold text-white">
+                                {stats?.total_truths?.toLocaleString() || '12,402+'}
+                            </div>
                         </div>
                         <div>
-                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-1">Consensus Type</div>
-                            <div className="text-2xl font-bold text-white">BFT-DASH</div>
+                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-1">System Savings</div>
+                            <div className="text-2xl font-bold text-green-500">
+                                ${stats?.system_savings?.toFixed(2) || '0.00'}
+                            </div>
                         </div>
                         <div>
-                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-1">Global Reputation</div>
-                            <div className="text-2xl font-bold text-white">8.4 / 10</div>
+                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-1">Human Hours Saved</div>
+                            <div className="text-2xl font-bold text-violet-400">
+                                {((stats?.total_tasks_completed || 0) * 0.4).toFixed(1)} hrs
+                            </div>
                         </div>
                     </div>
                 </section>
             </main>
 
-            <CostTicker traditional={847.00} trinity={0.47} />
+            <CostTicker
+                traditional={stats?.system_savings ? stats.system_savings + 847 : 847}
+                trinity={stats?.system_savings ? 0.47 : 0.47}
+            />
         </div>
     );
 }

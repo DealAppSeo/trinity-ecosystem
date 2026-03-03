@@ -36,6 +36,21 @@ import { ArxivMCP } from './servers/ArxivMCP';
 import { BacalhauMCP } from './servers/BacalhauMCP';
 import { PenpotMCP } from './servers/PenpotMCP';
 import { BraveMCP } from './servers/BraveMCP';
+import { supabaseAdmin as supabase } from '@/lib/supabase';
+
+interface ROIMap {
+    [key: string]: { hours: number; description: string };
+}
+
+const ROI_METRICS: ROIMap = {
+    'composio_execute': { hours: 0.5, description: 'Automated external action execution' },
+    'github_create_issue': { hours: 0.3, description: 'Automated project management' },
+    'tavily_search': { hours: 0.2, description: 'Accelerated web research' },
+    'filesystem_write': { hours: 0.1, description: 'Direct file system manipulation' },
+    'supabase_query': { hours: 0.4, description: 'Automated database operations' },
+    'figma_get_file': { hours: 0.5, description: 'Design asset retrieval' },
+    'default': { hours: 0.1, description: 'General agentic assistance' }
+};
 
 export class MCPManager {
     private servers: Map<string, MCPServer> = new Map();
@@ -186,10 +201,34 @@ export class MCPManager {
         for (const server of this.servers.values()) {
             const tools = await server.getTools();
             if (tools.some(t => t.name === toolName)) {
-                return await server.callTool(toolName, args);
+                const result = await server.callTool(toolName, args);
+                
+                // [PHASE 4] Background ROI Logging
+                this.logToolUsage(toolName, args).catch(err => {
+                    console.error(`[ROI] Failed to log tool usage: ${err.message}`);
+                });
+
+                return result;
             }
         }
         throw new Error(`Tool '${toolName}' not found in any active MCP server.`);
+    }
+
+    private async logToolUsage(toolName: string, args: any) {
+        const metric = ROI_METRICS[toolName] || ROI_METRICS['default'];
+        
+        const { error } = await supabase
+            .from('trinity_roi_logs')
+            .insert({
+                tool_name: toolName,
+                action_details: JSON.stringify(args).substring(0, 500),
+                hours_saved: metric.hours,
+                savings_category: metric.description,
+                created_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
+        console.log(`[ROI] 📈 Logged tool usage: ${toolName} (+${metric.hours}h)`);
     }
 
     async getStatus(): Promise<MCPRegistryRecord[]> {
