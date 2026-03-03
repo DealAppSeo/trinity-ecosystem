@@ -1,0 +1,743 @@
+﻿AI TRINITY SYMPHONY
+Crypto Prognosticator
+Master Handoff &amp; Status Document
+Version 1.2  |  March 2026  |  CONFIDENTIAL
+Sean Patrick Goodwin (HyperDAG)  |  AITrinitySymphony.com
+"Helping people help people â€” the last, the lost, and the least"
+PURPOSE: 
+Any AI agent or human reading this document should understand the full architecture, what is built, what is deployed, what is verified live, and exactly what remains. Truth over flattery. REAL / BUILT-UNTESTED / NOT STARTED. Verify before claiming.
+v1.2 Changes: 16-asset universe Â· Telegram ALPHA trade flow Â· /status /portfolio /pause /wolf commands Â· AI token tracking (TAO, FET) Â· Alpaca MCP deployment Â· Asset constant centralization
+1. What Is The Crypto Prognosticator
+A Byzantine Fault Tolerant (BFT) multi-agent prediction system for cryptocurrency markets, built on top of the existing AI Trinity Symphony infrastructure. It produces directional signals (BULLISH/BEARISH/NEUTRAL/NO_SIGNAL) for 16 assets every 20 minutes in SIMULATION mode, with mandatory Human-in-the-Loop review for high-uncertainty decisions.
+The system is named after the Pythagorean Comma â€” the irresolvable 23.46-cent gap between perfect mathematical tuning and real-world music. The system is designed to measure and manage the analogous gap between model predictions and market reality, rather than pretend it does not exist.
+1.1 The 16-Asset Universe (Updated v1.2)
+Ticker
+CoinGecko ID
+Alpaca Tradable
+Alpaca Symbol
+Category
+BTC
+bitcoin
+âœ… Yes
+BTC/USD
+ATS Core
+ETH
+ethereum
+âœ… Yes
+ETH/USD
+ATS Core
+SOL
+solana
+âœ… Yes
+SOL/USD
+ATS Core
+XRP
+ripple
+âœ… Yes
+XRP/USD
+ATS Core
+DOGE
+dogecoin
+âœ… Yes
+DOGE/USD
+ATS Core
+AVAX
+avalanche-2
+âœ… Yes
+AVAX/USD
+ATS Core
+LINK
+chainlink
+âœ… Yes
+LINK/USD
+ATS Core
+DOT
+polkadot
+âœ… Yes
+DOT/USD
+ATS Extended
+AAVE
+aave
+âœ… Yes
+AAVE/USD
+ATS Extended
+LTC
+litecoin
+âœ… Yes
+LTC/USD
+ATS Extended
+UNI
+uniswap
+âœ… Yes
+UNI/USD
+ATS Extended
+BNB
+binancecoin
+âŒ Signal Only
+â€”
+ATS Signal Only
+ADA
+cardano
+âŒ Signal Only
+â€”
+ATS Signal Only
+TRX
+tron
+âŒ Signal Only
+â€”
+ATS Signal Only
+TAO
+bittensor
+âŒ Signal Only
+â€”
+AI Tracking
+FET
+fetch-ai
+âŒ Signal Only
+â€”
+AI Tracking
+TAO (Bittensor) and FET (Fetch.ai / ASI Alliance): 
+AI-native tokens tracked for signal intelligence. TAO/FET price movements often lead broader AI narrative cycles â€” valuable leading indicators for TORCH. Alpaca does not yet support trading these; promote to tradable when Alpaca adds them. FET note: rebranded as ASI Alliance mid-2024 but CoinGecko ID fetch-ai still valid.
+1.2 Asset Constant â€” Single Source of Truth
+All 16 assets are defined ONCE in constants.ts. Every agent, every cycle loop, every Telegram picker imports from this single constant. Never duplicate the asset list. Never hardcode asset names in individual files.
+ATS_ASSETS
+ â€” all 16 assets with symbol, coingeckoId, alpacaSymbol, atsMonitored, alpacaTradable flags
+TRADABLE_ASSETS
+ â€” filter(a =&gt; a.alpacaTradable) â€” 11 assets for Alpaca order placement
+SIGNAL_ONLY_ASSETS
+ â€” filter(a =&gt; !a.alpacaTradable) â€” 5 assets for signal tracking only
+Verify alpacaSymbol values via 
+get_all_assets(asset_class='crypto')
+ at bot startup â€” do not hardcode without confirming
+1.3 The 8 Agent Roles
+Agent
+Role
+Responsibility
+SOPHIA
+Regime Classifier
+LNN-based market regime detection â€” TRENDING/RANGING/CHAOTIC/SHOCK etc.
+HDM
+Harmonic Cycle Memory
+FFT/CWT/EMD analysis â€” detects dominant market cycles and harmonic convergence
+NEXUS
+On-Chain Intelligence
+Blockchain data â€” exchange flows, whale movements, SOPR, funding rates
+TORCH
+Narrative/Sentiment
+Social volume, influencer RepScores, LunarCrush AltRank, Fear &amp; Greed. Degrades gracefully to NO_SIGNAL for assets with no narrative data seeded (DOT, AAVE, LTC, UNI, TAO, FET initially).
+VERITAS
+Adversarial Falsifier
+Challenges every signal â€” enforces monotonic uncertainty, requires contradicting evidence
+MEL
+Ensemble Aggregator
+ANFIS-weighted consensus â€” density matrix coherence across agent signals
+APM
+Portfolio Manager
+Epsilon-greedy exploration Phase 1 (15% explore, 0.995 decay). Thompson sampling after 100+ observations.
+GCM
+Pythagorean Comma
+Measures gap between model price and market-implied price. Issues challenge. Can veto. WOLF INTERVAL = automatic trade veto.
+1.4 Key Architectural Principles
+NO_SIGNAL is first-class â€” 
+the system outputs nothing rather than a bad signal
+Confidence must be earned â€” 
+any signal without contradicting_evidence is auto-flagged HIGH hallucination risk
+Agreement is not confidence â€” 
+BFT consensus only counts when agents used orthogonal evidence sources (EDM enforced)
+Every decision has provenance â€” 
+anfis_weight_history + prediction_postmortems = auditable patent trail
+Human is a signal â€” 
+HIAS tracks operator accuracy and promotes operator to voting agent when HIAS &gt; 0.85
+Weights are regime-conditional â€” 
+an agent accurate in TRENDING may be penalized in RANGING
+TORCH degrades gracefully â€” 
+insufficient narrative data â†’ NO_SIGNAL, not hallucination
+2. Architecture Overview
+2.1 Prediction Cycle Flow (20 Minutes)
+SOPHIA detects regime â†’ writes to prediction_regimes
+HDM runs harmonic analysis â†’ writes to harmonic_cycles
+All 16 assets: all agents emit signals â†’ writes to prediction_signals
+EDM check: source overlap &gt;70% (60% CHAOTIC, 50% SHOCK) â†’ mute lower agent
+GCM calculates Pythagorean Comma gap â†’ classifies HARMONIC/TEMPERED/DISSONANT/PRE_BIFURC/WOLF
+RQA entropy escalation: if recurrence_entropy &gt; 0.85 â†’ severity escalates one level
+BFT vote: 4 of 5 agents must agree â†’ writes to prediction_consensus
+HITL_REQUIRED flag set if: DISSONANT/PRE_BIFURC/WOLF comma, HIGH hallucination risk, or REVERSE cascade
+If HITL required â†’ Telegram alert sent via @AITrinityBot â†’ hunch capture flow
+On APPROVE â†’ Alpaca paper trade placed (BETA portfolio, tradable assets only)
+T+1h, T+4h, T+24h â†’ MCL postmortem runs â†’ updates all accuracy matrices
+2.2 Pythagorean Comma Severity Tiers
+Tier
+Gap
+Size
+HITL
+Action
+HARMONIC
+&lt; 1 comma
+1.0x
+No
+Auto-approve. Proceed normally.
+TEMPERED
+1-2 commas
+0.75x
+No
+Auto-approve. Log and reduce size 25%.
+DISSONANT
+2-3 commas
+0.50x
+Yes
+Challenge required â€” 3+ explanations needed. Reduce 50%.
+PRE_BIFURC
+RQA &gt; 0.85
+0.35x
+Yes â€” Urgent
+Between DISSONANT and WOLF. Catches dangerous transition.
+WOLF INTERVAL
+&gt; 3 commas
+0.0x
+Veto
+Automatic veto. No trade until regime reclassification.
+2.3 HIAS â€” Human Intuition Accuracy Score
+HIAS Score
+Capability Unlocked
+Practical Effect
+&lt; 0.58
+Logging only
+No system weight change. Hunch data captured for future calibration.
+0.58-0.70
+Tracked per category/regime/asset
+Interface personalizes to your accuracy patterns.
+0.70-0.80
+STRONG_NO reduces auto-confidence 10%
+Your NO signal has demonstrated measurable value.
+0.80-0.85
+STRONG_NO triggers Comma review
+Your veto forces a formal Comma challenge before execution.
+&gt; 0.85
+DISSONANT veto power â€” AGENT_SEAN promoted
+You ARE a voting agent. HIAS &gt; 0.85 unlocks GAMMA portfolio.
+2.4 Portfolio Architecture
+Portfolio
+Capital
+Source
+Trade Origin
+Purpose
+ALPHA
+$40,000
+Sean manual
+Telegram /alpha command
+or Alpaca dashboard
+Human intuition baseline â€” every ALPHA trade also captures HIAS hunch data
+BETA
+$40,000
+ATS automated
+HITL APPROVE in Telegram
+System recommendations only â€” auto-placed on approval
+GAMMA
+TBD
+Hybrid
+ATS signal + HIAS &gt; 0.70
+Unlocks after HIAS calibrated. Combines system + proven human edge.
+RESERVE
+$20,000
+Hold
+â€”
+Infrastructure buffer. Do not trade.
+ALPHA Trade Tagging: 
+client_order_id = ALPHA-{timestamp}-{asset}. BETA: client_order_id = ATS-BETA-{cycle_id}-{asset}. Daily 11:59 PM poll identifies ALPHA trades by absence of ATS-BETA- prefix. ALPHA- prefix makes filtering unambiguous.
+3. Telegram Control Interface (@AITrinityBot)
+@AITrinityBot is the unified command and control interface. All HITL decisions, ALPHA trades, and system monitoring go through Telegram. Three distinct flows with inline keyboards.
+3.1 Flow 1 â€” ATS HITL Alert (System-Initiated)
+Trigger: prediction_consensus row where hitl_required=true and hitl_completed_at is null.
+Alert card contains: 
+asset, final_signal, consensus_confidence, comma_severity, comma_gap_units, reverse_cascade_detected, hallucination_risk, top 2 agents by ANFIS weight, current regime.
+State Machine: ATS HITL
+PENDING_APPROVE â†’ Button: âœ… APPROVE | âŒ REJECT | â¸ DEFER 1H
+On APPROVE or REJECT â†’ PENDING_CATEGORY
+PENDING_CATEGORY â†’ Row 1: STRONG_YES | LEAN_YES | NEUTRAL | Row 2: LEAN_NO | STRONG_NO | PATTERN_SEEN | Row 3: NEWS_AWARE | TIMING_FEEL
+PENDING_CONFIDENCE â†’ Row 1: 1 2 3 4 5 | Row 2: 6 7 8 9 10
+PENDING_CONFIRM â†’ Full summary card â†’ ðŸš€ CONFIRM | ðŸš« CANCEL
+On CONFIRM â†’ write hitl_hunch_log, update prediction_consensus.hitl_completed_at, place Alpaca BETA paper trade (tradable assets only)
+DEFER 1H â†’ 1-hour timer, re-sends alert. No hunch logged. No trade placed.
+3.2 Flow 2 â€” ALPHA Manual Trade (/alpha command)
+Trigger: Sean sends /alpha to @AITrinityBot. Allows manual trades from mobile with full HIAS hunch capture â€” every ALPHA trade generates calibration data whether or not the system prompted it.
+State Machine: ALPHA Trade (9 States)
+ALPHA_IDLE â†’ Sean sends /alpha
+ALPHA_ASSET â†’ Asset picker (4 rows):
+    Row 1: BTC | ETH | SOL | XRP
+    Row 2: DOGE | AVAX | LINK
+    Row 3: DOT | AAVE | LTC | UNI
+    Row 4: BNB* | ADA* | TRX*  (signal-only warning if selected)
+    Row 5: ðŸ” OTHER (free text, validated against Alpaca asset list)
+ALPHA_DIRECTION â†’ ðŸ“ˆ BUY | ðŸ“‰ SELL
+ALPHA_SIZE â†’ SMALL 1% ~$400 | MEDIUM 2.5% ~$1,000 | LARGE 5% ~$2,000 | âœï¸ CUSTOM $
+ALPHA_CUSTOM_AMOUNT â†’ Free text input if CUSTOM selected. Validate: numeric, $100-$5,000.
+ALPHA_HUNCH â†’ Same 8 categories as ATS HITL (STRONG_YES through TIMING_FEEL). Log even if hunch contradicts direction â€” that IS the data.
+ALPHA_CONFIDENCE â†’ 1 through 10 (two rows of 5)
+ALPHA_CONFIRM â†’ Summary card with asset, direction, amount, hunch, confidence, ALPHA tag â†’ ðŸš€ EXECUTE | ðŸš« CANCEL
+ALPHA_EXECUTE â†’ Verify buying power â†’ place order â†’ write trade_execution_log (ALPHA) â†’ write hitl_hunch_log (decision_source=ALPHA) â†’ confirm with Alpaca order_id
+Session timeout: 30 minutes of inactivity â†’ expire, notify Sean, clear state
+ALPHA Confirmation Card Format
+ðŸ”µ ALPHA TRADE SUMMARY
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+Asset:      {asset}
+Direction:  {ðŸ“ˆ BUY / ðŸ“‰ SELL}
+Amount:     ${amount} ({pct}% of ALPHA)
+Hunch:      {category}
+Confidence: {n}/10
+Portfolio:  ALPHA (manual baseline)
+Mode:       PAPER TRADING
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+This trade will be logged and compared
+against ATS BETA signals for the same asset.
+3.3 Flow 3 â€” Status &amp; Control Commands
+Command
+What It Returns
+Inline Keyboard
+/status
+Alpaca buying power + equity, open positions count + P&amp;L, pending HITL count, last cycle timestamp + regime, system mode (SIMULATION/LIVE_HITL/LIVE_AUTO)
+None â€” formatted message
+/portfolio
+ALPHA vs BETA vs GAMMA trade count, win rates (if postmortems exist), P&amp;L comparison. Note: 'Insufficient data' if &lt; 5 trades in portfolio.
+None â€” formatted message
+/pause
+Pause confirmation: 'Pause prediction cycle? This will stop all new signals.'
+â¸ YES PAUSE | â–¶ï¸ KEEP RUNNING
+/resume
+Removes pause flag, confirms cycle running.
+None
+/wolf
+Lists all assets currently in WOLF INTERVAL â€” comma_severity=WOLF_INTERVAL, asset, gap, timestamp. 'These assets are vetoed by the Pythagorean Comma Agent.'
+None â€” formatted list
+/alpha
+Initiates ALPHA manual trade flow (9-state machine â€” see Flow 2 above)
+Full inline keyboard flow
+3.4 Telegram Architecture Rules
+EXTEND only â€” 
+HITLDispatcher.ts and HITLCallbackHandler.ts must be extended, never rebuilt
+StatusCommandHandler.ts â€” 
+new file for /status /portfolio /pause /resume /wolf commands
+State isolation â€” 
+ALPHA state machine states and ATS HITL states must not interfere
+30-minute timeout â€” 
+any incomplete ALPHA session expires, notifies Sean, clears state
+Dry-run mode â€” 
+all Alpaca orders and Supabase writes support --dry-run flag
+BNB/ADA/TRX in picker â€” 
+show with * warning, block execution, do not attempt Alpaca order
+Hunch contradictions are valid data â€” 
+STRONG_YES on a SELL trade is logged as-is. Do not block or warn.
+4. Deployment Status
+Supabase: 
+qnnpjhlxljtqyigedwkb.supabase.co (Viberific / AITrinitySymphony)
+Alpaca Paper: 
+Account PA3LAVZ299KX â€” $100,000 buying power
+Controller: 
+app.aitrinitysymphony.com
+Telegram Bot: 
+@AITrinityBot (live â€” Crypto Prognosticator extensions added)
+4.1 Database â€” 19 Tables Deployed and Verified
+Table
+Status
+Notes
+prediction_regimes
+âœ… LIVE
+Regime classification with LLE, RQA entropy, chaos_fractal_score
+prediction_signals
+âœ… LIVE
+Per-agent signals with hallucination risk, EDM overlap, wisdom keys
+prediction_consensus
+âœ… LIVE
+BFT consensus with Comma severity, HITL flags, cascade detection
+prediction_outcomes
+âœ… LIVE
+Multi-window outcomes (1h/4h/24h) with composite scoring
+prediction_postmortems
+âœ… LIVE
+MCL lessons with pgvector embedding index for RAG retrieval
+agent_accuracy_matrix
+âœ… LIVE
+Per-agent per-regime per-asset accuracy â€” drives ANFIS reweighting
+agent_capability_scores
+âœ… LIVE
+Secondary role capability (+0.02/-0.01). Eligible at 0.58.
+agent_role_contributions
+âœ… LIVE
+Per-cycle role tracking for postmortem attribution
+anfis_weight_history
+âœ… LIVE
+Full weight change provenance â€” epsilon-greedy until 100 obs, then Thompson
+harmonic_cycles
+âœ… LIVE
+HDM FFT/CWT output â€” resonance scores and cycle phases
+peer_lessons
+âœ… LIVE
+Cross-agent learning â€” 90-day expiry, orthogonality tracked
+historical_wisdom_activations
+âœ… LIVE
+22 wisdom frameworks + 6 failure anti-patterns â€” LLE-modulated decay
+influencer_rep_scores
+âœ… LIVE
+17 influencers seeded â€” Tier 1/2/3 + congressional members. DOT/AAVE/LTC/UNI/TAO/FET degrade to NO_SIGNAL until seeded.
+insider_trading_signals
+âœ… LIVE
+Congressional + SEC disclosures. SELL signals 1.30x amplified.
+bubble_migration_events
+âœ… LIVE
+11-level asset class hierarchy. Conservation gap &gt;20% = hidden flow alert.
+beneficiary_analysis
+âœ… LIVE
+Who gains/loses from current price. Optics-reality gap scoring.
+trade_execution_log
+âœ… LIVE
+Renamed from execution_log to avoid collision. ALPHA and BETA trades.
+hitl_hunch_log
+âœ… LIVE
+Every hunch capture with 8 categories. decision_source: ATS or ALPHA.
+human_intuition_scores
+âœ… LIVE
+HIAS per operator/category/regime/asset. Veto power at 0.85.
+All 24 indexes deployed. pgvector IVFFlat index live. pg_trgm fuzzy search live. process_prediction_postmortem atomic RPC function deployed.
+4.2 Environment Variables
+Variable
+Status
+Notes
+SUPABASE_URL
+âœ… LIVE
+Present in .env.local
+SUPABASE_SERVICE_ROLE_KEY
+âœ… LIVE
+Present. Alias SUPABASE_SERVICE_KEY also added.
+TELEGRAM_BOT_TOKEN
+âœ… LIVE
+Present in .env.local
+TELEGRAM_OWNER_CHAT_ID
+âœ… LIVE
+Present. Alias TELEGRAM_CHAT_ID also added.
+ALPACA_API_KEY
+âœ… LIVE
+Added to .env.local and Railway. Paper trading account PA3LAVZ299KX.
+ALPACA_SECRET_KEY
+âœ… LIVE
+Added to .env.local and Railway.
+ALPACA_BASE_URL
+âœ… LIVE
+https://paper-api.alpaca.markets/v2
+GLASSNODE_API_KEY
+â³ PENDING
+Signup: glassnode.com â€” free Studio tier
+SANTIMENT_API_KEY
+â³ PENDING
+Signup: santiment.net â€” free tier
+LUNARCRUSH_API_KEY
+â³ PENDING
+Signup: lunarcrush.com â€” free tier
+CRYPTOQUANT_API_KEY
+â³ PENDING
+Signup: cryptoquant.com â€” community tier
+COINGECKO_API_KEY
+â³ PENDING
+Signup: coingecko.com/en/api â€” free demo key
+COINBASE_API_KEY/SECRET
+â³ PENDING
+Read-only ONLY. Settings â†’ API â†’ New API Key
+BINANCE_API_KEY/SECRET
+â³ PENDING
+Read-only ONLY. Profile â†’ API Management
+5. Build Status by Phase
+Phase
+Status
+Details
+Phase 1: Prediction Cycle Engine
+ðŸ”¨ BUILT/UNTESTED
+20-minute loop for 16 assets. CoinGecko price fetch. 3-agent signals (HDM/NEXUS/TORCH). BFT consensus. Comma calculation. HITL flagging. TORCH graceful degradation for new assets. NOT YET CONFIRMED writing to Supabase.
+Asset Constant Centralization
+ðŸ”¨ IN PROGRESS
+constants.ts being created with 16-asset ATS_ASSETS array. MCLPostmortemHandler.ts being refactored to import from constants.ts. All other files to follow.
+Phase 2: HITL Interface
+ðŸ”¨ BUILT/UNTESTED
+Review queue at app.aitrinitysymphony.com. Hunch capture widget with 8 correct categories. Approve/Defer/Reject buttons. NOT YET CONFIRMED live.
+Phase 3: Reverse Cascade Detector
+ðŸ”¨ BUILT/UNTESTED
+Velocity comparison across assets. BTC lag detection. Confidence penalty -0.15 (-0.20 if LLE&gt;0.03). Auto-HITL on every REVERSE. NOT YET CONFIRMED wired to cycle.
+Phase 4/7: MCL Postmortem
+ðŸ”¨ BUILT/UNTESTED
+Multi-window evaluation (1h/4h/24h weighted 0.2/0.5/0.3). CoinGecko price verification. Atomic RPC deployed. HIAS loop closure. 10-obs ANFIS threshold. CLI --cycle-id flag.
+ATS HITL Telegram Flow
+ðŸ”¨ BUILT/UNTESTED
+Crypto HITL alert format. WOLF INTERVAL notification. REVERSE CASCADE alert. Hourly digest. State-machine hunch flow (PENDING_CATEGORY â†’ PENDING_CONFIDENCE). Extended HITLDispatcher.ts and HITLCallbackHandler.ts.
+ALPHA Trade Flow (/alpha)
+â³ IN PROGRESS
+9-state Telegram state machine. Asset picker for all 11 tradable assets + signal-only warnings. Hunch capture on every ALPHA trade. client_order_id = ALPHA-{timestamp}-{asset}. write to trade_execution_log + hitl_hunch_log with decision_source=ALPHA.
+Status Commands (/status etc.)
+â³ IN PROGRESS
+New StatusCommandHandler.ts. /status /portfolio /pause /resume /wolf. /pause uses existing config mechanism â€” no new tables.
+Alpaca BETA Paper Trading
+â³ NOT STARTED
+Wire APPROVE â†’ Alpaca paper trade. client_order_id = ATS-BETA-{cycle_id}-{asset}. Log order_id to trade_execution_log. Signal-only assets (BNB/ADA/TRX/TAO/FET) must never attempt order placement.
+Alpaca MCP Deployment
+â³ NOT STARTED
+Remote Railway deployment required for Claude Mobile. Docker â†’ Railway â†’ register as Claude.ai connector â†’ available on mobile. Separate from Trinity Symphony service.
+Daily ALPHA Poll
+â³ NOT STARTED
+11:59 PM daily. GET /v2/orders from Alpaca. Orders without ATS-BETA- prefix â†’ log as ALPHA. ALPHA- prefix makes identification unambiguous.
+Data Source Integrations
+âš¡ PARTIAL
+Fear &amp; Greed and CoinGecko trending: no key, may be wired. Glassnode/Santiment/LunarCrush: keys not yet registered. Coinbase/Binance read-only: keys not yet generated.
+GitHub Push / Railway Deploy
+âš ï¸ UNCONFIRMED
+Code built in Antigravity IDE. GitHub push and Railway auto-deploy NOT YET CONFIRMED. No Railway live logs seen.
+6. What Still Needs To Be Done
+Ordered by priority. Complete in sequence â€” each item unblocks the next.
+6.1 IMMEDIATE â€” Blockers
+6.1.1 Resolve Schema Discrepancies (Before Any Code Runs)
+trade_execution_log vs execution_log: 
+Correct table is trade_execution_log. The existing execution_log is a different table (Trinity agent API call tracking). Do not touch it.
+signal_direction vs final_direction: 
+Query information_schema.columns on prediction_signals. Use whichever column the existing code already writes to. Do not add columns without approval.
+decision_source column in hitl_hunch_log: 
+Verify it exists. If not, ALTER TABLE to add it (ALPHA or ATS). Show ALTER TABLE statement before running.
+ConstitutionalAgent.ts scope: 
+Confirm this is specifically the TORCH agent, not a shared base class. TORCH degradation logic must not affect other agents.
+6.1.2 GitHub Push + Railway Deploy (BLOCKER)
+Push all changes to GitHub main branch with descriptive commit message
+Confirm Railway auto-deploy triggered and build succeeded
+Show first live log line from Railway â€” do not report complete without Railway log proof
+6.1.3 First Cycle Verification
+Verify Alpaca connection: GET account details, confirm PA3LAVZ299KX and $100,000 buying power
+Write test row to prediction_regimes, SELECT it back, DELETE it
+Send test message via @AITrinityBot confirming connectivity
+Run ONE cycle for BTC only â€” confirm row IDs written to prediction_regimes, prediction_signals, prediction_consensus
+Show actual Supabase row IDs as proof â€” not just 'success' messages
+6.1.4 Hunch Category Verification
+Exact 8 categories required: 
+STRONG_YES | LEAN_YES | NEUTRAL | LEAN_NO | STRONG_NO | PATTERN_SEEN | NEWS_AWARE | TIMING_FEEL
+Antigravity originally proposed wrong categories (Psychological/Technical/Insider/Harmonic). Verify the correction was applied in HITLCallbackHandler.ts.
+6.2 NEXT â€” After First Cycle Confirmed
+Wire APPROVE â†’ Alpaca BETA paper trade (tradable assets only â€” never attempt BNB/ADA/TRX/TAO/FET)
+Complete ALPHA /alpha Telegram flow with all 9 states and 30-minute timeout
+Complete /status /portfolio /pause /resume /wolf command handlers
+Deploy Alpaca MCP to Railway (separate service) + register as Claude.ai connector for Claude Mobile
+Register free API keys: Glassnode, Santiment, LunarCrush, CryptoQuant, CoinGecko Demo
+Generate read-only exchange keys: Coinbase, Binance (READ ONLY permissions only)
+Run MCL postmortem first run after 1h cycle window: npx tsx scripts/crypto-postmortem.ts --cycle-id=&lt;uuid&gt;
+6.3 LATER â€” Phase 2 Enhancements
+Regime accuracy report: after 20 cycles, query agent_accuracy_matrix for regime specialists
+ANFIS reweighting: agents with 0.78+ accuracy in TRENDING get 1.5x weight in TRENDING cycles
+HIAS calibration: after 50 HITL decisions, identify which hunch categories add alpha
+GAMMA portfolio: unlock when HIAS &gt; 0.70 in at least one hunch category
+TORCH narrative seeding for DOT, AAVE, LTC, UNI, TAO, FET via Santiment/LunarCrush after keys registered
+TAO/FET leading indicator correlation: track whether AI token surges precede tradable asset moves (Phase 2 research)
+Thompson sampling: APM transitions from epsilon-greedy after 100+ observations
+Wisdom library: activate Phases 17-20 after bull run baseline established
+ATS vs Alpaca AI comparison: build after 30 days of parallel data exists
+pgvector lesson embeddings: activate Phase 13 embedding generation for RAG retrieval
+Partitioning: activate Section G SQL when AUM-percentage trigger fires (v3.1 Â§20.1)
+7. Sean's Personal Action Items
+These are things only Sean can do â€” API registrations, account setups, key generation. No agent can do these.
+7.1 Do Tonight â€” Unblocks Everything
+#
+Task
+Where
+Keys to Store
+1
+GitHub push + confirm Railway auto-deploy
+Antigravity IDE â†’ git push â†’ Railway dashboard
+None â€” confirm deploy log
+2
+Place first manual ALPHA trade
+Alpaca dashboard â€” any asset, any size
+None â€” auto-captured daily poll
+3
+Add BTC, ETH, SOL, XRP, DOGE, AVAX, LINK, DOT, AAVE, LTC, UNI to Alpaca watchlist
+Alpaca dashboard â†’ Watchlist â†’ Edit
+None
+7.2 Free Account Signups (15-20 Minutes Total)
+#
+Service
+URL
+Tier
+Railway Key Name
+4
+Glassnode
+glassnode.com
+Free (Studio)
+GLASSNODE_API_KEY
+5
+Santiment
+santiment.net
+Free tier
+SANTIMENT_API_KEY
+6
+LunarCrush
+lunarcrush.com
+Free tier
+LUNARCRUSH_API_KEY
+7
+CryptoQuant
+cryptoquant.com
+Community
+CRYPTOQUANT_API_KEY
+8
+CoinGecko Demo
+coingecko.com/en/api
+Free Demo
+COINGECKO_API_KEY
+Note: Fear &amp; Greed (api.alternative.me/fng) and CoinGecko trending endpoint need no signup â€” already free.
+7.3 Exchange API Keys â€” Read-Only ONLY
+#
+Exchange
+Where to Generate
+Permission
+Key Names
+9
+Coinbase
+coinbase.com â†’ Settings â†’ API â†’ New API Key
+READ ONLY
+COINBASE_API_KEY, COINBASE_API_SECRET
+10
+Binance
+binance.com â†’ Profile â†’ API Management
+READ ONLY
+BINANCE_API_KEY, BINANCE_API_SECRET
+CRITICAL: Read-only permissions only. Do not enable trading or withdrawal permissions. These keys are for data pull only.
+7.4 MCP Servers â€” Installation Priority
+MCP Server
+Priority
+What It Gives
+Install Method
+Alpaca MCP (Official)
+HIGH
+Natural language trading â€” place paper trades, check positions, portfolio management. Replaces custom Alpaca API wrapper.
+Railway Docker deploy â†’ register as Claude.ai connector â†’ available Claude Mobile + Desktop
+CoinGecko MCP (Official)
+HIGH
+Real-time prices for 15k+ coins. 8M+ tokens via GeckoTerminal. Official from CoinGecko.
+docs.coingecko.com/docs/mcp-server â€” Beta, works Claude Desktop today
+Crypto Indicators MCP
+MEDIUM
+RSI, MACD, Bollinger Bands pre-built â€” no implementing TA math.
+pulsemcp.com â€” kukapay/crypto-indicators
+CoinStats MCP
+MEDIUM
+Portfolio tracking + crypto news. TORCH narrative scoring input.
+Official MCP registry, free tier
+Crypto.com MCP
+LOW
+Public market data. Useful if CoinGecko rate limits.
+mcp.crypto.com
+Token Metrics MCP
+LOW
+Trading signals + AI analytics. Benchmark vs ATS signals.
+Official MCP registry, paid/free tier
+7.5 What Requires Zero Action From Sean
+Fear &amp; Greed Index â€” free public API, no key: api.alternative.me/fng
+CoinGecko trending endpoint â€” free public API, no key
+Supabase â€” already deployed and verified
+Railway â€” already connected to GitHub auto-deploy
+@AITrinityBot â€” already live, extensions built
+Alpaca paper account â€” already live, keys in Railway env
+8. Key Architectural Decisions
+8.1 v3.1 Configuration Amendments
+Amendment
+Decision
+Asset universe expansion
+10 â†’ 16 assets. 11 Alpaca-tradable, 5 signal-only. Defined once in constants.ts. Never duplicated. ATS_ASSETS, TRADABLE_ASSETS, SIGNAL_ONLY_ASSETS exported.
+AI token tracking
+TAO (Bittensor) and FET (Fetch.ai/ASI Alliance) added as signal-only. AI-native tokens â€” price moves often lead AI narrative cycles. Promote to tradable when Alpaca adds support.
+ALPHA trade flow
+Sean's manual trades captured via Telegram /alpha command with full 9-state machine. HIAS hunch capture on every ALPHA trade â€” not just ATS-prompted ones. client_order_id = ALPHA-{timestamp}-{asset}.
+ALPHA portfolio fairness
+ALPHA trades executed via Telegram /alpha â€” same speed and interface as BETA. Neither portfolio gets systematic speed advantage. Comparison is valid.
+TORCH graceful degradation
+For assets without influencer_rep_scores seeded (DOT/AAVE/LTC/UNI/TAO/FET initially), TORCH returns NO_SIGNAL with INSUFFICIENT_NARRATIVE_DATA flag. BFT consensus continues with remaining agents.
+Telegram architecture
+StatusCommandHandler.ts is new file. HITLDispatcher.ts and HITLCallbackHandler.ts extended only. ALPHA and ATS state machines are isolated. 30-minute session timeout on ALPHA flow.
+Schema collision resolution
+trade_execution_log (our table) vs execution_log (existing Trinity table). Both are in active use. Never rename or modify either. Separate purposes.
+HITL hunch capture
+8 categories required at every HITL point â€” ATS and ALPHA both. HIAS tracks and promotes operator to AGENT_SEAN at &gt; 0.85. Hunch contradictions are valid data â€” log without blocking.
+PRE_BIFURC tier
+New Comma tier between DISSONANT and WOLF. 0.35x position. HITL required urgent. Catches dangerous transition period before WOLF severity is reached.
+W3C slippage threshold
+0.35% (down from 0.40%). n8n triggered default, always-on at $8-15/month when threshold exceeded.
+9. Critical Rules for Any Agent Working On This
+Rule
+Detail
+NEVER assume column names
+Query information_schema.columns before every INSERT or SELECT on any table
+NEVER touch existing Trinity tables
+trinity_tasks, execution_log, trinity_agents, anfis_routing_logs are off limits
+NEVER create new tables
+The schema is complete with 19 tables. Use existing tables only.
+NEVER report LIVE without proof
+Show Supabase row IDs or Alpaca order IDs. Not just 'success' messages.
+NEVER run LIVE_HITL or LIVE_AUTO
+Without explicit Sean approval. Default: SIMULATION mode only.
+NEVER simplify or remove code
+Do not remove IntelligenceCore SDK code without explicit approval. Fix only the specific error.
+NEVER crash on missing API key
+Graceful degradation required. Missing key â†’ NO_SIGNAL, not system crash.
+NEVER put instructions in code blocks
+Only executable code/SQL in code blocks. Instructions go in chat text.
+NEVER attempt orders on signal-only assets
+BNB, ADA, TRX, TAO, FET must never have Alpaca orders placed. Signal tracking only.
+ALWAYS push to GitHub first
+Railway auto-deploys from main branch. Never deploy manually.
+ALWAYS verify hunch categories exactly
+STRONG_YES | LEAN_YES | NEUTRAL | LEAN_NO | STRONG_NO | PATTERN_SEEN | NEWS_AWARE | TIMING_FEEL
+ALWAYS use atomic transactions for postmortems
+All updates succeed or all roll back. See postmortem_atomic.sql RPC.
+ALWAYS tag BETA trades
+client_order_id = ATS-BETA-{cycle_id}-{asset}
+ALWAYS tag ALPHA trades
+client_order_id = ALPHA-{timestamp}-{asset}
+ALWAYS import assets from constants.ts
+Never duplicate the asset list. ATS_ASSETS is the single source of truth.
+ALWAYS check --dry-run support
+Alpaca orders and Supabase writes in ALPHA flow must support --dry-run flag
+10. Reference
+10.1 Key Files
+File
+Purpose
+Trinity_Symphony_Crypto_Prognosticator_Build_Directive_v3.2.docx
+Authoritative architecture spec â€” 20 sections, 20 build phases, all design decisions
+trinity_symphony_schema_v31.sql
+Complete schema â€” all 19 tables, 24 indexes, generated columns, seed data
+src/constants.ts
+Single source of truth â€” ATS_ASSETS 16-asset array with all flags
+schema_section_B.sql
+Core prediction tables â€” column reference for agents
+schema_section_C.sql
+Learning and wisdom tables
+schema_section_D.sql
+Intelligence and monitoring tables (includes trade_execution_log)
+schema_section_E.sql
+HITL and human intuition tables
+schema_section_F.sql
+All 24 indexes
+sql/postmortem_atomic.sql
+process_prediction_postmortem RPC function â€” deployed to Supabase
+src/hitl/HITLDispatcher.ts
+Telegram alert dispatch â€” extended with crypto message types
+src/hitl/HITLCallbackHandler.ts
+Telegram callback handling â€” ATS HITL + ALPHA state machines
+src/hitl/StatusCommandHandler.ts
+Telegram status commands â€” /status /portfolio /pause /resume /wolf
+src/hitl/MCLPostmortemHandler.ts
+Postmortem evaluation â€” all 5 table updates, atomic, HIAS closure
+scripts/crypto-postmortem.ts
+CLI trigger: --dry-run and --cycle-id flags
+scripts/verify-deployment.ts
+Post-deploy verification checklist â€” 10 checks
+scripts/test-first-cycle.ts
+One-time first cycle test â€” BTC only, write/read/delete
+10.2 Verification Checklist â€” Run After Every Deploy
+npx tsx scripts/verify-deployment.ts â€” runs all 10 checks
+Check flags: --check=env|tables|columns|rpc|seed|alpaca|telegram|cycle|hunches|trades
+Exit code 1 if any check fails â€” Railway log will show failure
+After Phase 1 first deploy only: npx tsx scripts/test-first-cycle.ts
+After first HITL decision: verify-deployment.ts --check=hunches
+After first APPROVE: verify-deployment.ts --check=trades
+1h after first live cycle: crypto-postmortem.ts --cycle-id=&lt;uuid&gt;
+Document generated: March 2026  |  AI Trinity Symphony v3.1  |  Version 1.2
+"Janitor for Jesus"  |  Philippians 4:8  |  Micah 6:8  |  Matthew 7:12

@@ -83,6 +83,8 @@ if os.path.exists(MODEL_PATH):
         logger.error(f"Failed to load GNN model: {e}")
 else:
     logger.warning("No GNN model found at gnn_model.pth. Running with random weights.")
+
+app = FastAPI(
     title="Trinity Science Division",
     description="Python Microservice for GNN and ANFIS operations",
     version="0.1.0"

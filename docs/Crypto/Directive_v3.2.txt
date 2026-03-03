@@ -1,0 +1,298 @@
+﻿AI TRINITY SYMPHONY
+Crypto Prognosticator
+MASTER BUILD DIRECTIVE
+Version 3.2  |  March 2026  |  CONFIDENTIAL
+Sean Patrick Goodwin (HyperDAG)  |  AITrinitySymphony.com
+"Helping people help people â€” the last, the lost, and the least"
+v3.2 Addendum: 
+This document supersedes v3.1 and adds Section 21 covering: 16-asset universe expansion, AI token tracking (TAO/FET), Telegram ALPHA trade flow, status/control commands, Alpaca MCP architecture, asset constant centralization, and TORCH graceful degradation. All prior sections (1-20) remain authoritative.
+Architecture co-developed through synthesis of Claude (Anthropic) and Grok (xAI) analysis
+21. v3.2 Amendments â€” Asset Expansion, ALPHA Flow &amp; Telegram Control
+This section documents all changes introduced in v3.2. Sections 1-20 remain fully authoritative. Read this section after Section 20.
+21.1 Asset Universe Expansion â€” 10 to 16 Assets
+The monitored asset universe expands from 10 to 16 assets. All assets run the full prediction cycle. Only 11 are Alpaca-tradable â€” 5 are signal-only and must never have orders placed against them.
+Ticker
+CoinGecko ID
+Category
+Alpaca Symbol
+Trade?
+BTC
+bitcoin
+ATS Core
+BTC/USD
+âœ… Tradable
+ETH
+ethereum
+ATS Core
+ETH/USD
+âœ… Tradable
+SOL
+solana
+ATS Core
+SOL/USD
+âœ… Tradable
+XRP
+ripple
+ATS Core
+XRP/USD
+âœ… Tradable
+DOGE
+dogecoin
+ATS Core
+DOGE/USD
+âœ… Tradable
+AVAX
+avalanche-2
+ATS Core
+AVAX/USD
+âœ… Tradable
+LINK
+chainlink
+ATS Core
+LINK/USD
+âœ… Tradable
+DOT
+polkadot
+ATS Extended
+DOT/USD
+âœ… Tradable
+AAVE
+aave
+ATS Extended
+AAVE/USD
+âœ… Tradable
+LTC
+litecoin
+ATS Extended
+LTC/USD
+âœ… Tradable
+UNI
+uniswap
+ATS Extended
+UNI/USD
+âœ… Tradable
+BNB
+binancecoin
+Signal Only
+â€”
+âŒ No order
+ADA
+cardano
+Signal Only
+â€”
+âŒ No order
+TRX
+tron
+Signal Only
+â€”
+âŒ No order
+TAO
+bittensor
+AI Token Tracking
+â€”
+âŒ No order
+FET
+fetch-ai
+AI Token Tracking
+â€”
+âŒ No order
+21.2 AI Token Tracking â€” TAO and FET
+TAO (Bittensor) and FET (Fetch.ai, now ASI Alliance) are the two most significant AI-native crypto assets. Their inclusion is directly on-brand for HyperDAG's AI infrastructure mission.
+TAO (Bittensor): 
+Decentralized ML network. Price movements correlate with AI sector sentiment before it reaches mainstream crypto.
+FET (Fetch.ai/ASI): 
+Merged with AGIX and OCEAN mid-2024 to form ASI Alliance token. CoinGecko ID fetch-ai still valid.
+Leading indicator value: 
+TAO/FET surges often precede AI narrative cycles in tradable assets. TORCH should monitor for correlation signals â€” Phase 2 enhancement.
+Alpaca promotion path: 
+When Alpaca adds TAO or FET support, update ATS_ASSETS alpacaSymbol field and set alpacaTradable=true. No other code changes needed.
+TORCH initial behavior: 
+NO_SIGNAL with INSUFFICIENT_NARRATIVE_DATA flag until influencer_rep_scores seeded. Degrade gracefully.
+21.3 Asset Constant Centralization â€” constants.ts
+All 16 assets are defined ONCE in constants.ts. This is the single source of truth. Never duplicate the asset list. Never hardcode asset names in individual agent or handler files.
+Required exports from constants.ts:
+ATS_ASSETS
+ â€” all 16 assets with: symbol, coingeckoId, alpacaSymbol (null if not tradable), atsMonitored, alpacaTradable
+TRADABLE_ASSETS
+ â€” ATS_ASSETS.filter(a =&gt; a.alpacaTradable) â€” 11 assets for Alpaca order placement
+SIGNAL_ONLY_ASSETS
+ â€” ATS_ASSETS.filter(a =&gt; !a.alpacaTradable) â€” 5 assets, never place orders
+Implementation rule: 
+Verify alpacaSymbol values via get_all_assets(asset_class='crypto') at bot startup. Do not hardcode without live confirmation from Alpaca API.
+Refactoring rule: 
+MCLPostmortemHandler.ts had a local ASSET_MAP â€” replace with import from constants.ts. All other files with asset arrays do the same.
+21.4 TORCH Agent â€” Graceful Degradation for New Assets
+TORCH depends on influencer_rep_scores being seeded for each asset. The 4 extended ATS assets (DOT, AAVE, LTC, UNI) and 2 AI tracking assets (TAO, FET) have no initial seed data. TORCH must degrade gracefully rather than hallucinate.
+Required logic before emitting any TORCH signal:
+Query influencer_rep_scores for the asset. If no rows exist â†’ return NO_SIGNAL with hallucination_risk=HIGH and evidence='INSUFFICIENT_NARRATIVE_DATA'
+BFT consensus continues without TORCH's vote â€” 4 of remaining 4 agents must agree instead
+Log the degradation event so postmortem can attribute absent TORCH data
+After Santiment/LunarCrush keys registered, seed narrative data for all 6 new assets â€” TORCH activates automatically when rows exist
+Scope warning: 
+If TORCH logic lives in a shared base class (ConstitutionalAgent.ts), scope the degradation check specifically to TORCH and specifically to assets where alpacaTradable=false or influencer_rep_scores count=0. Do not apply broadly to other agents.
+21.5 Portfolio Architecture â€” ALPHA Trade Flow
+The ALPHA portfolio (Sean's manual baseline) is now executed via Telegram /alpha command rather than only captured via daily Alpaca poll. This ensures both ALPHA and BETA trades flow through the same interface at the same speed â€” preserving comparison validity.
+Portfolio
+Capital
+Execution Method
+client_order_id Format
+ALPHA
+$40,000
+Telegram /alpha command (preferred)
+or Alpaca dashboard (fallback â€” captured at 11:59 PM poll)
+ALPHA-{timestamp}-{asset}
+BETA
+$40,000
+Telegram APPROVE button on ATS HITL alert
+ATS-BETA-{cycle_id}-{asset}
+GAMMA
+TBD
+ATS signal + HIAS &gt; 0.70 required
+TBD â€” unlocks after HIAS calibration
+RESERVE
+$20,000
+Hold â€” do not trade
+â€”
+Fairness principle: 
+Neither portfolio gets systematic speed advantage. ALPHA via /alpha = same interface as BETA via APPROVE. Comparison is valid.
+ALPHA hunch capture: 
+Every /alpha trade captures hunch category and confidence â€” same 8 categories as ATS HITL. Hunch data feeds HIAS whether or not the system prompted the trade.
+Contradiction logging: 
+STRONG_YES hunch on a SELL direction is logged as-is. Do not block or warn. The discrepancy between hunch and action IS the data.
+Daily poll fallback: 
+11:59 PM GET /v2/orders. Orders without ATS-BETA- prefix = ALPHA trades. ALPHA- prefix on /alpha trades makes identification unambiguous. Dashboard trades identified by absence of both prefixes.
+21.6 Telegram Control Interface â€” Full Specification
+21.6.1 ALPHA Trade State Machine (/alpha)
+9-state machine added to HITLCallbackHandler.ts alongside existing ATS HITL states. States are isolated â€” ATS HITL and ALPHA states cannot interfere.
+State
+Prompt / Message
+Buttons
+ALPHA_IDLE
+Sean sends /alpha
+Initiates flow
+ALPHA_ASSET
+Select asset for ALPHA trade:
+Row 1: BTC ETH SOL XRP
+Row 2: DOGE AVAX LINK
+Row 3: DOT AAVE LTC UNI
+Row 4: BNB* ADA* TRX* (signal-only warning)
+Row 5: ðŸ” OTHER
+ALPHA_DIRECTION
+Direction for {asset}:
+ðŸ“ˆ BUY  |  ðŸ“‰ SELL
+ALPHA_SIZE
+Position size (ALPHA = $40,000):
+SMALL 1% ~$400  |  MEDIUM 2.5% ~$1,000
+LARGE 5% ~$2,000  |  âœï¸ CUSTOM $
+ALPHA_CUSTOM_AMOUNT
+Enter dollar amount ($100-$5,000):
+Free text input â€” validate numeric
+ALPHA_HUNCH
+What's driving this trade?
+STRONG_YES  LEAN_YES  NEUTRAL
+LEAN_NO  STRONG_NO  PATTERN_SEEN
+NEWS_AWARE  TIMING_FEEL
+ALPHA_CONFIDENCE
+Confidence (1=low, 10=certain):
+1  2  3  4  5
+6  7  8  9  10
+ALPHA_CONFIRM
+Full summary card (see format below)
+ðŸš€ EXECUTE  |  ðŸš« CANCEL
+ALPHA_EXECUTE
+Verify buying power â†’ place order â†’ log â†’ confirm
+Returns Alpaca order_id
+Session timeout: 
+30 minutes of inactivity â†’ expire, notify Sean, clear all state for that chat_id
+Dry-run flag: 
+All Alpaca orders and Supabase writes support --dry-run. Log what would happen without executing.
+BNB/ADA/TRX/TAO/FET in picker: 
+Show in Row 4/5 with * marker. If selected, respond with signal-only warning. Do not advance state.
+21.6.2 Status &amp; Control Commands
+Command
+Returns
+Buttons
+/status
+Alpaca buying power + equity, open positions count + P&amp;L, pending HITL decisions count, last cycle timestamp + regime, system mode
+None
+/portfolio
+ALPHA vs BETA trade count, win rates (if postmortems exist), P&amp;L delta. Shows 'Insufficient data' if &lt; 5 trades.
+None
+/pause
+Confirmation: 'Pause prediction cycle? This will stop all new signals.'
+â¸ YES PAUSE  |  â–¶ï¸ KEEP RUNNING
+/resume
+Removes pause flag. Confirms cycle running.
+None
+/wolf
+All assets currently in WOLF INTERVAL â€” asset, gap, timestamp. 'These assets are vetoed by the Pythagorean Comma Agent.'
+None
+Implementation note: 
+Status commands go in new file StatusCommandHandler.ts. /pause uses existing config mechanism in Supabase â€” no new tables. Query information_schema before implementing to find correct config table.
+21.6.3 Telegram Architecture Rules (v3.2 Additions)
+EXTEND only â€” 
+HITLDispatcher.ts and HITLCallbackHandler.ts extended, never rebuilt
+New file â€” 
+StatusCommandHandler.ts for /status /portfolio /pause /resume /wolf
+State isolation â€” 
+ALPHA and ATS HITL state machines must not share state or interfere
+30-minute timeout â€” 
+incomplete ALPHA sessions expire, notify operator, clear state
+Dry-run mode â€” 
+all ALPHA execution paths support --dry-run flag
+21.7 Alpaca MCP â€” Remote Deployment for Claude Mobile
+Alpaca does not provide a hosted remote MCP server. Claude Mobile requires a remote HTTPS endpoint. Solution: deploy Alpaca MCP as a Docker container to Railway as a new service (separate from Trinity Symphony service).
+Deployment Flow
+Clone github.com/alpacahq/alpaca-mcp-server locally
+Build Docker image. Push to Docker Hub.
+Create new Railway service pointing at Docker image
+Environment variables: ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_PAPER_TRADE=True, HOST=0.0.0.0, PORT=8000
+Startup command: alpaca-mcp-server serve --transport streamable-http
+Railway provides public HTTPS URL ending in /mcp
+Register in claude.ai â†’ Profile â†’ Connectors â†’ Add custom connector â†’ name: Alpaca Trading â†’ URL: Railway HTTPS /mcp
+Enable in Claude Mobile: + â†’ Manage Connectors â†’ Custom Connectors â†’ Alpaca Trading â†’ enable
+Claude Mobile Use Cases
+Analysis (primary): 
+'Check my Alpaca account balance, pending HITL decisions, current BTC price' â€” briefing via voice
+Not for trade execution: 
+Execute trades via Telegram /alpha (logged, auditable, HIAS captured). Claude Mobile is the intelligence layer, Telegram is the execution layer.
+21.8 Schema â€” v3.2 Clarifications (No New Tables)
+No new tables required for v3.2 changes. The 19-table schema is sufficient. Two clarifications:
+hitl_hunch_log.decision_source: 
+Add column if not present. Values: 'ATS' (system-prompted) or 'ALPHA' (Sean-initiated /alpha trade). ALTER TABLE only â€” show statement before running.
+trade_execution_log vs execution_log: 
+trade_execution_log is the crypto trade table. execution_log is the existing Trinity Symphony API call tracking table. Both in active use. Never rename or modify either.
+21.9 Items Deferred in v3.2 â€” Rationale
+Item
+Why Deferred
+When To Revisit
+TAO/FET leading indicator correlation analysis
+Phase 2 enhancement â€” need 30+ days of signal data first
+After TAO/FET narrative seeding complete and 30 cycles run
+GAMMA portfolio activation
+Requires HIAS &gt; 0.70 in at least one category â€” not yet calibrated
+After 50+ HITL decisions logged and analyzed
+Promote TAO/FET to tradable
+Alpaca does not yet support these assets
+When Alpaca adds support â€” update constants.ts only
+TORCH narrative seeding for 6 new assets
+Santiment/LunarCrush keys not yet registered
+After Sean registers API keys (see Section 7 Handoff doc)
+Claude Mobile as execution layer
+Telegram /alpha is cleaner, auditable, HIAS-integrated
+If Telegram becomes unavailable or Mobile UX is preferred
+Guiding Principles â€” Unchanged
+"Act justly, love mercy, walk humbly" â€” Micah 6:8
+Truth over flattery: 
+The system outputs NO_SIGNAL rather than a false-confident prediction.
+Efficiency over engagement: 
+Shortest path to done. Every agent has a single clear job.
+Human is a signal: 
+HIAS treats every HITL and ALPHA decision as calibration data â€” not just approvals.
+Eat your own dogfood: 
+AI Trinity Symphony is built using AI Trinity Symphony.
+Care shown through right questions: 
+The smartest behavior is asking before assuming. This applies to every agent, every cycle.
+Document v3.2  |  March 2026  |  AI Trinity Symphony  |  Section 21 Addendum
+Prepared by Claude (Anthropic) in synthesis with Grok (xAI)
+"Janitor for Jesus"  |  Philippians 4:8  |  Micah 6:8  |  Matthew 7:12

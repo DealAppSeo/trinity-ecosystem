@@ -7,6 +7,7 @@ import { AGENT_WISDOM, CONSTITUTION } from './wisdom';
 import { mcpManager } from '../mcp/MCPManager';
 import { ERC8004Bridge } from '../governance/ERC8004Bridge';
 import { ArtifactIntelligence } from '../intelligence/ArtifactIntelligence';
+import { zkpBadgeGenerator } from '@/lib/guardrail/ZKPReputationBadge';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
 
@@ -79,6 +80,10 @@ export class ConstitutionalAgent {
 
     // RepID & Governance State
     reputationScore: number = 0;
+    private hitlThresholds = {
+        reputation: 70, // RepID must be > 70 for full autonomy
+        confidence: 0.8 // Confidence must be > 0.8 for full autonomy
+    };
     autonomyTier: AutonomyTier = 'Assist';
     tasksCompleted: number = 0;
     sessionMetrics: SessionMetrics;
@@ -751,23 +756,85 @@ export class ConstitutionalAgent {
         // [PHASE 20] ATOMIC CLAIM: Ensure we own the task before starting
         const claimed = await this.claimTask(task.id);
         if (!claimed) {
-            console.log(`[${this.name}] ⚠️ Task ${task.id} already claimed by another agent. Skipping.`);
+            console.log(`[${this.name}] \u26a0\ufe0f Task ${task.id} already claimed by another agent. Skipping.`);
             return { success: false, error: 'Already claimed' };
         }
 
         try {
+            // [ADAPTIVE HITL] Check Authority before starting
+            const authority = await this.checkExecutionAuthority(task);
+            if (!authority.authorized) {
+                console.log(`[${this.name}] \ud83d\udea8 ADAPTIVE HITL: Authority restricted. Pausing for human approval...`);
+                await this.requestHITLApproval(task, authority.reason);
+                return { success: false, error: 'Pending HITL approval', paused: true };
+            }
+
             // TRY LOCAL FIRST
             if (this.canHandleLocally(task)) {
-                console.log(`[LOCAL] ⚡ Handling ${task.id} without LLM (Tier 1)`);
+                console.log(`[LOCAL] \u26a1 Handling ${task.id} without LLM (Tier 1)`);
                 return await this.handleLocal(task);
             }
 
             // ONLY THEN use LLM
             return await this.processWithLLM(task);
         } catch (error) {
-            console.error(`[${this.name}] 🚨 Process failed for task ${task.id}:`, error);
+            console.error(`[${this.name}] \ud83d\udea8 Process failed for task ${task.id}:`, error);
             await this.releaseClaim(task.id);
             return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    }
+
+    /**
+     * [P-003/HIAS] checkExecutionAuthority
+     * Grants autonomous execution authority based on RepID and confidence.
+     */
+    async checkExecutionAuthority(task: Task): Promise<{ authorized: boolean; reason?: string }> {
+        // [PHASE 22] REPID-WEIGHTED AUTONOMY
+        const repID = this.reputationScore;
+        const confidence = 0.9; // [STUB] Should be derived from agentic evaluation
+
+        if (repID < this.hitlThresholds.reputation) {
+            return { authorized: false, reason: `RepID (${repID}) below threshold (${this.hitlThresholds.reputation})` };
+        }
+
+        // [TRACK 3] ZKP VERIFICATION (ERC-8004)
+        const isVerified = await zkpBadgeGenerator.verifyDBT(this.name, this.hitlThresholds.reputation);
+        if (!isVerified) {
+            return { authorized: false, reason: `ZKP Verification Failed: No valid ERC-8004 DBT proof for RepID > ${this.hitlThresholds.reputation}` };
+        }
+
+        // Divergence Check (Logic from Claude)
+        // If task description has [DIVERGENT] or system detects plan drift
+        if (task.title.includes('[DIVERGENT]') || (task as any).isDivergent) {
+            return { authorized: false, reason: 'Plan divergence detected' };
+        }
+
+        return { authorized: true };
+    }
+
+    /**
+     * [ADAPTIVE HITL] requestHITLApproval
+     * Pauses the task and sends a request to the n8n/Telegram bridge.
+     */
+    async requestHITLApproval(task: Task, reason?: string) {
+        await this.supabase.from('trinity_tasks').update({
+            status: 'pending_hitl',
+            result: `[PAUSED] Seeking HITL approval. Reason: ${reason}`
+        }).eq('id', task.id);
+
+        // POST to n8n webhook (Trigger Telegram notification)
+        if (process.env.N8N_HITL_WEBHOOK_URL) {
+            try {
+                await axios.post(process.env.N8N_HITL_WEBHOOK_URL, {
+                    agent: this.name,
+                    task_id: task.id,
+                    task_title: task.title,
+                    reason: reason,
+                    reputation: this.reputationScore
+                });
+            } catch (e) {
+                console.error(`[HITL] Failed to trigger n8n webhook:`, e);
+            }
         }
     }
 
@@ -865,6 +932,9 @@ export class ConstitutionalAgent {
             // [PHASE 20] Already claimed via processTask -> claimTask
             // Persistent Activity Logging
             await this.log('task_processing_llm', `Starting LLM task: ${task.title}`, { taskId: task.id, type: task.task_type });
+
+            // 0. RIPPLE EFFECT PROTOCOL: Sensitivity Cascade Prediction
+            await this.predictRippleEffect(task);
 
             // 1. CONTEXT PIPE: GATHER WISDOM (The "Amnesia" Fix)
             const wisdomContext = await this.gatherWisdom(task);
@@ -998,9 +1068,7 @@ ALWAYS use the save_artifact tool to store your results. Failure to produce a ta
                     artifact_url: externalArtifactUrl,
                     completed_at: new Date().toISOString(),
                     // SUBJECTIVE LOGIC: b+d+u=1
-                    belief: evaluation.score / 100,
-                    disbelief: evaluation.score < 50 ? (50 - evaluation.score) / 100 : 0,
-                    uncertainty: evaluation.score > 90 ? 0.05 : 0.2,
+                    ...this.calculateTriad(evaluation.score, task),
                     metadata: JSON.stringify({
                         provider: 'openai',
                         certainty: evaluation.score / 100,
@@ -1166,12 +1234,13 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
 
             // C. Seed Task
             if (taskIdea && taskIdea.title) {
+                const priority = Math.min(100, Math.max(0, taskIdea.priority || 15)); // Clamped priority
                 await this.supabase.from('trinity_tasks').insert({
                     title: `[GENESIS - V2] ${taskIdea.title} `,
                     description: `${taskIdea.description} \n\n[SOURCE]: Web Trend Scan`,
                     task_type: 'research',
                     assigned_to: this.name, // Self-claim
-                    priority: taskIdea.priority || 15,
+                    priority: priority,
                     status: 'pending',
                     metadata: { source: 'web-aware-idle', rep_trigger: this.reputationScore }
                 });
@@ -1184,6 +1253,22 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
     }
 
     async spawnNextStep(originalTask: Task, result: string, evaluation: { score: number; handoff_required: boolean; handoff_to?: string }) {
+        // [FIX 5] Peer Verification Mandate (BFT Mandate Logic)
+        if (originalTask.priority >= 80 && originalTask.status !== 'verified') {
+            await this.supabase.from('trinity_tasks').insert({
+                title: `[VERIFY] ${originalTask.title}`,
+                description: `Peer verification mission for task ${originalTask.id}.`,
+                status: 'pending',
+                priority: Math.min(100, Math.max(0, originalTask.priority)), // Clamped priority
+                task_type: 'verification',
+                parent_task_id: originalTask.id,
+                requires_consensus: true
+            });
+            return;
+        }
+
+        if (!evaluation.handoff_required) return; // If no handoff is required, exit early
+
         // [ANTIGRAVITY] ROBUST LOOP BREAKER: Do NOT spawn verification for a verification task.
         const titleMatch = originalTask.title.includes('[VERIFY]') ||
             originalTask.title.includes('[REVIEW]') ||
@@ -1354,6 +1439,78 @@ Format as JSON: { "title": "...", "description": "...", "priority": 15 }
             handoff_required: handoff && this.name !== targetAgent, // Don't handoff to self
             handoff_to: targetAgent
         };
+    }
+
+    /**
+     * Subjective Logic Triad: b + d + u = 1
+     * b: Belief (evidence-based trust)
+     * d: Disbelief (evidence of failure)
+     * u: Uncertainty (vacuity / lack of evidence)
+     */
+    calculateTriad(score: number, task: Task): { belief: number; disbelief: number; uncertainty: number } {
+        const b = score / 100;
+        // Non-linear uncertainty: vacuum of evidence decreases as belief approaches extremes
+        const u = 0.15 * (1 - Math.pow(2 * b - 1, 2));
+        const d = Math.max(0, 1 - b - u);
+
+        return {
+            belief: parseFloat(b.toFixed(4)),
+            disbelief: parseFloat(d.toFixed(4)),
+            uncertainty: parseFloat(u.toFixed(4))
+        };
+    }
+
+    /**
+     * Ripple Effect Protocol: Predicts sensitivity cascades before execution.
+     * Models how this task impacts other active agents and identifies potential conflicts.
+     */
+    async predictRippleEffect(task: Task) {
+        console.log(`[RIPPLE] 🌊 Modeling sensitivity cascade for Task ${task.id}...`);
+
+        try {
+            // 1. Check for Active Interdependencies
+            const { data: activeTasks } = await this.supabase
+                .from('trinity_tasks')
+                .select('id, title, claimed_by')
+                .neq('id', task.id)
+                .in('status', ['doing', 'in_progress', 'running']);
+
+            const ripples = (activeTasks || []).map(t => ({
+                target_task: t.id,
+                agent: t.claimed_by,
+                sensitivity: this.calculateSensitivity(task, t),
+                type: 'semantic_overlap'
+            })).filter(r => r.sensitivity > 0.4);
+
+            if (ripples.length > 0) {
+                console.log(`[RIPPLE] ⚠️ Detected ${ripples.length} sensitivity ripples. Warning swarm.`);
+                await this.log('ripple_cascade_detected', `Task ${task.id} creates ripples in ${ripples.map(r => r.target_task).join(', ')}`, { ripples });
+            } else {
+                console.log(`[RIPPLE] ✅ No significant cascades predicted. Safe to execute.`);
+            }
+
+            // Persist Ripple State to Metadata
+            task.metadata = {
+                ...(task.metadata as any || {}),
+                ripple_predictions: ripples,
+                ripple_check_at: new Date().toISOString()
+            };
+
+        } catch (e: any) {
+            console.warn(`[RIPPLE] Cascade modeling failed: ${e.message}`);
+        }
+    }
+
+    private calculateSensitivity(t1: Task, t2: Task): number {
+        // Simple keyword overlap heuristic for sensitivity
+        const s1 = (t1.title + ' ' + (t1.description || '')).toLowerCase();
+        const s2 = (t2.title + ' ' + (t2.description || '')).toLowerCase();
+
+        const words1 = new Set(s1.split(' ').filter(w => w.length > 4));
+        const words2 = s2.split(' ').filter(w => w.length > 4);
+
+        const overlap = words2.filter(w => words1.has(w)).length;
+        return Math.min(1, overlap / 5); // Max sensitivity at 5 words overlap
     }
 
     async logBenchmark(task: Task, score: number) {
@@ -1808,7 +1965,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     status: 'online', // SSOT: UI expects 'online' or 'active' for Green
                     last_active: timestamp,
                     current_tier: this.autonomyTier,
-                    reputation_score: this.reputationScore,
+                    // reputation_score: this.reputationScore, // [FIX 1] Stop agent-side RepID overwrite
                     tasks_completed: this.tasksCompleted,
                     current_task_summary: this.currentTaskTitle ? `Working: ${this.currentTaskTitle}` : 'Idle'
                 }, { onConflict: 'agent_name' });
@@ -2183,7 +2340,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         const response = await fetch('https://api.x.ai/v1/chat/completions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROK_API_KEY}` },
-            body: JSON.stringify({ model: 'grok-beta', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
+            body: JSON.stringify({ model: 'grok-2', messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
         });
         const data = await response.json();
         return { output: data.choices[0].message.content };
