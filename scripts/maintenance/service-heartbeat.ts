@@ -9,7 +9,8 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const SERVICE_NAME = process.argv[2] || 'trinity-infrastructure';
+const rawName = process.argv[2] || 'trinity-infrastructure';
+const SERVICE_NAME = rawName.toLowerCase().startsWith('trinity-') ? rawName.toLowerCase() : `trinity-${rawName.toLowerCase()}`;
 const SERVICE_TYPE = process.argv[3] || 'SYSTEM';
 
 async function serviceHeartbeat() {
@@ -27,8 +28,8 @@ async function serviceHeartbeat() {
                 last_active: now,
                 squad: 'INFRA',
                 current_tier: SERVICE_TYPE,
-                current_task_summary: `[SERVICE] Monitoring ${SERVICE_NAME} core health.`,
-                reputation_score: 100 // Infrastructure is always trusted
+                current_task_summary: `[SERVICE] Monitoring ${SERVICE_NAME} core health.`
+                // reputation_score: 100 // [REMOVED] Infrastructure reputation is managed by DB triggers
             }, { onConflict: 'agent_name' });
 
         if (regError) console.error(`❌ [${SERVICE_NAME}] Registry update failed:`, regError.message);

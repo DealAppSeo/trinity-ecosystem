@@ -1,5 +1,5 @@
 
-import { RailwayMCP } from '../lib/mcp/servers/RailwayMCP';
+import { RailwayMCP } from '../../lib/mcp/servers/RailwayMCP';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 

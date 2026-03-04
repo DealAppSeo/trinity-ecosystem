@@ -25,8 +25,8 @@ export async function register() {
                         last_active: now,
                         squad: 'INFRA',
                         current_tier: 'SYSTEM',
-                        current_task_summary: '[SERVICE] Main Hub & UI Controller Active.',
-                        reputation_score: 100
+                        current_task_summary: '[SERVICE] Main Hub & UI Controller Active.'
+                        // reputation_score: 100 // [REMOVED] Infrastructure reputation is managed by DB triggers
                     }, { onConflict: 'agent_name' });
 
                 // 2. Update Heartbeat
