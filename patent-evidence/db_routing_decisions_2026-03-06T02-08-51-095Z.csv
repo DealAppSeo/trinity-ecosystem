@@ -1,0 +1,4 @@
+id,query_type,tier_selected,confidence,latency_budget_ms,agent_id,decided_at,metadata
+1,research,warm,0.9,30,trinity-hdm,2026-03-04T23:40:52.014205+00:00,
+2,casual_chat,warm,0.88,500,test-agent-personal,2026-03-05T22:18:39.462619+00:00,"{""bid_type"":""NODE"",""zkp_weight"":1,""zkp_applied"":false,""masked_features"":3,""safety_override"":false,""compute_bid_winner"":""HyperDAG/P2P-Node""}"
+3,governance_tx,warm,0.480000139999953,50,test-agent-corporate,2026-03-05T22:18:39.793055+00:00,"{""bid_type"":""CLOUD"",""zkp_weight"":1,""zkp_applied"":false,""masked_features"":3,""safety_override"":false,""compute_bid_winner"":""Groq/DeepSeek-V3""}"
