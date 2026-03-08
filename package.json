@@ -91,7 +91,7 @@
     "@x402/evm": "^2.0.0",
     "@x402/fetch": "^2.0.0",
     "@x402/next": "^2.0.0",
-    "@recallnet/agent-toolkit": "^1.0.0",
+    "@recallnet/agent-toolkit": "^0.0.8",
     "@pinata/sdk": "^2.1.0",
     "viem": "^2.45.3",
     "wagmi": "^2.19.5",
