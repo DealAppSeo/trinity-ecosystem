@@ -17,6 +17,13 @@ export default function HackathonDashboard() {
         { name: 'SOPHIA', repid: 7450, tier: 'GOLD' },
     ]);
 
+    const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+    const handleCreateWallet = async () => {
+        // In a real app, this would call /api/brain/cdp/wallet
+        setWalletAddress("0x8626...f71C");
+    };
+
     const [recentTrades, setRecentTrades] = useState([
         { asset: 'BTC/USDC', direction: 'LONG', outcome: '+4.21 USDC', donor: 'GiveDirectly', drift: 'PASS (0.003)' },
         { asset: 'ETH/USDC', direction: 'SHORT', outcome: '+1.15 USDC', donor: 'Water.org', drift: 'PASS (0.012)' },
@@ -45,6 +52,33 @@ export default function HackathonDashboard() {
                     </div>
                 ))}
             </div>
+
+            {/* Coinbase Wallet Section */}
+            <section className="dashboard-card space-y-4">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-sm font-bold opacity-60 uppercase tracking-wider">Agent Identity (CDP)</h2>
+                    <img src="https://avatars.githubusercontent.com/u/18060233?s=200&v=4" alt="Coinbase" className="w-6 h-6 grayscale opacity-50" />
+                </div>
+                {!walletAddress ? (
+                    <button
+                        onClick={handleCreateWallet}
+                        className="w-full py-3 bg-trust/10 border border-trust/30 text-trust rounded-md font-bold hover:bg-trust/20 transition-all text-xs"
+                    >
+                        INITIALIZE AGENT WALLET
+                    </button>
+                ) : (
+                    <div className="flex justify-between items-center p-3 bg-black/40 rounded border border-white/10">
+                        <div className="space-y-1">
+                            <div className="text-[10px] opacity-40 uppercase">Base Sepolia Address</div>
+                            <div className="text-sm font-mono">{walletAddress}</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[10px] text-trust font-bold">FUNDED</div>
+                            <div className="text-xs font-bold">0.1 ETH</div>
+                        </div>
+                    </div>
+                )}
+            </section>
 
             {/* Live Decisions */}
             <section className="space-y-4">

@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source
 COPY . .
@@ -42,7 +42,7 @@ COPY --from=builder /app/*.js ./
 COPY --from=builder /app/tsconfig*.json ./
 
 # Install PROD dependencies only
-RUN npm ci --production
+RUN npm ci --production --legacy-peer-deps
 
 ENV NODE_ENV=production
 EXPOSE 3000

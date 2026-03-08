@@ -11,6 +11,11 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 
+from app.cdp_service import cdp_service
+
+# Configure CDP
+cdp_service.initialize()
+
 # Configure Structlog
 structlog.configure(
     processors=[
@@ -73,6 +78,16 @@ science_agent = Agent(
 async def check_rep_threshold(ctx: RunContext[None], rep: float) -> str:
     """Check if the reputation meets the threshold for deep interaction."""
     return "Threshold Met" if rep > 80 else "Threshold Not Met"
+
+@science_agent.tool
+async def create_coinbase_wallet(ctx: RunContext[None], network: str = "base-sepolia") -> str:
+    """Create a new crypto wallet via Coinbase CDP."""
+    try:
+        wallet = cdp_service.create_wallet(network)
+        address = wallet.default_address
+        return f"Wallet created successfully! ID: {wallet.id}, Address: {address}"
+    except Exception as e:
+        return f"Wallet creation failed: {str(e)}"
 
 async def get_science_decision(data: DecisionInput) -> DecisionOutput:
     logger.info("science_decision_start", latency_ms=data.latency_ms, rep=data.user_reputation)

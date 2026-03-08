@@ -48,6 +48,8 @@ At least one "Elite" provider (OpenAI/Anthropic) is recommended for orchestratio
 - `PINATA_API_KEY`: For IPFS metadata storage.
 - `PINATA_SECRET_API_KEY`
 - `GITHUB_TOKEN`: For agent code maintenance tasks.
+- `TRINITY_DEPLOYER_PRIVATE_KEY`: Admin Wallet for funding agents (CRITICAL)
+- `SUPERFLUID_HOST_ADDRESS`: Superfluid CFA host address (Base Sepolia)
 
 ## LLM Gateway Stack
 - `HELICONE_API_KEY`: For reasoning observability and cost tracking.

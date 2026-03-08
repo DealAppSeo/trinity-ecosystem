@@ -1379,3 +1379,8 @@
 [2026-03-08T04:32:16.764Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
 [2026-03-08T04:33:38.568Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
 
+[2026-03-08T10:30:18.791Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T10:33:09.667Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-08T10:37:13.480Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T10:43:56.602Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"

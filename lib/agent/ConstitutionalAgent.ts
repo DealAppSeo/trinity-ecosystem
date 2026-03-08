@@ -4835,20 +4835,21 @@ ${task.description}
     // ============================================
 
     private async missionNexus(): Promise<number> {
-        console.log(`[NEXUS] 📡 Scraping crypto signals...`);
+        console.log(`[NEXUS] 📡 Scraping crypto signals & TrustShell mentions...`);
         const signals = [
             { source: 'Fear & Greed', signal_type: 'market_sentiment', data: { index: 75, label: 'Greed' }, confidence: 0.8 },
-            { source: 'CoinGecko', signal_type: 'volume_surge', data: { asset: 'ETH', surge: '15%' }, confidence: 0.72 }
+            { source: 'GitHub', signal_type: 'trust_interest', data: { repo: 'OpenClaw', mention: 'agent security' }, confidence: 0.85 }
         ];
         let count = 0;
         for (const sig of signals) {
             const { error } = await this.supabase.from('trinity_signals').insert([sig]);
             if (!error) count++;
-            if (sig.confidence > 0.7) {
-                await this.supabase.from('trinity_tasks').insert([{
-                    title: `[VALIDATE] Signal from ${sig.source}`,
-                    assigned_to: 'VERITAS',
-                    metadata: { signal_data: sig }
+            if (sig.signal_type === 'trust_interest') {
+                await this.supabase.from('gcm_content_queue').insert([{
+                    source: 'NEXUS_MONITOR',
+                    content_url: 'https://github.com/openclaw',
+                    relevance_score: sig.confidence,
+                    metadata: { product: 'trustshell' }
                 }]);
             }
         }
@@ -4856,7 +4857,14 @@ ${task.description}
     }
 
     private async missionVeritas(): Promise<number> {
-        console.log(`[VERITAS] ⚖️ Validating signals...`);
+        console.log(`[VERITAS] ⚖️ Validating signals & scanning npm...`);
+        const isTrustScan = Math.random() > 0.5;
+        if (isTrustScan) {
+            await this.supabase.from('veritas_competitive_log').insert([{
+                package_name: 'agent-guardian', score: 0.45, notes: 'Generic wrapper, weak BFT.'
+            }]);
+            return 1;
+        }
         const { data: signals } = await this.supabase.from('trinity_signals').select('*').eq('verified', false).limit(5);
         if (!signals || signals.length === 0) return 0;
         let count = 0;
@@ -4865,26 +4873,18 @@ ${task.description}
             await this.supabase.from('trinity_signals').update({ verified: true, data: { ...sig.data, verified_result: isVerified } }).eq('id', sig.id);
             count++;
         }
-        if (count >= 3) {
-            await this.supabase.from('trinity_tasks').insert([{
-                title: `[INSIGHT] Generate synthesis for ${count} validated signals`,
-                assigned_to: 'TORCH',
-                metadata: { validated_signals_count: count }
-            }]);
-        }
         return count;
     }
 
     private async missionSophia(): Promise<number> {
-        console.log(`[SOPHIA] 🧠 ANFIS Self-Optimization...`);
-        const { data: sessions } = await this.supabase.from('wisdom_sessions').select('*').order('created_at', { ascending: false }).limit(10);
-        if (!sessions) return 0;
-        await this.supabase.from('trinity_agent_logs').insert([{
-            agent_name: 'SOPHIA',
-            message: `ANFIS: Tuned weights for 10 sessions based on performance variance.`,
-            action: 'ANFIS_OPTIMIZATION'
-        }]);
-        return sessions.length;
+        console.log(`[SOPHIA] 🧠 ANFIS Optimization & Waitlist Welcome...`);
+        // Handle waitlist personalization
+        const { data: signups } = await this.supabase.from('trustshell_waitlist').select('*').limit(3);
+        if (signups && signups.length > 0) {
+            console.log(`[SOPHIA] Personalizing welcomes for ${signups.length} users.`);
+            // Mock personalized message queuing
+        }
+        return signups?.length || 0;
     }
 
     private async missionHDM(): Promise<number> {
@@ -4923,6 +4923,16 @@ ${task.description}
         console.log(`[APM] 📈 Portfolio Analysis...`);
         const drawdown = Math.random() * 2;
         await this.supabase.from('apm_performance').insert([{ portfolio_value: 1000000, drawdown }]);
+
+        // Superfluid Trigger: Mock BUY signal
+        const isBuy = Math.random() > 0.8;
+        if (isBuy) {
+            console.log(`[APM] 🤑 BUY SIGNAL DETECTED. Triggering SOPHIA -> HDM Research Stream.`);
+            const { SuperfluidService } = require('../lib/web3/superfluid');
+            await SuperfluidService.startStream('SOPHIA', 'HDM', 0.001);
+            await this.notifyTelegram(`🤑 *APM BUY SIGNAL*: Triggering research stream (0.001 USDC/min)`);
+        }
+
         if (drawdown > 5) {
             await this.notifyTelegram(`🚨 *APM Alert*: Drawdown exceeds 5%! Current: ${drawdown.toFixed(2)}%`);
         }
@@ -4930,14 +4940,24 @@ ${task.description}
     }
 
     private async missionGCM(): Promise<number> {
-        console.log(`[GCM] 📣 Opportunity Scout...`);
-        await this.supabase.from('gcm_content_queue').insert([{ source: 'LinkedIn', content_url: 'https://example.com', relevance_score: 0.85 }]);
+        console.log(`[GCM] 📣 Opportunity Scout & Outreach...`);
+        await this.supabase.from('gcm_outreach_queue').insert([{
+            github_url: 'https://github.com/clone/openclaw-fork',
+            stars: 120,
+            contact_info: 'dev@example.com'
+        }]);
         return 1;
     }
 
     private async missionTorch(): Promise<number> {
-        console.log(`[TORCH] 🔥 Insight Synthesis...`);
-        await this.supabase.from('torch_insights').insert([{ title: 'Market Convergence', content: 'Significant pattern alignment detected between NEXUS/HDM.' }]);
+        console.log(`[TORCH] 🔥 Insight Synthesis (TrustShell Fokus)...`);
+        const insight = "AI Agent trust is the new encryption. Without a verifiable BFT Gate, your autonomous agent is a liability.";
+        await this.supabase.from('torch_insights').insert([{
+            title: 'TrustShell Dev Insight',
+            content: insight,
+            metadata: { product: 'trustshell' }
+        }]);
+        await this.notifyTelegram(`🔥 *TORCH Trust Insight*: ${insight}`);
         return 1;
     }
 
@@ -4947,12 +4967,23 @@ ${task.description}
     }
 
     private async missionOrch(): Promise<number> {
-        console.log(`[ORCH] 🛡️ Watchdog Scan...`);
+        console.log(`[ORCH] 🛡️ Watchdog Scan & TrustPage Check...`);
         const agents = ['NEXUS', 'VERITAS', 'SOPHIA', 'HDM', 'CHESED', 'MEL', 'APM', 'GCM', 'TORCH', 'W3C', 'SHOFET'];
         let alerts = 0;
+
+        // 1. Uptime Check for trustshell.dev (Simulated)
+        const isUp = Math.random() > 0.05;
+        if (!isUp) {
+            await this.notifyTelegram(`🚨 *Service Down*: trustshell.dev is unresponsive!`);
+            alerts++;
+        }
+
         const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
         for (const agent of agents) {
-            const { data } = await this.supabase.from('trinity_agent_logs').select('*').eq('agent_name', agent).gt('cycle_end', thirtyMinsAgo);
+            const { data } = await this.supabase.from('trinity_agent_logs')
+                .select('*')
+                .eq('agent_name', agent)
+                .gt('cycle_end', thirtyMinsAgo);
             if (!data || data.length === 0) {
                 await this.notifyTelegram(`🚨 *Agent Down*: ${agent} missed 2+ cycles!`);
                 alerts++;

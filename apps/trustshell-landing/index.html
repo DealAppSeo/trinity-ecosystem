@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrustShell | The Trust Layer for AI Agents</title>
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --text: #ffffff;
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        .hero {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: radial-gradient(circle at center, #1e1e2d 0%, #0a0a0c 100%);
+        }
+
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            font-size: 1.5rem;
+            color: #94a3b8;
+            max-width: 600px;
+        }
+
+        .cta {
+            margin-top: 2rem;
+            padding: 1rem 2rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .cta:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+
+        .waitlist {
+            margin-top: 3rem;
+            background: var(--glass);
+            padding: 2rem;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        input {
+            padding: 0.8rem;
+            border-radius: 4px;
+            border: none;
+            width: 250px;
+            background: #1e1e2d;
+            color: white;
+        }
+
+        .btn {
+            padding: 0.8rem 1.5rem;
+            background: var(--secondary);
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <section class="hero">
+        <h1>TrustShell</h1>
+        <p>Your agent is capable. Is it trustworthy?</p>
+        <div class="code-block"
+            style="background: #1e1e2d; padding: 1rem; border-radius: 8px; font-family: monospace; color: #3b82f6; margin-top: 2rem;">
+            npm install @hyperdag/trustshell
+        </div>
+        <div class="waitlist">
+            <h3>Join the Early Access Waitlist</h3>
+            <form id="waitlistForm">
+                <input type="email" placeholder="Enter your email" required id="email">
+                <select id="agentType" style="padding: 0.8rem; border-radius: 4px; background: #1e1e2d; color: white;">
+                    <option value="trading">Trading Agent</option>
+                    <option value="research">Research Agent</option>
+                    <option value="executive">Executive Assistant</option>
+                </select>
+                <button type="submit" class="btn">Join Now</button>
+            </form>
+            <p id="msg" style="font-size: 0.9rem; margin-top: 1rem; display: none;">✅ You're on the list!</p>
+        </div>
+    </section>
+
+    <script>
+        document.getElementById('waitlistForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const agentType = document.getElementById('agentType').value;
+
+            // Simulating Supabase call
+            console.log("Waitlist Signup:", { email, agentType });
+            document.getElementById('msg').style.display = 'block';
+            document.getElementById('waitlistForm').reset();
+        });
+    </script>
+</body>
+
+</html>
