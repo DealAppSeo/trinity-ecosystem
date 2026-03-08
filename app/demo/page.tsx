@@ -143,12 +143,35 @@ export default function DemoPage() {
                 {/* 5. ACTIVITY FEED */}
                 <Panel title="Swarm Events" icon={MessageSquare}>
                     <div className="space-y-1 text-[10px] h-full overflow-y-auto pr-2 custom-scrollbar">
-                        {logs.map((log, i) => (
-                            <div key={i} className="flex gap-2">
-                                <span className="text-slate-600">[{new Date().toLocaleTimeString()}]</span>
-                                <span className={log.includes('Failed') || log.includes('error') ? 'text-red-400' : 'text-slate-300'}>{log}</span>
-                            </div>
-                        ))}
+                        {logs.map((log: any, i) => {
+                            const isObject = typeof log === 'object';
+                            const message = isObject ? log.message : log;
+                            const agent = isObject ? log.agent_name : 'SYS';
+                            const action = isObject ? log.action : '';
+                            const time = isObject && log.created_at ? new Date(log.created_at).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+                            return (
+                                <div key={i} className={`text-[10px] border-l-2 pl-2 py-1 mb-1 ${action === 'LAOP_ENGAGE' ? 'border-amber-500 bg-amber-500/5' :
+                                        action === 'LAOP_BACKGROUND_TASK' ? 'border-cyan-500 bg-cyan-500/5' :
+                                            'border-slate-800'
+                                    }`}>
+                                    <div className="flex justify-between text-[8px] text-slate-500">
+                                        <span>{agent}</span>
+                                        <span>{time}</span>
+                                    </div>
+                                    <div className={
+                                        action === 'LAOP_ENGAGE' ? 'text-amber-200' :
+                                            action === 'LAOP_BACKGROUND_TASK' ? 'text-cyan-200' :
+                                                'text-slate-300'
+                                    }>
+                                        {action?.includes('BFT') ? '🗳️ ' :
+                                            action === 'LAOP_ENGAGE' ? '💡 ' :
+                                                action === 'LAOP_BACKGROUND_TASK' ? '⚡ ' : ''}
+                                        {message}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </Panel>
             </div>

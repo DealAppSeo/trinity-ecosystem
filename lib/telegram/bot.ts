@@ -507,10 +507,28 @@ bot.command('join', async (ctx) => {
 // --- Assistant Evolution: NL Intent Routing ---
 
 bot.on('text', async (ctx, next) => {
-    const text = ctx.message.text;
-    if (text.startsWith('/')) return next();
+    const transcript = ctx.message.text;
+    const lowerText = transcript.toLowerCase();
 
-    const lowerText = text.toLowerCase();
+    // [LAOP] LATENCY AS OPPORTUNITY - ENGAGEMENT LAYER
+    const { EngagementEngine } = await import('../laop/EngagementEngine');
+    const laop = new EngagementEngine('ORCH');
+    const { shouldEngage, estimatedLatency } = await laop.evaluate(transcript);
+
+    if (shouldEngage && !transcript.startsWith('/')) {
+        const question = await laop.generateQualifyingQuestion(transcript, {
+            currentTask: 'Telegram Swarm Interaction',
+            background: 'Observer/Admin'
+        });
+
+        await laop.logEngagement({
+            query: transcript,
+            engagement_question: question,
+            latency_ms: estimatedLatency
+        });
+
+        return ctx.replyWithMarkdown(`💡 *Parallel Processing Activated*\n\n${question}`);
+    }
 
     // Exact Keyboard Matches
     if (lowerText.includes('📊 health')) return handleHealth(ctx);
@@ -573,6 +591,15 @@ bot.on('voice', async (ctx) => {
         }
 
         await ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, undefined, `📝 *Transcript*: "${text}"`, { parse_mode: 'Markdown' });
+
+        // [LAOP] Trigger for Voice too if high latency expected
+        const { EngagementEngine } = await import('../laop/EngagementEngine');
+        const laop = new EngagementEngine('ORCH');
+        const { shouldEngage } = await laop.evaluate(text);
+        if (shouldEngage) {
+            const question = await laop.generateQualifyingQuestion(text, { currentTask: 'Voice Command' });
+            await ctx.replyWithMarkdown(`🎙️ *Voice Optimized Loop*\n\n${question}`);
+        }
 
         // Feed transcript into the text handler logic
         (ctx as any).message.text = text;

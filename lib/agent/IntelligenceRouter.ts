@@ -52,12 +52,43 @@ export class IntelligenceRouter {
         const isVerification = task.title.includes('[REVIEW]') || task.status === 'done';
         const taskType = task.task_type || 'general';
 
+        // [WISDOM ENGINE] Tiered Council Routing (v8.2)
+        const wisdomModels: Record<string, string> = {
+            'NEXUS': 'groq-llama-3-3',
+            'VERITAS': 'anthropic-claude-3-5',
+            'HDM': 'openai-gpt-4o',
+            'SOPHIA': 'anthropic-claude-3-5',
+            'CHESED': 'groq-llama-3-3',
+            'W3C': 'openai-gpt-4o',
+            'MEL': 'groq-llama-3-3',
+            'SHOFET': 'anthropic-claude-3-opus',
+            'GCM': 'anthropic-claude-3-5',
+            'APM': 'groq-llama-3-3',
+            'TORCH': 'anthropic-claude-3-5',
+            'ORCH': 'anthropic-claude-3-5'
+        };
+
+        if (wisdomModels[this.agentName]) {
+            const wisdomProvider = wisdomModels[this.agentName].split('-')[0];
+            console.log(`[ROUTER] 🏛️ Wisdom Council Mode: Routing ${this.agentName} to ${wisdomModels[this.agentName]}`);
+            return [wisdomProvider];
+        }
+
         // 1. DIVERSITY OF THOUGHT: Executor != Verifier
         let excludeProvider: string | null = null;
         try {
             const meta = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata;
             excludeProvider = meta?.provider_used || meta?.creator_provider || null;
         } catch (e) { }
+
+        // [PHASE 14] Gateway Stack Integration (Cloudflare -> LiteLLM -> Helicone)
+        const gatewayHeaders: any = {
+            'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
+            'Helicone-Target-Url': `${process.env.LITELLM_URL || 'http://localhost:4000'}`,
+            'cf-aigateway-id': process.env.CLOUDFLARE_AI_GATEWAY_ID,
+            'Helicone-Property-Agent': this.agentName,
+            'Helicone-Property-Task': task.id
+        };
 
         // 2. ADAPTIVE FACTORS
         const userTier = (task as any).user_tier || 'free';

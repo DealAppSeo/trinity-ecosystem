@@ -2,7 +2,7 @@
 
 To ensure full hackathon readiness, the following environment variables must be configured in your environment (e.g., Railway, Vercel, .env).
 
-## Agent Wallets (Base Sepolia)
+## Agent Wallets (Base Sepolia) ✅ PROVIDED
 Required for all 12 agents to sign registration receipts and update reputation on-chain.
 - `APM_PRIVATE_KEY`
 - `GCM_PRIVATE_KEY`
@@ -48,3 +48,8 @@ At least one "Elite" provider (OpenAI/Anthropic) is recommended for orchestratio
 - `PINATA_API_KEY`: For IPFS metadata storage.
 - `PINATA_SECRET_API_KEY`
 - `GITHUB_TOKEN`: For agent code maintenance tasks.
+
+## LLM Gateway Stack
+- `HELICONE_API_KEY`: For reasoning observability and cost tracking.
+- `CLOUDFLARE_AI_GATEWAY_ID`: For edge caching (outer layer).
+- `LITELLM_URL`: URL of the LiteLLM service on Railway (e.g., `https://litellm-production.up.railway.app`).

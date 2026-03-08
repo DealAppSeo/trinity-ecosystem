@@ -1,0 +1,1 @@
+scheduler: npm run scheduler

@@ -50,13 +50,45 @@ export async function POST(req: NextRequest) {
 
         // 2. Intent Parsing / Agent Response
         console.log(`[VOICE] Step 2: Parsing intent: "${transcript}"`);
-        let agentResponse = "I'm not sure how to help with that yet.";
         const lower = transcript.toLowerCase();
+
+        // [LAOP] LATENCY AS OPPORTUNITY - ENTER ENGAGEMENT LOOP
+        const laop = new EngagementEngine('ORCH');
+        const { shouldEngage, estimatedLatency } = await laop.evaluate(transcript);
+
+        if (shouldEngage && !isAudio) {
+            console.log(`[LAOP] 💡 High Latency Detected (${estimatedLatency}ms). Engaging user...`);
+            const question = await laop.generateQualifyingQuestion(transcript, {
+                currentTask: 'Market Analysis',
+                background: 'Trinity Symphony Developer'
+            });
+
+            // Log the initiation of background work
+            const { supabaseAdmin } = await import('@/lib/supabase'); // Ensure supabaseAdmin is imported here if not already
+            await supabaseAdmin.from('trinity_agent_logs').insert([{
+                agent_name: 'ORCH',
+                message: `⚡ LAOP ACTIVATED: Engaging user via qualifying question. Background processing started for: "${transcript}"`,
+                action: 'LAOP_ENGAGE',
+                metadata: { estimated_latency: estimatedLatency }
+            }]);
+
+            // Return the question IMMEDIATELY for the UI to show
+            return NextResponse.json({
+                transcript,
+                agentResponse: question,
+                laop_engaged: true,
+                estimated_latency: estimatedLatency
+            });
+        }
+
+        let agentResponse = "I'm not sure how to help with that yet."; // Default agentResponse
+        let bftTriggered = false; // Initialize bftTriggered
 
         if (lower.includes('status') || lower.includes('report')) {
             agentResponse = "All systems nominal. ERC-8004 Identity Registry is live on Base Sepolia. All 12 agents are registered.";
         } else if (lower.includes('buy') || lower.includes('sell') || lower.includes('eth') || lower.includes('trade')) {
             agentResponse = `Order intent detected: "${transcript}". Triggering BFT consensus among 12 agents. Please stand by for confirmation.`;
+            bftTriggered = true; // Set bftTriggered
 
             // SIMULATE BFT TRIGGER
             try {

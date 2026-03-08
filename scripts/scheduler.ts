@@ -1,97 +1,27 @@
+import { TaskRouter } from '../lib/scheduler/TaskRouter';
 
-// @ts-nocheck
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-import { createClient } from '@supabase/supabase-js';
+async function main() {
+    console.log("🛠️ Starting Trinity Scheduler Pulse...");
+    const router = new TaskRouter();
 
-// Simple Scheduler to keep agents busy
-// Runs every hour or continuously checks for idle state
+    // Run immediately on start
+    await router.pollAndRoute();
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Ecosystem Targets for Continuous Optimization
-const ECOSYSTEM_DOMAINS = [
-    { name: 'PurposeHub.ai', url: 'https://purposehub.ai', focus: 'impact' },
-    { name: 'ImageBearer.org', url: 'https://imagebearer.org', focus: 'impact' },
-    { name: 'HyperDag.org', url: 'https://hyperdag.org', focus: 'tech' },
-    { name: 'AISocialMirror.com', url: 'https://aisocialmirror.com', focus: 'truth_ux' },
-    { name: 'AIDebate.io', url: 'https://aidebate.io', focus: 'truth' }
-];
-
-async function runScheduler() {
-    console.log("🕰️  Trinity Scheduler Online. Monitoring Fleet Activity...");
-
+    // Then poll every 5 minutes
     setInterval(async () => {
-        const time = new Date().toLocaleTimeString();
-
-        // 1. Monitor Queue Depth
-        const { count, error } = await supabase
-            .from('trinity_tasks')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending');
-
-        if (error) console.error("Scheduler Error:", error.message);
-
-        console.log(`[${time}] Pending Tasks: ${count}`);
-
-        // ------------------------------------------------------------
-        // HYBRID EVERGREEN SCHEDULER (North Star Seeder)
-        // ------------------------------------------------------------
-
-        // Only seed if queue is empty or very low to prevent spam
-        if (count === 0) {
-            console.log("🌑 Queue Empty. Running Opportunity Auctions (Bidder System)...");
-
-            // 1. Get North Star (Simulated for now, could be from trinity_stats)
-            const northStar = "Ensure System Homeostasis and Growth";
-
-            // 2. Spawn Strategy Task (Bidder System)
-            // Assigned to 'trinity-sophia' (Wisdom) or 'trinity-nexus' (Connector) to delegate
-            await supabase.from('trinity_tasks').insert({
-                title: `[STRATEGY] Align with North Star: ${northStar}`,
-                description: `[EVERGREEN]\n1. ANALYZE: Current system stats.\n2. IDENTIFY: One key opportunity for optimization or growth.\n3. SPAWN: Create specific tasks for Architect or Engineer.\n4. REPORT: Log findings.`,
-                task_type: 'strategy',
-                assigned_to: 'trinity-sophia', // The Strategist
-                priority: 90, // High priority to kickstart loop
-                status: 'pending',
-                metadata: { tags: ['evergreen', 'strategy', 'north-star'], benchmark: true }
-            });
-            console.log(`🌱 Seeded: Strategy Task for Sophia`);
-        } else {
-            console.log("🌖 Swarm Active. Checking for Auction Opportunities...");
-
-            // HYBRID BIDDER LOGIC
-            // Find tasks pending for > 10m (stuck) OR unassigned
-            // In a real swarm, we'd check created_at. Here we just grab 1 unassigned to demonstrate.
-
-            const { data: auctionableTasks } = await supabase
-                .from('trinity_tasks')
-                .select('*')
-                .eq('status', 'pending')
-                .is('assigned_to', null) // Only unassigned tasks need auction
-                .limit(1);
-
-            if (auctionableTasks && auctionableTasks.length > 0) {
-                const task = auctionableTasks[0];
-                console.log(`[SCHEDULER] 🔨 Triggering Auction for Task: ${task.title}`);
-
-                try {
-                    // Dynamic Import for Bidder to avoid build-time issues in scripts
-                    const { runArbitrageAuction } = await import('../lib/bidder');
-                    await runArbitrageAuction(task, 'execute');
-                } catch (e: any) {
-                    console.error(`[SCHEDULER] Auction Failed: ${e.message}`);
-                }
-            }
+        try {
+            await router.pollAndRoute();
+        } catch (e: any) {
+            console.error(`[SCHEDULER] Loop Error:`, e.message);
         }
+    }, 5 * 60 * 1000);
 
-        // Hybrid Trigger: Verify "Stuck" tasks (older than 24h) and reset them
-        // ... (Logic to be added in Phase 9.1)
-
-    }, 60000); // Check every minute
+    console.log("✅ Scheduler is active and polling every 5 minutes.");
 }
 
-runScheduler().catch(console.error);
+// Keep process alive
+process.on('uncaughtException', (err) => {
+    console.error('Fatal Scheduler Exception:', err);
+});
+
+main().catch(console.error);
