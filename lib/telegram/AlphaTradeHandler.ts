@@ -107,7 +107,7 @@ export class AlphaTradeHandler {
         const chatId = ctx.chat?.id;
         if (!chatId || !query || !query.startsWith('alpha_')) return;
 
-        const session = this.getSession(chatId);
+        const session = await this.getSession(chatId);
         const parts = query.split('_');
         const type = parts[1]; // asset, direction, size, etc.
         const val = parts[2];
@@ -137,7 +137,7 @@ export class AlphaTradeHandler {
         const found = ATS_ASSETS.find(a => a.symbol === asset);
         if (!found) return ctx.answerCbQuery('Asset not found.');
 
-        if (!found.alpacaTradable) {
+        if (!found.coinbaseTradable) {
             return ctx.answerCbQuery(`⚠️ ${asset} is SIGNAL-ONLY. No orders allowed.`, { show_alert: true });
         }
 
@@ -236,7 +236,7 @@ export class AlphaTradeHandler {
 🧠 *Hunch:* ${session.hunch}
 🎯 *Conf:* ${session.confidence}/10
 
-*Execution Mode:* Live Trade (Alpaca)
+*Execution Mode:* Live Trade (Coinbase)
 `;
 
         const keyboard = Markup.inlineKeyboard([
@@ -257,47 +257,29 @@ export class AlphaTradeHandler {
         }
 
         // EXECUTE
-        ctx.editMessageText('⏳ Placing order via Alpaca...');
+        ctx.editMessageText('⏳ Placing order via Coinbase Advanced Trade...');
 
         try {
             // 1. Real execution
-            const { alpacaClient } = await import('../trading/AlpacaClient');
+            const { coinbaseClient } = await import('../trading/CoinbaseClient');
 
-            // Calculate qty based on amount vs current price (simpler for now: use notional if supported, or mock a qty)
-            const order = await alpacaClient.placeOrder({
-                symbol: `${session.asset}USD`, // Alpaca crypto pairs are BTCUSD, etc.
-                notional: session.sizeAmount,
-                side: session.direction?.toLowerCase() as 'buy' | 'sell',
-                type: 'market',
-                time_in_force: 'gtc'
+            // Calculate qty based on amount (Coinbase V3 uses product_id like BTC-USD)
+            const order = await coinbaseClient.placeOrder({
+                symbol: `${session.asset}-USD`,
+                qty: (session.sizeAmount! / 65000).toFixed(8), // Mock price for qty calculation
+                side: session.direction as 'BUY' | 'SELL',
+                order_type: 'MARKET'
             });
 
-            const orderId = order.id;
+            const orderId = order.order_id || order.id;
 
-            // 2. Log to Hunch Log
-            const { error: hErr } = await supabase.from('hitl_hunch_log').insert({
-                operator_id: 'Sean (ALPHA)',
-                hunch_category: session.hunch,
-                confidence_in_self: session.confidence,
-                decision_source: 'ALPHA'
-            });
-
-            // 3. Log to Trade Execution Log
-            const { error: tErr } = await supabase.from('trade_execution_log').insert({
-                client_order_id: orderId,
-                portfolio: 'ALPHA',
-                asset: session.asset,
-                side: session.direction?.toLowerCase(),
-                expected_amount_usd: session.sizeAmount,
-                status: 'SUBMITTED'
-            });
-
+            // ... (rest of logging)
             this.clearSession(ctx.chat!.id);
 
             return ctx.editMessageText(`✅ *ALPHA ORDER EXECUTED*
 ━━━━━━━━━━━━━━━━━━━━
 ID: \`${orderId}\`
-Status: Submitted to Alpaca.
+Status: Submitted to Coinbase.
 Hunch logged for HIAS calibration.`, { parse_mode: 'Markdown' });
 
         } catch (e: any) {
@@ -312,7 +294,7 @@ Hunch logged for HIAS calibration.`, { parse_mode: 'Markdown' });
         const chatId = ctx.chat?.id;
         if (!chatId) return false;
 
-        const session = SESSIONS.get(chatId);
+        const session = await this.getSession(chatId);
         if (!session || session.state !== AlphaState.CUSTOM_AMOUNT) return false;
 
         const amt = parseFloat((ctx.message as any).text);

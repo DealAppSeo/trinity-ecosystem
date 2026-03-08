@@ -1268,3 +1268,114 @@
 [2026-02-22T23:06:17.805Z] [trinity-mel] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
 [2026-02-22T23:07:16.960Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
 [2026-02-23T03:48:41.034Z] [trinity-orch] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T17:27:48.369Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T17:31:36.486Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-07T17:33:00.915Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T17:35:11.718Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:35:11.734Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:35:11.799Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:35:11.819Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:38:55.062Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T17:39:04.966Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-07T17:40:32.472Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:40:32.512Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:44:54.461Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T17:51:36.631Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T17:51:47.025Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-07T17:56:24.678Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:56:24.720Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:56:24.752Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:56:24.784Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T17:57:24.850Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T17:58:31.235Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-07T18:13:23.406Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T18:13:28.424Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T18:14:29.706Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-07T18:19:35.123Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T18:23:47.574Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-07T18:24:45.751Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T18:24:45.755Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T18:24:45.810Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T18:24:45.820Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T18:26:31.947Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T18:26:31.957Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T18:26:31.975Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T18:26:31.991Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T18:30:51.470Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T18:31:01.637Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-07T18:31:47.037Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T18:31:47.047Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T18:31:47.055Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T18:31:47.068Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T21:37:49.623Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T21:38:01.287Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T22:19:13.775Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T22:19:18.546Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T22:21:23.438Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-07T22:26:31.374Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T22:30:12.210Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-07T22:33:05.080Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-07T22:34:47.901Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-07T22:38:38.558Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T01:39:31.907Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T02:14:21.090Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T02:20:22.155Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T02:25:40.289Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T02:27:49.145Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-08T02:31:03.351Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T02:31:03.358Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T02:31:03.362Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T02:31:03.367Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T02:36:34.214Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T03:32:38.997Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T03:34:53.893Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-08T03:37:56.517Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T03:37:56.525Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T03:37:56.529Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T03:37:56.535Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T03:43:18.745Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T03:43:29.081Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-08T03:49:52.073Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T03:55:03.174Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:00:07.891Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-08T04:01:23.764Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:01:23.779Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:01:23.792Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:01:23.808Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:01:28.577Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:01:28.587Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:01:28.655Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:06:57.890Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:09:48.932Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:14:52.665Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-08T04:14:52.686Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-08T04:14:52.691Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+
+[2026-03-08T04:15:24.020Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:15:47.990Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:15:48.006Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:15:48.027Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:15:48.031Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:20:49.552Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:20:54.289Z] [trinity-nexus] [meta-llama/Llama-3.3-70B-Instruct-Turbo] 429: {"error":{"message":"Model busy, retry later"}}
+[2026-03-08T04:25:02.412Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:26:10.261Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:31:51.160Z] [trinity-nexus] [deepseek-ai/DeepSeek-V3] 401: "Api key is invalid"
+[2026-03-08T04:32:16.764Z] [trinity-nexus] [llama3.1-8b] 429: {"message":"Tokens per day limit exceeded - too many tokens processed.","type":"too_many_tokens_error","param":"quota","code":"token_quota_exceeded"}
+[2026-03-08T04:33:38.568Z] [trinity-nexus] [Llama-3.1-405B-Instruct] 404: {"error":"Model not found"}
+

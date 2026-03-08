@@ -25,6 +25,7 @@ import { VeritasConverter } from './VeritasConverter';
 import { TIMLManager, TIMLAllocation } from './TIMLManager';
 import { SBFAOperator, SBFAInput, SBFAResult } from './SBFAOperator';
 import { HITLDispatcher } from '../hitl/HITLDispatcher';
+import { zkpBadgeGenerator } from '../guardrail/ZKPReputationBadge';
 // import { HyperDAG } from './HyperDAG';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
@@ -46,6 +47,14 @@ const LLM_TIERS: Record<string, number> = {
 const GOLDEN_RATIO_THRESHOLD = 0.61803398875;
 const VERITAS_MIN_SAMPLES = 10;
 const PYRO_DISAGREEMENT_THRESHOLD = 1.2; // ITCM: Inter-Temporal Consensus Margin
+
+// x402 & ERC-8004 Constants (Phase 4.75)
+const PHI = 1.61803398875;
+const COMMA_RATIO = 531441 / 524288; // Pythagorean Comma (12 perfect fifths vs 7 octaves)
+const LLE_THRESHOLD = 0.05; // Lyapunov Exponent Threshold for drift detection
+const TRINITY_ESCROW_ADDRESS = '0xA80041Acf8861058B35A620BD9EeaA8004bc7388'; // Representative Place-holder
+const X402_VERSION = 2;
+const X402_HEADER = 'PAYMENT-SIGNATURE';
 
 const PROVIDERS: Record<string, ProviderConfig & { region?: string; endpoint_group?: string }> = {
     openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1/chat/completions', envKey: 'OPENAI_API_KEY', model: 'gpt-4o', tier: 'paid', priority: 3, region: 'us-east-1' },
@@ -162,6 +171,8 @@ export class ConstitutionalAgent {
     availableProviders: string[];
     researchTool: ResearchTool; // Dependency Injection slot
     private octokit: Octokit;
+    public wallet: any;
+    public account: any;
 
     // RepID & Governance State
     reputationScore: number = 0;
@@ -308,6 +319,10 @@ export class ConstitutionalAgent {
         }).catch(e => console.error(`[${this.name}] ðŸ§  Memory initialization failed:`, e));
 
         this.octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+
+        // Initialize Wallet from Environment
+        this.initializeWallet();
+
         console.log(`[${this.name}] ðŸš€ Initialized v${this.version}`);
     }
 
@@ -388,10 +403,8 @@ export class ConstitutionalAgent {
     }
 
     /**
-     * Updates reputation based on task outcome.
-     * @param success Did the agent complete the task?
-     * @param targetAgent Optional: Agent name to update (defaults to self)
-     * @param overrideDelta Optional: Custom delta for slashing/reward
+     * Generates an insight from a task result and persists it.
+     * Also stores the result in the agent's memory.
      */
     async generateInsight(task: Task, result: string) {
         // [PHASE 25] SHARED KNOWLEDGE LOOP (Grok's Phase 3)
@@ -499,10 +512,101 @@ export class ConstitutionalAgent {
         } catch (e) {
             console.warn(`[xMEMORY] Contradiction boost failed:`, e);
         }
-        return 0;
     }
 
-    async updateReputation(success: boolean, targetAgent?: string, overrideDelta?: number, confidence?: number) {
+    /**
+     * computeRepIDThreshold: Dynamic threshold scaling with transaction amount.
+     * Higher amounts require higher reputation/confidence (Euler-bounded).
+     */
+    private computeRepIDThreshold(usdcAmount: number): number {
+        const baseThreshold = 0.618; // φ
+        const amountFactor = Math.log10(Math.max(1, usdcAmount)) / 10;
+        return Math.min(0.95, baseThreshold + amountFactor);
+    }
+
+    /**
+     * pythagoreanCommaVeto: Pre-execution gap detection based on musical mathematics (P-009).
+     * Detects divergence between predicted vs actual model state using the Comma ratio.
+     */
+    private pythagoreanCommaVeto(predictedState: number, actualState: number): { veto: boolean; tier: string; gap: number } {
+        const ratio = Math.max(predictedState, actualState) / Math.min(predictedState, actualState);
+        const gap = Math.abs(predictedState - actualState);
+
+        if (ratio > COMMA_RATIO * 1.05) return { veto: true, tier: 'EMERGENCY', gap };
+        if (ratio > COMMA_RATIO) return { veto: true, tier: 'VETO', gap };
+        if (gap > LLE_THRESHOLD) return { veto: false, tier: 'WARNING', gap };
+
+        return { veto: false, tier: 'NONE', gap: 0 };
+    }
+
+    /**
+     * getAutonomyTier: Determines if agent can execute immediately, must notify, or must ask.
+     */
+    private getAutonomyTier(repid: number, confidence: number, amount: number): AutonomyTier {
+        const threshold = this.computeRepIDThreshold(amount);
+
+        if (repid >= threshold && confidence >= 0.8) return 'JUST_DO_IT';
+        if (repid >= threshold * 0.8 && confidence >= 0.6) return 'DO_THEN_TELL';
+        return 'ASK_FIRST';
+    }
+
+    /**
+     * authorizeTransaction: Final Gate before autonomous execution for high-stakes tasks.
+     * Enforces P-011: RepID-Gated Agent Payment Authorization.
+     */
+    async authorizeTransaction(usdcAmount: number): Promise<{ authorized: boolean; proof?: any; error?: string }> {
+        const threshold = this.computeRepIDThreshold(usdcAmount);
+
+        if (this.reputationScore < threshold) {
+            return {
+                authorized: false,
+                error: `Reputation score ${this.reputationScore.toFixed(2)} below required threshold ${threshold.toFixed(2)} for ${usdcAmount} USDC.`
+            };
+        }
+
+        // For high-value transactions (> 10 USDC), generate ZKP proof and lock escrow
+        if (usdcAmount >= 10) {
+            try {
+                const zkpResult = await zkpBadgeGenerator.generateProof(this.name, threshold);
+
+                // [P-011] On-chain Escrow Lock
+                // In production, this would call the TrinityEscrow.lockFunds() via a web3 provider (viem/ethers)
+                console.log(`[ESCROW] 🔒 Locking ${usdcAmount} USDC for task auth (Agent: ${this.name})`);
+
+                return {
+                    authorized: zkpResult.valid,
+                    proof: zkpResult,
+                    error: zkpResult.valid ? undefined : "ZKP Proof verification failed."
+                };
+            } catch (err: any) {
+                return { authorized: false, error: `ZKP/Escrow Failed: ${err.message}` };
+            }
+        }
+
+        return { authorized: true };
+    }
+
+    /**
+     * finalizeEscrow: Releases or refunds funds based on task outcome.
+     * Integrates with the Pythagorean Comma Veto (refund on veto).
+     */
+    async finalizeEscrow(txHash: string, success: boolean, veto: boolean): Promise<boolean> {
+        if (veto) {
+            console.log(`[ESCROW] ↩️ Pythagorean Veto detected. Triggering refund for ${txHash}`);
+            // Call TrinityEscrow.refundFunds(txHash)
+            return true;
+        }
+
+        if (success) {
+            console.log(`[ESCROW] 🔓 Task successful. Releasing funds to agent wallet (Tx: ${txHash})`);
+            // Call TrinityEscrow.releaseFunds(txHash, proof)
+            return true;
+        }
+
+        return false;
+    }
+
+    async updateReputation(success: boolean, targetAgent?: string, overrideDelta?: number, confidence?: number, paymentDetails?: { amount: number; proofHash: string; txHash: string }) {
         // [PHASE P4] 3-TIER REPID SYNTHESIS
         const name = targetAgent || this.name;
         const conf = confidence !== undefined ? confidence : (success ? 0.9 : 0.1);
@@ -545,7 +649,16 @@ export class ConstitutionalAgent {
         const tier3_cvs = registry?.contrarian_value_score || 1.0; // 15%
 
         // 5. Synthesis: RepID = (0.6 * T1) + (0.25 * T2) + (0.15 * T3) * 100
-        const repIdScore = ((0.6 * tier1_calibration) + (0.25 * tier2_accuracy) + (0.15 * Math.min(1.0, tier3_cvs / 2.0))) * 100;
+        let repIdScore = ((0.6 * tier1_calibration) + (0.25 * tier2_accuracy) + (0.15 * Math.min(1.0, tier3_cvs / 2.0))) * 100;
+
+        // [PHASE 4.75] Amount-Weighted Scaling (Article 3 enforcement)
+        if (paymentDetails && paymentDetails.amount > 0) {
+            const weight = paymentDetails.amount >= 100 ? 2.0 :
+                paymentDetails.amount >= 10 ? 1.5 :
+                    paymentDetails.amount >= 1 ? 1.2 : 1.0;
+            const delta = repIdScore - (registry?.reputation_score || 50);
+            repIdScore = (registry?.reputation_score || 50) + (delta * weight);
+        }
 
         // [PHASE M] RepID Time Decay (Prevent "Coasting")
         const AGE_DECAY = 0.98; // 2% decay per day of inactivity
@@ -568,6 +681,31 @@ export class ConstitutionalAgent {
             tasks_completed: success ? (registry?.tasks_completed || 0) + 1 : (registry?.tasks_completed || 0),
             last_active: new Date().toISOString()
         }).eq('agent_name', name);
+
+        // [PHASE 4.5] Task 2: Update agent_repid_score in compute_bids (Closing the loop)
+        try {
+            await this.supabase
+                .from('compute_bids')
+                .update({ agent_repid_score: finalScore })
+                .eq('agent_id', name);
+            console.log(`[REPID-CHAIN] 🪢 Closing loop for ${name}: RepID ${finalScore.toFixed(2)} recorded in compute_bids.`);
+        } catch (e) { console.warn(`[REPID-CHAIN] ⚠️ Failed to update compute_bids:`, e); }
+
+        // [PHASE 4.75] Task 0/2: Official Anti-Sybil Log (agent_repid_history)
+        if (paymentDetails?.proofHash) {
+            try {
+                await this.supabase.from('agent_repid_history').insert({
+                    agent_id: name,
+                    repid_delta: repIdScore - (registry?.reputation_score || 50),
+                    accuracy_score: accuracy,
+                    payment_proof_hash: paymentDetails.proofHash,
+                    payment_amount_usdc: paymentDetails.amount,
+                    payment_tx_timestamp: new Date().toISOString(),
+                    reason: success ? 'Task Success' : 'Task Failure'
+                });
+                console.log(`[ANTI-SYBIL] 🛡️ Reputation event anchored by payment proof: ${paymentDetails.proofHash.substring(0, 10)}...`);
+            } catch (e) { console.warn(`[ANTI-SYBIL] ⚠️ Failed to anchor rep event:`, e); }
+        }
 
         // [PHASE 30] ERC-8004 REPUTATION SYNC
         try {
@@ -1848,37 +1986,37 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     }
                 }
 
-                if (lowBelief || explicitEscalate) {
-                    console.log(`[ANTIGRAVITY] ðŸš¨ ESCALATING to Phone HITL Gateway...`);
+                if (lowBelief || explicitEscalate || (this.reputationScore < 61)) {
+                    console.log(`[ANTIGRAVITY] 🚨 ESCALATING to Telegram HITL Bridge...`);
 
-                    // NEW: Integrate HITLManager
-                    const hitl = HITLManager.getInstance();
-                    const reason = lowBelief ? `Low certainty score (${evaluation.score})` : 'Explicit escalation request';
+                    const reason = explicitEscalate ? 'Explicit escalation request' :
+                        (lowBelief ? `Low certainty score (${evaluation.score})` : `Low RepID (${this.reputationScore})`);
 
                     try {
-                        const requestId = await hitl.escalate(
-                            String(task.id),
-                            this.name,
-                            reason,
-                            {
-                                evaluation,
-                                last_result: result.output.substring(0, 1000),
-                                prompt_context: prompt.substring(0, 1000)
-                            }
-                        );
+                        const hitlResult = await HITLDispatcher.dispatchToHITL({
+                            taskId: String(task.id),
+                            agentId: this.name,
+                            agentRepId: String(this.reputationScore),
+                            missionSummary: task.title,
+                            confidenceScore: (evaluation.score / 100),
+                            spiScore: 0.75, // Placeholder for Phase 4.5
+                            escalationReason: reason
+                        });
 
-                        await this.supabase.from('trinity_tasks').update({
-                            status: 'pending_clarification',
-                            claimed_by: null,
-                            result: `[HITL ESCALATION] ${reason}. Request ID: ${requestId}`,
-                            verification_result: `Paused for Human-In-The-Loop approval.`,
-                            metadata: {
-                                ...(JSON.parse(task.metadata || '{}')),
-                                hitl_request_id: requestId,
-                                escalated_by: this.name,
-                                escalation_time: new Date().toISOString()
-                            }
-                        }).eq('id', task.id);
+                        if (hitlResult.status === 'SENT') {
+                            await this.supabase.from('trinity_tasks').update({
+                                status: 'pending_clarification',
+                                claimed_by: null,
+                                result: `[HITL ESCALATION] ${reason}. Telegram Message ID: ${hitlResult.telegramMessageId}`,
+                                verification_result: `Paused for Telegram HITL approval (Phase 4.5 Bridge).`,
+                                metadata: {
+                                    ...(JSON.parse(task.metadata || '{}')),
+                                    hitl_telegram_id: hitlResult.telegramMessageId,
+                                    escalated_by: this.name,
+                                    escalation_time: new Date().toISOString()
+                                }
+                            }).eq('id', task.id);
+                        }
 
                         await notificationManager.notifyUser({
                             title: `HITL ESCALATION: ${this.name}`,
@@ -4530,6 +4668,52 @@ ${task.description}
         const primaryResponse = triadResponses.find(r => r.role === 'ROOT')?.response || triadResponses[0].response;
 
         return { ...sbfaResult, primaryResponse };
+    }
+
+    private resolveLegacyName(name: string): string {
+        const MAP: Record<string, string> = {
+            'MCP': 'trinity-orch',
+            'ORCH': 'trinity-orch',
+            'APM': 'trinity-apm',
+            'GCM': 'trinity-gcm',
+            'HDM': 'trinity-hdm',
+            'MEL': 'trinity-mel',
+            'NEXUS': 'trinity-nexus',
+            'TORCH': 'trinity-torch',
+            'VERITAS': 'trinity-veritas',
+            'CHESED': 'trinity-chesed',
+            'SOPHIA': 'trinity-sophia',
+            'W3C': 'trinity-w3c',
+            'SHOFET': 'trinity-shofet'
+        };
+        const upper = name ? name.toUpperCase() : '';
+        return MAP[upper] || MAP[name] || name;
+    }
+
+    private initializeWallet() {
+        try {
+            const shortName = this.name.replace('trinity-', '').toUpperCase();
+            const envKey = `${shortName}_PRIVATE_KEY`;
+            const privateKey = process.env[envKey] as `0x${string}`;
+
+            if (privateKey && privateKey !== '0x...') {
+                const { privateKeyToAccount } = require('viem/accounts');
+                const { createWalletClient, http } = require('viem');
+                const { baseSepolia } = require('viem/chains');
+
+                this.account = privateKeyToAccount(privateKey);
+                this.wallet = createWalletClient({
+                    account: this.account,
+                    chain: baseSepolia,
+                    transport: http()
+                });
+                console.log(`[${this.name}] 🔐 Wallet initialized: ${this.account.address}`);
+            } else {
+                console.warn(`[${this.name}] ⚠️ No private key found for ${envKey}. Wallet operations will be mocked.`);
+            }
+        } catch (e: any) {
+            console.error(`[${this.name}] ❌ Wallet initialization failed:`, e.message);
+        }
     }
 }
 

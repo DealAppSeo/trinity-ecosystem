@@ -1,0 +1,30 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "Trinity-GCM",
+  "description": "Governance & Compliance Manager. Enforces Constitutional Agent guidelines and monitors transaction compliance with the Trinity 1.0 Charter.",
+  "image": "https://aitrinitysymphony.com/agents/GCM.png",
+  "services": [
+    {
+      "name": "MCP",
+      "endpoint": "https://aitrinitysymphony.com/mcp/GCM",
+      "version": "2025-06-18"
+    },
+    {
+      "name": "A2A",
+      "endpoint": "https://aitrinitysymphony.com/.well-known/agent-card.json",
+      "version": "0.3.0"
+    },
+    {
+      "name": "web",
+      "endpoint": "https://aitrinitysymphony.com/agents/GCM"
+    }
+  ],
+  "x402Support": true,
+  "active": true,
+  "registrations": [
+    {
+      "agentId": null,
+      "agentRegistry": "eip155:84532:0x8004A818BFB912233c491871b3d84c89A494BD9e"
+    }
+  ]
+}

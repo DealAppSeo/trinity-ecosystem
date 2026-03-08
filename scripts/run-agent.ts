@@ -94,6 +94,11 @@ async function startAgent() {
     }
 
     console.log(`✅ ${finalAgentName} is ONLINE (Tier: ${agent.autonomyTier}, Rep: ${agent.reputationScore})`);
+    if (agent.account) {
+        console.log(`📡 Wallet Active: ${agent.account.address}`);
+    } else {
+        console.warn(`⚠️ Wallet NOT initialized for ${finalAgentName}. Private key may be missing.`);
+    }
 
     // START HTTP SERVER FOR RAILWAY/UPTIME ROBOT
     // Railway requires the app to listen on PORT (usually 3000)

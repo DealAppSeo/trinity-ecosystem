@@ -8,11 +8,13 @@ export class StatusCommandHandler {
      */
     static async handleStatus(ctx: Context) {
         try {
-            // 1. Real Alpaca Call
-            const { alpacaClient } = await import('../trading/AlpacaClient');
-            const account = await alpacaClient.getAccount();
-            const buyingPower = parseFloat(account.buying_power);
-            const equity = parseFloat(account.equity);
+            // 1. Real Coinbase Call
+            const { coinbaseClient } = await import('../trading/CoinbaseClient');
+            const accounts = await coinbaseClient.getAccount();
+            // Coinbase returns an array of accounts
+            const primaryAccount = accounts.accounts?.[0] || { available_balance: { value: '0' }, hold: { value: '0' } };
+            const buyingPower = parseFloat(primaryAccount.available_balance.value);
+            const equity = buyingPower + parseFloat(primaryAccount.hold.value);
 
             // 2. Pending HITL
             const { count: pending } = await supabase
@@ -31,7 +33,7 @@ export class StatusCommandHandler {
             const message = `
 📊 *ATS SYSTEM STATUS*
 ━━━━━━━━━━━━━━━━━━━━
-💰 *Alpaca BP:* $${buyingPower.toLocaleString()}
+💰 *Coinbase Adv:* $${buyingPower.toLocaleString()}
 📈 *Equity:* $${equity.toLocaleString()}
 ⏳ *Pending HITL:* ${pending || 0}
 🕒 *Last Cycle:* ${lastCycle ? lastCycle.asset + ' (' + new Date(lastCycle.cycle_started_at).toLocaleTimeString() + ')' : 'None'}

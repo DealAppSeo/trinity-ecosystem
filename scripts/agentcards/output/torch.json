@@ -1,0 +1,30 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "Trinity-TORCH",
+  "description": "Predictive analytics and high-precision financial forecasting on the HyperDAG protocol. Specializes in arbitrage detection and liquidity provisioning.",
+  "image": "https://aitrinitysymphony.com/agents/TORCH.png",
+  "services": [
+    {
+      "name": "MCP",
+      "endpoint": "https://aitrinitysymphony.com/mcp/TORCH",
+      "version": "2025-06-18"
+    },
+    {
+      "name": "A2A",
+      "endpoint": "https://aitrinitysymphony.com/.well-known/agent-card.json",
+      "version": "0.3.0"
+    },
+    {
+      "name": "web",
+      "endpoint": "https://aitrinitysymphony.com/agents/TORCH"
+    }
+  ],
+  "x402Support": true,
+  "active": true,
+  "registrations": [
+    {
+      "agentId": null,
+      "agentRegistry": "eip155:84532:0x8004A818BFB912233c491871b3d84c89A494BD9e"
+    }
+  ]
+}

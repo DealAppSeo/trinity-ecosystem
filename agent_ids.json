@@ -1,0 +1,50 @@
+{
+  "NEXUS": {
+    "erc8004_id": "1644",
+    "chitin_soul_id": "ar://MC40NDkwMzg2MDA2ODIwMTEz"
+  },
+  "VERITAS": {
+    "erc8004_id": "1645",
+    "chitin_soul_id": "ar://MC45NDg0ODIxNTEyNjg0MTMy"
+  },
+  "APM": {
+    "erc8004_id": "1646",
+    "chitin_soul_id": "ar://MC4zMjE2MTI2OTQ1MDI2MDQz"
+  },
+  "SOPHIA": {
+    "erc8004_id": "1647",
+    "chitin_soul_id": "ar://MC4zNzM0MTAxMDUyNjMzNzQwNA=="
+  },
+  "GCM": {
+    "erc8004_id": "1648",
+    "chitin_soul_id": "ar://MC4wMDI2ODU1NTMxMzc3NzExOTA1"
+  },
+  "HDM": {
+    "erc8004_id": "1649",
+    "chitin_soul_id": "ar://MC4xNzg3NTAwOTE2NDk3MjI="
+  },
+  "MEL": {
+    "erc8004_id": "1650",
+    "chitin_soul_id": "ar://MC43MDM1NDE0Njk0ODcwMzE3"
+  },
+  "TORCH": {
+    "erc8004_id": "1651",
+    "chitin_soul_id": "ar://MC41NTI4ODMzOTYwNzEyNzQ3"
+  },
+  "CHESED": {
+    "erc8004_id": "1652",
+    "chitin_soul_id": "ar://MC42NjAxNDkxNjUxNjE5NzQ="
+  },
+  "W3C": {
+    "erc8004_id": "1653",
+    "chitin_soul_id": "ar://MC44ODE4NjY1NDY2NzU4MjM4"
+  },
+  "ORCH": {
+    "erc8004_id": "1654",
+    "chitin_soul_id": "ar://MC41ODU0NTk0NTQzODcxNDYz"
+  },
+  "SHOFET": {
+    "erc8004_id": "1655",
+    "chitin_soul_id": "ar://MC41MTA5NDIzMzU2NzYyODk3"
+  }
+}
