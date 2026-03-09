@@ -8,9 +8,10 @@ pydantic-ai==0.0.14
 structlog==24.1.0
 arize-phoenix==2.0.0
 openinference-instrumentation-pydantic-ai==0.1.12
-opentelemetry-api==1.23.0
-opentelemetry-sdk==1.23.0
-opentelemetry-exporter-otlp==1.23.0
+opentelemetry-api>=1.25.0
+opentelemetry-sdk>=1.25.0
+opentelemetry-exporter-otlp>=1.25.0
+opentelemetry-semantic-conventions>=0.54b1
 python-dotenv==1.0.1
 torch==2.2.0 --index-url https://download.pytorch.org/whl/cpu
 torch_geometric==2.5.0
