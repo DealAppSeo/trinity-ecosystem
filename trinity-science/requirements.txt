@@ -6,8 +6,8 @@ scikit-fuzzy==0.4.2
 pydantic>=2.10,<3.0.0
 pydantic-ai==0.0.14
 structlog>=24.1.0
-arize-phoenix==2.0.0
-openinference-instrumentation-pydantic-ai==0.1.12
+arize-phoenix>=4.0.0
+openinference-instrumentation-pydantic-ai>=0.1.12
 opentelemetry-api>=1.25.0
 opentelemetry-sdk>=1.25.0
 opentelemetry-exporter-otlp>=1.25.0
