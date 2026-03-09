@@ -1,6 +1,5 @@
 import os
-from coinbase_sdk.wallet import Wallet
-from coinbase_sdk.cdp import Cdp
+from cdp import Cdp, Wallet
 import structlog
 
 logger = structlog.get_logger("cdp-service")

@@ -28,6 +28,7 @@ dependencies = [
     "crewai>=0.28.0",
     "llama-index>=0.10.0",
     "autogen-agentchat>=0.2.36",
+    "cdp-sdk>=0.15.1",
     "lightrag-hkm>=1.0.1",
 ]
 

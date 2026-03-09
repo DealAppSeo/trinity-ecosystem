@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
+import { Card } from '@/components/ui/Card';
 import { Activity, Shield, Coins, Brain, MessageSquare } from 'lucide-react';
 
 import { supabase } from '@/lib/supabase';
