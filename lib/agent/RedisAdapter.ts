@@ -21,13 +21,28 @@ export class RedisAdapter {
 
         if (dragonflyUrl && dragonflyKey) {
             console.log(`[REDIS] ⚡ Initializing Primary (DragonflyDB) on ${dragonflyUrl}:${dragonflyPort}...`);
+            let retryCount = 0;
+            const maxRetries = 3;
+            const backoffDelays = [5000, 30000, 300000]; // 5s, 30s, 5min
+
             try {
                 this.redis = new Redis({
                     host: dragonflyUrl,
                     port: dragonflyPort,
                     password: dragonflyKey,
                     tls: {}, // Port 6385 usually requires TLS
-                    retryStrategy: (times) => Math.min(times * 50, 2000)
+                    retryStrategy: (times) => {
+                        if (times > maxRetries) {
+                            if (retryCount === maxRetries) {
+                                retryCount++;
+                                import('../notification/NotificationManager').then(({ notificationManager }) => {
+                                    notificationManager.sendTelegram(`🚨 *[REDIS CRITICAL]* persistent connection failure to DragonflyDB after ${maxRetries} retries.`);
+                                });
+                            }
+                            return null; // Stop retrying
+                        }
+                        return backoffDelays[times - 1];
+                    }
                 });
                 this.type = 'ioredis';
 
