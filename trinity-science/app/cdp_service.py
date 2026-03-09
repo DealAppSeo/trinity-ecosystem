@@ -1,5 +1,10 @@
 import os
-from cdp import Cdp, Wallet
+try:
+    from cdp import Cdp, Wallet
+except ImportError:
+    Cdp = Wallet = None
+    print("[WARNING] cdp-sdk not found. CdpService will be disabled.")
+
 import structlog
 
 logger = structlog.get_logger("cdp-service")

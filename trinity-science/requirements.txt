@@ -1,24 +1,27 @@
+# Core API
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
-numpy>=1.26.0
-networkx>=3.2.1
+python-dotenv>=1.0.1
+
+# ANFIS / ML Core — keep these exact
+torch==2.2.0
+torch_geometric==2.5.0
 scikit-fuzzy==0.4.2
+numpy>=1.26.0,<2.0.0
+scipy>=1.10.0
+scikit-learn>=1.2.0
+networkx>=3.2.1
+
+# Data / API
 pydantic>=2.10,<3.0.0
-pydantic-ai==0.0.14
+requests>=2.32.3
+supabase>=2.11.0
 structlog>=24.1.0
-arize-phoenix>=4.0.0
-openinference-instrumentation-pydantic-ai>=0.1.12
+prometheus_client>=0.20.0
+python-dateutil>=2.8.0
+
+# Observability (lightweight)
 opentelemetry-api>=1.25.0
 opentelemetry-sdk>=1.25.0
 opentelemetry-exporter-otlp>=1.25.0
 opentelemetry-semantic-conventions>=0.54b1
-python-dotenv>=1.0.1
-torch==2.2.0 --index-url https://download.pytorch.org/whl/cpu
-torch_geometric==2.5.0
-prometheus_client>=0.20.0
-supabase>=2.11.0
-crewai>=1.10.0
-llama-index==0.10.0
-autogen-agentchat==0.2.36
-cdp-sdk>=0.15.1
-requests>=2.32.3

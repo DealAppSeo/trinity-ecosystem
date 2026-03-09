@@ -1,20 +1,35 @@
 import os
-from pydantic_ai import Agent, RunContext
+try:
+    from pydantic_ai import Agent, RunContext
+except ImportError:
+    Agent = RunContext = None
+    print("[WARNING] pydantic_ai not found. Stubs used.")
+
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
 import structlog
 import logging
-from openinference.instrumentation.pydantic_ai import PydanticAIInstrumentor
+try:
+    from openinference.instrumentation.pydantic_ai import PydanticAIInstrumentor
+except ImportError:
+    PydanticAIInstrumentor = None
+
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 
-from app.cdp_service import cdp_service
+try:
+    from app.cdp_service import cdp_service
+except ImportError:
+    cdp_service = None
+
 
 # Configure CDP
-cdp_service.initialize()
+if cdp_service:
+    cdp_service.initialize()
+
 
 # Configure Structlog
 structlog.configure(
@@ -46,10 +61,14 @@ if ENABLE_TRACING:
         trace.set_tracer_provider(trace_provider)
         
         # Instrument Pydantic AI
-        PydanticAIInstrumentor().instrument()
-        logger.info("Tracing and Pydantic AI instrumentation enabled.", endpoint=PHOENIX_ENDPOINT)
+        if PydanticAIInstrumentor:
+            PydanticAIInstrumentor().instrument()
+            logger.info("Tracing and Pydantic AI instrumentation enabled.", endpoint=PHOENIX_ENDPOINT)
+        else:
+            logger.info("Tracing enabled but Pydantic AI instrumentation skipped (import failed).")
     except Exception as e:
         logger.warning("Tracing initialization failed. Proceeding without tracing.", error=str(e))
+
 else:
     logger.info("Tracing disabled by environment variable (ENABLE_TRACING=false).")
 
@@ -72,16 +91,19 @@ science_agent = Agent(
         "You are the Trinity Science Brain. Your goal is to maximize system flow while maintaining high accuracy. "
         "Use system latency as an opportunity to engage the user for clarification if the task is complex."
     ),
-)
+) if Agent else None
 
-@science_agent.tool
+@science_agent.tool if science_agent else lambda f: f
 async def check_rep_threshold(ctx: RunContext[None], rep: float) -> str:
+
     """Check if the reputation meets the threshold for deep interaction."""
     return "Threshold Met" if rep > 80 else "Threshold Not Met"
 
-@science_agent.tool
+@science_agent.tool if science_agent else lambda f: f
 async def create_coinbase_wallet(ctx: RunContext[None], network: str = "base-sepolia") -> str:
     """Create a new crypto wallet via Coinbase CDP."""
+    if not cdp_service:
+        return "CDP Service not available (stubbed)."
     try:
         wallet = cdp_service.create_wallet(network)
         address = wallet.default_address
@@ -89,10 +111,16 @@ async def create_coinbase_wallet(ctx: RunContext[None], network: str = "base-sep
     except Exception as e:
         return f"Wallet creation failed: {str(e)}"
 
+
 async def get_science_decision(data: DecisionInput) -> DecisionOutput:
     logger.info("science_decision_start", latency_ms=data.latency_ms, rep=data.user_reputation)
+    if not science_agent:
+        logger.warning("science_agent_unavailable_returning_default")
+        return DecisionOutput(should_query_user=True, interaction_type='deep_clarification', reason="Science agent unavailable (math focus)")
+    
     result = await science_agent.run(
         f"Determine interaction strategy for: Latency={data.latency_ms}, Rep={data.user_reputation}, Complexity={data.task_complexity}"
     )
     logger.info("science_decision_end", result=result.data.interaction_type)
     return result.data
+
