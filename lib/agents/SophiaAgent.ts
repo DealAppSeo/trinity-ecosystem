@@ -9,10 +9,7 @@ const REPUTATION_REGISTRY_ABI = parseAbi([
     'function giveFeedback(uint256 agentId, string calldata uri, bytes32 hash) external',
 ]);
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 
 const account = privateKeyToAccount((process.env.SOPHIA_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000000') as `0x${string}`);
 const wallet = createWalletClient({ account, chain: baseSepolia, transport: http() });

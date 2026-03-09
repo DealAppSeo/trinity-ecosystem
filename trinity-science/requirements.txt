@@ -17,7 +17,7 @@ torch==2.2.0 --index-url https://download.pytorch.org/whl/cpu
 torch_geometric==2.5.0
 prometheus_client==0.20.0
 supabase==2.3.0
-crewai==0.28.0
+crewai>=0.100.0
 llama-index==0.10.0
 autogen-agentchat==0.2.36
 cdp-sdk>=0.15.1

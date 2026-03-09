@@ -2,12 +2,7 @@
 import { createWalletClient, createPublicClient, http, keccak256, encodePacked } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
-);
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 
 const REPUTATION_REGISTRY_ADDRESS = '0x8004B663056A597Dffe9eCcC1965A193B7388713';
 const REPUTATION_REGISTRY_ABI = [

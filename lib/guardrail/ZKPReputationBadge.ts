@@ -1,6 +1,6 @@
 
 import * as snarkjs from 'snarkjs';
-import { supabaseAdmin as supabase } from '../supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 
 /**
  * ZKPReputationBadge: Privacy-Preserving Reputation Proofs (ERC-8004 DBT)

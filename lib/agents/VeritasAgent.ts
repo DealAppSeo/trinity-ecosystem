@@ -15,10 +15,7 @@ const VALIDATION_REGISTRY_ABI = parseAbi([
     'function validationResponse(bytes32 requestHash, bool response, string calldata responseURI, bytes32 responseHash, string calldata tag) external',
 ]);
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 
 const account = privateKeyToAccount((process.env.VERITAS_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000000') as `0x${string}`);
 const wallet = createWalletClient({ account, chain: baseSepolia, transport: http() });
