@@ -4928,7 +4928,7 @@ ${task.description}
         const isBuy = Math.random() > 0.8;
         if (isBuy) {
             console.log(`[APM] 🤑 BUY SIGNAL DETECTED. Triggering SOPHIA -> HDM Research Stream.`);
-            const { SuperfluidService } = require('../lib/web3/superfluid');
+            const { SuperfluidService } = require('../../lib/web3/superfluid');
             await SuperfluidService.startStream('SOPHIA', 'HDM', 0.001);
             await this.notifyTelegram(`🤑 *APM BUY SIGNAL*: Triggering research stream (0.001 USDC/min)`);
         }

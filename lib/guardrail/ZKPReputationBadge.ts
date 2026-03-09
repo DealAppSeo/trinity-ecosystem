@@ -1,7 +1,5 @@
 
 import * as snarkjs from 'snarkjs';
-import fs from 'fs';
-import path from 'path';
 import { supabaseAdmin as supabase } from '../supabase';
 
 /**
@@ -9,8 +7,8 @@ import { supabaseAdmin as supabase } from '../supabase';
  * Implements Phase 4.8: ZKP Reputation Integrity using Plonky3/Circom.
  */
 export class ZKPReputationBadge {
-    private circuitWasmPath = path.join(process.cwd(), 'circuits/repid_threshold_js/repid_threshold.wasm');
-    private zkeyPath = path.join(process.cwd(), 'circuits/repid_threshold_final.zkey');
+    private circuitWasmPath = 'circuits/repid_threshold_js/repid_threshold.wasm';
+    private zkeyPath = 'circuits/repid_threshold_final.zkey';
 
     /**
      * Generate a ZKP proof of reputation level.
@@ -37,17 +35,27 @@ export class ZKPReputationBadge {
         let proof, publicSignals;
 
         // 3. Execution (Simulated if circuit not compiled, otherwise real)
-        if (fs.existsSync(this.circuitWasmPath) && fs.existsSync(this.zkeyPath)) {
+        let exists = false;
+        if (typeof window === 'undefined') {
             try {
-                const result = await snarkjs.groth16.fullProve(inputs, this.circuitWasmPath, this.zkeyPath);
-                proof = result.proof;
-                publicSignals = result.publicSignals;
-                console.log(`[ZKP] ✅ Real Groth16 proof generated for ${agentName}`);
+                const fs = require('fs');
+                const path = require('path');
+                const fullWasmPath = path.join(process.cwd(), this.circuitWasmPath);
+                const fullZkeyPath = path.join(process.cwd(), this.zkeyPath);
+                exists = fs.existsSync(fullWasmPath) && fs.existsSync(fullZkeyPath);
+
+                if (exists) {
+                    const result = await snarkjs.groth16.fullProve(inputs, fullWasmPath, fullZkeyPath);
+                    proof = result.proof;
+                    publicSignals = result.publicSignals;
+                    console.log(`[ZKP] ✅ Real Groth16 proof generated for ${agentName}`);
+                }
             } catch (err) {
-                console.error(`[ZKP] Proof generation failed:`, err);
-                return this.generateSimulatedProof(agentName, minReputation, agent.reputation_score);
+                console.error(`[ZKP] Server-side proof generation failed:`, err);
             }
-        } else {
+        }
+
+        if (!exists || !proof) {
             return this.generateSimulatedProof(agentName, minReputation, agent.reputation_score);
         }
 

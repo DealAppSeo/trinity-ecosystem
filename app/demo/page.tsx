@@ -1,22 +1,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Activity, Shield, Coins, Brain, MessageSquare } from 'lucide-react';
 
 import { supabase } from '@/lib/supabase';
 
 const Panel = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
-    <Card className="bg-slate-900 border-slate-800 text-slate-100 h-full overflow-hidden shadow-xl">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b border-slate-800 mb-4">
-            <CardTitle className="text-sm font-medium uppercase tracking-wider text-slate-400">
+    <Card className="bg-slate-900 border-slate-800 text-slate-100 h-full overflow-hidden shadow-xl p-0">
+        <div className="flex flex-row items-center justify-between space-y-0 p-4 pb-2 border-b border-slate-800 mb-4">
+            <div className="text-sm font-medium uppercase tracking-wider text-slate-400">
                 {title}
-            </CardTitle>
+            </div>
             <Icon className="h-4 w-4 text-cyan-400" />
-        </CardHeader>
-        <CardContent className="h-[calc(100%-60px)]">
+        </div>
+        <div className="px-4 pb-4 h-[calc(100%-60px)]">
             {children}
-        </CardContent>
+        </div>
     </Card>
 );
 
@@ -152,8 +152,8 @@ export default function DemoPage() {
 
                             return (
                                 <div key={i} className={`text-[10px] border-l-2 pl-2 py-1 mb-1 ${action === 'LAOP_ENGAGE' ? 'border-amber-500 bg-amber-500/5' :
-                                        action === 'LAOP_BACKGROUND_TASK' ? 'border-cyan-500 bg-cyan-500/5' :
-                                            'border-slate-800'
+                                    action === 'LAOP_BACKGROUND_TASK' ? 'border-cyan-500 bg-cyan-500/5' :
+                                        'border-slate-800'
                                     }`}>
                                     <div className="flex justify-between text-[8px] text-slate-500">
                                         <span>{agent}</span>

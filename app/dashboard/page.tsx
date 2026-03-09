@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import './dashboard.css';
+import '../dashboard.css';
 
 interface AgentStatus {
     name: string;
