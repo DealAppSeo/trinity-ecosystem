@@ -56,6 +56,8 @@ export default function middleware(request: NextRequest) {
     const isPublicRoute =
         pathname === '/health' ||
         pathname === '/api/health' ||
+        pathname === '/demo' ||
+        pathname.startsWith('/demo/') ||
         pathname.startsWith('/api/telegram') ||
         pathname.startsWith('/api/bot') ||
         pathname.startsWith('/api/waitlist') ||

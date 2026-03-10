@@ -2250,7 +2250,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             const SAFE_U_MAX = 0.05;
 
             const isHighConfidence = (
-                finalScore > SAFE_REP_MIN &&
+                this.reputationScore > SAFE_REP_MIN &&
                 (evaluation.score / 100) > 0.9 && // Evaluation score as confidence proxy
                 SAFE_DOMAINS.has(task.domain || 'general') &&
                 (task as any).vulnerability_type !== 'EMERGENT'
@@ -2274,7 +2274,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     task_type: task.task_type || 'general',
                     output_summary: result.output.substring(0, 500),
                     full_output: result.output,
-                    rep_id_score: finalScore / 100, // Normalize for Bot display if needed
+                    rep_id_score: this.reputationScore / 100, // Normalize for Bot display if needed
                     wsce_score: evaluation.score / 100,
                     u_score: evaluation.score > 90 ? 0.05 : 0.2, // Match marking logic
                     cost_saved: (result as any).savings_attribution?.total_savings_usd || 0,
@@ -4333,8 +4333,13 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     }
 
     async callSiliconFlow(system: string, prompt: string, tools: any[] = []): Promise<LLMResult> {
-        const model = process.env.SILICONFLOW_MODEL || 'deepseek-ai/DeepSeek-V3';
-        return this.callOpenAICompatible('https://api.siliconflow.cn/v1/chat/completions', process.env.SILICONFLOW_API_KEY!, model, system, prompt, tools, 'siliconflow');
+        try {
+            const model = process.env.SILICONFLOW_MODEL || 'deepseek-ai/DeepSeek-V3';
+            return await this.callOpenAICompatible('https://api.siliconflow.cn/v1/chat/completions', process.env.SILICONFLOW_API_KEY!, model, system, prompt, tools, 'siliconflow');
+        } catch (e: any) {
+            console.error(`[${this.name}] ⚠️ SiliconFlow Error: ${e.message}. Skipping...`);
+            throw e; // Parent callLLM will handle rotation
+        }
     }
 
     async callOpenAICompatible(url: string, apiKey: string, model: string, systemPrompt: string, prompt: string, tools: any[], providerKey?: string, options: any = {}): Promise<LLMResult> {
