@@ -1,0 +1,16 @@
+[package]
+name = "rust-brain"
+version = "0.1.0"
+edition = "2021"
+description = "Solana HFT & Escrow Manager for Trinity Ecosystem"
+
+[dependencies]
+# Required for Railway to bind to a port and stay alive
+tokio = { version = "1.32", features = ["full"] }
+warp = "0.3.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Solana Web3 integrations (We will fill these out in the next sprint)
+# solana-client = "1.16"
+# solana-sdk = "1.16"
