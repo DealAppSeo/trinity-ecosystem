@@ -56,6 +56,23 @@ export class IntelligenceRouter {
         let verification_required = isVerification || riskScore > 0.6;
         let cost_sensitivity = 0.5;
 
+        // Fetch Historical Dissent for ANFIS feedback loops
+        let history_avg_dissent = 0.1;
+        try {
+            const { data: priors } = await supabase.from('trinity_domain_priors').select('current_divergence').limit(5);
+            if (priors && priors.length > 0) {
+                history_avg_dissent = priors.reduce((sum, p) => sum + (p.current_divergence || 0), 0) / priors.length;
+            }
+        } catch(e) {}
+        
+        console.log(`[ANFIS] 📜 Historical Dissent Extracted: ${history_avg_dissent.toFixed(2)}`);
+
+        // Fuzzy rules blending History 
+        if (history_avg_dissent > 0.2) {
+             console.log(`[ANFIS] ⚠️ High historical dissent detected. Pushing verification sensitivity higher.`);
+             verification_required = true;
+        }
+
         if (titleAndDesc.match(/audit|complex|bft|consensus|stress|synthesis|verify/i)) complexity = 0.8;
         if (titleAndDesc.match(/simple|draft|warmup|scan/i)) complexity = 0.2;
         
