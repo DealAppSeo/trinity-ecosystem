@@ -1,5 +1,5 @@
 # apps/rust-brain/Dockerfile
-FROM rust:1.76 as builder
+FROM rust:1.85 as builder
 WORKDIR /usr/src/app
 COPY . .
 RUN cargo install --path .
