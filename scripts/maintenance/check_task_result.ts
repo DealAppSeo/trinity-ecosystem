@@ -3,7 +3,7 @@ import path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 async function checkTask(id: number) {
-    const { supabase } = await import('../lib/supabase');
+    const { supabase } = await import('../../lib/supabase');
     const { data: task, error } = await supabase
         .from('trinity_tasks')
         .select('*')

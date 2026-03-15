@@ -3,13 +3,15 @@ const fs = require('fs');
 const path = require('path');
 
 async function verifyPhase_4_8() {
-    console.log('🔍 Starting Phase 4.8 Verification (ZKP Reputation Integrity)...\n');
+    console.log('🔍 Starting Phase 4.8 Verification (Recursive ZKP Reputation Integrity)...\n');
 
     // 1. Files Verification
     const filesToCheck = [
-        'circuits/repid_threshold.circom',
+        'circuits/repid_recursive.circom',
+        'circuits/repid_recursive_final.zkey',
+        'circuits/verification_key.json',
         'lib/guardrail/ZKPReputationBadge.ts',
-        'app/api/reputation/proof/route.ts'
+        'scripts/self_audit_agent.ts'
     ];
 
     console.log('--- 📂 Files Verification ---');
@@ -24,20 +26,22 @@ async function verifyPhase_4_8() {
 
     // 2. Logic Verification (Grep Patterns)
     console.log('\n--- 🧠 Logic Verification (Patterns) ---');
-    const circuitContent = fs.readFileSync(path.join(process.cwd(), 'circuits/repid_threshold.circom'), 'utf8');
+    const circuitContent = fs.readFileSync(path.join(process.cwd(), 'circuits/repid_recursive.circom'), 'utf8');
     const badgeContent = fs.readFileSync(path.join(process.cwd(), 'lib/guardrail/ZKPReputationBadge.ts'), 'utf8');
     const agentContent = fs.readFileSync(path.join(process.cwd(), 'lib/agent/ConstitutionalAgent.ts'), 'utf8');
 
-    if (circuitContent.includes('GreaterThan(32)')) console.log('✅ Found correct Circom comparator syntax');
-    if (circuitContent.includes('threshold - 1')) console.log('✅ Found inclusive threshold logic (>=)');
+    if (circuitContent.includes('GreaterEqThan(32)')) console.log('✅ Found optimized GreaterEqThan(32) logic');
+    if (circuitContent.includes('Poseidon(3)')) console.log('✅ Found Poseidon history provenance hashing');
+    if (circuitContent.includes('RepIDRecursiveProof')) console.log('✅ Found recursive aggregator template');
 
     if (badgeContent.includes('snarkjs.groth16.fullProve')) console.log('✅ Found snarkjs integration in Badge Manager');
-    if (badgeContent.includes('generateSimulatedProof')) console.log('✅ Found high-fidelity simulation fallback');
+    if (badgeContent.includes('historyHash')) console.log('✅ Found history hash provenance integration');
 
     if (agentContent.includes('zkpBadgeGenerator')) console.log('✅ Found ZKP import in ConstitutionalAgent');
     if (agentContent.includes('authorizeTransaction')) console.log('✅ Found authorizeTransaction gate in ConstitutionalAgent');
+    if (agentContent.includes('requestZKPProof')) console.log('✅ Found bidding-ready ZKP request hook');
 
-    console.log('\n🏁 Phase 4.8 Verification Complete.');
+    console.log('\n🏁 Phase 4.8 (Recursive ZKP) Verification Complete.');
 }
 
 verifyPhase_4_8().catch(console.error);

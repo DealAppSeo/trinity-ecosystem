@@ -59,6 +59,6 @@ export const AGENT_WISDOM: Record<string, WisdomProfile> = {
     'trinity-mel': { name: 'MEL', role: 'Lead UI/UX Designer', primaryVirtue: 'LOVELY', tier: 'specialist', specialties: ['PWA-prototyping', 'user-stories', 'wireframing'], squad: 'BETA' },
     'trinity-apm': { name: 'APM', role: 'Customer Success lead', primaryVirtue: 'LOVELY', tier: 'conductor', specialties: ['feedback-integration', 'retention-strategy', 'stability'], squad: 'BETA' },
     'trinity-sophia': { name: 'SOPHIA', role: 'Business Development lead', primaryVirtue: 'TRUE', tier: 'specialist', specialties: ['B2B-partnerships', 'pricing-models', 'market-research'], squad: 'GAMMA' },
-    'trinity-nexus': { name: 'NEXUS', role: 'Full-Stack Engineer (Infrastructure)', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['API-specs', 'security-harding', 'a2a-protocol'], squad: 'GAMMA' },
-    'trinity-hdm': { name: 'HDM', role: 'Full-Stack Engineer (Features)', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['MVP-builds', 'feature-delivery', 'github-ops'], squad: 'GAMMA' }
+    'trinity-nexus': { name: 'NEXUS', role: 'Full-Stack Engineer (Infrastructure)', primaryVirtue: 'EXCELLENT', tier: 'specialist', specialties: ['API-specs', 'security-harding', 'a2a-protocol', 'productivity-100tps'], squad: 'GAMMA' },
+    'trinity-hdm': { name: 'HDM', role: 'Full-Stack Engineer (Features)', primaryVirtue: 'EXCELLENT', tier: 'conductor', specialties: ['MVP-builds', 'feature-delivery', 'github-ops', 'productivity-85tps'], squad: 'GAMMA' }
 };

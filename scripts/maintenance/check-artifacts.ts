@@ -7,7 +7,7 @@ async function checkArtifacts() {
     console.log('🔍 Checking for artifacts...');
 
     // Dynamic import to ensure dotenv.config() has run
-    const { supabase } = await import('../lib/supabase');
+    const { supabase } = await import('../../lib/supabase');
 
     const { data: artifacts, error } = await supabase
         .from('trinity_artifacts')

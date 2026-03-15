@@ -1,0 +1,11 @@
+{
+  "verified": true,
+  "network": "Base Sepolia",
+  "hash": "0x92be19f78a23bdd93cfa2fa8bb5a64de937915cd1f3bf9b9276e6294f8a8b978",
+  "blockNumber": "38887590",
+  "from": "0xdf6b8215d193b11b4903d223729c3cf7a6de271d",
+  "to": "0x8004f9998fe4af7c4489a6d94de301200e72a494",
+  "status": "MINED_AND_SUCCESSFUL",
+  "gasUsed": "21000",
+  "explorerLink": "https://sepolia.basescan.org/tx/0x92be19f78a23bdd93cfa2fa8bb5a64de937915cd1f3bf9b9276e6294f8a8b978"
+}

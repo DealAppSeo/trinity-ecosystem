@@ -1,4 +1,5 @@
 import { Task, ProviderConfig, WisdomProfile } from './types';
+import { OpenAIEmbeddings } from "@langchain/openai";
 import { AGENT_WISDOM } from './wisdom';
 import { UnifiedServiceRegistry, ServiceDefinition, ServiceTier } from './UnifiedServiceRegistry';
 import { RedisAdapter } from './RedisAdapter';
@@ -324,6 +325,61 @@ export class IntelligenceRouter {
             console.log(`[ROUTER] 💸 Recorded spend for ${providerKey}: $${cost.toFixed(4)}. Total today: $${(currentSpend + cost).toFixed(4)}`);
         } catch (e) {
             console.error('[ROUTER] Failed to record spend:', e);
+        }
+    }
+
+    /**
+     * PGVector Semantic Cache mechanism intercepting LLM invocations.
+     * Cuts token spend by returning exact matches for conceptually identical queries.
+     */
+    public async invokeWithSemanticCache(prompt: string, llm: any, providerName: string): Promise<string> {
+        try {
+            const embeddings = new OpenAIEmbeddings({ modelName: "text-embedding-3-small" });
+            const [query_embedding] = await embeddings.embedDocuments([prompt]);
+            
+            // Search semantic_cache via RPC
+            const { data: matches, error } = await supabase.rpc('match_semantic_cache', {
+                query_embedding,
+                match_threshold: 0.92,
+                match_count: 1
+            });
+
+            if (matches && matches.length > 0) {
+                const hit = matches[0];
+                console.log(`[SEMANTIC CACHE] ⚡ Hit! Similarity: ${(hit.similarity * 100).toFixed(1)}%. Provider: ${hit.provider_used}`);
+                
+                // Track usage efficiency metric
+                const estimatedTokens = Math.floor(prompt.length / 4);
+                await supabase.from('provider_usage_log').insert({
+                    provider_used: providerName,
+                    task_type: 'CACHE_HIT',
+                    tokens_in: 0,
+                    tokens_out: 0,
+                    cost_usd: 0,
+                    created_at: new Date().toISOString()
+                }).then(()=>{}).catch(()=>{});
+                
+                return hit.response_text;
+            }
+
+            console.log(`[SEMANTIC CACHE] 🐢 Miss for ${providerName}. Sourcing from LLM...`);
+            const aiRes = await llm.invoke(prompt);
+            const responseText = aiRes.content.toString();
+
+            // Store result in cache asynchronously
+            supabase.from('semantic_cache').insert({
+                query_embedding,
+                query_text: prompt,
+                response_text: responseText,
+                provider_used: providerName,
+                tokens_saved: 0
+            }).then(() => {}).catch(e => console.error("[SEMANTIC CACHE] Store error:", e.message));
+
+            return responseText;
+        } catch (e: any) {
+            console.warn(`[SEMANTIC CACHE] Failed (${e.message}), falling back to direct LLM call.`);
+            const aiRes = await llm.invoke(prompt);
+            return aiRes.content.toString();
         }
     }
 }

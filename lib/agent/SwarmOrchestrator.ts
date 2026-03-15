@@ -20,10 +20,35 @@ export class SwarmOrchestrator {
     private static AGENT_MAP: Record<string, string[]> = {
         [SwarmState.RESEARCH]: ['trinity-veritas', 'trinity-torch', 'trinity-sophia'],
         [SwarmState.DESIGN]: ['trinity-mel', 'trinity-seraph'],
-        [SwarmState.IMPLEMENTATION]: ['trinity-axis', 'trinity-veritas', 'trinity-nexus'], // Axis for code, Veritas for security, Nexus for network
+        [SwarmState.IMPLEMENTATION]: ['trinity-axis', 'trinity-veritas', 'trinity-nexus'],
         [SwarmState.QUALITY_ASSURANCE]: ['trinity-torch', 'trinity-mel'],
-        [SwarmState.GOVERNANCE]: ['trinity-veritas', 'trinity-seraph', 'trinity-chesed']
+        [SwarmState.GOVERNANCE]: ['trinity-veritas', 'trinity-seraph', 'trinity-chesed', 'trinity-gcm']
     };
+
+    private static PHASE_START_TIME: Record<string, number> = {};
+    private static ADAPTIVE_PARALLEL: boolean = false;
+
+    /**
+     * Starts a new phase and tracks time for "Adaptive Sprint Sizing" (Grok Suggestion).
+     */
+    static startPhase(state: SwarmState) {
+        this.PHASE_START_TIME[state] = Date.now();
+        console.log(`[ORCH] 🚀 Phase START: ${state}`);
+    }
+
+    /**
+     * Ends a phase and adjusts next sprint intensity.
+     */
+    static endPhase(state: SwarmState) {
+        const duration = Date.now() - (this.PHASE_START_TIME[state] || Date.now());
+        console.log(`[ORCH] 🏁 Phase END: ${state} (Duration: ${duration}ms)`);
+
+        // If phase took too long (> 1 hour for complexity 1), enable parallelization
+        if (duration > 3600000) {
+            this.ADAPTIVE_PARALLEL = true;
+            console.log(`[ORCH] ⚡ Duration threshold exceeded. Enabling ADAPTIVE_PARALLEL for next phase.`);
+        }
+    }
 
     /**
      * Determines the next step in a complex workflow using LangGraph-style state transitions.
@@ -56,13 +81,23 @@ export class SwarmOrchestrator {
                 };
             }
 
-            // [ANTIGRAVITY] Self-Healing: If evaluation is low, loop back to previous state or escalate
+            // [ANTIGRAVITY] Self-Healing: If evaluation is low, loop back or escalate
             if (evaluation.score < 40) {
-                return {
-                    nextAgent: meta.prev_agent || 'trinity-veritas',
-                    nextState: currentState, // Retry current state
-                    instruction: `Your previous work was flagged with low confidence (${evaluation.score}). Please refine or escalate. Critique: ${evaluation.critique || 'Unknown error'}`
-                };
+                // FALLBACK TO MOCK (Antifragile Fallback - Grok Suggestion)
+                if (evaluation.critical_error) {
+                    console.warn(`[ORCH] 🛡️ Critical error detected in implementation. Falling back to semantic mock.`);
+                    handoff = {
+                        nextAgent: 'trinity-nexus', // Engineering Lead for mock stabilization
+                        nextState: SwarmState.IMPLEMENTATION,
+                        instruction: `Implementation FAILED. Switching to ANFIS-MOCK mode for stability. Please log details and request human/Grok directive.`
+                    };
+                } else {
+                    return {
+                        nextAgent: meta.prev_agent || 'trinity-veritas',
+                        nextState: currentState, // Retry current state
+                        instruction: `Your previous work was flagged with low confidence (${evaluation.score}). Please refine or escalate. Critique: ${evaluation.critique || 'Unknown error'}`
+                    };
+                }
             }
 
             // [PHASE 8] Constitutional Handshake & A2A Bridge

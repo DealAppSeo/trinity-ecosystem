@@ -91,8 +91,8 @@ export const useTrinityController = () => {
                 const minutesIdle = (now - lastSeenTime) / 60000;
 
                 // Thresholds
-                const isActive = minutesIdle < 5; // 5 mins active window
-                const isIdle = minutesIdle >= 5 && minutesIdle < 60; // Amber threshold (Start at 5 to close the gap)
+                const isActive = minutesIdle < 15; // 15 mins active window
+                const isIdle = minutesIdle >= 15 && minutesIdle < 60; // Amber threshold (Start at 15 to close the gap)
 
                 // Tiered Logic
                 // Green: Active + Has recent task activity
@@ -149,7 +149,11 @@ export const useTrinityController = () => {
             if (heartbeatData) setHeartbeats(heartbeatData);
 
             // Fetch Unified Stats (Savings + Truths)
-            const statsRes = await fetch('/api/stats');
+            const statsRes = await fetch('/api/stats', {
+                headers: {
+                    'x-trinity-admin-key': localStorage.getItem('trinity_admin_key') || ''
+                }
+            });
             const unifiedStats = statsRes.ok ? await statsRes.json() : null;
 
             const calculatedActiveAgents = enrichedAgents.filter((a: any) => ['active', 'online', 'green', 'blue', 'amber'].includes(a.status)).length;
@@ -165,7 +169,11 @@ export const useTrinityController = () => {
             });
 
             // [PHASE 10] Fetch Sovereign Ecosystem Data
-            const sovRes = await fetch('/api/sovereign');
+            const sovRes = await fetch('/api/sovereign', {
+                headers: {
+                    'x-trinity-admin-key': localStorage.getItem('trinity_admin_key') || ''
+                }
+            });
             if (sovRes.ok) {
                 const sovData = await sovRes.json();
                 setSovereignData(sovData);

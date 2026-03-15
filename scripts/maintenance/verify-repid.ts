@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
-import { ConstitutionalAgent } from '../lib/agent/ConstitutionalAgent';
+import { ConstitutionalAgent } from '../../lib/agent/ConstitutionalAgent';
 import { createClient } from '@supabase/supabase-js';
 
 async function verifyRepID() {

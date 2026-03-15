@@ -59,11 +59,13 @@ export class BFTModel {
         // 4. Calculate agreement ratio (2/3 threshold check)
         const agreement = winner.count / results.length;
         const confidence = (winner.weight / (results.length * 100)) * 100;
+        const isConsensusMet = agreement >= 0.66; // Hardcoded Layer 3 gate
 
         return {
             consensus: winner.output,
             confidence: Math.min(100, confidence),
-            agreement
+            agreement,
+            isConsensusMet
         };
     }
 

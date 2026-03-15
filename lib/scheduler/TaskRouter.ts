@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 
 export class TaskRouter {
     private telegramToken: string = process.env.TELEGRAM_BOT_TOKEN || '';
-    private chatId: string = process.env.TELEGRAM_CHAT_ID || '';
+    private chatId: string = process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_OWNER_CHAT_ID || '';
 
     constructor() { }
 

@@ -96,6 +96,10 @@ export class ANFISRouter {
         let targetSquad: GroupId = 'GAMMA';
         let suggestedModel: any = 'mistral-small-3';
 
+        // Grok-inspired Adaptive Provider Rotation
+        const currentPool = this.getProviderPool(targetSquad);
+        suggestedModel = currentPool[Math.floor(Math.random() * currentPool.length)];
+
         if (outputScore < 0.25) {
             targetSquad = 'ALPHA';
             suggestedModel = 'groq';
@@ -113,9 +117,31 @@ export class ANFISRouter {
         return {
             targetSquad,
             confidence: 0.85 + (Math.random() * 0.1), 
-            reasoning: `ANFIS Score ${outputScore.toFixed(3)} (Inputs: ${inputs.map(n => n.toFixed(2))}) mapped to ${targetSquad}.`,
+            reasoning: `ANFIS Score ${outputScore.toFixed(3)} (Inputs: ${inputs.map(n => n.toFixed(2))}) mapped to ${targetSquad}. Using ${suggestedModel}.`,
             suggestedModel
         };
+    }
+
+    /**
+     * getProviderPool: Returns available models for a squad.
+     * Can be dynamically rotated based on hallucination patterns.
+     */
+    private getProviderPool(squad: GroupId): string[] {
+        const pools: Record<GroupId, string[]> = {
+            'ALPHA': ['groq-llama-3', 'groq-mixtral'],
+            'BETA': ['local_4090_llama', 'local_4090_phi'],
+            'GAMMA': ['claude-3-5-sonnet', 'gemini-1.5-pro', 'gpt-4o'],
+            'ORCHESTRATION': ['deepseek-r1', 'gpt-4-turbo']
+        };
+        return pools[squad] || ['mistral-small'];
+    }
+
+    /**
+     * rotateProviders: Explicitly triggered by Swarm Intelligence (Grok Suggestion)
+     */
+    public forceRotate(squad: GroupId): void {
+        console.log(`[ANFIS] 🔄 Provider rotation forced for ${squad} due to detected pattern.`);
+        // In production, this would update a dynamic 'activeModel' in Supabase
     }
 
     // Static Helper for legacy compat (wraps instance)

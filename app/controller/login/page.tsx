@@ -19,6 +19,10 @@ export default function ControllerLogin() {
             // Set cookie for middleware
             document.cookie = `trinity_access=true; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
             document.cookie = `trinity_role=founder; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
+            
+            // Persist for API authentication
+            localStorage.setItem('trinity_admin_key', accessKey);
+            
             router.push('/pulse/watch');
         } else {
             setError('Invalid Access Key. Authority denied.');

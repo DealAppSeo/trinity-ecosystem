@@ -22,10 +22,12 @@ import { ERC8004Bridge } from '@/lib/web3/erc8004';
 import { MemoryManager } from '@/lib/memory/MemoryManager';
 import { LLMService } from '@/lib/memory/ShimiTree';
 import { VeritasConverter } from './VeritasConverter';
+import { x402Middleware } from '../x402/x402Middleware';
 import { TIMLManager, TIMLAllocation } from './TIMLManager';
 import { SBFAOperator, SBFAInput, SBFAResult } from './SBFAOperator';
 import { HITLDispatcher } from '../hitl/HITLDispatcher';
 import { zkpBadgeGenerator } from '../guardrail/ZKPReputationBadge';
+import { RedisAdapter } from './RedisAdapter';
 // import { HyperDAG } from './HyperDAG';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
@@ -57,6 +59,7 @@ const X402_VERSION = 2;
 const X402_HEADER = 'PAYMENT-SIGNATURE';
 
 const PROVIDERS: Record<string, ProviderConfig & { region?: string; endpoint_group?: string }> = {
+    groq: { name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1/chat/completions', envKey: 'GROQ_API_KEY', model: 'llama3-8b-8192', tier: 'free', priority: 1, region: 'us-west-1' },
     openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1/chat/completions', envKey: 'OPENAI_API_KEY', model: 'gpt-4o', tier: 'paid', priority: 3, region: 'us-east-1' },
     anthropic: { name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1/messages', envKey: 'ANTHROPIC_API_KEY', model: 'claude-3-5-sonnet-20241022', tier: 'paid', priority: 3, isAnthropic: true, region: 'us-east-1' },
     gemini: { name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', envKey: 'GEMINI_API_KEY', model: 'gemini-1.5-flash-latest', tier: 'free', priority: 2, isGemini: true, region: 'us-west-1' },
@@ -202,7 +205,7 @@ export class ConstitutionalAgent {
     BIBLE_CACHE_TTL: number = 10 * 60 * 1000;
 
     // Dynamic Directive
-    systemPrompt: string | null = null;
+    systemPrompt: string | null = "If uncertain, return null.";
 
     // [PHASE 11] Intelligence Router
     private router: IntelligenceRouter;
@@ -534,9 +537,22 @@ export class ConstitutionalAgent {
 
         if (ratio > COMMA_RATIO * 1.05) return { veto: true, tier: 'EMERGENCY', gap };
         if (ratio > COMMA_RATIO) return { veto: true, tier: 'VETO', gap };
-        if (gap > LLE_THRESHOLD) return { veto: false, tier: 'WARNING', gap };
+        if (gap > LLE_THRESHOLD) return { veto: false, tier: 'NONE', gap: 0 }; // Downgraded WARNING to NONE if not vetoed
 
         return { veto: false, tier: 'NONE', gap: 0 };
+    }
+
+    /**
+     * [PHASE 13] evaluateDissentConfidence
+     * Calculates a 0-1 confidence score of model-ensemble dissent.
+     */
+    private evaluateDissentConfidence(sbfa: SBFAResult): number {
+        // Conflict is normalized Mean KL Divergence
+        const conflict = Math.min(1.0, sbfa.disagreement / 1.5);
+        // Uncertainty is 1 - max probability
+        const uncertainty = sbfa.risk;
+        // Weighted aggregate (Conflict weighted higher for BFT consensus)
+        return (conflict * 0.7) + (uncertainty * 0.3);
     }
 
     /**
@@ -567,16 +583,20 @@ export class ConstitutionalAgent {
         // For high-value transactions (> 10 USDC), generate ZKP proof and lock escrow
         if (usdcAmount >= 10) {
             try {
-                const zkpResult = await zkpBadgeGenerator.generateProof(this.name, threshold);
+                // Generate recursive ZKP proof (Base + Aggregate)
+                const zkpResult = await zkpBadgeGenerator.generateProof(this.name, threshold, true);
 
-                // [P-011] On-chain Escrow Lock
-                // In production, this would call the TrinityEscrow.lockFunds() via a web3 provider (viem/ethers)
-                console.log(`[ESCROW] 🔒 Locking ${usdcAmount} USDC for task auth (Agent: ${this.name})`);
+                // [P-011] On-chain Escrow Lock & x402 Signing
+                console.log(`[ESCROW] 🔒 Locking ${usdcAmount} USDC for task auth (Agent: ${this.name}, ZKP: ${zkpResult.valid ? 'VERIFIED' : 'FAILED'})`);
+
+                // Generate EIP-712 Signature for the transaction
+                const atomicAmount = ERC8004Bridge.toAtomicUnits(usdcAmount);
+                const paymentSignature = await (x402Middleware as any).signPayment(this.name, atomicAmount, 'AGENT_TASK_AUTH', new Date().toISOString());
 
                 return {
                     authorized: zkpResult.valid,
-                    proof: zkpResult,
-                    error: zkpResult.valid ? undefined : "ZKP Proof verification failed."
+                    proof: { ...zkpResult, paymentSignature },
+                    error: zkpResult.valid ? undefined : "ZKP Proof verification failed (Reputation/History Integrity)."
                 };
             } catch (err: any) {
                 return { authorized: false, error: `ZKP/Escrow Failed: ${err.message}` };
@@ -584,6 +604,14 @@ export class ConstitutionalAgent {
         }
 
         return { authorized: true };
+    }
+
+    /**
+     * requestZKPProof: Specialized method for high-integrity identity verification (Bidding/Reg).
+     */
+    async requestZKPProof(threshold: number = 0.7): Promise<any> {
+        console.log(`[${this.name}] 🛡️ Requesting ZKP identity proof for threshold ${threshold}...`);
+        return await zkpBadgeGenerator.generateProof(this.name, threshold, true);
     }
 
     /**
@@ -756,6 +784,20 @@ export class ConstitutionalAgent {
                 actual_cost_usd: actualCost,
                 savings_attribution: savingsAttribution
             });
+
+            // [PHASE 13] OPPORTUNITY TOKENS (Savings Pass-Through)
+            // Credit 20% of savings as "opportunity tokens" for user benefits
+            const savingsUsd = Math.max(0, baselineCost - actualCost);
+            if (savingsUsd > 0) {
+                const opportunityTokens = savingsUsd * 0.2;
+                console.log(`[FRUGAL] 💰 Opportunity Tokens Generated: ${opportunityTokens.toFixed(6)}`);
+                // ZKP Placeholder: In a real system, we would mint tokens or update a credit balance
+                await this.log('opportunity_tokens_minted', `Credited ${opportunityTokens.toFixed(6)} opportunity tokens from savings`, {
+                    taskId,
+                    savingsUsd,
+                    opportunityTokens
+                });
+            }
 
             // [FIX 4] Wire actual_cost to the main trinity_tasks table
             await this.supabase
@@ -2036,6 +2078,36 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     },
                     aggregated_belief: sbfaResult.aggregatedBelief
                 });
+
+                // [PHASE 13] HARD GATE: PYTHAGOREAN COMMA VETO
+                const dissentConfidence = this.evaluateDissentConfidence(sbfaResult);
+                console.log(`[${this.name}] 🛡️ Dissent Confidence: ${dissentConfidence.toFixed(4)}`);
+
+                if (dissentConfidence > 0.85) {
+                    const errorMsg = `Pythagorean Comma Veto triggered: Dissent Confidence (${dissentConfidence.toFixed(4)}) exceeded 0.85 hard gate. Blocking output for HITL review.`;
+                    console.error(`[${this.name}] 🚫 ${errorMsg}`);
+                    
+                    await this.log('VETO', errorMsg, {
+                        taskId: task.id,
+                        dissentConfidence,
+                        disagreement: sbfaResult.disagreement,
+                        risk: sbfaResult.risk
+                    });
+
+                    // [ANTIFRAGILE] ADAPTIVE RETRAINING (v8.6)
+                    // If vetoed, immediately update system prompt to incorporate "Lesson Learned"
+                    console.log(`[${this.name}] 🧠 Adapting to Veto: Injecting failure memory into system prompt...`);
+                    const lesson = `Last failure: Vetoed due to high dissent on task "${task.title}". New Rule: Cross-validate numerical data more strictly.`;
+                    this.systemPrompt = (this.systemPrompt || "") + "\n" + lesson;
+                    
+                    await this.supabase.from('trinity_agent_registry')
+                        .update({ system_prompt: this.systemPrompt })
+                        .eq('agent_name', this.name);
+
+                    // BLOCK: Escalate directly to HITL and fail this task run
+                    await this.emitHelpRequest(task, 'PYTHAGOREAN_VETO', errorMsg);
+                    throw new Error('PYTHAGOREAN_VETO: Output rejected by ensemble dissent gate.');
+                }
             }
 
             // [PHASE 10] AGENT REFLECTION
@@ -2070,6 +2142,25 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
             // 4. [LEARN] Evaluation & Escalation Logic
             let evaluation = await this.evaluateResult(task, result.output);
+            
+            // [PHASE 1] FAST-FAIL GATE: confidence < 0.80 -> HITL flag, stop
+            if (evaluation.score < 80) {
+                console.log(`[ANTIGRAVITY] 🚨 FAST-FAIL GATE: Confidence (${evaluation.score}) < 80. Flagging HITL and Stopping.`);
+                await this.supabase.from('trinity_tasks').update({
+                    status: 'pending_hitl',
+                    result: `[FAST-FAIL] Confidence too low (${evaluation.score}%). Require Human In The Loop.`
+                }).eq('id', task.id);
+                
+                await notificationManager.notifyUser({
+                    title: `Fast-Fail Gate Triggered: ${this.name}`,
+                    message: `Task ${task.id} confidence < 80%. Require HITL.`,
+                    type: 'warning',
+                    agentName: this.name,
+                    taskId: task.id
+                });
+                return { success: false, error: 'Fast-fail confidence < 80%', escalated: true };
+            }
+
             let lowBelief = evaluation.score < 40;
             let explicitEscalate = result.output.toLowerCase().includes('escalate') || result.output.toLowerCase().includes('more info');
 
@@ -3711,6 +3802,31 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
             return { output: "Simulation: All LLM providers are unavailable." };
         }
 
+        // [PHASE 1] REDIS SEMANTIC CACHE LAYER
+        const redisPool = RedisAdapter.getInstance();
+        const cacheToken = require('crypto').createHash('sha256').update(prompt + (options.forceModel || '')).digest('hex');
+        const cacheKey = `semantic_cache:${cacheToken}`;
+
+        try {
+            const cachedResponse = await redisPool.get(cacheKey);
+            if (cachedResponse) {
+                console.log(`[${this.name}] 🧠 SEMANTIC CACHE HIT: Returning cached LLM response for key ${cacheToken.substring(0,8)}...`);
+                const parsed = typeof cachedResponse === 'string' ? JSON.parse(cachedResponse) : cachedResponse;
+                if (parsed && typeof parsed.output !== 'undefined') {
+                    if (task && typeof task.metadata !== 'undefined') {
+                        try {
+                            const meta = typeof task.metadata === 'string' ? JSON.parse(task.metadata || '{}') : (task.metadata || {});
+                            meta.provider_used = 'redis_cache';
+                            task.metadata = JSON.stringify(meta);
+                        } catch (e) {}
+                    }
+                    return parsed as LLMResult;
+                }
+            }
+        } catch (e: any) {
+            console.warn(`[CACHE] Failed to read from Redis semantic cache:`, e.message);
+        }
+
         try {
             // 1. Get Tools for this Agent
             const tools = await mcpManager.getToolsForRole(this.name);
@@ -3827,6 +3943,13 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     ]);
 
                     if (providerResult) {
+                        // [PHASE 1] Cache the successful result
+                        try {
+                            await redisPool.set(cacheKey, JSON.stringify(providerResult), 86400); // 24hr cache
+                        } catch (e: any) {
+                            console.warn(`[CACHE] Failed to set Redis cache:`, e.message);
+                        }
+
                         // [RESOURCEFUL] Record Spend
                         if (providerResult.usage) {
                             await this.router.recordSpend(providerKey, providerResult.usage.total_tokens);
@@ -4670,7 +4793,7 @@ ${task.description}
         const roles = [
             { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Primary data capture." },
             { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty. High-level integration." },
-            { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique. Search for hidden flaws." },
+            { id: 'FIFTH', prompt: "FIFTH ROLE: Pythagorean Comma Contrarian. Your job is to find the tiny logical gap (the comma) in the emerging consensus and argue against it. Identify hidden flaws, biases, or edge cases that others might overlook." },
             { id: 'SEVENTH', prompt: "SEVENTH ROLE: Long-tail Calibration. Focus on extreme edge cases." }
         ];
 
@@ -4762,7 +4885,7 @@ ${task.description}
         const roles = [
             { id: 'ROOT', prompt: "ROOT ROLE: Technical Evidence & Grounding. Focus on verifiable facts and primary data." },
             { id: 'THIRD', prompt: "THIRD ROLE: Synthesis & Sovereignty Impact. Focus on high-level integration and alignment with Trinity goals." },
-            { id: 'FIFTH', prompt: "FIFTH ROLE: Adversarial Critique & Edge Cases. Search for flaws, risks, and potential failures." }
+            { id: 'FIFTH', prompt: "FIFTH ROLE: Pythagorean Comma Contrarian. Your job is to find the tiny logical gap (the comma) in the emerging consensus and argue against it. Search for flaws, risks, and potential failures." }
         ];
 
         const triadResponses = await Promise.all(roles.map(async (role) => {

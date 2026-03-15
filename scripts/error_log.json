@@ -1,0 +1,6 @@
+{
+  "message": "",
+  "name": "ResourceExhaustedError",
+  "stack": "ResourceExhaustedError\n    at APIError.fromError (C:\\Users\\Cash4\\OneDrive\\Desktop\\trinity-ecosystem\\trinity-ecosystem\\node_modules\\@coinbase\\coinbase-sdk\\dist\\coinbase\\api_error.js:80:24)\n    at C:\\Users\\Cash4\\OneDrive\\Desktop\\trinity-ecosystem\\trinity-ecosystem\\node_modules\\@coinbase\\coinbase-sdk\\dist\\coinbase\\utils.js:37:52\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Axios.request (C:\\Users\\Cash4\\OneDrive\\Desktop\\trinity-ecosystem\\trinity-ecosystem\\node_modules\\axios\\dist\\node\\axios.cjs:4791:14)\n    at async Wallet.createWithSeed (C:\\Users\\Cash4\\OneDrive\\Desktop\\trinity-ecosystem\\trinity-ecosystem\\node_modules\\@coinbase\\coinbase-sdk\\dist\\coinbase\\wallet.js:202:24)\n    at async test (C:\\Users\\Cash4\\OneDrive\\Desktop\\trinity-ecosystem\\trinity-ecosystem\\scripts\\test-x402-live.js:35:22)",
+  "response": null
+}

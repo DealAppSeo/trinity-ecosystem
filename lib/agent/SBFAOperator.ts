@@ -20,6 +20,7 @@ export interface SBFAResult {
     risk: number;
     sPi: number;
     status: 'COLLAPSE' | 'ABSTAIN';
+    shouldRetrain: boolean; // v8.6 hook
     primaryResponse?: any;
 }
 
@@ -65,6 +66,10 @@ export class SBFAOperator {
         // [PHASE 13] Fast Path Belief Extraction: Decisive collapse above 0.7 confidence
         const status = maxProb > 0.7 ? 'COLLAPSE' : 'ABSTAIN';
 
+        // [ANTIFRAGILE] RETRAIN TRIGGER (v8.6)
+        // Highly controversial or highly uncertain results trigger adaptive retraining
+        const shouldRetrain = disagreement > 1.0 || (risk > 0.5 && status === 'ABSTAIN');
+
         return {
             aggregatedBelief,
             disagreement,
@@ -73,7 +78,8 @@ export class SBFAOperator {
             latency: tailLatency,
             risk,
             sPi,
-            status
+            status,
+            shouldRetrain
         };
     }
 
