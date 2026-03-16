@@ -68,33 +68,57 @@ export default function ConductorPage() {
     const [isSavingNS, setIsSavingNS] = useState(false);
 
     useEffect(() => {
-        fetch('/api/captain').then(r => r.json()).then(data => {
+        fetch('/api/captain', {
+            headers: {
+                'x-trinity-admin-key': process.env.NEXT_PUBLIC_TRINITY_ADMIN_KEY || ''
+            }
+        }).then(r => r.json()).then(data => {
             if (data?.north_star_directive) setNorthStar(data.north_star_directive);
         });
     }, []);
 
     const updateNorthStar = async () => {
         setIsSavingNS(true);
-        await fetch('/api/captain', {
+        const promise = fetch('/api/captain', {
             method: 'POST',
-            body: JSON.stringify({ action: 'UPDATE_NORTH_STAR', north_star: northStar })
+            body: JSON.stringify({ action: 'UPDATE_NORTH_STAR', north_star: northStar }),
+            headers: { 
+                'Content-Type': 'application/json',
+                'x-trinity-admin-key': process.env.NEXT_PUBLIC_TRINITY_ADMIN_KEY || ''
+            }
+        }).then(async res => {
+            if (!res.ok) throw new Error(await res.text() || 'Failed to update');
+            return res;
         });
+
+        toast.promise(promise, {
+            loading: 'Updating North Star...',
+            success: 'North Star directive updated!',
+            error: (err) => `Failed to update: ${err.message || 'Unknown error'}`
+        });
+
+        await promise.catch(() => {});
         setIsSavingNS(false);
     };
 
     const wakeTrinity = async () => {
-        toast.promise(
-            fetch('/api/captain', {
-                method: 'POST',
-                body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_WAKE' }),
-                headers: { 'Content-Type': 'application/json' }
-            }),
-            {
-                loading: 'Dispatching wake signal...',
-                success: 'Swarm wake signal sent!',
-                error: 'Failed to wake swarm'
+        const promise = fetch('/api/captain', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_WAKE' }),
+            headers: { 
+                'Content-Type': 'application/json',
+                'x-trinity-admin-key': process.env.NEXT_PUBLIC_TRINITY_ADMIN_KEY || ''
             }
-        );
+        }).then(async res => {
+            if (!res.ok) throw new Error(await res.text() || 'Failed');
+            return res;
+        });
+
+        toast.promise(promise, {
+            loading: 'Dispatching wake signal...',
+            success: 'Swarm wake signal sent!',
+            error: (err) => `Failed to wake swarm: ${err.message || 'Unknown error'}`
+        });
     };
 
     const resetTrinity = async () => {
@@ -103,39 +127,41 @@ export default function ConductorPage() {
         const promise = fetch('/api/captain', {
             method: 'POST',
             body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_RESET' }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'x-trinity-admin-key': process.env.NEXT_PUBLIC_TRINITY_ADMIN_KEY || ''
+            }
+        }).then(async res => {
+            if (!res.ok) throw new Error(await res.text() || 'Failed');
+            return res;
         });
 
         toast.promise(promise, {
             loading: 'Resetting system...',
             success: 'System reset completed!',
-            error: 'Failed to reset system'
+            error: (err) => `Failed to reset system: ${err.message || 'Unknown error'}`
         });
 
-        await promise;
+        await promise.catch(() => {});
         setTimeout(refresh, 1000);
     };
 
     const handleHITLApprove = async (id: string) => {
-        toast.promise(
-            supabase.from('trinity_tasks').update({ status: 'doing', metadata: { approved_by: 'FOUNDER' } }).eq('id', id),
-            {
-                loading: 'Approving task...',
-                success: 'Task approved and released!',
-                error: 'Failed to approve task'
-            }
-        );
+        const promise = supabase.from('trinity_tasks').update({ status: 'doing', metadata: { approved_by: 'FOUNDER' } }).eq('id', id).then(({ error }) => { if (error) throw error; });
+        toast.promise(promise, {
+            loading: 'Approving task...',
+            success: 'Task approved and released!',
+            error: (err) => `Failed to approve task: ${err.message || 'Unknown error'}`
+        });
     };
 
     const handleHITLReject = async (id: string) => {
-        toast.promise(
-            supabase.from('trinity_tasks').update({ status: 'cancelled', metadata: { rejected_by: 'FOUNDER' } }).eq('id', id),
-            {
-                loading: 'Rejecting task...',
-                success: 'Task rejected and stalled.',
-                error: 'Failed to reject task'
-            }
-        );
+        const promise = supabase.from('trinity_tasks').update({ status: 'cancelled', metadata: { rejected_by: 'FOUNDER' } }).eq('id', id).then(({ error }) => { if (error) throw error; });
+        toast.promise(promise, {
+            loading: 'Rejecting task...',
+            success: 'Task rejected and stalled.',
+            error: (err) => `Failed to reject task: ${err.message || 'Unknown error'}`
+        });
     };
 
     // --- SHARE FEATURE ---
