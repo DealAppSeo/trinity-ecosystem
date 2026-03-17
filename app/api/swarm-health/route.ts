@@ -26,6 +26,27 @@ export async function GET() {
 
         if (backlogError) throw backlogError;
 
+        // Offline Agents Check (> 10 mins)
+        try {
+            const { data: offlineAgents } = await supabase
+                .from('trinity_agent_registry')
+                .select('agent_name')
+                .lt('last_active', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+                .not('agent_name', 'in', '("trinity-ecosystem","trinity-science","trinity-symphony")');
+            
+            if (offlineAgents && offlineAgents.length > 0) {
+                // Prevent extreme spam using a global var (works per serverless container)
+                const now = Date.now();
+                if (!global.lastOfflineAlert || (now - global.lastOfflineAlert) > 15 * 60 * 1000) {
+                    global.lastOfflineAlert = now;
+                    const offlineNames = offlineAgents.map(a => a.agent_name).join(', ');
+                    const { sendTelegramAlert } = require('@/lib/telegram/notify');
+                    await sendTelegramAlert(`⚠️ *AGENTS OFFLINE*\nThe following agents have missed their heartbeats (>10 mins):\n${offlineNames}`);
+                }
+            }
+        } catch(e) {}
+
+
         // 3. Recent Artifacts & Consensus (last 24h)
         const { data: recentArtifacts, error: artifactError } = await supabase
             .from('trinity_artifacts')

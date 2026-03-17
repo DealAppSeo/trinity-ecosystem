@@ -214,8 +214,9 @@ const isObserver = hasRole(['owner', 'admin', 'observer']);
 
 // --- Keyboard Config ---
 const commandCenter = Markup.keyboard([
-    ['📊 Health', '➕ Mission'],
-    ['💎 Pulse', '💰 Grants']
+    ['⚡ Wake', '❤️ Health', '📊 Status'],
+    ['📋 Tasks', '▶ Sprint', '✅ HITL'],
+    ['🤖 Agents', '💰 Spend', '📝 New Task']
 ]).resize();
 
 // --- Commands ---
@@ -252,7 +253,7 @@ _Type /status for real-time portfolio vitals._
     }
 });
 
-bot.command('tasks', isAdmin, async (ctx) => {
+bot.command('approve', isAdmin, async (ctx) => {
     const { data: pending, error } = await supabaseAdmin
         .from('approval_queue')
         .select('*')
@@ -578,14 +579,15 @@ async function executeIntent(ctx: any, intent: any) {
 async function handleWake(ctx: any) {
     await ctx.reply('🚀 Waking swarm...');
     try {
-        await fetch('https://controller.aitrinitysymphony.com/api/captain', {
+        // Pointing to Phase C Wake endpoint
+        await fetch('https://controller.aitrinitysymphony.com/api/agents/wake', {
             method: 'POST',
-            body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_WAKE' }),
+            body: JSON.stringify({}),
             headers: { 'Content-Type': 'application/json', 'x-trinity-admin-key': process.env.TELEGRAM_BOT_TOKEN || '' }
         });
-        await ctx.reply('✅ Swarm is awake.');
+        await ctx.reply('✅ Swarm awake signal sent.', commandCenter);
     } catch {
-        await ctx.reply('⚠️ Swarm wake signal sent, but could not confirm receipt.');
+        await ctx.reply('⚠️ Swarm wake signal sent, but could not confirm receipt.', commandCenter);
     }
 }
 
@@ -593,55 +595,114 @@ async function handleSprintStatus(ctx: any) {
     return ctx.reply(`ℹ️ *Available Sprint Commands*:
 - \`/sprint start\` (Runs all tiers)
 - \`/sprint start tier1\` (Runs just Warmup)
-- \`/status\` (Shows last sprint performance)`, { parse_mode: 'Markdown' });
+- \`/status\` (Shows last sprint performance)`, { parse_mode: 'Markdown', ...commandCenter });
 }
 
-async function handleAddTask(ctx: any, description: string) {
-    const priority = description.toLowerCase().includes('urgent') ? 'urgent' : 'normal';
-    
-    // We try to include 'title' if required by the DB schema, though the user omitted it. 
-    // Wait, let's use the exact DB schema from previous insert just replacing metadata to created_by if requested.
-    // The user requested:
-    const { data, error } = await supabaseAdmin
-        .from('trinity_tasks')
-        .insert({
-            description,
-            status: 'pending',
-            priority,
-            created_by: 'sean_telegram',
-            created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-    
-    if (error) return ctx.reply('❌ Failed: ' + error.message);
-    
-    return ctx.reply(
-        `✅ Task created\n` +
-        `📋 "${description}"\n` +
-        `Priority: ${priority.toUpperCase()}\n` +
-        `ID: ${data.id}`
-    );
+async function handleTasksList(ctx: any) {
+    const { data: pending } = await supabaseAdmin.from('trinity_tasks').select('*').in('status', ['pending', 'todo']).order('priority', { ascending: false }).limit(10);
+    if (!pending || pending.length === 0) return ctx.reply('📭 No pending tasks.', commandCenter);
+    let msg = `📋 *Pending Tasks*\n━━━━━━━━━━━━━━━━━━━━\n`;
+    pending.forEach(t => msg += `- [${t.agent_name || 'Unassigned'}] ${t.title || 'Task'} (Prio ${t.priority})\n`);
+    await ctx.replyWithMarkdown(msg, commandCenter);
 }
+
+async function handleReport(ctx: any) {
+    await ctx.reply('Generating morning report...', commandCenter);
+    await fetch('https://controller.aitrinitysymphony.com/api/agents/morning-report', {
+        headers: { 'x-trinity-admin-key': process.env.TELEGRAM_BOT_TOKEN || '' }
+    });
+}
+
+async function handleAgents(ctx: any) {
+    return handleHealth(ctx);
+}
+
+async function handleSpend(ctx: any) {
+    return ctx.reply('💰 *Spend Tracker*\n━━━━━━━━━━━━━━━━━━━━\nEstimated Cost: $0.00\n(Detailed telemetry to be enabled)', commandCenter);
+}
+
+async function handleNewTaskStart(ctx: any) {
+    const kb = Markup.inlineKeyboard([
+        [Markup.button.callback('NEXUS', 'task:NEXUS'), Markup.button.callback('TORCH', 'task:TORCH'), Markup.button.callback('VERITAS', 'task:VERITAS')],
+        [Markup.button.callback('SOPHIA', 'task:SOPHIA'), Markup.button.callback('GCM', 'task:GCM'), Markup.button.callback('MEL', 'task:MEL')],
+        [Markup.button.callback('APM', 'task:APM'), Markup.button.callback('ORCH', 'task:ORCH'), Markup.button.callback('SHOFET', 'task:SHOFET')]
+    ]);
+    await ctx.reply('Which agent?', kb);
+}
+
+// Inline keyboard callbacks for guided task creation
+bot.action(/task:(.+)/, async (ctx) => {
+    const agent = ctx.match[1];
+    const kb = Markup.inlineKeyboard([
+        [Markup.button.callback('🔴 Urgent', 'prio:urgent:' + agent), Markup.button.callback('🟡 Normal', 'prio:normal:' + agent), Markup.button.callback('🟢 Low', 'prio:low:' + agent)]
+    ]);
+    await ctx.editMessageText(`Agent selected: ${agent}\n\nPriority?`, kb);
+});
+
+bot.action(/prio:(.+):(.+)/, async (ctx) => {
+    const prioName = ctx.match[1];
+    const agent = ctx.match[2];
+    await ctx.deleteMessage();
+    await ctx.reply(`Describe the task for ${agent} (Priority: ${prioName}):`, {
+        reply_markup: {
+            force_reply: true,
+            selective: true
+        }
+    });
+});
 
 export async function handleTextMessage(ctx: any) {
+    // 1. Check for Force Reply for New Task Flow
+    if (ctx.message?.reply_to_message?.text && ctx.message.reply_to_message.text.includes('Describe the task for')) {
+        const replyText = ctx.message.reply_to_message.text;
+        const match = replyText.match(/Describe the task for (.+) \(Priority: (.+)\):/);
+        if (match) {
+            const agent = match[1];
+            const prioStr = match[2];
+            let priorityVal = 50;
+            if (prioStr === 'urgent') priorityVal = 100;
+            if (prioStr === 'low') priorityVal = 10;
+
+            const { data, error } = await supabaseAdmin.from('trinity_tasks').insert({
+                title: ctx.message.text.substring(0, 50),
+                description: ctx.message.text,
+                status: 'pending',
+                priority: priorityVal,
+                agent_name: agent,
+                created_at: new Date().toISOString()
+            }).select().single();
+
+            if (error) return ctx.reply('❌ Failed: ' + error.message, commandCenter);
+            return ctx.reply(`✅ Task queued\nAgent: ${agent} | Priority: ${priorityVal}\n'${ctx.message.text}'\nTask ID: #${data.id}`, commandCenter);
+        }
+    }
+
     const text = ctx.message?.text?.toLowerCase().trim() || '';
     if (text.startsWith('/')) return;
     
-    if (text.includes('health') || text.includes('status'))
-        return handleHealth(ctx);
-    if (text.includes('wake'))
-        return handleWake(ctx);
+    // Explicit matches for the 3x3 keyboard
+    if (text.includes('health') || text === '❤️ health') return handleHealth(ctx);
+    if (text.includes('wake') || text.includes('⚡ wake')) return handleWake(ctx);
+    if (text.includes('status') || text === '📊 status') return StatusCommandHandler.handleStatus(ctx);
+    if (text.includes('tasks') || text === '📋 tasks') return handleTasksList(ctx);
+    if (text.includes('sprint') || text === '▶ sprint') return handleSprintStatus(ctx);
+    if (text.includes('hitl') || text === '✅ hitl') {
+        const msg = ctx.message;
+        msg.text = '/approve';
+        return handleUpdate({ ...ctx.update, message: msg } as any); // Redirects to /approve handler later
+    }
+    if (text.includes('agents') || text === '🤖 agents') return handleAgents(ctx);
+    if (text.includes('spend') || text === '💰 spend') return handleSpend(ctx);
+    if (text.includes('new task') || text === '📝 new task') return handleNewTaskStart(ctx);
+
     if (text.startsWith('task:') || text.includes('add task')) {
         const desc = text.replace(/^task:/i, '').replace('add task', '').trim();
-        return handleAddTask(ctx, desc);
+        // Fallback for old fast-path
+        return handleNewTaskStart(ctx);
     }
-    if (text.includes('sprint'))
-        return handleSprintStatus(ctx);
     
-    // Complex intent -> DeepSeek parser
-    const intent = await parseIntent(text);
-    return executeIntent(ctx, intent);
+    // Complex intent fallback
+    return ctx.reply(`🤔 I've noted that. If you'd like me to start a new mission, use "📝 New Task".`, commandCenter);
 }
 
 bot.on('text', async (ctx) => {

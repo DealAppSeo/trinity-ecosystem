@@ -1,0 +1,331 @@
+HYPERDAG PROTOCOL
+ARTIFACT 1: Complete Patent Portfolio
+All Patents · All Claims · All Features · All Benefits
+Sean Patrick Goodwin · March 2026 · ATTORNEY-CLIENT PRIVILEGED
+This artifact presents every patent in the HyperDAG portfolio — filed and pending — with full claims, features, and benefits in one place. Use alongside Artifact 2 (Feature/Benefit Matrix) to determine optimal claim placement and identify combination opportunities.
+FILING PRIORITY — BEFORE MARCH 22, 2026 HACKATHON SUBMISSION:
+P-013 (DBT→SBT)  ·  P-014 (Night Shift)  ·  P-015 (Multi-Chain RepID)  ·  P-016 (Data Fabric)
+The hackathon video is a public reduction-to-practice event. Anything demonstrated without a filed provisional is unprotected.
+FILED PROVISIONALS — August 2025
+Eleven provisionals filed August 2025. Claims below are reconstructed from technical documentation. Grok must verify against actual filing language and flag any discrepancies before non-provisional conversion.
+P-001  
+HyperDAG Core DAG Architecture
+Status: 
+FILED Aug 2025
+   |   Products: HyperDAG Protocol · All Products
+Core Novelty
+Extension of directed acyclic graph structure with hyperedges enabling multi-dimensional, parallel task routing across AI agent networks. The foundational infrastructure patent on which all other HyperDAG patents depend.
+Benefits
+Enables trustworthy multi-agent AI coordination at scale. Every downstream patent builds on this foundation. Licensing value: any multi-agent AI system using DAG-based routing.
+Grok Note
+Grok: Confirm P-001 does not inadvertently claim ANFIS routing or BFT consensus — those belong in P-004 and P-005 respectively.
+Claims
+Claim 1 (System): A directed acyclic graph computing system wherein graph edges are replaced by hyperedges capable of connecting more than two nodes simultaneously, enabling parallel multi-agent task routing
+Claim 2 (Method): A task routing method using hyperedge traversal wherein a single task instruction can activate multiple agent nodes in parallel without sequential dependency chains
+Claim 3 (Fault Tolerance): The system of Claim 1 wherein hyperedge routing automatically reroutes around failed nodes, maintaining task completion with degraded agent availability
+Claim 4 (Agent Hierarchy): A hierarchical agent organization method using HyperDAG structure comprising sensory input agents, interneuron processing agents, motor output agents, and orchestration agents
+Claim 5 (DAG + BFT): The system of Claim 1 further comprising Byzantine Fault Tolerant consensus at designated consensus nodes within the DAG structure
+⚠️  Overlap / Strategic Note: Low overlap risk. Foundation patent — keep claims architectural/structural. Do not claim ANFIS routing mechanics here (P-004) or consensus methods (P-005).
+P-002  
+Multiplicative GNN + HyperDAG Multi-Agent Coordination
+Status: 
+FILED Aug 2025 | NON-PROV DEADLINE: Aug 17 2026 ⚠️
+   |   Products: NEXUS CRE · Trinity · HyperDAG
+Core Novelty
+Combination of HyperDAG hyperedge routing WITH Multiplicative Graph Neural Network convolution using golden ratio φ=1.618 as a scaling factor in the MultiplicativeConv layer — creating stable attractor basins in routing weight space. Novel combination not found in prior art.
+Benefits
+Enables: stable multi-agent routing at scale, ZKP-gated reputation, verifiable agent coordination. Licensing targets: any enterprise deploying multi-agent AI systems, autonomous vehicle coordination, supply chain AI, healthcare AI orchestration.
+Grok Note
+Grok: P-002 non-provisional deadline August 17, 2026 — attorney engagement MUST begin by June 1, 2026. This is the most valuable patent in the portfolio and the most urgent.
+Claims
+Claim 1 (System): A multi-agent AI coordination system wherein a HyperDAG structure routes tasks between agents using multiplicative graph neural network weights scaled by the golden ratio φ = 1.61803398875
+Claim 2 (φ Stability): A routing weight stabilization method wherein multiplicative convolution with φ ensures routing weights remain in a mathematically stable attractor basin, preventing runaway weight divergence
+Claim 3 (ZKP Reputation): A system wherein agent reputation scores are stored as zero-knowledge proof commitments, enabling reputation-gated task routing without revealing underlying performance data
+Claim 4 (Recursive Learning): A method of adaptive HyperDAG weight adjustment based on task outcome logs with measurable learn gain = (post_weight - pre_weight) / recursion_depth
+Claim 5 (Hybrid ZKP Switch): A dynamic ZKP selection method switching between SNARK proofs for latency-sensitive operations and STARK proofs when risk score > 0.85
+Claim 6 (3x3+3 Structure): A neuromorphic agent organization method comprising three 3-agent squads (sensory, interneuron, motor) plus three orchestration agents, routed via HyperDAG hyperedges
+Claim 7 (BYO Agnostic): The system of Claim 1 further comprising a credential abstraction layer enabling substitution of LLM providers, wallets, and identity systems without modifying core routing logic
+Claim 8 (CRE Application): Application of Claims 1-4 to commercial real estate underwriting wherein GNN embeddings represent property comps: h_v^(k) = σ(W^(k) · CONCAT(h_v^(k-1), AGG({h_u^(k-1): u ∈ N(v)})))
+Claim 9 (Multi-Chain): The system of Claim 3 wherein ZKP reputation proofs are portable across EVM and non-EVM blockchain networks without agent re-registration
+Claim 10 (STARK Fallback): The method of Claim 5 wherein STARK fallback is triggered by: dissent score > 0.85, origin risk flag, or historical anomaly pattern detected in recursive DB
+⚠️  Overlap / Strategic Note: ⚠️ CRITICAL: Do NOT include ANFIS routing formulas here — those belong exclusively in P-004. Do NOT include BFT veto threshold mechanics — those belong in P-005. P-002 claims the DAG/GNN structure; P-004 claims the fuzzy inference routing within it. Grok MUST verify this separation in the actual filing before non-provisional conversion.
+P-003  
+Hybrid Intelligent Agent System (HIAS) — IDENTITY UNKNOWN
+Status: 
+FILED Aug 2025 | CONTENTS UNCONFIRMED
+   |   Products: Unknown — needs verification
+Core Novelty
+The original P-003 filing contents are unknown from documentation. Grok's recommendation is to treat this as the HIAS patent covering the fusion of perception/reasoning/action agent architecture with wisdom synthesis tiers. VERIFY ACTUAL FILING CONTENTS IMMEDIATELY.
+Benefits
+Depends entirely on actual filing contents. If redirected to SBFA: enables bias-free AI consensus, reduces coordinated hallucination risk, regulatory compliance for AI system diversity requirements.
+Grok Note
+Grok: THIS IS THE MOST URGENT VERIFICATION NEEDED. What is P-003? Retrieve the actual filing immediately.
+Claims
+UNCONFIRMED — Grok must retrieve actual filing and list claims here
+Grok Option A: If P-003 covers agent type architecture (perception/reasoning/action) — keep as-is, ensure no BFT overlap
+Grok Option B: If P-003 overlaps with P-002 or P-005 — flag for consolidation strategy before non-provisional
+Recommended new scope if P-003 needs redirection: Cover SBFA (Stochastic Bias Fracture Array) multi-provider diversity as standalone claim
+Recommended Claim 1: A multi-agent AI system wherein agents in a consensus group are required to use LLM providers from distinct epistemic families, preventing coordinated hallucination through shared training biases
+Recommended Claim 2: A method of classifying LLM providers into epistemic families based on training organization, dataset provenance, and known failure mode profiles
+Recommended Claim 3: The system of Claims 1-2 applied to BFT consensus wherein the mathematical fault tolerance guarantee is augmented by the statistical guarantee that colluding agents cannot share identical hallucination patterns
+⚠️  Overlap / Strategic Note: ⚠️ HIGH RISK: Unknown contents mean unknown overlaps. Grok must identify P-003 actual claims before any other patent strategy decisions. If P-003 duplicates P-002 claims, both could be invalidated.
+P-004  
+ANFIS Intelligent LLM Routing + Latency as Opportunity Pattern (LAOP)
+Status: 
+FILED Aug 2025
+   |   Products: Trinity · TrustShell · TrustRails · TrustSquad · NEXUS CRE · All Products
+Core Novelty
+Two independently novel ideas combined: (1) ANFIS fuzzy inference for dynamic LLM cost-tier routing achieving 72.5% cost reduction; (2) LAOP — using inference latency as a productive opportunity by generating Socratic engagement questions while background processing continues. Neither existed in prior art in this combination.
+Benefits
+72.5% LLM cost reduction (proven metric). LAOP improves user engagement during wait times. Recursive adaptation improves routing efficiency over time. Licensing targets: any multi-LLM application, enterprise AI platforms, AI agent frameworks.
+Grok Note
+Grok: LAOP is genuinely unique — ensure Claim 2 language is broad enough to cover any form of using latency productively, not just Socratic questions. Consider: 'a method of using AI inference latency for any productive secondary action.' Also confirm P-006 (unknown) does not duplicate ANFIS claims.
+Claims
+Claim 1 (ANFIS Routing System): An AI task routing system using an Adaptive Neuro-Fuzzy Inference System comprising generalized bell membership functions μ_Aᵢⱼ(x) = 1/[1+((x-cᵢⱼ)/aᵢⱼ)^2bᵢⱼ] to dynamically route tasks to optimal LLM providers based on complexity, required accuracy, output type, and cost
+Claim 2 (LAOP Method): A method of using AI inference latency as a productive opportunity by simultaneously: (a) routing the query to background high-capability processing, and (b) generating a Socratic engagement question for the user using a fast low-cost model during the wait period
+Claim 3 (Tiered Cost Routing): A three-tier LLM routing method routing approximately 80% of volume to utility-tier models (~$0.27/M tokens), 15% to mid-tier, and 5% to frontier models, achieving at least 65% cost reduction versus always-frontier routing
+Claim 4 (φ Weight Stability): A routing weight stabilization method using φ = 1.61803398875 as the scaling factor in the ANFIS multiplicative convolution layer ensuring routing weights remain in a stable attractor basin with ε = 1e-8 numerical floor
+Claim 5 (Wisdom Tier Synthesis): A tiered multi-agent wisdom synthesis method wherein task complexity score determines which tier of agents synthesizes the response: individual agent (Tier 1), BFT consensus (Tier 2), or SHOFET arbitration (Tier 3)
+Claim 6 (Audit Trail): A method of generating a provenance record for each routed LLM call comprising: provider selected, ANFIS routing score, task complexity classification, token count, cost, latency, and output hash
+Claim 7 (BYO Agnostic): The system of Claim 1 wherein any LLM API key, wallet credential, or identity token can be substituted without modifying the ANFIS routing logic
+Claim 8 (Recursive Adaptation): The system of Claim 1 wherein ANFIS membership function parameters are updated based on measured routing outcomes, with learn gain = (post_accuracy - pre_accuracy) / recursion_depth
+Claim 9 (Hallucination Detection Integration): The method of Claim 5 wherein Tier 2 BFT consensus includes hallucination injection testing with 100% veto requirement before output delivery
+Claim 10 (Provider Diversity): The system of Claim 3 wherein providers selected for multi-agent consensus tasks are required to be from distinct epistemic families per SBFA methodology
+Claim 11 (Night Shift Integration): The system of Claim 1 further comprising a background scavenger agent that monitors remaining daily API capacity and assigns backlog tasks before provider daily limits reset
+Claim 12 (Domain Application): Application of Claims 1-4 to commercial real estate underwriting, trading signal generation, and compliance review workflows
+⚠️  Overlap / Strategic Note: LAOP (Claim 2) is the single most novel claim across the entire portfolio. No prior art exists for deliberately using inference latency as a Socratic engagement opportunity. Protect this claim broadly. Do NOT narrow it unnecessarily in provisional.
+P-005  
+BFT φ-Weighted Consensus with Pythagorean Comma Veto Override
+Status: 
+FILED Aug 2025
+   |   Products: Trinity · TrustRails · NEXUS CRE · TrustSquad
+Core Novelty
+Standard Byzantine Fault Tolerance augmented by two novel mechanisms: (1) φ-weighted virtue scoring of agent votes (not all agents vote equally — reputation history weights the vote); (2) Pythagorean Comma Veto Override — a minority agent with confidence > 0.85 can BLOCK the majority consensus, preventing the classic BFT failure mode of suppressing a correct minority.
+Benefits
+Zero-hallucination autonomous commerce. Mathematically prevents correct-minority suppression. On-chain audit of every veto event. Licensing targets: autonomous trading systems, clinical decision support, autonomous vehicle safety systems, any high-stakes autonomous AI.
+Grok Note
+Grok: The φ-weighted voting is the most defensible element of P-005. Ensure Claim 1 is broad enough to cover any non-linear reputation weighting, not just φ specifically. Consider: 'wherein agent vote weights are a superlinear function of historical performance scores.'
+Claims
+Claim 1 (φ-Weighted Votes): A Byzantine Fault Tolerant consensus method wherein agent votes are weighted by virtue scores: weight_i = φ^(repID_i/1000) where φ = 1.61803398875, producing non-linear reputation compounding
+Claim 2 (Veto Override): A consensus veto mechanism wherein a dissenting agent with confidence score > θ_veto (default 0.85) triggers a hard veto blocking consensus output regardless of majority vote count, preventing correct-minority suppression
+Claim 3 (HITL Escalation): The system of Claim 2 wherein a triggered veto escalates output to human-in-the-loop review rather than discarding it, ensuring correct-minority voices reach human decision-makers
+Claim 4 (KL Divergence Detection): A method of detecting Byzantine agent behavior using KL-divergence between an agent's current output distribution and its established behavioral baseline: D_KL(P||Q) > threshold triggers veto
+Claim 5 (On-Chain Validation): The method of Claim 2 wherein a veto trigger event generates a ValidationRequest() transaction on an ERC-8004 compatible Validation Registry, creating a tamper-proof on-chain audit record
+Claim 6 (Three-Ply BFT): A three-layer BFT method comprising: Layer 1 (majority vote with φ-weighting), Layer 2 (Pythagorean Comma veto gate), Layer 3 (HITL escalation), each independently blocking erroneous outputs
+Claim 7 (Autonomy Tiers): A method of determining agent autonomous execution authority based on BFT consensus confidence: JUST_DO_IT (9/12+ agreement, high RepID), DO_THEN_TELL (7-8/12), ASK_FIRST (< 7/12 or veto)
+Claim 8 (Judas Protocol): A method of detecting coordinated agent manipulation (Judas Agent) using KL-divergence monitoring of multiple agents simultaneously, triggering veto when coordinated drift pattern detected
+Claim 9 (Financial Application): Application of Claims 1-3 to autonomous trading systems wherein BFT consensus gates trade execution and Pythagorean Comma veto prevents execution of anomalous signals
+Claim 10 (Pythagorean Comma Analogy): The veto mechanism of Claim 2 named for and mathematically analogous to the Pythagorean comma — the harmonic rounding error in music theory that compounds catastrophically if uncorrected
+⚠️  Overlap / Strategic Note: P-005 and P-009 are closely related. STRATEGY: Keep separate. P-005 = the BFT system with veto. P-009 = the specific Pythagorean Comma drift detection formula that TRIGGERS the P-005 veto. Independent licensing value. P-009 Claim 1 should explicitly reference P-005 veto as the action triggered.
+P-006 through P-010 — CONTENTS UNKNOWN
+These five provisionals were filed August 2025 but their contents are unverified in any documentation reviewed. This is a critical gap — unknown claims create unknown overlap risks.
+Grok: RETRIEVE ALL FIVE FILINGS IMMEDIATELY. For each, confirm: title, core claims, and whether any claims duplicate P-001 through P-005 or P-009/P-011.
+Hypothesis for each based on numbering sequence:
+P-006: Possibly ANFIS variant or wisdom engine component — if so, consolidate into P-004 dependent claims
+P-007: Possibly HyperDAG variant — if so, consolidate into P-002 dependent claims
+P-008: Possibly payment/wallet system — if so, consolidate into P-011 or keep separate for x402 coverage
+P-010: Possibly CRE-specific method — if so, consolidate into P-012
+P-009  
+Pythagorean Comma Mathematical Drift Detection
+Status: 
+FILED Aug 2025
+   |   Products: Trinity (VERITAS agent) · TrustRails
+Core Novelty
+Specific mathematical method of detecting AI agent output drift using a harmonic gap metric analogous to the Pythagorean comma in music theory — the rounding error that compounds into catastrophic discord if uncorrected. Pre-trade drift detection before capital is deployed.
+Benefits
+Pre-trade protection against AI drift. On-chain verifiable drift events. Recursive sensitivity catches gradual drift missed by point-in-time detection. Licensing targets: any autonomous AI system, algorithmic trading, clinical AI, autonomous vehicles.
+Claims
+Claim 1 (Broad Method): A method of detecting output drift in AI language models by measuring the divergence between consecutive outputs using a harmonic gap metric analogous to the Pythagorean comma: the accumulated rounding error between 12 perfect fifths and 7 octaves in musical tuning
+Claim 2 (Pre-Trade Gate): Application of Claim 1 to autonomous trading systems wherein detected drift above threshold triggers a hard gate preventing trade execution until human review is completed
+Claim 3 (KL-Divergence Implementation): The method of Claim 1 wherein the harmonic gap metric is computed as KL-divergence D_KL(P_current||P_baseline) > 0.85 triggering the Pythagorean Comma Veto of P-005
+Claim 4 (Recursive Monitoring): A continuous monitoring method wherein VERITAS agent measures drift across N consecutive outputs, with sensitivity increasing recursively for gradual drift that single-measurement detection misses
+Claim 5 (Identity Spoof Detection): Extension of Claim 1 to detect agent identity spoofing wherein an agent's output distribution is compared against the behavioral profile registered in its ERC-8004 Identity Registry entry
+Claim 6 (Compound Error Prevention): A method of preventing Pythagorean comma-style error compounding in AI systems by detecting and correcting small systematic errors before they accumulate into large output failures
+Claim 7 (On-Chain Evidence): The method of Claim 3 wherein a veto trigger generates a ValidationRequest() with a Recall Network CID pointing to the full drift calculation evidence, enabling independent verification
+⚠️  Overlap / Strategic Note: P-009 triggers the P-005 veto. They are complementary: P-009 is the SENSOR, P-005 is the GATE. Claim 3 should explicitly reference P-005. Keep separate patents — independent licensing value (P-009 applies to any AI system needing drift detection, not just systems with BFT).
+P-011  
+RepID-Gated Payment Authorization for Autonomous AI Agents
+Status: 
+FILED Aug 2025
+   |   Products: Trinity · TrustShell · TrustRails · TrustSquad
+Core Novelty
+Using an on-chain reputation score as a dynamic authorization gate for AI agent payment execution — agents earn the right to spend autonomously through verified performance history. The RepID IS the agent's credit score and spending authorization.
+Benefits
+Agents earn spending authority through verified behavior. Zero-trust autonomous commerce. Every payment creates reputation evidence. Licensing targets: any autonomous AI payment system, DeFi agent protocols, enterprise AI procurement automation.
+Grok Note
+Grok: Claim 1 formula language is sensitive — do NOT include in any submission materials. Describe only as 'reputation-scaled payment threshold using logarithmic transaction weighting.'
+Claims
+Claim 1 (System): A payment authorization system for autonomous AI agents wherein transaction approval threshold T is a function of the agent's on-chain RepID score: T = floor(2000 × log₁₀(amount × 1000 + 1) × (1.5 − virtue_score)) [NOTE: DO NOT PUBLISH FORMULA UNTIL NON-PROV FILED]
+Claim 2 (Autonomy Tiers): A three-tier autonomous execution framework: JUST_DO_IT (RepID > 70, confidence > 0.8, amount < T), DO_THEN_TELL (medium parameters), ASK_FIRST (low RepID or high value)
+Claim 3 (Virtue Weighting): A reputation computation method weighting: accuracy, honesty, calibration, helpfulness, harm_avoidance — wherein each virtue is scored 0-1 and combined as: virtue_score = Σ(weight_i × virtue_i)
+Claim 4 (Logarithmic Scaling): A payment threshold formula using logarithmic scaling of transaction amount, preventing disproportionate restriction of micropayments while maintaining protection for large transactions
+Claim 5 (ERC-8004 Integration): The system of Claims 1-3 wherein RepID scores are stored in and retrieved from an ERC-8004 Reputation Registry smart contract, enabling cross-platform reputation verification
+Claim 6 (x402 Middleware): The system of Claim 1 wherein payment execution uses x402 HTTP payment protocol with reputation gate enforced at the middleware layer before the x402 payment request is transmitted
+Claim 7 (Feedback Loop): A reputation update method wherein x402 payment outcomes (success/failure/dispute) update agent RepID scores via ERC-8004 giveFeedback() with payment_proof_hash as evidence
+Claim 8 (Cross-Agent Authorization): A method of one agent authorizing another agent's payment execution based on delegated RepID authority scoped to a defined transaction limit and time window
+Claim 9 (Soulbound Linkage): The system of Claims 1-3 wherein agent RepID is linked to a human-verified Soulbound Token, ensuring autonomous spending authority traces to a legally accountable human principal
+⚠️  Overlap / Strategic Note: ⚠️ PATENT GATE: The specific formula in Claim 1 must NOT appear verbatim in public README, demo video, or any public document until the non-provisional is filed. The method can be described conceptually. The formula is the patentable implementation.
+P-012  
+NEXUS CRE Five-System Novel Combination Patent
+Status: 
+FILED (date TBC) — VERIFY FILING DATE
+   |   Products: NEXUS CRE Intelligence · NMGDA
+Core Novelty
+The Berkshire Principle patent: individual components have prior art, but the combination of ANFIS routing + BFT consensus + GNN cap rate estimation + ZKP privacy + ERC-8004 agent identity applied to commercial real estate underwriting has never existed before.
+Benefits
+Compresses 3-5 day CRE underwriting to 27 minutes. ZKP-private deal matching. GNN-grounded cap rates (eliminates stale comps). Licensing targets: CRE SaaS platforms, institutional lenders, property technology companies.
+Claims
+Claim 1 (Combination): A CRE underwriting system combining ANFIS-routed multi-agent LLM processing, BFT consensus on financial outputs, GNN cap rate estimation, ZKP deal matching, and ERC-8004 agent identity — producing verified underwriting in < 30 minutes
+Claim 2 (GNN Cap Rate): A cap rate estimation method using Graph Neural Network trained on verified comparable transactions: h_v^(k) = σ(W^(k) · CONCAT(h_v^(k-1), AGG({h_u^(k-1): u ∈ N(v)})))
+Claim 3 (XIRR Dual-Path): Dual independent XIRR computation with divergence flagging: NPV = Σᵢ CFᵢ/(1+r)^((dᵢ-d₀)/365) = 0; ε = 1e-8 convergence tolerance
+Claim 4 (Markov Vacancy): Probabilistic NOI using Markov vacancy chain: P(V_{t+1}=j|V_t=i) = M_{ij} — tenant-by-tenant state transitions replacing flat vacancy assumptions
+Claim 5 (LASSO Sensitivity): IRR driver identification using LASSO regression: β* = argmin_β{||y-Xβ||² + λ||β||₁} producing sparse sensitivity ranking of material risk drivers
+Claim 6 (ZK Deal Matching): Anonymous deal-to-capital matching using ZKP wherein both parties prove criteria compatibility without revealing identity until mutual consent
+Claim 7 (AI Verified Badge): A verification credential system for real estate deals wherein NEXUS engine verification of financial assumptions produces an on-chain verified badge viewable by capital deployers
+Claim 8 (DealPulse Notifications): A private notification system generating ZKP-verified event notifications without revealing underlying deal or investor identity
+⚠️  Overlap / Strategic Note: P-012 explicitly builds on P-002 (GNN), P-004 (ANFIS), P-005 (BFT), and ZKP methods as components. The combination patent is valid even when components have prior art. Ensure P-012 claims the COMBINATION, not the individual methods.
+NEEDS FILING — Before March 22, 2026
+P-013  
+DBT→SBT Human Accountability Chain for AI Agent Governance
+Status: 
+NEEDS FILING — Before March 22, 2026
+   |   Products: TrustShell · TrustRails · TrustSquad · Trinity · All
+Core Novelty
+A cryptographic accountability chain linking AI agent Delegated Bound Tokens (DBTs) to verified human Soulbound Tokens (SBTs) via ZKP proofs of legal status. Agents can only act within the scope of their human principal's verified legal authority. Pre-compliant with EU AI Act, FATF AML requirements, and anticipated US AI governance regulations.
+Benefits
+Pre-regulatory compliance moat. Enterprise buyers in regulated industries (banking, healthcare, government) cannot deploy AI agents without accountability chains — this IS the solution. Licensing targets: enterprise AI platforms, regulated industry AI deployments, government AI systems.
+Grok Note
+Grok: File this as provisional immediately. The regulatory landscape is moving fast — being the first filed provisional on AI agent accountability chains could be enormously valuable as regulations mandate this.
+Claims
+Claim 1 (System): A system enforcing human accountability for AI agent actions wherein each agent DBT is cryptographically linked to a human SBT via ZKP proof of legal status, scoping agent spending authority to human principal's verified legal capacity
+Claim 2 (4FA Conversion): A DBT-to-SBT conversion method requiring four-factor authentication: biometric (WebAuthn), hardware device attestation, knowledge factor (OTP), and geolocation check
+Claim 3 (ZKP Legal Proof): A method proving human principal legal status (age >18, non-sanctioned, non-incarcerated) using ZKP without revealing personal data: generateProof({private_status, public_threshold})
+Claim 4 (Chainlink Oracle Integration): The method of Claim 3 wherein legal status verification uses Chainlink oracle data from OFAC sanctions lists and public records as ZKP proof inputs
+Claim 5 (Minor Protection): The system of Claims 1-2 wherein agents linked to principals below legal age threshold are restricted from autonomous financial transactions regardless of RepID score
+Claim 6 (Revocation): A method of revoking agent SBT-linked authority upon verified legal status violation, automatically restricting autonomous spending scope
+Claim 7 (Antifragile Retry): A retry mechanism with exponential backoff for failed verification, escalating to HITL review after maximum retries: risk = dissent × (1 - repID/1000)
+Claim 8 (Regulatory Pre-Compliance): The system of Claims 1-3 architecturally satisfying EU AI Act Article 14 human oversight requirements for high-risk AI systems without requiring post-deployment modification
+Claim 9 (Terrorist/Criminal Screening): Application of Claims 3-4 to screen agent principals against international terrorism and criminal databases, preventing deployment of agents on behalf of sanctioned entities
+⚠️  Overlap / Strategic Note: Unique combination: DBT/SBT architecture (Vitalik SBT concept) + 4FA validation + ZKP legal proofs + autonomous spending scope restriction. The combination is novel. Individual components (ZKP KYC from Polygon ID, SBTs from Vitalik) are prior art but this combination for AI agent governance is not.
+P-014  
+Night Shift Autonomous Token Budget Scavenger Agent
+Status: 
+NEEDS FILING — Before March 22, 2026
+   |   Products: Trinity · TrustSquad · Any Multi-Provider LLM System
+Core Novelty
+An autonomous agent that monitors remaining daily API token capacity across multiple LLM providers and intelligently assigns backlog tasks before daily limits reset — converting paid-but-unused capacity (which expires at reset) into productive compute. Novel as an autonomous agent behavior pattern.
+Benefits
+20-40% effective capacity increase from paid subscriptions. Collective network learning improves routing for all participants. Zero-cost background intelligence improvement. Licensing targets: enterprise AI platforms paying for multi-provider LLM subscriptions.
+Claims
+Claim 1 (Method): A method of maximizing time-limited AI inference API allocations by monitoring remaining capacity, maintaining a prioritized backlog queue, and autonomously executing queued tasks before capacity expiration at daily reset
+Claim 2 (Multi-Provider): The method of Claim 1 applied across heterogeneous LLM providers with different capacity limits and reset schedules, optimally allocating tasks to maximize total value before each provider resets
+Claim 3 (ANFIS Prioritization): Task prioritization using ANFIS scoring based on: task_value, token_cost_estimate, remaining_capacity, task_urgency — ensuring highest-value tasks execute first within available budget
+Claim 4 (Semantic Cache Pre-screen): Pre-screening queued tasks against semantic cache before execution, preventing redundant API calls for substantially similar queries already answered within the reset window
+Claim 5 (Threshold Trigger): An autonomous trigger mechanism activating at configurable time threshold (e.g., 23:00) when remaining_capacity > 20% of daily limit
+Claim 6 (Learn Gain Metric): A method of measuring Night Shift productivity using learn_gain = (post_sprint_accuracy - pre_sprint_accuracy) / recursion_depth, with minimum target gain > 15% per cycle
+Claim 7 (Collective Learning): Application of Claim 1 to a network of agent squads wherein idle capacity runs collective benchmark tasks improving ANFIS routing for all network participants
+Claim 8 (Provider Arbitrage): A cost optimization method directing Night Shift tasks preferentially to providers with highest remaining free-tier capacity before using paid capacity
+⚠️  Overlap / Strategic Note: Verify P-014 does not duplicate any ANFIS claims in P-004. The ANFIS prioritization in Claim 3 is an APPLICATION of P-004 routing to a new context, not a re-claim of the routing method itself.
+P-015  
+Multi-Chain AI Agent RepID Portability via ZKP Bridge
+Status: 
+NEEDS FILING — Before March 22, 2026
+   |   Products: TrustRails · TrustShell · Trinity
+Core Novelty
+A ZKP-based method enabling AI agent reputation established on one blockchain to be verifiably ported to another without re-registration. The agent provides a ZKP proof of its Chain A reputation state, which Chain B accepts as valid initial reputation.
+Benefits
+Agents build reputation once, use everywhere. Enables multi-chain autonomous commerce. Licensing targets: cross-chain DeFi protocols, enterprise multi-chain AI deployments, Web3 gaming with multi-chain agents.
+Claims
+Claim 1 (Method): A method of transferring AI agent reputation between blockchain networks using ZKP proof of reputation state on source chain, accepted by destination chain registry without independent verification history
+Claim 2 (EVM to Non-EVM): The method of Claim 1 applied to EVM-to-Solana reputation transfer using chain-agnostic ZKP proof format
+Claim 3 (Reputation Floor): Cross-chain transfer applies discount factor for unverified destination history, providing reputation floor: dest_repID = source_repID × discount_factor
+Claim 4 (Bidirectional Sync): Reputation consistency maintenance across multiple chains via ZKP proofs within defined synchronization window
+Claim 5 (No Re-Registration): The specific method of avoiding agent re-registration on destination chain, preserving accumulated reputation rather than requiring fresh reputation building
+Claim 6 (ERC-8004 Compatible): The method of Claims 1-3 implemented using ERC-8004 Identity Registry on each chain as the reputation anchor, with cross-chain ZKP bridge connecting registries
+⚠️  Overlap / Strategic Note: Unique: no prior art for reputation portability across chains for AI agents specifically. Cross-chain identity bridges exist (e.g., LayerZero) but not for AI agent reputation scores in this combination.
+P-016  
+ANFIS-Routed Polyglot Decentralized Data Fabric with ZKP Access Control
+Status: 
+NEEDS FILING — Before March 22, 2026
+   |   Products: TrustRails · NEXUS CRE · HyperDAG Protocol
+Core Novelty
+A self-building, self-improving data infrastructure routing data to optimal storage (local cache, relational DB, IPFS, vector DB) using ANFIS scoring, with ZKP proofs controlling access. The combination of ANFIS routing + polyglot persistence + ZKP access + self-adapting schema is novel.
+Benefits
+65-75% storage cost reduction via intelligent tiering. ZKP-enforced data privacy without performance penalty. Self-healing schema prevents data pipeline failures. Licensing targets: enterprise data platforms, healthcare data infrastructure, financial services data lakes.
+Claims
+Claim 1 (System): A data storage system using ANFIS to route events to optimal storage based on risk score: if risk > 0.85 → ZKP-encrypt + shard to IPFS; else → local cache
+Claim 2 (ZKP Access): Access to IPFS-sharded sensitive data gated by ZKP proving authorization without revealing requester identity or underlying data
+Claim 3 (Self-Building Schema): Automatic schema adaptation wherein agents detect new data fields, reach BFT consensus on schema update, and apply without manual intervention
+Claim 4 (Recursive Improvement): ANFIS routing weights updated based on measured storage performance metrics with recursive adaptation: gain = (latency_before - latency_after) / recursion_depth
+Claim 5 (CDC Migration): Strangler fig legacy migration using Change Data Capture (CDC) tools monitoring legacy DB transaction logs and routing events to fabric in real-time
+Claim 6 (pgvector Integration): The system of Claim 1 wherein vector embeddings for semantic search are stored in pgvector extension within the relational tier, enabling semantic cache without additional database services
+Claim 7 (Multi-Agent Write): A method of coordinating concurrent multi-agent writes to the fabric using the BFT consensus of P-005 to resolve write conflicts
+⚠️  Overlap / Strategic Note: Verify ANFIS claims in Claim 1 are APPLICATION-LEVEL (routing data to storage) and do not duplicate the LLM routing claims in P-004. Same ANFIS method, different domain application — this is legitimate and provides broader coverage.
+NEW OPPORTUNITIES — File April 2026
+P-017  
+TrustSquad: Personal Four-Agent BFT Swarm with Idle Collective Learning
+Status: 
+NEEDS FILING — April 2026
+   |   Products: TrustSquad.dev
+Core Novelty
+A consumer-deployable four-agent AI squad: one infrastructure agent (COMPASS) plus three user-selected specialists using enforced LLM diversity, reaching BFT consensus before delivering outputs. Idle squads participate in collective network benchmarks, receiving routing improvements in exchange. Zero personal data disclosed via ZKP.
+Benefits
+Democratizes enterprise trust infrastructure for individuals. Idle learning creates compounding network value. Specialist marketplace creates platform business model. Licensing targets: consumer AI subscription services, enterprise team productivity tools.
+Claims
+Claim 1 (System): A personal AI agent system comprising one infrastructure agent and three user-selected specialist agents using enforced LLM diversity, requiring BFT consensus from at least 2-of-3 specialists before output delivery
+Claim 2 (Idle Learning): Inactive squads participate in collective network benchmarks contributing anonymous performance metrics to improve ANFIS routing for all participants, with ZKP ensuring zero user content disclosure
+Claim 3 (Specialist Marketplace): A marketplace for AI specialist configurations wherein third-party developers publish domain-specific agent profiles, with revenue sharing: 70% developer / 30% platform
+Claim 4 (BYOK Specialist): Each specialist uses user-provided LLM API key enabling cost optimization while platform trust infrastructure remains managed
+Claim 5 (Enforced Diversity): Three specialists required to use LLMs from different epistemic families preventing coordinated hallucination through shared training biases
+Claim 6 (RepID from Contribution): Idle benchmark participation contributes to squad collective RepID score, creating reputation incentive for idle-period contribution
+Claim 7 (COMPASS Infrastructure): The infrastructure agent managing ANFIS routing, semantic memory via pgvector, RepID verification, and session orchestration independently of specialist selection
+⚠️  Overlap / Strategic Note: P-017 builds on P-005 (BFT), P-004 (ANFIS), P-014 (idle learning), P-019 (SBFA) — cite these as prior art owned by same inventor. The consumer product application and idle collective learning exchange mechanism are the novel elements.
+P-018  
+Semantic Cache with Vector Embedding Pre-screening for Multi-Agent AI
+Status: 
+CONSIDER — April 2026
+   |   Products: Trinity · TrustSquad · All
+Core Novelty
+Pre-screening AI prompts against vector embedding cache before API calls, returning cached responses for queries with cosine similarity > configurable threshold. Applied to multi-agent swarms where shared cache eliminates redundant calls across agents.
+Benefits
+30-40% effective API cost reduction. Sub-millisecond response for repeated similar queries. Licensing targets: high-volume AI API consumers, enterprise chatbots, multi-agent frameworks.
+Claims
+Claim 1: A method of reducing AI inference API calls by pre-screening prompts against a vector embedding cache returning cached responses for queries with cosine similarity ≥ 0.92
+Claim 2: The method of Claim 1 applied to multi-agent swarms with shared cache reducing redundant calls across all agents
+Claim 3: Implementation using pgvector extension on existing PostgreSQL infrastructure, eliminating need for separate vector database services
+Claim 4: Cache invalidation method based on temporal decay and topic-specific volatility scores (e.g., market data caches expire faster than factual knowledge caches)
+⚠️  Overlap / Strategic Note: Check if semantic caching is already claimed within P-004 (ANFIS routing). If P-004 includes caching as part of the routing system, P-018 may be redundant or should be continuation claims. Verify before filing.
+P-019  
+Stochastic Bias Fracture Array (SBFA) Multi-Provider Diversity
+Status: 
+CONSIDER — April 2026
+   |   Products: Trinity · TrustSquad · All
+Core Novelty
+Mandating LLM provider diversity in consensus groups to prevent coordinated hallucination through shared training biases. Classifying providers into epistemic families and enforcing selection from different families per consensus group.
+Benefits
+Statistically near-zero probability of coordinated hallucination. Regulatory compliance for AI system diversity. Licensing targets: enterprise AI safety systems, regulated industry AI deployments.
+Claims
+Claim 1: A method of AI hallucination prevention requiring LLM providers in consensus groups to be from distinct epistemic families (different training organizations, datasets, architectures)
+Claim 2: A classification method for determining LLM epistemic family membership based on training organization, data provenance, and known failure mode profiles
+Claim 3: The method of Claim 1 applied to BFT consensus augmenting mathematical fault tolerance with statistical guarantee that colluding agents cannot share identical hallucination patterns
+Claim 4: A stochastic rotation method periodically reassigning providers to consensus groups to prevent long-term collusion patterns from forming
+⚠️  Overlap / Strategic Note: If P-003 (unknown) covers SBFA, consolidate P-019 into P-003 as dependent claims rather than filing separately. ONLY file P-019 as standalone if P-003 does not cover SBFA. Grok: check P-003 first.
+STRATEGIC DECISIONS — Grok Action Required
+DECISION 1: Consolidation vs. Separation Strategy
+Grok recommends consolidating P-005 into P-003 and P-009 into P-004 to reduce portfolio complexity.
+Claude recommends keeping all separate for independent licensing value.
+RECOMMENDED RESOLUTION: Keep P-004, P-005, P-009 separate. BFT systems (P-005) and drift detection (P-009) have independent licensing markets from routing (P-004). Consolidation reduces defensibility. File P-003 separately once contents identified.
+DECISION 2: Quantum-Resistant ZKP Claims
+Grok recommends adding quantum-resistant ZKP (STARK-based) claims across P-002, P-003, P-004.
+RECOMMENDED APPROACH: Add quantum-resistant STARK fallback as dependent claims within existing provisionals, not new patents. Specifically: P-005 Claim 11 (STARK-based veto validation), P-013 Claim 10 (quantum-resistant legal proof). Miden STARK is the specific technology — cite it in claims.
+DECISION 3: ERC-8004 Integration Breadth
+ERC-8004 appears as integration in P-005, P-009, P-011, P-013, P-015 — but there is no patent specifically on Trinity's ERC-8004 integration architecture itself.
+CONSIDER: A new provisional specifically claiming the integration of ERC-8004 all-three-registries (Identity + Reputation + Validation) with x402 payments and Recall Network memory as a novel trust stack. This is demonstrated in the hackathon and is patentable as a combination.
+Working title: 'Complete Trustless Agent Commerce Stack: ERC-8004 × x402 × Recall Network Integration'
+DECISION 4: Dual License Structure
+RECOMMENDED: HyperDAG Open Trust License (HOTL) based on Business Source License (BSL)
+Free for: individual developers, open source projects, non-profits, academic use, mission orgs (last/lost/least)
+Commercial license required: companies >$1M revenue, SaaS products, enterprise deployment, regulated industries
+Pricing: Startup $5K/year · Growth $25K/year · Enterprise $100K+/year
+BSL converts to Apache 2.0 after 4 years — keeps commercial window relevant while building open source community
+HyperDAG Protocol · Sean Patrick Goodwin · March 2026 · ATTORNEY-CLIENT PRIVILEGED — NOT FOR DISTRIBUTION

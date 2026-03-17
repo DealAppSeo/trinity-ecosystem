@@ -41,7 +41,15 @@ export class ApprovalQueue {
             throw error;
         }
 
+        try {
+            const { sendTelegramAlert } = require('./telegram/notify');
+            await sendTelegramAlert(`✅ *HITL REQUIRED*\nAgent: ${task.agent_id}\nTask: ${task.output_summary}\nUse /approve to review.`);
+        } catch (e) {
+            console.error('Failed to send HITL alert', e);
+        }
+
         return data;
+
     }
 
     /**

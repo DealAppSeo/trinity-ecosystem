@@ -105,7 +105,11 @@ export class HMASCoordinator {
         const approvedProposals = await this.applyVetoProtocol(proposals);
 
         if (approvedProposals.length === 0) {
-            console.error(`[HMAS] \u26a0\ufe0f EMERGENCY: All proposals blocked by Veto Protocol!`);
+            console.error(`[HMAS] ⚠️ EMERGENCY: All proposals blocked by Veto Protocol!`);
+            try {
+                const { sendTelegramAlert } = require('./telegram/notify');
+                await sendTelegramAlert(`🚨 *BFT VETO FIRED*\nAll proposals blocked!\nTask ID: ${taskId}\nConsensus Halted: Emergency Divergence Detected`);
+            } catch (e) {}
             return "Consensus Halted: Emergency Divergence Detected";
         }
 
@@ -176,10 +180,18 @@ export class HMASCoordinator {
             console.log(`[HMAS] [VETO_CHECK] Agent: ${p.agent} | Gap: ${G.toFixed(4)} | LLE: ${LLE.toFixed(4)} | Severity: ${severity.toFixed(4)}`);
 
             if (severity > 1.10) {
-                console.error(`[HMAS] \ud83d\udea8 EMERGENCY TIER: Severe Divergence (${severity.toFixed(2)})! Halting all.`);
+                console.error(`[HMAS] 🚨 EMERGENCY TIER: Severe Divergence (${severity.toFixed(2)})! Halting all.`);
+                try {
+                    const { sendTelegramAlert } = require('./telegram/notify');
+                    await sendTelegramAlert(`🚨 *BFT VETO FIRED*\nSevere Divergence: ${severity.toFixed(2)}!\nAgent: ${p.agent}`);
+                } catch (e) {}
                 return []; // Critical Halt
             } else if (severity > 1.05) {
-                console.warn(`[HMAS] \u26d4 VETO TIER: Blocking ${p.agent} due to trajectory drift.`);
+                console.warn(`[HMAS] ⛔ VETO TIER: Blocking ${p.agent} due to trajectory drift.`);
+                try {
+                    const { sendTelegramAlert } = require('./telegram/notify');
+                    await sendTelegramAlert(`🚨 *BFT VETO FIRED*\nBlocking ${p.agent} due to trajectory drift.\nSeverity: ${severity.toFixed(2)}`);
+                } catch (e) {}
                 continue; // Block specific agent
             } else if (severity >= this.COMMA_RATIO) {
                 console.log(`[HMAS] \u26a0\ufe0f WARNING TIER: Pythagorean Comma drift detected in ${p.agent}.`);
