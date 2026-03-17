@@ -70,7 +70,7 @@ export default function ConductorPage() {
     useEffect(() => {
         fetch('/api/captain', {
             headers: {
-                'x-trinity-admin-key': process.env.NEXT_PUBLIC_TRINITY_ADMIN_KEY || localStorage.getItem('trinity_admin_key') || ''
+                'x-trinity-admin-key': localStorage.getItem('trinity_admin_key') || ''
             }
         }).then(r => r.json()).then(data => {
             if (data?.north_star_directive) setNorthStar(data.north_star_directive);
@@ -84,7 +84,7 @@ export default function ConductorPage() {
             body: JSON.stringify({ action: 'UPDATE_NORTH_STAR', north_star: northStar }),
             headers: { 
                 'Content-Type': 'application/json',
-                'x-trinity-admin-key': process.env.NEXT_PUBLIC_TRINITY_ADMIN_KEY || localStorage.getItem('trinity_admin_key') || ''
+                'x-trinity-admin-key': localStorage.getItem('trinity_admin_key') || ''
             }
         }).then(async res => {
             if (!res.ok) throw new Error(await res.text() || 'Failed to update');
@@ -102,12 +102,12 @@ export default function ConductorPage() {
     };
 
     const wakeTrinity = async () => {
-        const promise = fetch('/api/captain', {
+        const promise = fetch('/api/admin/wake', {
             method: 'POST',
-            body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_WAKE' }),
+            body: JSON.stringify({}),
             headers: { 
                 'Content-Type': 'application/json',
-                'x-trinity-admin-key': process.env.NEXT_PUBLIC_TRINITY_ADMIN_KEY || localStorage.getItem('trinity_admin_key') || ''
+                'x-trinity-admin-key': localStorage.getItem('trinity_admin_key') || ''
             }
         }).then(async res => {
             if (!res.ok) throw new Error(await res.text() || 'Failed');
@@ -129,7 +129,7 @@ export default function ConductorPage() {
             body: JSON.stringify({ action: 'SEND_SIGNAL', signal: 'SYSTEM_RESET' }),
             headers: { 
                 'Content-Type': 'application/json',
-                'x-trinity-admin-key': process.env.NEXT_PUBLIC_TRINITY_ADMIN_KEY || localStorage.getItem('trinity_admin_key') || ''
+                'x-trinity-admin-key': localStorage.getItem('trinity_admin_key') || ''
             }
         }).then(async res => {
             if (!res.ok) throw new Error(await res.text() || 'Failed');
