@@ -1,6 +1,6 @@
 import { supabaseAdmin as supabase } from '../supabase';
 import { ERC8004Bridge } from '../web3/erc8004';
-import { signTypedData, verifyTypedData } from 'viem';
+import { verifyTypedData } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
 export interface x402Receipt {
@@ -79,8 +79,7 @@ export class x402Middleware {
 
         const account = privateKeyToAccount(privateKey);
         
-        return await signTypedData({
-            privateKey,
+        return await account.signTypedData({
             domain: X402_DOMAIN,
             types: X402_TYPES,
             primaryType: 'Payment',
