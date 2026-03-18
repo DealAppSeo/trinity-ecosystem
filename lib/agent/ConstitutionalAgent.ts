@@ -2682,7 +2682,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             // Mark the PARENT task as verified if this was a review
             const parentId = (originalTask.metadata as any)?.parent_task_id;
             if (parentId) {
-                const isApproved = evaluation.score > 0.5;
+                const isApproved = evaluation.score > 50;
 
                 // [PHASE P1] GOLDEN RATIO BFT CONSENSUS (61.8%)
                 const { data: parentTask, error } = await this.supabase
