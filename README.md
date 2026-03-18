@@ -1,81 +1,45 @@
-# 🦅 Trinity Symphony: The Autonomous Civilization Layer
+# Trinity Symphony: Validated Agentic Swarms
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org)
-[![Platform](https://img.shields.io/badge/Platform-Web3%20%2B%20AI-orange)](https://aitrinitysymphony.com)
-[![BFT](https://img.shields.io/badge/Security-3--Ply_BFT-green)](./docs/CORE_CONCEPTS.md#byzantine-fault-tolerance-bft)
-[![Evolutionary](https://img.shields.io/badge/Optimization-ESP_Engine-purple)](./docs/CORE_CONCEPTS.md#evolutionary-swarm-pruning-esp)
+## SECTION 1 — What We Built
 
-**Sovereign multi-agent infrastructure at the trivergence of Web3 + AI + Antifragility.**
+Trinity Symphony is a 12-agent AI swarm where every agent has an on-chain identity, reputation score, and audit trail. Built on ERC-8004 and x402 on Base Sepolia.
 
-The AI Trinity Symphony is not just a chatbot or a workflow engine—it is a **Self-Optimizing Autonomous Civilization Layer**. We are building a world where agents are sovereign, reputation is verifiable, and computation is antifragile.
+Last week our own AI hallucinated two transaction hashes. Our system caught itself lying — before any action was taken. That is not a simulation. That happened while building this submission.
 
-### 🌌 The Trivergence: AI meets Web3
-1. **Agent Intelligence (Trinity)**: Autonomous reasoning powered by constitutionally-bound LLM swarms.
-2. **Decentralized Truth (HyperDAG)**: Distributed ledgers providing immutable proof of action (EIP-8004).
-3. **Adaptive Reputation (RepID)**: Zero-Knowledge proofs for identity and trust scaling.
+## SECTION 2 — The Proof
 
----
+* **Fake hash attempt 1:** 0xc1207... NOT FOUND on BaseScan
+* **Fake hash attempt 2:** 0x44750... NOT FOUND on BaseScan
+* **Verified hash:** 0x92be19f78a23bdd93cfa2fa8bb5a64de937915cd1f3bf9b9276e6294f8a8b978
+* **BaseScan link:** https://sepolia.basescan.org/tx/0x92be19f78a23bdd93cfa2fa8bb5a64de937915cd1f3bf9b9276e6294f8a8b978
 
-## 🏛️ The Architecture of Sovereignty
+## SECTION 3 — Live Contracts on Base Sepolia
 
-Our ecosystem utilizes a **Dual-Repo "Shared Soul" Architecture**, separating the visual orchestration from the core constitutional logic.
+* **IdentityRegistry:** 0x8004A818BFB912233c491871b3d84c89A494BD9e
+* **ReputationRegistry:** 0x8004B663056A597Dffe9eCcC1965A193B7388713
 
-### 🔄 The Routing & Consensus Flow
-```mermaid
-graph TD
-    User([User Request]) --> Router{Intelligence Router}
-    Router -->|Risk Assessment| Risk[Risk Score Engine]
-    
-    subgraph "3-Ply BFT Consensus"
-    Risk -->|High Risk| Execs[3+ Heterogeneous Executors]
-    Execs --> Vers[3+ Cross-Family Verifiers]
-    Vers --> ANFIS[ANFIS Fuzzy Aggregator]
-    end
-    
-    ANFIS -->|Truth| Result[Consensus Output]
-    Result --> Merkle[(Merkle DAG Audit Trail)]
-    
-    subgraph "Self-Optimization Loop"
-    Result --> Stats[Evolutionary Logger]
-    Stats --> ESP[ESP Pruning Engine]
-    ESP -->|Mutate/Prune| Router
-    end
-```
+## SECTION 4 — Architecture
 
----
+* **12 agents:** NEXUS, TORCH, GCM, APM, VERITAS, MEL, SOPHIA, HDM, W3C, ORCH, SHOFET, GAMMA
+* Three LLM providers for SBFA adversarial validation
+* Byzantine Fault Tolerance with Pythagorean Comma veto
+* ANFIS intelligent routing
+* ZKP reputation proofs
 
-## 🧬 Technical Pillars
+## SECTION 5 — How It Catches Lies
 
-- **[3-Ply BFT Consensus](./docs/CORE_CONCEPTS.md#byzantine-fault-tolerance-bft)**: Byzantine Fault Tolerant routing that ensures 99.9% semantic integrity for critical tasks.
-- **[Evolutionary Swarm Pruning (ESP)](./docs/CORE_CONCEPTS.md#evolutionary-swarm-pruning-esp)**: Bio-inspired "Natural Selection" for AI agents. We prune inefficiency and reward excellence.
-- **[ANFIS-Driven Arbitrage](./docs/CORE_CONCEPTS.md#anfis-adaptive-neuro-fuzzy-inference-system)**: Fuzzy-logic based intelligence routing that balances **Cost, Speed, and Quality** in real-time.
-- **[Merkle DAG Audit Trail](./docs/CORE_CONCEPTS.md#merkle-dag-directed-acyclic-graph)**: Every decision is content-addressed and cryptographically linked for total transparency.
-- **[ZKP RepID Credentials](./docs/CORE_CONCEPTS.md#zkp-repid-zero-knowledge-reputation-id)**: Privacy-preserving reputation that scales agent permissions without exposing PII.
+1. Agent submits output
+2. Two independent agents verify blind
+3. BFT consensus required before action
+4. Dissent triggers Pythagorean Comma veto
+5. Veto logged on-chain permanently
+6. RepID score updated for lying agent
 
----
+## SECTION 6 — Patent Portfolio
 
-## 🏗️ Repo Ecosystem
+12 provisional patent applications filed August 2025.
+Methods patent-protected. Code MIT licensed.
 
-| Repository | Purpose | Primary Tech |
-| :--- | :--- | :--- |
-| **[trinity-ecosystem](https://github.com/DealAppSeo/trinity-ecosystem)** | The Orchestration Layer & Dashboard | Next.js, RadixUI, Supabase |
-| **[trinity-symphony-shared](https://github.com/DealAppSeo/trinity-symphony-shared)** | The "Shared Soul" (Core Logic) | TypeScript, ANFIS, Custom BFT |
-| **[hyperdag-protocol](https://github.com/DealAppSeo/hyperdag-protocol)** | The "Truth" (Decentralized Ledger) | Solidity, EIP-8004, Merkle DAG |
-| **[hyperdag-platform](https://github.com/DealAppSeo/hyperdag-platform)** | The "Bridge" (Algorithmic Routing) | TypeScript, Multi-GNN, SDK |
+## SECTION 7 — Mission
 
----
-
-## 🤝 Join the Symphony
-
-We are looking for collaborators who believe in **Democratized Agentic AI**. Whether you are a GNN researcher, a Web3 developer, or a Prompt Engineer—there is a chair in the orchestra for you.
-
-### Getting Started
-1. Review our **[Technical Glossary](./docs/CORE_CONCEPTS.md)** to understand our primitives.
-2. Check the **[Ecosystem Status Report](ECOSYSTEM_STATUS_REPORT.md)** for active tasks.
-3. Join the conversation on **[X](https://x.com/aitrinitysymphony)** or **[Discord](https://discord.gg/yourlink)**.
-
-### Co-opetition Model
-We hold patents defensively to prevent corporate enclosure. If you are building in the open, you have our blessing (and a royalty-free license).
-
-[Contributing](CONTRIBUTING.md) • [Security](SECURITY.md) • [Code of Conduct](CODE_OF_CONDUCT.md)
+Help people help people — the last, the lost, and the least. Micah 6:8.

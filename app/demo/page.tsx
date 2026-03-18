@@ -6,6 +6,37 @@ import { Activity, Shield, Coins, Brain, MessageSquare, Zap, AlertTriangle, Down
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
 
 import { supabase } from '@/lib/supabase';
+import { createPublicClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+
+const viemClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http()
+});
+
+const IDENTITY_REGISTRY = '0x8004A818BFB912233c491871b3d84c89A494BD9e';
+const IDENTITY_ABI = [{
+  "inputs": [{ "internalType": "string", "name": "", "type": "string" }],
+  "name": "agents",
+  "outputs": [
+    { "internalType": "string", "name": "name", "type": "string" },
+    { "internalType": "address", "name": "wallet", "type": "address" },
+    { "internalType": "uint256", "name": "reputation", "type": "uint256" },
+    { "internalType": "bool", "name": "isActive", "type": "bool" },
+    { "internalType": "uint256", "name": "lastUpdate", "type": "uint256" }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+}] as const;
+
+const AGENT_NAMES = [
+    'orch', 'torch', 'gcm', 'veritas',
+    'nexus', 'shofet', 'sophia', 'hdm',
+    'w3c', 'apm', 'mel', 'chesed',
+    'trinity-orch', 'trinity-torch', 'trinity-gcm', 'trinity-veritas',
+    'trinity-nexus', 'trinity-shofet', 'trinity-sophia', 'trinity-hdm',
+    'trinity-w3c', 'trinity-apm', 'trinity-mel', 'trinity-chesed'
+];
 
 const Panel = ({ title, icon: Icon, children, status }: { title: string, icon: any, children: React.ReactNode, status?: string }) => (
     <Card className="bg-slate-900 border-slate-800 text-slate-100 h-full overflow-hidden shadow-2xl p-0 relative group hover:border-cyan-500/50 transition-all duration-500">
@@ -88,6 +119,8 @@ export default function DemoPage() {
     const [agents, setAgents] = useState<any[]>([]);
     const [priors, setPriors] = useState<any[]>([]);
     const [hallucs, setHallucs] = useState<any[]>([]);
+    const [identityData, setIdentityData] = useState<any[]>([]);
+    const [isIdentityLoading, setIsIdentityLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -98,7 +131,7 @@ export default function DemoPage() {
                 .from('trinity_agent_logs')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(30);
+                .limit(10);
             if (recentLogs) setLogs(recentLogs);
 
             const { data: activeAgents } = await supabase
@@ -127,7 +160,7 @@ export default function DemoPage() {
         const channel = supabase
             .channel('demo-changes-v2')
             .on('postgres_changes', { event: 'INSERT', table: 'trinity_agent_logs', schema: 'public' }, (payload) => {
-                setLogs(prev => [payload.new, ...prev].slice(0, 30));
+                setLogs(prev => [payload.new, ...prev].slice(0, 10));
             })
             .on('postgres_changes', { event: '*', table: 'trinity_agent_registry', schema: 'public' }, () => {
                 fetchInitial();
@@ -141,6 +174,52 @@ export default function DemoPage() {
             supabase.removeChannel(channel);
         };
     }, []);
+
+    useEffect(() => {
+        // Fetch On-Chain Identities
+        const fetchIdentities = async () => {
+            setIsIdentityLoading(true);
+            try {
+                const multicallArgs = AGENT_NAMES.map(name => ({
+                    address: IDENTITY_REGISTRY,
+                    abi: IDENTITY_ABI,
+                    functionName: 'agents',
+                    args: [name]
+                }));
+                const results = await viemClient.multicall({ contracts: multicallArgs as any });
+                
+                const parsed = results.map((res: any, i) => {
+                    if (res.status === 'success' && res.result[1] && res.result[1] !== '0x0000000000000000000000000000000000000000') {
+                        return {
+                            name: AGENT_NAMES[i],
+                            wallet: res.result[1],
+                            reputation: Number(res.result[2]),
+                            isActive: res.result[3],
+                            lastUpdate: Number(res.result[4])
+                        };
+                    }
+                    return null;
+                }).filter(Boolean);
+                
+                // Deduplicate by wallet address keeping latest
+                const unique = Array.from(new Map(parsed.map(item => [item.wallet, item])).values());
+                
+                if (unique.length > 0) {
+                    setIdentityData(unique);
+                }
+            } catch (e) {
+                console.error('Failed to fetch onchain identities', e);
+            } finally {
+                setIsIdentityLoading(false);
+            }
+        };
+
+        if (mounted) {
+            fetchIdentities();
+            const idInterval = setInterval(fetchIdentities, 60000); // 60 seconds
+            return () => clearInterval(idInterval);
+        }
+    }, [mounted]);
 
     if (!mounted) return null;
 
@@ -223,21 +302,26 @@ export default function DemoPage() {
                 {/* 3. ERC-8004 REPUTATION */}
                 <Panel title="IDENTITY_REGISTRY" icon={Activity} status="ERC-8004">
                     <div className="space-y-3 h-full overflow-y-auto pr-2 custom-scrollbar">
-                        {agents.map(agent => (
-                            <div key={agent.agent_name} className="flex justify-between items-center border-b border-slate-800/50 py-2 group/item">
-                                <div className="flex items-center gap-2">
-                                    <div className={`h-1.5 w-1.5 rounded-full ${agent.status === 'online' || agent.status === 'working' ? 'bg-green-500' : 'bg-slate-600'}`} />
-                                    <span className="text-[10px] font-bold tracking-tight text-slate-400 group-hover/item:text-white transition-colors">
-                                        {agent.agent_name.replace('trinity-', '').toUpperCase()}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="h-1 w-12 bg-slate-800 rounded-full overflow-hidden hidden sm:block">
-                                        <div className="h-full bg-cyan-600" style={{ width: `${agent.reputation_score}%` }} />
+                        {isIdentityLoading && identityData.length === 0 ? (
+                           <div className="flex items-center justify-center h-full text-[10px] text-cyan-500 animate-pulse uppercase tracking-widest text-center">
+                              SYNCING ON-CHAIN IDENTITIES<br/>BASE SEPOLIA
+                           </div>
+                        ) : identityData.map((agent: any) => (
+                            <div key={agent.name} className="flex flex-col border-b border-slate-800/50 py-2 group/item">
+                                <div className="flex justify-between items-center mb-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`h-1.5 w-1.5 rounded-full ${agent.isActive ? 'bg-green-500' : 'bg-slate-600'}`} />
+                                        <span className="text-[10px] font-bold tracking-tight text-slate-400 group-hover/item:text-white transition-colors">
+                                            {agent.name.replace('trinity-', '').toUpperCase()}
+                                        </span>
                                     </div>
                                     <span className="text-xs font-mono font-bold text-cyan-500">
-                                        {agent.reputation_score.toFixed(1)}
+                                        {agent.reputation.toFixed(1)}
                                     </span>
+                                </div>
+                                <div className="flex justify-between items-center text-[8px] text-slate-500 font-mono tracking-widest uppercase">
+                                    <span>ID: {agent.wallet.slice(0,6)}...{agent.wallet.slice(-4)}</span>
+                                    <span>T-{new Date(agent.lastUpdate * 1000).toLocaleTimeString()}</span>
                                 </div>
                             </div>
                         ))}
@@ -277,12 +361,15 @@ export default function DemoPage() {
                     <div className="space-y-1 text-[10px] h-full overflow-y-auto pr-2 custom-scrollbar">
                         {logs.map((log: any, i) => {
                             const isVeto = log.action === 'VETO' || log.message?.includes('VETO');
+                            const isConsensus = log.action?.includes('CONSENSUS') || log.message?.includes('CONSENSUS');
+                            const isHitl = log.action?.includes('HITL') || log.message?.includes('HITL');
                             const time = log.created_at ? new Date(log.created_at).toLocaleTimeString() : '??:??:??';
 
                             return (
                                 <div key={i} className={`text-[9px] border-l-2 pl-2 py-1.5 mb-1 transition-all group/log ${
                                     isVeto ? 'border-red-500 bg-red-500/10' :
-                                    log.action?.includes('CONSENSUS') ? 'border-amber-500 bg-amber-500/5' :
+                                    isConsensus ? 'border-green-500 bg-green-500/10' :
+                                    isHitl ? 'border-amber-500 bg-amber-500/10' :
                                     log.action?.includes('PULSE') ? 'border-cyan-500 bg-cyan-500/2' :
                                     'border-slate-800 hover:border-slate-600'
                                 }`}>

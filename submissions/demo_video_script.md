@@ -1,25 +1,17 @@
-# Trinity Symphony: 3-Minute Demo Video Script
+[0:00-0:45] [blank screen or title card]
+"Every AI system asks you to trust it. Last week, our own AI gave us two fake transaction hashes. Here's proof."
 
-**Scene 1: The Problem (0:00–0:30)**
-*   **Visual**: Dark screen with chaotic news headlines: "AI Trade Error Wipes $10M", "LLM Hallucination Leads to Bad Transaction".
-*   **Voiceover**: "In the fast-paced world of stablecoins and autonomous agents, a single AI hallucination isn't just a glitch—it's a financial catastrophe. Current agentic infra lacks a trust layer that can scale at the speed of USDC."
+[0:45-0:55] [the two failed BaseScan lookups]
+"Both returned not found. Before we used either one, our system caught itself lying. Here's how."
 
-**Scene 2: Introducing TrustShell (0:30–1:00)**
-*   **Visual**: Trinity Symphony logo appears. Transition to the **Immune System Dashboard**.
-*   **Voiceover**: "Introducing TrustShell by Trinity Symphony. We've built an antifragile trust layer for autonomous agents using ZKP-Gated Reputation (ERC-8004) and the x402 payment protocol. Our system doesn't just block errors; it learns from them recursively."
+[0:55-1:45] [Panel 3 — agent registry]
+"12 agents. Each one has an on-chain identity registered to Base Sepolia. They cannot impersonate each other."
 
-**Scene 3: Live Demo - The Veto (1:00–1:45)**
-*   **Visual**: Split screen. Left side: Terminal showing an agent attempting a USDC trade with an injected hallucination. Right side: The 'BFT_CONSENSUS' panel in the dashboard.
-*   **Voiceover**: "Watch as an agent attempts a high-frequency trade. Here, we inject a synthetic error. Immediately, our Pythagorean Comma consensus triggers a VETO. The funds stay locked in escrow, protecting the user."
+[1:45-2:25] [Panel 5 — activity feed]
+"When any agent submits an output, two others verify it blind. If they disagree — a BFT veto fires. That veto is permanent. On-chain. Auditable."
 
-**Scene 4: The Immune System (1:45–2:15)**
-*   **Visual**: Zoom in on the 'IMMUNE_SYSTEM_CORE' dashboard. Show the Health Gauge and the Veto Trend Chart.
-*   **Voiceover**: "The vetoed hallucination is logged recursively. The system measure the 'Learn Gain' and adapts the agent's domain priors. Look at the dashboard—our health score remains at 100% because the threat was neutralized before it hit the chain."
+[2:25-2:30] [verified tx hash on BaseScan]
+"This is the transaction that confirmed our third attempt was real. The system required cryptographic proof before accepting it."
 
-**Scene 5: Scalability & Impact (2:15–2:45)**
-*   **Visual**: Show the Solana StableHacks logo and the Base Sepolia tx links. Briefly show a Telegram Trade Card.
-*   **Voiceover**: "TrustShell is cross-chain ready, with a specialized Solana port for SPL-USDC trades. And we've built-in a viral flywheel: every trade can route 1% to GiveDirectly via our Telegram trade cards, turning autonomous profit into human impact."
-
-**Scene 6: Call to Action (2:45–3:00)**
-*   **Visual**: Website URL and QR code.
-*   **Voiceover**: "Wise Agents. Zero-Risk Trades. Join the Trinity Symphony. Submit now on StableHacks and ERC-8004."
+[2:30-3:00] [TrustShell.dev or Trinity logo]
+"AI will make financial decisions. AI will make health decisions. What happens when it lies to someone who cannot afford the consequences? Trinity Symphony is how we make sure it doesn't. Safe, ethical, verifiable AI — built for the people who need it most. Micah 6:8."
