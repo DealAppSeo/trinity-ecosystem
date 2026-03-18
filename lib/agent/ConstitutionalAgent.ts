@@ -2742,7 +2742,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                         description: `Task ${parentId} failed peer verify. Dispute reason: ${result.substring(0, 200)}`,
                         task_type: 'critique',
                         priority: 90,
-                        status: 'pending',
+                        status: 'assigned',
                         metadata: { disputed_task_id: parentId, disputed_agent: parentTask.claimed_by }
                     });
                 }
