@@ -64,11 +64,16 @@ const AGENT_MAP: Record<string, string> = {
     'SHOFET': 'trinity-shofet'
 };
 
-// Use mapped name or fallback to arg (handle case where user already provided full name)
-const normalizedName = AGENT_MAP[agentName.toUpperCase()] || (agentName.startsWith('trinity-') ? agentName : `trinity-${agentName.toLowerCase()}`);
+// Pass the ALL-CAPS key (NEXUS, TORCH, etc.) as the agent identity
+// The trinity- prefix stays in AGENT_MAP only for Railway routing
+// ConstitutionalAgent receives 'NEXUS' not 'trinity-nexus'
+let parsedKey = agentName.toUpperCase();
+if (parsedKey.startsWith('TRINITY-')) {
+    parsedKey = parsedKey.replace('TRINITY-', '');
+}
+const finalAgentName = parsedKey;
 
-console.log(`[INIT] Name Normalized: ${agentName} -> ${normalizedName}`);
-const finalAgentName = normalizedName;
+console.log(`[INIT] Agent Identity: ${finalAgentName} (Railway Route: ${AGENT_MAP[finalAgentName] || 'UNKNOWN'})`);
 
 async function startAgent() {
     // DYNAMIC IMPORT TO ENSURE ENV VARS ARE LOADED FIRST
