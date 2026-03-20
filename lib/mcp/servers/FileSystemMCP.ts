@@ -3,16 +3,46 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { supabase } from '../../supabase';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 export class FileSystemMCP implements MCPServer {
     name = 'FileSystem';
     private rootDir: string;
+    private s3: S3Client | null = null;
 
     constructor() {
         // Safe Root: ./artifacts (create if not exists)
         this.rootDir = path.resolve(process.cwd(), 'artifacts');
         if (!fs.existsSync(this.rootDir)) {
             fs.mkdirSync(this.rootDir, { recursive: true });
+        }
+
+        // [PHASE 5] Initialize Cloudflare R2 Client
+        if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN) {
+            this.s3 = new S3Client({
+                region: 'auto',
+                endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+                credentials: {
+                    accessKeyId: process.env.CLOUDFLARE_API_TOKEN_ID || process.env.CLOUDFLARE_API_TOKEN,
+                    secretAccessKey: process.env.CLOUDFLARE_API_TOKEN
+                }
+            });
+        }
+    }
+
+    private async backupToR2(absolutePath: string, relativeKey: string, payload: string) {
+        if (!this.s3) return;
+        try {
+            const command = new PutObjectCommand({
+                Bucket: process.env.CLOUDFLARE_R2_BUCKET,
+                Key: `artifacts/${relativeKey}`,
+                Body: payload,
+                ContentType: relativeKey.endsWith('.json') ? 'application/json' : 'text/plain'
+            });
+            await this.s3.send(command);
+            console.log(`[FileSystemMCP] ☁️ Backed up ${relativeKey} to R2 Bucket.`);
+        } catch (e: any) {
+            console.warn(`[FileSystemMCP] ⚠️ R2 Backup failed for ${relativeKey}: ${e.message}`);
         }
     }
 
@@ -141,15 +171,18 @@ export class FileSystemMCP implements MCPServer {
                     signed: true,
                     project: project,
                     category: category,
-                    tags: keywords,
-                    smart_folder: `${project}/${category}`,
-                    taskId: taskId // Preserve original if not number
                 }
             });
             if (error) console.error('[FileSystemMCP] DB Save Error:', error.message);
             else console.log(`[FileSystemMCP] Saved ${relativePath} to Database (Project: ${project}).`);
-        } catch (err) {
-            console.error('[FileSystemMCP] DB Exception:', err);
+
+            // [PHASE 5] Cloudflare R2 Backup Sidecar
+            if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_R2_BUCKET) {
+                this.backupToR2(safePath, relativePath, content).catch(e => console.error('[R2 Backup Error]', e.message));
+            }
+
+        } catch (e: any) {
+            console.error(`[FileSystemMCP] DB Exception or R2 error for ${relativePath}:`, e.message);
         }
 
         return `Successfully wrote to ${relativePath} (RepID: ${repId})`;

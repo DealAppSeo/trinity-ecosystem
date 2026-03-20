@@ -58,19 +58,16 @@ const TRINITY_ESCROW_ADDRESS = '0xA80041Acf8861058B35A620BD9EeaA8004bc7388'; // 
 const X402_VERSION = 2;
 const X402_HEADER = 'PAYMENT-SIGNATURE';
 
+const liteLlmUrl = process.env.LITELLM_URL || 'https://trinity-litellm.railway.app';
+
 const PROVIDERS: Record<string, ProviderConfig & { region?: string; endpoint_group?: string }> = {
-    groq: { name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1/chat/completions', envKey: 'GROQ_API_KEY', model: 'llama3-8b-8192', tier: 'free', priority: 1, region: 'us-west-1' },
-    openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1/chat/completions', envKey: 'OPENAI_API_KEY', model: 'gpt-4o', tier: 'paid', priority: 3, region: 'us-east-1' },
-    anthropic: { name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1/messages', envKey: 'ANTHROPIC_API_KEY', model: 'claude-3-5-sonnet-20241022', tier: 'paid', priority: 3, isAnthropic: true, region: 'us-east-1' },
-    gemini: { name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', envKey: 'GEMINI_API_KEY', model: 'gemini-1.5-flash-latest', tier: 'free', priority: 2, isGemini: true, region: 'us-west-1' },
-    deepseek: { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/chat/completions', envKey: 'DEEPSEEK_API_KEY', model: 'deepseek-chat', tier: 'free', priority: 1, region: 'cn-east' },
-    siliconflow: { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.com/v1/chat/completions', envKey: 'SILICONFLOW_API_KEY', model: 'deepseek-ai/DeepSeek-V3', tier: 'free', priority: 1, region: 'cn-west' },
-    deepinfra: { name: 'DeepInfra', baseUrl: 'https://api.deepinfra.com/v1/openai/chat/completions', envKey: 'DEEPINFRA_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 1, region: 'us-west-2' },
-    grok: { name: 'Grok', baseUrl: 'https://api.x.ai/v1/chat/completions', envKey: 'GROK_API_KEY', model: 'grok-3', tier: 'free', priority: 2, region: 'us-east-1' },
-    cerebras: { name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1/chat/completions', envKey: 'CEREBRAS_API_KEY', model: 'llama3.1-8b', tier: 'free', priority: 1, region: 'us-west-1' },
-    sambanova: { name: 'SambaNova', baseUrl: 'https://api.sambanova.ai/v1/chat/completions', envKey: 'SAMBANOVA_API_KEY', model: 'Meta-Llama-3.1-70B-Instruct', tier: 'free', priority: 1, region: 'us-east-1' },
-    together: { name: 'Together', baseUrl: 'https://api.together.xyz/v1/chat/completions', envKey: 'TOGETHER_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', tier: 'free', priority: 2, region: 'us-west-2' },
-    openrouter: { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1/chat/completions', envKey: 'OPENROUTER_API_KEY', model: 'deepseek/deepseek-chat', tier: 'paid', priority: 3, region: 'global' }
+    'groq-llama': { name: 'Groq Llama', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'groq/llama-3.1-70b-versatile', tier: 'free', priority: 1 },
+    'fireworks-llama': { name: 'Fireworks Llama', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'fireworks_ai/accounts/fireworks/models/llama-v3p1-70b-instruct', tier: 'free', priority: 1 },
+    'mistral-medium': { name: 'Mistral Medium', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'mistral/mistral-medium-latest', tier: 'paid', priority: 2 },
+    'deepseek-reasoner': { name: 'DeepSeek Reasoner', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'deepseek/deepseek-reasoner', tier: 'paid', priority: 2 },
+    'anthropic-claude': { name: 'Anthropic Claude', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'anthropic/claude-sonnet-4-20250514', tier: 'paid', priority: 3, isAnthropic: true },
+    'openrouter-fallback': { name: 'OpenRouter Fallback', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'openrouter/auto', tier: 'paid', priority: 3 },
+    'together-fallback': { name: 'Together Fallback', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'together_ai/meta-llama/Llama-3-70b-chat-hf', tier: 'paid', priority: 3 }
 };
 
 // ============================================
@@ -399,6 +396,20 @@ export class ConstitutionalAgent {
                 this.autonomyTier = 'Assist';
                 console.log(`[${this.name}] Registered new agent with squad: ${this.squad}`);
             }
+
+            // [PHASE 4] Load Constitutional Memory from DB BEFORE agent takes tasks
+            const { data: mems, error: memErr } = await this.supabase
+                .from('trinity_memories')
+                .select('content')
+                .eq('type', 'constitutional')
+                .eq('is_active', true);
+
+            if (!memErr && mems && mems.length > 0) {
+                const addendum = mems.map(m => m.content).join('\n\n');
+                this.systemPrompt = (this.systemPrompt ? this.systemPrompt + '\n\n' : '') + '[CONSTITUTIONAL MEMORY OVERRIDE]\n' + addendum;
+                console.log(`[${this.name}] 📜 constitutional_memory_loaded (${mems.length} active directives)`);
+            }
+
         } catch (err: any) {
             console.error(`[${this.name}] âš ï¸ SYNC ERROR (Anti-Fragile Fallback Active): ${err.message}`);
             // Fallback is automatic since this.systemPrompt remains null (default)

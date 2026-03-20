@@ -1,0 +1,34 @@
+{
+  "heterogeneous": {
+    "tasks": 0,
+    "error": null
+  },
+  "antifragile": {
+    "tasks": 68533,
+    "error": null
+  },
+  "different entry points": {
+    "tasks": 0,
+    "error": null
+  },
+  "agent isolation": {
+    "tasks": 0,
+    "error": null
+  },
+  "start command variation": {
+    "tasks": 0,
+    "error": null
+  },
+  "intentional agent diversity": {
+    "tasks": 0,
+    "error": null
+  },
+  "diverse entry": {
+    "tasks": 0,
+    "error": null
+  },
+  "isolated environments": {
+    "tasks": 0,
+    "error": null
+  }
+}

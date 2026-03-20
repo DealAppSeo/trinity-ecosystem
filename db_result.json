@@ -1,0 +1,47 @@
+[
+  {
+    "id": 141116,
+    "title": "TEST: Lie Detection Verification",
+    "status": "pending",
+    "verification_result": null,
+    "claimed_by": null,
+    "claimed_at": null,
+    "verify_count": 0
+  },
+  {
+    "id": 141115,
+    "title": "TEST: Lie Detection Verification",
+    "status": "pending",
+    "verification_result": null,
+    "claimed_by": null,
+    "claimed_at": null,
+    "verify_count": 0
+  },
+  {
+    "id": 141114,
+    "title": "TEST: Lie Detection Verification",
+    "status": "assigned",
+    "verification_result": null,
+    "claimed_by": null,
+    "claimed_at": null,
+    "verify_count": 0
+  },
+  {
+    "id": 141113,
+    "title": "TEST: Correct Polling Query Detection",
+    "status": "pending",
+    "verification_result": null,
+    "claimed_by": null,
+    "claimed_at": null,
+    "verify_count": 0
+  },
+  {
+    "id": 141112,
+    "title": "TEST: Lie Detection Verification",
+    "status": "assigned",
+    "verification_result": null,
+    "claimed_by": null,
+    "claimed_at": null,
+    "verify_count": 0
+  }
+]

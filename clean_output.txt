@@ -1,0 +1,13 @@
+trinity-chesed | ACTIVE | 2026-03-14T07:50:18.695Z | Logs: 80798
+trinity-mel | ACTIVE | 2026-03-14T07:50:15.692Z | Logs: 92687
+trinity-nexus | ACTIVE | 2026-03-10T03:09:56.331Z | Logs: 61031
+trinity-torch | DEAD | 2026-02-28T16:36:53.105Z | Logs: 91330
+trinity-w3c | DEAD | 2026-02-28T16:36:51.898Z | Logs: 64516
+trinity-veritas | DEAD | 2026-02-26T05:52:08.729Z | Logs: 165536
+trinity-hdm | DEAD | 2026-02-26T05:52:06.736Z | Logs: 80134
+trinity-gcm | DEAD | 2026-02-26T05:52:01.999Z | Logs: 74519
+trinity-apm | DEAD | 2026-02-26T05:51:58.133Z | Logs: 89514
+
+--- HEALTH ENDPOINT ---
+Status: 200
+Body: {"status":"healthy","agent":"trinity-veritas","version":"8.1.5-failover-hardened","timestamp":"2026-03-18T21:02:42.280Z"}

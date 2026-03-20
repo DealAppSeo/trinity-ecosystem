@@ -1,0 +1,58 @@
+{
+  "testTasks": [
+    {
+      "id": 141112,
+      "title": "TEST: Lie Detection Verification",
+      "status": "assigned",
+      "assigned_to": null,
+      "agent_assigned": "VERITAS",
+      "task_type": "research",
+      "priority": 90
+    },
+    {
+      "id": 141113,
+      "title": "TEST: Correct Polling Query Detection",
+      "status": "pending",
+      "assigned_to": "trinity-veritas",
+      "agent_assigned": null,
+      "task_type": "research",
+      "priority": 90
+    },
+    {
+      "id": 141114,
+      "title": "TEST: Lie Detection Verification",
+      "status": "assigned",
+      "assigned_to": null,
+      "agent_assigned": "VERITAS",
+      "task_type": "research",
+      "priority": 90
+    },
+    {
+      "id": 141115,
+      "title": "TEST: Lie Detection Verification",
+      "status": "pending",
+      "assigned_to": "trinity-veritas",
+      "agent_assigned": "VERITAS",
+      "task_type": "research",
+      "priority": 90
+    },
+    {
+      "id": 141116,
+      "title": "TEST: Lie Detection Verification",
+      "status": "pending",
+      "assigned_to": "trinity-veritas",
+      "agent_assigned": "VERITAS",
+      "task_type": "research",
+      "priority": 90
+    }
+  ],
+  "activeTask": {
+    "id": 140900,
+    "title": "Build & Test constitutional-agent-base.js v8.2.0",
+    "status": "pending_clarification",
+    "assigned_to": "orch",
+    "agent_assigned": null,
+    "task_type": "code",
+    "priority": 100
+  }
+}

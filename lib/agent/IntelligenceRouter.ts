@@ -38,8 +38,28 @@ export class IntelligenceRouter {
         const cacheKey = `route:${task.id}:${task.title.substring(0, 20)}`;
         const cached = this.cache.get(cacheKey);
         if (cached && cached.expires > Date.now()) {
-            console.log(`[ROUTER] ⚡ Cache Hit for [${task.title}]`);
+            console.log(`[ROUTER] ⚡ Local Cache Hit for [${task.title}]`);
             return cached.result;
+        }
+
+        // [PHASE 5] Cloudflare KV Routing Cache
+        if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_KV_NAMESPACE && process.env.CLOUDFLARE_API_TOKEN) {
+            try {
+                const kvRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/storage/kv/namespaces/${process.env.CLOUDFLARE_KV_NAMESPACE}/values/${encodeURIComponent(cacheKey)}`, {
+                    headers: { 'Authorization': `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` }
+                });
+                if (kvRes.ok) {
+                    const kvCached = await kvRes.json();
+                    if (kvCached && kvCached.result) {
+                        console.log(`[ROUTER] ☁️ KV Cache Hit for [${task.title}]`);
+                        // Hydrate local cache
+                        this.cache.set(cacheKey, { result: kvCached.result, expires: Date.now() + 3600000 });
+                        return kvCached.result;
+                    }
+                }
+            } catch (e: any) {
+                console.warn(`[ROUTER] ⚠️ KV Load Failed: ${e.message}`);
+            }
         }
 
         const riskScore = this.calculateRiskScore(task);
@@ -98,49 +118,53 @@ export class IntelligenceRouter {
             excludeProvider = meta?.provider_used || meta?.creator_provider || null;
         } catch (e) { }
 
+        const SBFA_EXCLUSIONS: Record<string, string[]> = {
+            'VERITAS': ['groq-llama', 'together-fallback', 'fireworks-llama'],
+            'SHOFET':  ['anthropic-claude', 'openrouter-fallback'],
+        };
+
         // ====== 10+ PROVIDER ROUTING CASCADE ======
         let selectedProviders: string[] = [];
 
         if (reliability_critical) {
-            console.log(`[ROUTER] 🛡️ Reliability Critical: Routing via Portkey Gateway`);
-            selectedProviders.push('portkey');
+            console.log(`[ROUTER] 🛡️ Reliability Critical: Routing via deepseek-reasoner`);
+            selectedProviders.push('deepseek-reasoner');
         } else if (latency_required > 0.8) {
-            console.log(`[ROUTER] ⚡ Latency Required: Cerebras -> Groq Cascade`);
-            selectedProviders.push('cerebras');
-            if (active(availableProviders, 'groq')) selectedProviders.push('groq');
+            console.log(`[ROUTER] ⚡ Tier 1 (Fast/Cheap) Priority`);
+            selectedProviders.push('groq-llama');
+            if (active(availableProviders, 'fireworks-llama')) selectedProviders.push('fireworks-llama');
         } else if (complexity < 0.3 && cost_sensitivity > 0.7) {
-            console.log(`[ROUTER] 📉 Simple/Cheap: Groq / SambaNova -> Together`);
-            if (active(availableProviders, 'samba')) selectedProviders.push('samba');
-            else selectedProviders.push('groq');
-            if (active(availableProviders, 'together')) selectedProviders.push('together');
+            console.log(`[ROUTER] 📉 Simple/Cheap: groq-llama -> fireworks-llama -> together-fallback`);
+            selectedProviders.push('groq-llama');
+            if (active(availableProviders, 'fireworks-llama')) selectedProviders.push('fireworks-llama');
+            if (active(availableProviders, 'together-fallback')) selectedProviders.push('together-fallback');
         } else if (complexity >= 0.3 && complexity <= 0.6 && reasoning_heavy) {
-            console.log(`[ROUTER] 🧠 Reasoning Heavy: DeepSeek -> OpenRouter`);
-            selectedProviders.push('deepseek');
-            if (active(availableProviders, 'openrouter')) selectedProviders.push('openrouter');
-        } else if (fact_verification_required) {
-            console.log(`[ROUTER] 🕵️ Fact Verification: Perplexity -> You.com`);
-            selectedProviders.push('perplexity');
-            if (active(availableProviders, 'you')) selectedProviders.push('you');
-        } else if (web_data_required) {
-            console.log(`[ROUTER] 🌐 Web Data: You.com -> Perplexity`);
-            selectedProviders.push('you');
-            if (active(availableProviders, 'perplexity')) selectedProviders.push('perplexity');
+            console.log(`[ROUTER] 🧠 Tier 2 (Reasoning): deepseek-reasoner -> mistral-medium -> openrouter-fallback`);
+            selectedProviders.push('deepseek-reasoner');
+            if (active(availableProviders, 'mistral-medium')) selectedProviders.push('mistral-medium');
+            if (active(availableProviders, 'openrouter-fallback')) selectedProviders.push('openrouter-fallback');
+        } else if (fact_verification_required || web_data_required) {
+            console.log(`[ROUTER] 🕵️ Fact Verification / Web Data via deepseek-reasoner`);
+            selectedProviders.push('deepseek-reasoner');
         } else if (complexity > 0.7 && high_stakes) {
-            console.log(`[ROUTER] 🦅 High Stakes FRONTIER: Claude -> GPT-4o -> Gemini`);
-            // Add primary depending on strict explicit assignment if passed elsewhere, else fallback
-            selectedProviders.push('anthropic'); // Claude
-            selectedProviders.push('openai'); // GPT-4o
-            if (active(availableProviders, 'google-genai')) selectedProviders.push('google-genai');
+            console.log(`[ROUTER] 🦅 Tier 3 (Constitutional/High Stakes): anthropic-claude`);
+            selectedProviders.push('anthropic-claude');
         } else {
-            // General Fallback based on Epistemic Diversity
-            selectedProviders.push('deepseek');
-            selectedProviders.push('groq');
+            console.log(`[ROUTER] Epistemic Diversity Fallback`);
+            selectedProviders.push('deepseek-reasoner');
+            selectedProviders.push('groq-llama');
         }
 
         // Apply Hard Excludes (Verifying agents can't use same provider familiy as generator)
         if (excludeProvider && verification_required) {
             const excludeFamily = this.getEpistemicFamily(excludeProvider);
             selectedProviders = selectedProviders.filter(p => this.getEpistemicFamily(p) !== excludeFamily);
+        }
+
+        // Apply SBFA Exclusion Rule (Validator override)
+        if (isVerification) {
+            const forbiddenModels = SBFA_EXCLUSIONS[this.agentName] || [];
+            selectedProviders = selectedProviders.filter(p => !forbiddenModels.includes(p));
         }
 
         // Ensure we actually have the provider available. 
@@ -171,6 +195,18 @@ export class IntelligenceRouter {
         // Log usage explicitly for Budget Monitor
         for (const p of finalSelection) {
              this.logRoutingSelection(p, taskType);
+        }
+
+        // Hydrate local cache
+        this.cache.set(cacheKey, { result: finalSelection, expires: Date.now() + 3600000 });
+
+        // [PHASE 5] Persist to Cloudflare KV routing cache
+        if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_KV_NAMESPACE && process.env.CLOUDFLARE_API_TOKEN) {
+            fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/storage/kv/namespaces/${process.env.CLOUDFLARE_KV_NAMESPACE}/values/${encodeURIComponent(cacheKey)}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ result: finalSelection, timestamp: Date.now() })
+            }).catch(e => console.warn(`[ROUTER] ⚠️ KV Save Failed: ${e.message}`));
         }
 
         return finalSelection;

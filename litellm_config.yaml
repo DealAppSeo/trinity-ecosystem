@@ -13,7 +13,7 @@ model_list:
       api_key: os.environ/MISTRAL_API_KEY
   - model_name: deepseek-reasoner
     litellm_params:
-      model: deepseek/deepseek-reasoner
+      model: deepseek/deepseek-chat
       api_key: os.environ/DEEPSEEK_API_KEY
   - model_name: anthropic-claude
     litellm_params:
@@ -27,3 +27,10 @@ model_list:
     litellm_params:
       model: together_ai/meta-llama/Llama-3-70b-chat-hf
       api_key: os.environ/TOGETHER_API_KEY
+
+litellm_settings:
+  drop_params: true
+  request_timeout: 30
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
