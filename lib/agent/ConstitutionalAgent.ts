@@ -4085,7 +4085,11 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         );
 
         let providerPromise: Promise<LLMResult>;
-        if (provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools, onStream);
+        const proxyCfg = PROVIDERS[provider];
+        if (proxyCfg && proxyCfg.baseUrl.includes(liteLlmUrl)) {
+            providerPromise = this.callOpenAICompatible(proxyCfg.baseUrl, process.env[proxyCfg.envKey] || 'sk-proxy', modelOverride || proxyCfg.model, systemPrompt, prompt, tools);
+        }
+        else if (provider === 'openai') providerPromise = this.callOpenAI(systemPrompt, prompt, tools, onStream);
         else if (provider === 'anthropic') providerPromise = this.callAnthropic(systemPrompt, prompt, tools, onStream);
         else if (provider === 'gemini') providerPromise = this.callGemini(systemPrompt, prompt, tools, onStream);
         else if (provider === 'grok') providerPromise = this.callGrok(systemPrompt, prompt, tools);
