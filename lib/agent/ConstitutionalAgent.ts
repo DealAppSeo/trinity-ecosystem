@@ -61,6 +61,7 @@ const X402_HEADER = 'PAYMENT-SIGNATURE';
 const liteLlmUrl = process.env.LITELLM_URL || 'https://trinity-litellm.railway.app';
 
 const PROVIDERS: Record<string, ProviderConfig & { region?: string; endpoint_group?: string }> = {
+    'cerebras-llama': { name: 'Cerebras Llama', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'CEREBRAS_API_KEY', model: 'cerebras/llama3.1-70b', tier: 'free', priority: 0 },
     'groq-llama': { name: 'Groq Llama', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'groq/llama-3.1-70b-versatile', tier: 'free', priority: 1 },
     'fireworks-llama': { name: 'Fireworks Llama', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'fireworks_ai/accounts/fireworks/models/llama-v3p1-70b-instruct', tier: 'free', priority: 1 },
     'mistral-medium': { name: 'Mistral Medium', baseUrl: `${liteLlmUrl}/v1/chat/completions`, envKey: 'LITELLM_MASTER_KEY', model: 'mistral/mistral-medium-latest', tier: 'paid', priority: 2 },

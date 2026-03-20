@@ -131,11 +131,13 @@ export class IntelligenceRouter {
             selectedProviders.push('deepseek-reasoner');
         } else if (latency_required > 0.8) {
             console.log(`[ROUTER] ⚡ Tier 1 (Fast/Cheap) Priority`);
-            selectedProviders.push('groq-llama');
+            selectedProviders.push('cerebras-llama');
+            if (active(availableProviders, 'groq-llama')) selectedProviders.push('groq-llama');
             if (active(availableProviders, 'fireworks-llama')) selectedProviders.push('fireworks-llama');
         } else if (complexity < 0.3 && cost_sensitivity > 0.7) {
-            console.log(`[ROUTER] 📉 Simple/Cheap: groq-llama -> fireworks-llama -> together-fallback`);
-            selectedProviders.push('groq-llama');
+            console.log(`[ROUTER] 📉 Simple/Cheap: cerebras-llama -> groq-llama -> fireworks-llama -> together-fallback`);
+            selectedProviders.push('cerebras-llama');
+            if (active(availableProviders, 'groq-llama')) selectedProviders.push('groq-llama');
             if (active(availableProviders, 'fireworks-llama')) selectedProviders.push('fireworks-llama');
             if (active(availableProviders, 'together-fallback')) selectedProviders.push('together-fallback');
         } else if (complexity >= 0.3 && complexity <= 0.6 && reasoning_heavy) {
