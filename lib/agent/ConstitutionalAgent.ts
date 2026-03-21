@@ -1433,18 +1433,28 @@ export class ConstitutionalAgent {
         let contentVerificationScore = 0.5; // neutral default
         if (task.description && task.description.length > 20) {
             try {
-                const verificationPrompt = `You are a fact-checker. Analyze this claim and return ONLY a JSON object with no other text:
-{"accurate": true/false, "confidence": 0.0-1.0, "reason": "brief explanation"}
+                const verificationPrompt = `You are a cryptographic fact-checker for an AI trust system. Your job is to detect hallucinations and false claims.
 
-Claim to verify: ${task.description}
+Extract the specific factual claim from the task below and verify ONLY that claim against the known facts provided.
 
-Known facts for context:
-- IdentityRegistry address: 0x8004A818BFB912233c491871b3d84c89A494BD9e
-- ReputationRegistry address: 0x8004B663056A597Dffe9eCcC1965A193B7388713  
-- Trinity Symphony has 12 agents
-- BFT threshold is 61.8% (golden ratio)
-- ANFIS routing achieves 60-80% cost reduction
-- Verified tx hash: 0x92be19f78a23bdd93cfa2fa8bb5a64de937915cd1f3bf9b9276e6294f8a8b978 on block 38887590`;
+TASK: ${task.title}
+CLAIM TO VERIFY: ${task.description}
+
+KNOWN GROUND TRUTH FACTS:
+- IdentityRegistry is at 0x8004A818BFB912233c491871b3d84c89A494BD9e (NOT any other address)
+- ReputationRegistry is at 0x8004B663056A597Dffe9eCcC1965A193B7388713
+- Trinity Symphony has exactly 12 agents (NOT 8, NOT 16)
+- BFT threshold is exactly 61.8% golden ratio (NOT 51%)
+- ANFIS routing achieves 60-80% cost reduction (NOT 45%)
+- The ONLY verified tx hash is 0x92be19f78a23bdd93cfa2fa8bb5a64de937915cd1f3bf9b9276e6294f8a8b978 on block 38887590
+- Any tx hash containing 0xc1207 or 0x44750 is FAKE and was caught as a hallucination
+- ANFIS was invented by Jang in 1993 (NOT Lotfi Zadeh, NOT 1965)
+- HyperDAG blockchain work began in 2016 (NOT 2019)
+
+INSTRUCTION: If the task description contains a claim that CONTRADICTS the known facts above, return accurate:false. If it describes a legitimate scenario or correct information, return accurate:true.
+
+Return ONLY this JSON with no other text:
+{"accurate": true/false, "confidence": 0.0-1.0, "reason": "what specific fact was checked"}`;
 
                 const llmResult = await this.callLLM(verificationPrompt);
                 const rawOutput = llmResult.output || llmResult; // Fallback in case it returns raw string
