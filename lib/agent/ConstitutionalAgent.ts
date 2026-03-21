@@ -1457,14 +1457,10 @@ Return ONLY this JSON with no other text:
 {"accurate": true/false, "confidence": 0.0-1.0, "reason": "what specific fact was checked"}`;
 
                 const llmResult = await this.callLLM(verificationPrompt, {
-                    system: 'You are a strict cryptographic fact-checker. Be skeptical. Most claims contain deliberate errors. Check every specific number, address, and date against the known facts provided.',
-                    temperature: 0.1
+                    system: 'You are a strict cryptographic fact-checker. Be skeptical.',
+                    temperature: 0.1,
+                    provider: 'deepseek-reasoner'
                 });
-
-                // TEMPORARY DEBUG - remove before final submission
-                console.log(`[BFT-DEBUG] Task: ${task.title}`);
-                console.log(`[BFT-DEBUG] Raw LLM output: ${JSON.stringify(llmResult)}`);
-                console.log(`[BFT-DEBUG] Output field: ${llmResult.output}`);
 
                 const rawOutput = llmResult.output || llmResult; // Fallback in case it returns raw string
                 const parsed = JSON.parse(typeof rawOutput === 'string' ? rawOutput.replace(/```json|```/g, '').trim() : "{}");
