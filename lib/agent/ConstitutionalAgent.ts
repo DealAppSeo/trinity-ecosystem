@@ -1656,6 +1656,7 @@ Return ONLY this JSON with no other text:
         const { data: task, error } = await query
             .in('status', ['pending', 'todo', 'pending_clarification'])
             .is('claimed_by', null)
+            .or(`metadata->retry_after.is.null,metadata->retry_after.lte.${new Date().toISOString()}`)
             // If expert, prioritize clarification tasks (mentorship)
             .order('status', { ascending: false })
             .order('priority', { ascending: false })
@@ -1807,10 +1808,14 @@ ${result.substring(0, 2000)}
                     
                     return { success: true, llm_used: false };
                   } else {
-                    // No peer task to verify yet — mark as pending and retry later
+                    // No peer task found — add cooldown to prevent queue thrashing
                     await this.supabase.from('trinity_tasks').update({
                       status: 'pending',
-                      result: null
+                      result: null,
+                      metadata: {
+                        ...(task.metadata as any || {}),
+                        retry_after: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+                      }
                     }).eq('id', task.id);
                     return { success: false, error: 'No peer task found' };
                   }
