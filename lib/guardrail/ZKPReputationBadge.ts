@@ -1,4 +1,3 @@
-import * as snarkjs from 'snarkjs';
 import { supabaseAdmin as supabase } from '../supabase';
 import * as crypto from 'crypto';
 
@@ -89,6 +88,7 @@ export class ZKPReputationBadge {
                 const fullZkeyPath = path.join(process.cwd(), this.zkeyPath);
                 
                 if (fs.existsSync(fullWasmPath) && fs.existsSync(fullZkeyPath)) {
+                    const snarkjs = await import('snarkjs');
                     const result = await snarkjs.groth16.fullProve(inputs, fullWasmPath, fullZkeyPath);
                     proof = result.proof;
                     publicSignals = result.publicSignals;
@@ -177,6 +177,7 @@ export class ZKPReputationBadge {
                 const fullZkeyPath = path.join(process.cwd(), this.hallucZkeyPath);
                 
                 if (fs.existsSync(fullWasmPath) && fs.existsSync(fullZkeyPath)) {
+                    const snarkjs = await import('snarkjs');
                     const result = await snarkjs.groth16.fullProve(inputs, fullWasmPath, fullZkeyPath);
                     proof = result.proof;
                     publicSignals = result.publicSignals;
