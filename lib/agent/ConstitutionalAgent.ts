@@ -2120,6 +2120,19 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     await this.emitHelpRequest(task, 'PYTHAGOREAN_VETO', errorMsg);
                     throw new Error('PYTHAGOREAN_VETO: Output rejected by ensemble dissent gate.');
                 }
+
+                // [HACKATHON] Surge.xyz Integration: Trigger TradeIntent upon BFT Consensus Completion
+                try {
+                    const { SurgeAdapter } = require('./SurgeAdapter');
+                    await SurgeAdapter.submitTradeIntent({
+                        taskId: task.id,
+                        agent: this.name,
+                        output: result.output,
+                        disagreement: sbfaResult.disagreement
+                    });
+                } catch (adapterErr) {
+                    console.error(`[${this.name}] ⚠️ SurgeAdapter execution failed:`, adapterErr);
+                }
             }
 
             // [PHASE 10] AGENT REFLECTION
