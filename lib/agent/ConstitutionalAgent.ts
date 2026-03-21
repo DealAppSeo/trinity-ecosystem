@@ -1482,6 +1482,34 @@ Return ONLY: {"error_found": true/false, "confidence": 0.0-1.0, "what_is_wrong":
         }
         let uncertainty = Math.max(0.0, 1.0 - belief - disbelief);
 
+        // [REASONING TRACE] Hash the BFT decision for on-chain anchoring
+        const reasoningTrace = {
+            task_id: task.id,
+            agent: this.name,
+            belief: belief,
+            disbelief: disbelief,
+            uncertainty: uncertainty,
+            provider_used: executorProvider || 'unknown',
+            verifier_provider: verifierProvider || 'unknown',
+            phi_weight: weight,
+            content_verification_score: contentVerificationScore || null,
+            timestamp: new Date().toISOString()
+        };
+        const traceString = JSON.stringify(reasoningTrace, Object.keys(reasoningTrace).sort());
+        const crypto = await import('crypto');
+        const traceHash = crypto.createHash('sha256').update(traceString).digest('hex');
+
+        await this.supabase.from('trinity_agent_logs').insert({
+            agent_name: this.name,
+            event_type: 'bft_reasoning_trace',
+            metadata: {
+                ...reasoningTrace,
+                trace_hash: traceHash,
+                erc8004_anchor_pending: true
+            }
+        });
+        console.log(`[BFT] 🔐 Reasoning trace hashed: ${traceHash}`);
+
         // Final aggregate logic (weighted influence)
         const isVerified = (belief > disbelief) && (belief > 0.4);
         const newVerifyCount = ((task as any).verify_count || 0) + 1;
