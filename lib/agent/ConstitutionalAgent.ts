@@ -2360,6 +2360,11 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 throw new Error(`Database Update Failed: ${doneError.message}`);
             }
 
+            // [HACKATHON] Adaptive Learning Loop (Runs every 10 tasks)
+            if (task.task_type === 'hallucination_detection' || task.task_type === 'BFT_CONSENSUS_STRESS') {
+                await this.updateHallucinationThreshold();
+            }
+
             // [PHASE M] MOBILE COCKPIT INTEGRATION
             const SAFE_DOMAINS = new Set(['creative', 'technical', 'general']);
             const SAFE_REP_MIN = 90; // RepID is 0-100 here
@@ -2481,6 +2486,66 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             }
             await this.logResiliencePulse(false, Date.now() - (this as any).taskStartTime);
             return { success: false, llm_used: true };
+        }
+    }
+
+    // [HACKATHON] Adaptive Learning Loop
+    private async updateHallucinationThreshold() {
+        try {
+            const { data: agentData } = await this.supabase
+                .from('trinity_agent_registry')
+                .select('metadata')
+                .eq('agent_name', this.name)
+                .single();
+
+            let metadata = agentData?.metadata ? (typeof agentData.metadata === 'string' ? JSON.parse(agentData.metadata) : agentData.metadata) : {};
+            let currentThreshold = metadata.confidence_threshold !== undefined ? metadata.confidence_threshold : 0.80;
+
+            const { count } = await this.supabase
+                .from('trinity_tasks')
+                .select('*', { count: 'exact', head: true })
+                .in('task_type', ['hallucination_detection', 'BFT_CONSENSUS_STRESS'])
+                .in('status', ['done', 'failed', 'PYTHAGOREAN_VETO'])
+                .eq('agent_name', this.name);
+                
+            if (count && count % 10 === 0) {
+                const { data: tasks } = await this.supabase
+                    .from('trinity_tasks')
+                    .select('status')
+                    .in('task_type', ['hallucination_detection', 'BFT_CONSENSUS_STRESS'])
+                    .in('status', ['done', 'failed', 'PYTHAGOREAN_VETO'])
+                    .eq('agent_name', this.name)
+                    .order('completed_at', { ascending: false })
+                    .limit(10);
+
+                if (tasks && tasks.length === 10) {
+                    const caught = tasks.filter(t => t.status === 'done' || t.status === 'PYTHAGOREAN_VETO').length;
+                    const catchRate = caught / 10;
+                    
+                    let newThreshold = currentThreshold;
+                    if (catchRate > 0.90) {
+                        newThreshold = Math.max(0.01, currentThreshold - 0.02);
+                    } else if (catchRate < 0.70) {
+                        newThreshold = Math.min(0.99, currentThreshold + 0.05);
+                    }
+
+                    if (newThreshold !== currentThreshold) {
+                        console.log(`[ADAPTIVE LOOP] Catch Rate: ${(catchRate * 100).toFixed(1)}%. Updating confidence_threshold from ${currentThreshold} to ${newThreshold.toFixed(2)}`);
+                        metadata.confidence_threshold = Number(newThreshold.toFixed(2));
+                        await this.supabase.from('trinity_agent_registry')
+                            .update({ metadata })
+                            .eq('agent_name', this.name);
+                        
+                        const logMessage = `Adaptive Loop: 10-task batch processed. Catch Rate: ${(catchRate * 100).toFixed(1)}%. Threshold adjusted: ${currentThreshold} -> ${newThreshold.toFixed(2)}`;
+                        await this.supabase.from('sprint_reports').insert({
+                            autonomous_session_march20: logMessage,
+                            hallucination_catch_rate_summary: `Agent: ${this.name} | Batch Catch Rate: ${(catchRate * 100).toFixed(1)}% | New Threshold: ${newThreshold.toFixed(2)}`
+                        });
+                    }
+                }
+            }
+        } catch (err) {
+            console.error(`[ADAPTIVE LOOP] Failed to update hallucination threshold:`, err);
         }
     }
 
