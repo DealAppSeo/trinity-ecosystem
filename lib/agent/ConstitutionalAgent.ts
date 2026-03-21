@@ -1429,14 +1429,50 @@ export class ConstitutionalAgent {
             // In a strict mode, we might want to return here, but for now we log and proceed with lower weight
         }
 
+        // [CONTENT VERIFICATION] Analyze claim accuracy via LLM
+        let contentVerificationScore = 0.5; // neutral default
+        if (task.description && task.description.length > 20) {
+            try {
+                const verificationPrompt = `You are a fact-checker. Analyze this claim and return ONLY a JSON object with no other text:
+{"accurate": true/false, "confidence": 0.0-1.0, "reason": "brief explanation"}
+
+Claim to verify: ${task.description}
+
+Known facts for context:
+- IdentityRegistry address: 0x8004A818BFB912233c491871b3d84c89A494BD9e
+- ReputationRegistry address: 0x8004B663056A597Dffe9eCcC1965A193B7388713  
+- Trinity Symphony has 12 agents
+- BFT threshold is 61.8% (golden ratio)
+- ANFIS routing achieves 60-80% cost reduction
+- Verified tx hash: 0x92be19f78a23bdd93cfa2fa8bb5a64de937915cd1f3bf9b9276e6294f8a8b978 on block 38887590`;
+
+                const llmResult = await this.callLLM(verificationPrompt);
+                const rawOutput = llmResult.output || llmResult; // Fallback in case it returns raw string
+                const parsed = JSON.parse(typeof rawOutput === 'string' ? rawOutput.replace(/```json|```/g, '').trim() : "{}");
+                contentVerificationScore = parsed.accurate ? parsed.confidence : (1 - parsed.confidence);
+            } catch (e) {
+                console.warn('[BFT] Content verification LLM failed, using default score');
+            }
+        }
+
         // [PHASE 10] CALCULATE BELIEF (b), DISBELIEF (d), UNCERTAINTY (u)
         // b + d + u = 1
-        let belief = (artifactCount > 0) ? 0.7 : (hasResult ? 0.5 : 0.0);
-        let disbelief = (artifactCount === 0 && !hasResult) ? 0.9 : 0.1;
+        let belief;
+        let disbelief;
 
-        // Boost belief based on reputation weight
-        belief = Math.min(0.99, belief * weight);
-        disbelief = Math.max(0.01, disbelief / weight);
+        // Weight content verification heavily for hallucination_detection tasks
+        if (task.task_type === 'hallucination_detection') {
+            belief = contentVerificationScore * weight;
+            disbelief = (1 - contentVerificationScore) * weight;
+        } else {
+            // Original logic for other task types
+            belief = (artifactCount > 0) ? 0.7 : (hasResult ? 0.5 : 0.0);
+            disbelief = (artifactCount === 0 && !hasResult) ? 0.9 : 0.1;
+            
+            // Boost belief based on reputation weight
+            belief = Math.min(0.99, belief * weight);
+            disbelief = Math.max(0.01, disbelief / weight);
+        }
         let uncertainty = Math.max(0.0, 1.0 - belief - disbelief);
 
         // Final aggregate logic (weighted influence)
