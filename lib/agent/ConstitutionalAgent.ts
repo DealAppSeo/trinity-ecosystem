@@ -1722,6 +1722,45 @@ ${result.substring(0, 2000)}
             }
 
             try {
+                // [ADVERSARIAL ROUTING] Route verification and hallucination tasks to BFT pipeline
+                if (task.task_type === 'hallucination_detection' || 
+                    task.task_type === 'BFT_CONSENSUS_STRESS' ||
+                    task.task_type === 'peer_verification') {
+                  
+                  // Find a peer task to verify — not our own work
+                  const { data: peerTask } = await this.supabase
+                    .from('trinity_tasks')
+                    .select('*')
+                    .eq('status', 'done')
+                    .neq('claimed_by', this.name)
+                    .neq('agent_name', this.name)
+                    .eq('task_type', 'hallucination_detection')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                  if (peerTask) {
+                    console.log(`[ADVERSARIAL] 🎯 ${this.name} routing to verifyPeerTask for ${peerTask.id}`);
+                    await this.verifyPeerTask(peerTask);
+                    
+                    // Mark the routing task itself as done
+                    await this.supabase.from('trinity_tasks').update({
+                      status: 'done',
+                      result: `Adversarial verification routed to verifyPeerTask on task ${peerTask.id}`,
+                      claimed_by: this.name
+                    }).eq('id', task.id);
+                    
+                    return { success: true, llm_used: false };
+                  } else {
+                    // No peer task to verify yet — mark as pending and retry later
+                    await this.supabase.from('trinity_tasks').update({
+                      status: 'pending',
+                      result: null
+                    }).eq('id', task.id);
+                    return { success: false, error: 'No peer task found' };
+                  }
+                }
+
                 // TRY LOCAL FIRST
                 if (this.canHandleLocally(task)) {
                     console.log(`[LOCAL] âš¡ Handling ${task.id} without LLM (Tier 1)`);
