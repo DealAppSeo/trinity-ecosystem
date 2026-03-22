@@ -28,6 +28,7 @@ import { SBFAOperator, SBFAInput, SBFAResult } from './SBFAOperator';
 import { HITLDispatcher } from '../hitl/HITLDispatcher';
 import { zkpBadgeGenerator } from '../guardrail/ZKPReputationBadge';
 import { RedisAdapter } from './RedisAdapter';
+import { AdversarialVerifierAgent } from './AdversarialVerifierAgent';
 // import { HyperDAG } from './HyperDAG';
 
 const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosystem/main/docs/MCPs';
@@ -1806,9 +1807,22 @@ ${result.substring(0, 2000)}
             try {
                 // [ADVERSARIAL ROUTING] Route verification and hallucination tasks to BFT pipeline
                 if (task.task_type === 'hallucination_detection' || 
-                    task.task_type === 'BFT_CONSENSUS_STRESS' ||
-                    task.task_type === 'peer_verification') {
-                  
+                    task.task_type === 'BFT_CONSENSUS_STRESS') {
+                    
+                    console.log(`[ADVERSARIAL] 🎯 ${this.name} routing to AdversarialVerifierAgent for hook bypass on task ${task.id}`);
+                    const verifier = new AdversarialVerifierAgent();
+                    const claim = task.description || task.title || '';
+                    const verificationResult = await verifier.verify(claim, this.name);
+
+                    // Mark the routing task itself as done
+                    await this.supabase.from('trinity_tasks').update({
+                      status: 'done',
+                      result: `Adversarial verification complete. Result: ${JSON.stringify(verificationResult)}`,
+                      claimed_by: this.name
+                    }).eq('id', task.id);
+                    
+                    return { success: true, llm_used: true };
+                } else if (task.task_type === 'peer_verification') {
                   // Find a peer task to verify — not our own work
                   const { data: peerTask } = await this.supabase
                     .from('trinity_tasks')
@@ -1828,7 +1842,7 @@ ${result.substring(0, 2000)}
                     // Mark the routing task itself as done
                     await this.supabase.from('trinity_tasks').update({
                       status: 'done',
-                      result: `Adversarial verification routed to verifyPeerTask on task ${peerTask.id}`,
+                      result: `Peer verification routed to verifyPeerTask on task ${peerTask.id}`,
                       claimed_by: this.name
                     }).eq('id', task.id);
                     
