@@ -1,4 +1,5 @@
 -- Create Hallucination Logs for the Immune System Dashboard
+DROP TABLE IF EXISTS trinity_hallucination_logs;
 CREATE TABLE IF NOT EXISTS trinity_hallucination_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     timestamp TIMESTAMPTZ DEFAULT NOW(),

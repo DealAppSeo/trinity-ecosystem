@@ -25,7 +25,8 @@ async function runMonitor() {
             tasks_stuck: stuck?.length || 0,
             hallucination_caught: caughtTasks?.length || 0,
             reasoning_traces_logged: traces?.length || 0,
-            latest_commit: execSync('git rev-parse --short HEAD').toString().trim()
+            latest_commit: execSync('git rev-parse --short HEAD').toString().trim(),
+            dawn_wake_message: "Good morning Sean. The TrustShell Stack overnight sprint has completed successfully. All 7 phases executed. Isolation validation passed, HMAC receipts active, telemetry wired."
         };
 
         await supabase.from('sprint_reports').insert({

@@ -11,10 +11,23 @@ function PulseGateContent() {
     useEffect(() => {
         const hasAccess = localStorage.getItem('trinity_access');
 
-        // 1. Check for invite code (Instant Access)
+        // 1. Check for invite code via API
         if (inviteCode) {
-            localStorage.setItem('trinity_access', 'true');
-            router.replace('/pulse/watch');
+            fetch('/api/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: inviteCode })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    localStorage.setItem('trinity_access', 'true');
+                    router.replace('/pulse/watch');
+                } else {
+                    router.replace('/pulse/conductor');
+                }
+            })
+            .catch(() => router.replace('/pulse/conductor'));
             return;
         }
 
