@@ -1,0 +1,45 @@
+814: // [FIX 4] Wire actual_cost to the main trinity_tasks table
+816: .from('trinity_tasks')
+1012: .from('trinity_tasks')
+1028: await this.supabase.from('trinity_tasks').update({
+1043: .from('trinity_tasks')
+1063: await this.supabase.from('trinity_tasks').update({
+1076: .from('trinity_tasks')
+1109: await this.supabase.from('trinity_tasks').update({
+1275: .from('trinity_tasks')
+1335: .from('trinity_tasks')
+1377: .from('trinity_tasks')
+1509: const { error: updateError } = await this.supabase.from('trinity_tasks').update({
+1556: await this.supabase.from('trinity_tasks').update({
+1642: .from('trinity_tasks')
+1787: .from('trinity_tasks')
+1802: await this.supabase.from('trinity_tasks').update({
+1811: await this.supabase.from('trinity_tasks').update({
+1851: .from('trinity_tasks')
+1886: .from('trinity_tasks')
+1902: .from('trinity_tasks')
+1932: .from('trinity_tasks')
+1977: .from('trinity_tasks')
+2148: await this.supabase.from('trinity_tasks').update({ result: streamAccumulator + "\n\n(Streaming...)" }).eq('id', task.id);
+2272: await this.supabase.from('trinity_tasks').update({
+2335: await this.supabase.from('trinity_tasks').update({
+2433: .from('trinity_tasks')
+2480: await this.supabase.from('trinity_tasks').update({
+2553: const { error: failError } = await this.supabase.from('trinity_tasks').update({
+2569: await this.supabase.from('trinity_tasks').update({
+2603: .from('trinity_tasks')
+2611: .from('trinity_tasks')
+2681: .from('trinity_tasks')
+2741: await this.supabase.from('trinity_tasks').insert([{
+2771: await this.supabase.from('trinity_tasks').insert([{
+2842: await this.supabase.from('trinity_tasks').insert({
+2877: .from('trinity_tasks')
+2928: await this.supabase.from('trinity_tasks').insert({
+2938: await this.supabase.from('trinity_tasks').update({
+2980: await this.supabase.from('trinity_tasks').insert({
+3015: await this.supabase.from('trinity_tasks').insert({
+3133: await this.supabase.from('trinity_tasks').insert({
+3270: .from('trinity_tasks')
+3289: .from('trinity_tasks')
+3460: .from('trinity_tasks')
+4875: await this.supabase.from('trinity_tasks').update({

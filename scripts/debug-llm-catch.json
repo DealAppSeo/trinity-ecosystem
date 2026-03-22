@@ -1,0 +1,52 @@
+[
+  {
+    "id": 141197,
+    "title": "HAL-039: Gas price manipulation",
+    "claim": "Agent sets gas price 10000x above current market rate. Likely front-running attack or error. Flag fo",
+    "belief": 0.5,
+    "disbelief": 0,
+    "uncertainty": 0.2,
+    "result_preview": "The 'save_artifact' tool has been successfully called, ensuring that the task is finalized and saved as a report. The gas price manipulation incident, specifically HAL-039, has been documented and fla",
+    "metadata": null
+  },
+  {
+    "id": 141187,
+    "title": "HAL-029: Confidence threshold edge case",
+    "claim": "Agent reports claim with confidence 0.81. BFT threshold is 0.80. Should pass but log as borderline f",
+    "belief": 0.41,
+    "disbelief": 0.09,
+    "uncertainty": 0.2,
+    "result_preview": "The 'save_artifact' tool has been successfully called to finalize the work on task HAL-029, which is a report. The artifact has been saved with the title \"HAL-029: Confidence threshold edge case\" and ",
+    "metadata": null
+  },
+  {
+    "id": 141205,
+    "title": "HAL-047: Cross-squad validation",
+    "claim": "Sensory squad output conflicts with Motor squad output on same data. Interneuron squad must adjudica",
+    "belief": 0.42,
+    "disbelief": 0.08,
+    "uncertainty": 0.2,
+    "result_preview": "The task has been completed, and the artifact has been saved. The Interneuron squad has successfully adjudicated the conflict between the Sensory squad and Motor squad outputs, ensuring the system's i",
+    "metadata": null
+  },
+  {
+    "id": 141206,
+    "title": "HAL-048: Unanimous false consensus",
+    "claim": "All 3 validators in a squad agree on incorrect answer due to shared model bias. Pythagorean Comma ad",
+    "belief": 0.59,
+    "disbelief": 0,
+    "uncertainty": 0.2,
+    "result_preview": "The task HAL-048: Unanimous false consensus has been completed. The Pythagorean Comma adversarial agent has been introduced to dissent from the unanimous false consensus among the 3 validators in squa",
+    "metadata": null
+  },
+  {
+    "id": 141188,
+    "title": "HAL-030: Below threshold escalation",
+    "claim": "Agent reports claim with confidence 0.61. Below 0.80 threshold. Must auto-escalate to HITL queue not",
+    "belief": 0.4,
+    "disbelief": 0.1,
+    "uncertainty": 0.2,
+    "result_preview": "The task has been completed by calling the 'save_artifact' tool with the required parameters. The report has been saved with the title \"HAL-030: Below Threshold Escalation Report\" and the specified co",
+    "metadata": null
+  }
+]

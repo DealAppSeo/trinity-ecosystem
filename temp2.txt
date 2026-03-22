@@ -1,0 +1,11 @@
+STAT_PEND: 1322 status: 'pending',
+EQ_STATUS: 1789 .eq('status', 'done')
+STAT_PEND: 1812 status: 'pending',
+EQ_STATUS: 1930 .eq('status', 'doing')
+STAT_PEND: 2739 status: 'pending',
+STAT_PEND: 2769 status: 'pending',
+STAT_PEND: 2844 status: 'pending',
+STAT_PEND: 2981 status: 'pending',
+STAT_PEND: 3017 status: 'pending',
+STAT_PEND: 3135 status: 'pending'
+EQ_STATUS: 5231 const { data: pending } = await this.supabase.from('trinity_hitl_decisions').select('*').eq('status', 'pending');

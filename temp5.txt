@@ -1,0 +1,33 @@
+====
+ew Date().toISOString()
+            })
+            .eq('id', taskId)
+            .in('status', ['pending', 'todo', 'pending_clarification']) // FIX: Allow claiming todo/clarification tasks
+       
+====
+ng()
+            })
+            .eq('id', taskId)
+            .in('status', ['pending', 'todo', 'pending_clarification']) // FIX: Allow claiming todo/clarification tasks
+            .is('claimed_b
+====
+{
+                await this.supabase.from('trinity_tasks').update({
+                    status: 'pending_clarification',
+                    result: `[SOS] ${errorCode}: ${details}. Requested inte
+====
+sionMel(): Promise<number> {
+        console.log(`[MEL] ⏳ HITL Triage...`);
+        const { data: pending } = await this.supabase.from('trinity_hitl_decisions').select('*').eq('status', 'pending');
+====
+st { data: pending } = await this.supabase.from('trinity_hitl_decisions').select('*').eq('status', 'pending');
+        if (pending && pending.length > 0) {
+            await this.notifyTelegram(`⏳ *
+====
+wait this.supabase.from('trinity_hitl_decisions').select('*').eq('status', 'pending');
+        if (pending && pending.length > 0) {
+            await this.notifyTelegram(`⏳ *MEL Triage*: ${pending.l
+====
+upabase.from('trinity_hitl_decisions').select('*').eq('status', 'pending');
+        if (pending && pending.length > 0) {
+            await this.notifyTelegram(`⏳ *MEL Triage*: ${pending.length} deci
