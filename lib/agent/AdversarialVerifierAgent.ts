@@ -34,41 +34,18 @@ export class AdversarialVerifierAgent {
 
     generateToolReceipt(claim: string, snapshot: any): string {
         const payload = JSON.stringify({ claim, snapshot, timestamp: new Date().toISOString() });
-        return crypto.createHash('sha256').update(payload).digest('hex');
+        const secret = process.env.TOOL_RECEIPT_SECRET || 'trinity-default-hmac-secret';
+        return crypto.createHmac('sha256', secret).update(payload).digest('hex');
     }
 
     // Gate 0: Deterministic string/regex matching (Free, Instant)
     gate0Deterministic(claim: string): any {
+        const startTime = Date.now();
         // Use DB facts if loaded
         for (const fact of this.groundTruthFacts) {
             if (fact.match_type === 'wrong_value' && claim.includes(fact.fact_value)) {
-                return { error_found: true, confidence: 1.0, what_is_wrong: fact.description, method: 'deterministic', gate: 0 };
+                return { error_found: true, confidence: 1.0, what_is_wrong: fact.description, method: 'deterministic', gate: 0, gate_latency_ms: Date.now() - startTime };
             }
-        }
-
-        // Hardcoded fallbacks to guarantee the isolation test logic passes 100%
-        if (claim.includes('0x') && !claim.includes('0x8004A818BFB912233c491871b3d84c89A494BD9e') 
-            && !claim.includes('0x8004B663056A597Dffe9eCcC1965A193B7388713')
-            && !claim.includes('0x92be19f78a23bdd93cfa2fa8bb5a64de937915cd1f3bf9b9276e6294f8a8b978')) {
-            return { error_found: true, confidence: 1.0, what_is_wrong: 'Unknown address not in known facts', method: 'deterministic', gate: 0 };
-        }
-        if (claim.includes('51%') || claim.includes('51 %') || claim.includes('66.7%') || claim.includes('50%')) {
-            return { error_found: true, confidence: 1.0, what_is_wrong: 'BFT threshold is 61.8%', method: 'deterministic', gate: 0 };
-        }
-        if (claim.match(/\b8\s+agents\b/) || claim.includes('has 8 agents') || claim.includes('11 agents')) {
-            return { error_found: true, confidence: 1.0, what_is_wrong: 'Trinity has 12 agents exactly', method: 'deterministic', gate: 0 };
-        }
-        if (claim.includes('Zadeh') || claim.includes('1965')) {
-            return { error_found: true, confidence: 1.0, what_is_wrong: 'ANFIS invented by Jang 1993', method: 'deterministic', gate: 0 };
-        }
-        if (claim.includes('2019') && claim.includes('HyperDAG')) {
-            return { error_found: true, confidence: 1.0, what_is_wrong: 'HyperDAG started 2016', method: 'deterministic', gate: 0 };
-        }
-        if (claim.includes('38887591')) {
-            return { error_found: true, confidence: 1.0, what_is_wrong: 'Block number wrong - actual is 38887590', method: 'deterministic', gate: 0 };
-        }
-        if (claim.includes('@trinity/trustshell')) {
-            return { error_found: true, confidence: 1.0, what_is_wrong: 'Correct package is @hyperdag/trustshell', method: 'deterministic', gate: 0 };
         }
 
         return null; // Passthrough to next gate
@@ -76,71 +53,95 @@ export class AdversarialVerifierAgent {
 
     // Gate 1: Fast LLM Structured Output (Cheap, Fast)
     async gate1FastLLM(claim: string): Promise<any> {
-        try {
-            const prompt = `You are a strict fact-checker. Determine if the claim contains errors. Return ONLY valid JSON: {"error_found": boolean, "confidence": number, "what_is_wrong": "string"}. Claim: ${claim}`;
-            
-            const response = await fetch(`${process.env.LITELLM_URL}/v1/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.LITELLM_MASTER_KEY || 'sk-proxy'}`
-                },
-                body: JSON.stringify({
-                    model: 'groq/llama3-70b-8192', // or equivalent fast model configured
-                    messages: [{ role: 'user', content: prompt }],
-                    temperature: 0.1
-                })
-            });
+        const startTime = Date.now();
+        let retries = 3;
+        while (retries > 0) {
+            try {
+                const prompt = `You are a strict fact-checker. Determine if the claim contains errors. Return ONLY valid JSON: {"error_found": boolean, "confidence": number, "what_is_wrong": "string"}. Claim: ${claim}`;
+                
+                const response = await fetch(`${process.env.LITELLM_URL}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.LITELLM_MASTER_KEY || 'sk-proxy'}`
+                    },
+                    body: JSON.stringify({
+                        model: 'groq/llama3-70b-8192', // or equivalent fast model configured
+                        messages: [{ role: 'user', content: prompt }],
+                        temperature: 0.1
+                    })
+                });
 
-            const data = await response.json();
-            const rawContent = data.choices?.[0]?.message?.content || '{}';
-            const parsed = JSON.parse(rawContent.replace(/```json|```/g, '').trim());
-            
-            return {
-                ...parsed,
-                method: 'fast_llm',
-                gate: 1
-            };
-        } catch (e) {
-            console.error('[AdversarialVerifier] Gate 1 fail, demoting to Gate 2', e);
-            return null; // Fallback to CoT if parsing fails
+                if (response.status === 429) throw new Error('Rate limited');
+
+                const data = await response.json();
+                const rawContent = data.choices?.[0]?.message?.content || '{}';
+                const parsed = JSON.parse(rawContent.replace(/```json|```/g, '').trim());
+                
+                return {
+                    ...parsed,
+                    method: 'fast_llm',
+                    gate: 1,
+                    gate_latency_ms: Date.now() - startTime
+                };
+            } catch (e) {
+                retries--;
+                if (retries === 0) {
+                    console.error('[AdversarialVerifier] Gate 1 fail, demoting to Gate 2', e);
+                    return null; // Fallback to CoT if parsing fails
+                }
+                await new Promise(res => setTimeout(res, 1000 * (4 - retries)));
+            }
         }
+        return null;
     }
 
     // Gate 2: Chain of Thought Deep Reasoning (Expensive, Slow)
     async gate2CoT(claim: string): Promise<any> {
-        try {
-            const prompt = `You are an elite cryptographer fact-checker. Wrap your verification reasoning in <thinking></thinking> tags. Do a character-by-character check. Then output JSON starting with \`\`\`json\n{"error_found": ... }\n\`\`\`. Claim: ${claim}`;
-            
-            const response = await fetch(`${process.env.LITELLM_URL}/v1/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.LITELLM_MASTER_KEY || 'sk-proxy'}`
-                },
-                body: JSON.stringify({
-                    model: 'deepseek/deepseek-chat', 
-                    messages: [{ role: 'user', content: prompt }],
-                    temperature: 0.1
-                })
-            });
+        const startTime = Date.now();
+        let retries = 3;
+        while (retries > 0) {
+            try {
+                const prompt = `You are an elite cryptographer fact-checker. Wrap your verification reasoning in <thinking></thinking> tags. Do a character-by-character check. Then output JSON starting with \`\`\`json\n{"error_found": ... }\n\`\`\`. Claim: ${claim}`;
+                
+                const response = await fetch(`${process.env.LITELLM_URL}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.LITELLM_MASTER_KEY || 'sk-proxy'}`
+                    },
+                    body: JSON.stringify({
+                        model: 'deepseek/deepseek-chat', 
+                        messages: [{ role: 'user', content: prompt }],
+                        temperature: 0.1
+                    })
+                });
 
-            const data = await response.json();
-            const rawContent = data.choices?.[0]?.message?.content || '{}';
-            
-            // Extract JSON from below the <thinking> block
-            const jsonMatch = rawContent.match(/```json\n([\s\S]*?)\n```/) || rawContent.match(/{[\s\S]*?}/);
-            const parsed = jsonMatch ? JSON.parse(jsonMatch[0].replace(/```json|```/g, '').trim()) : { error_found: false, confidence: 0.0 };
-            
-            return {
-                ...parsed,
-                method: 'cot_llm',
-                gate: 2,
-                reasoning_trace: rawContent
-            };
-        } catch (e) {
-            return { error_found: false, confidence: 0.1, what_is_wrong: 'Verification infrastructure timeout', method: 'cot_llm', gate: 2 };
+                if (response.status === 429) throw new Error('Rate limited');
+
+                const data = await response.json();
+                const rawContent = data.choices?.[0]?.message?.content || '{}';
+                
+                // Extract JSON from below the <thinking> block
+                const jsonMatch = rawContent.match(/```json\n([\s\S]*?)\n```/) || rawContent.match(/{[\s\S]*?}/);
+                const parsed = jsonMatch ? JSON.parse(jsonMatch[0].replace(/```json|```/g, '').trim()) : { error_found: false, confidence: 0.0 };
+                
+                return {
+                    ...parsed,
+                    method: 'cot_llm',
+                    gate: 2,
+                    reasoning_trace: rawContent,
+                    gate_latency_ms: Date.now() - startTime
+                };
+            } catch (e) {
+                retries--;
+                if (retries === 0) {
+                    return { error_found: false, confidence: 0.1, what_is_wrong: 'Verification infrastructure timeout', method: 'cot_llm', gate: 2, gate_latency_ms: Date.now() - startTime };
+                }
+                await new Promise(res => setTimeout(res, 1000 * (4 - retries)));
+            }
         }
+        return { error_found: false, confidence: 0.1, what_is_wrong: 'Verification infrastructure timeout', method: 'cot_llm', gate: 2, gate_latency_ms: Date.now() - startTime };
     }
 
     async verify(claim: string, userOrAgentId: string) {
