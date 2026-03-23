@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { TelegramLoginWidget } from '@/components/ui/TelegramLoginWidget';
 import { Sparkles, Shield, Cpu, Zap, Network, ChevronRight, Activity, Globe, Lock, ArrowRight, BookOpen } from 'lucide-react';
+import { WaitlistForm } from '@/components/WaitlistForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -219,11 +220,7 @@ export default async function LandingPage() {
                     Explore Repos
                   </Button>
                 </Link>
-                <Link href="/join">
-                  <Button variant="outline" className="border-white/10 hover:bg-white/5 px-8 py-6 rounded-2xl font-black">
-                    Get Access
-                  </Button>
-                </Link>
+                <WaitlistForm />
               </div>
             </div>
           </div>
