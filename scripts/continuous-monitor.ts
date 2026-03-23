@@ -15,15 +15,26 @@ async function runMonitor() {
         const { data: doneLastHour } = await supabase.from('trinity_tasks').select('id').eq('status', 'done').gt('updated_at', new Date(Date.now() - 3600000).toISOString());
         const { data: pending } = await supabase.from('trinity_tasks').select('id').eq('status', 'pending');
         const { data: stuck } = await supabase.from('trinity_tasks').select('id').eq('status', 'pending_clarification');
-        const { data: caughtTasks } = await supabase.from('trinity_tasks').select('id').eq('task_type', 'hallucination_detection').eq('status', 'done').gt('disbelief', 0.3);
-        const { data: traces } = await supabase.from('trinity_agent_logs').select('id').eq('event_type', 'bft_reasoning_trace');
+        const { data: hallucinationTasks } = await supabase.from('trinity_tasks').select('id, belief, disbelief').eq('task_type', 'hallucination_detection').eq('status', 'done').not('belief', 'is', null);
+        let caughtCount = 0;
+        let totalDisbelief = 0;
+        for (const t of hallucinationTasks || []) {
+            totalDisbelief += parseFloat(t.disbelief || '0');
+            if (parseFloat(t.disbelief) > 0.3) caughtCount++;
+        }
+        const catchRate = hallucinationTasks?.length ? Math.round((caughtCount / hallucinationTasks.length) * 100) : 0;
+        const avgDisbelief = hallucinationTasks?.length ? (totalDisbelief / hallucinationTasks.length).toFixed(3) : '0';
+
+        const { data: traces } = await supabase.from('trinity_agent_logs').select('id').eq('action', 'bft_reasoning_trace');
 
         const payload = {
             timestamp: new Date().toISOString(),
             tasks_done_last_hour: doneLastHour?.length || 0,
             tasks_pending: pending?.length || 0,
             tasks_stuck: stuck?.length || 0,
-            hallucination_caught: caughtTasks?.length || 0,
+            hallucination_caught: caughtCount,
+            adversarial_catch_rate: `${catchRate}%`,
+            avg_adversarial_disbelief: avgDisbelief,
             reasoning_traces_logged: traces?.length || 0,
             latest_commit: execSync('git rev-parse --short HEAD').toString().trim(),
             dawn_wake_message: "Good morning Sean. The TrustShell Stack overnight sprint has completed successfully. All 7 phases executed. Isolation validation passed, HMAC receipts active, telemetry wired."
