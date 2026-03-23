@@ -764,15 +764,36 @@ export class ConstitutionalAgent {
      * Logs the actual cost of an LLM call and calculates savings versus a weighted market baseline.
      */
     async logCost(taskId: string | number, result: LLMResult) {
-        if (!result.cost || result.cost <= 0) return;
-
         try {
+            const totalTokens = (result.usage?.prompt_tokens || 0) + (result.usage?.completion_tokens || 0);
+            
+            // 1. Dynamic Cost Calculation based on model
+            let actualCost = result.cost || 0;
+            const modelStr = (result.model || '').toLowerCase();
+            
+            if (modelStr.includes('groq') || modelStr.includes('llama')) {
+                actualCost = (totalTokens / 1000000) * 0.07;
+            } else if (modelStr.includes('cerebras')) {
+                actualCost = (totalTokens / 1000000) * 0.10;
+            } else if (modelStr.includes('deepseek')) {
+                actualCost = (totalTokens / 1000000) * 0.27;
+            } else if (modelStr.includes('anthropic') || modelStr.includes('claude')) {
+                actualCost = (totalTokens / 1000000) * 3.00;
+            } else if (modelStr.includes('openai') || modelStr.includes('gpt')) {
+                actualCost = (totalTokens / 1000000) * 5.00;
+            }
+
+            if (actualCost <= 0) return;
+
+            // 2. NEW: Update actual_cost in trinity_tasks directly for the Hackathon Demo
+            await this.supabase.from('trinity_tasks').update({
+                actual_cost: actualCost
+            }).eq('id', taskId);
+
             // FrugalGPT Baseline (Claude's Formula): 60% GPT4-T, 20% Sonnet, 20% Llama70B
             // Input/Output average ~ $6.72 / 1M tokens
             const baselineRate = 6.72 / 1000000;
-            const totalTokens = (result.usage?.prompt_tokens || 0) + (result.usage?.completion_tokens || 0);
             const baselineCost = totalTokens * baselineRate;
-            const actualCost = result.cost;
 
             const savingsPct = baselineCost > 0 ? ((baselineCost - actualCost) / baselineCost) * 100 : 0;
 
