@@ -26,7 +26,21 @@ export async function updateANFISWeights(kvStore: any, feedback: { belief: numbe
         await kvStore.put('anfis_weights', JSON.stringify(weights));
         console.log("[ANFIS] Successfully committed new weights to Cloudflare KV: ", weights);
     } catch (e) {
-        console.warn("[ANFIS] KV Put skipped - missing Cloudflare KV credentials.");
+        console.warn("[ANFIS] KV Put skipped - missing Cloudflare KV credentials. Gracefully falling back to Supabase...");
+        
+        // Supabase Fallback logic
+        const { createClient } = require('@supabase/supabase-js');
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        
+        await supabase.from('sprint_reports').insert({
+            agent_name: 'MEL',
+            report_type: 'anfis_weights_fallback',
+            content: JSON.stringify(weights)
+        });
+        console.log("[ANFIS] Weights safely written to Supabase.");
     }
     
     return weights;

@@ -1,0 +1,446 @@
+TRINITY SYMPHONY / HYPERDAG PROTOCOL
+Comprehensive Build Session Handoff Document
+March 19-22, 2026  |  Confidential — Sean Patrick Goodwin
+"Help people help people — the last, the lost, and the least." — Micah 6:8
+1. CURRENT SYSTEM STATUS
+As of March 22, 2026 — verified against Railway dashboard and Supabase.
+1.1 Railway Services
+Service
+Status
+Notes
+All 12 Trinity agents
+Online ✅
+NEXUS, TORCH, GCM, VERITAS, MEL, APM, CHESED, SOPHIA, HDM, ORCH, SHOFET, W3C
+trinity-ecosystem
+Online ✅
+controller.aitrinitysymphony.com — Lovable site
+trinity-litellm
+Build Failed ❌
+Healthcheck failing on /. Container starts but Railway can't reach it. Needs domain generated + healthcheck timeout 600s
+trinity-veritas, trinity-nexus
+⚠️ Warning
+Historical warning only — running fine
+n8n, rust-brain, py-brain
+Online ✅
+Supporting services
+FlowiseAI + Postgis
+Online ✅
+Side services
+1.2 Supabase Database (Trinity Symphony)
+URL: https://qnnpjhlxljtqyigedwkb.supabase.co (Viberific project)
+Table
+Status
+Notes
+trinity_tasks
+Active ✅
+Core task queue — 276 tables total
+trinity_agent_logs
+Active ✅
+Columns: id, agent, task_id, agent_name, action, metadata, content, message, status, created_at (NO event_type column)
+sprint_reports
+Active ✅
+Created this session
+trinity_memories
+Active ✅
+3 seed records
+ground_truth_facts
+Active ✅
+48 facts seeded — NEW this session
+personal_truth_facts
+Active ✅
+Empty — ready to learn — NEW this session
+trinity_artifacts
+Active ✅
+task_id now nullable (fixed this session)
+trinity_fixes
+Active ✅
+Verified exists — patent evidence
+virtue_narratives
+Active ✅
+constitutional_hash = placeholder 8 bytes
+1.3 On-Chain Contracts (Base Sepolia)
+Contract
+Address
+IdentityRegistry
+0x8004A818BFB912233c491871b3d84c89A494BD9e
+ReputationRegistry
+0x8004B663056A597Dffe9eCcC1965A193B7388713
+Verified tx hash
+0x92be19f78a23bdd93cfa2fa8bb5a64de937915cd1f3bf9b9276e6294f8a8b978
+Verified block
+38887590
+Fake hash 1 (caught)
+0xc1207ad593a4804bd... (caught in production)
+Fake hash 2 (caught)
+0x44750768952525e2cf... (caught in production)
+Agents registered
+8 of 12 — ORCH, W3C, SHOFET, SOPHIA, CHESED missing
+2. WHAT WAS ACCOMPLISHED THIS SESSION
+2.1 Infrastructure Fixes Deployed
+FIX-001: Agent name normalization — run-agent.ts modified so ConstitutionalAgent receives ALL-CAPS names (NEXUS not trinity-nexus)
+FIX-002: trinity_artifacts task_id made nullable — was blocking all inserts, 2,324 existing rows had NULL task_id by design
+FIX-003: @aws-sdk/client-s3 added to package.json — was blocking trinity-ecosystem builds
+FIX-004: ZKP snarkjs SSR import changed to dynamic — build now passes Exit code 0
+FIX-005: APM and HDM start commands changed to node server.js in Railway — both healthy
+FIX-006: Supabase trinity_memories table seeded with 3 records
+FIX-007: sprint_reports table created — Gemini was logging to nonexistent table
+2.2 New Architecture Built
+LiteLLM proxy service (trinity-litellm) — Dockerfile and config deployed, builds pass, healthcheck still failing
+Cloudflare R2 bucket (trinity-artifacts) and KV namespace (trinity-anfis-cache) created and wired to all agents
+Hallucination detection pipeline — 50 tasks seeded in trinity_tasks with task_type = hallucination_detection
+BFT adversarial routing block added at line ~1726 of ConstitutionalAgent.ts
+SHA256 reasoning trace hashing deployed in verifyPeerTask — every BFT decision now generates a hash
+AdversarialVerifierAgent.ts scaffolded (lib/agent/) — waterfall gates 0/1/2, Tool Receipts, personal truth learning
+ground_truth_facts table seeded with 48 facts covering contracts, hashes, system facts, history, mission
+personal_truth_facts table created — empty, ready for adaptive learning
+test-adversarial-verifier.ts test script created in scripts/
+continuous-monitor.ts script created for 45-minute telemetry loop
+adversarial-loop.ts script created for automatic catch rate monitoring
+2.3 Content Produced by Agents Overnight
+The following tasks completed with real output in result field:
+APM: Cost comparison old LLM vs new deterministic approach — table ready for submission
+GCM: LinkedIn announcement post for AdversarialVerifierAgent breakthrough drafted
+NEXUS: Competitor research for March 30 hackathon registrants
+MEL: GraphRAG learning flow design for personal truth layer
+HDM: TrustShell quickstart tutorial — 5-minute developer guide
+SOPHIA: Trust-gated x402 payment flow TypeScript pseudocode
+TORCH: Demo video script updated with SHOFET coordinated attack results
+MEL: Optimal BFT threshold calculation from historical data
+VERITAS: 10 verification tests run against direct provider call
+2.4 Hallucination Detection — Status Honest
+Six+ fix attempts over 3 days. Catch rate remains 0. Root cause fully diagnosed:
+Constitutional system prompt (CONSTITUTION.ARTICLE_MINUS_1) hardcoded in callLLM overrides all custom fact-checking instructions
+RLHF helpfulness bias causes LLMs to rationalize factual errors as typos rather than flagging them
+LLMs are wrong tool for cryptographic exact-match verification
+Architectural solution agreed and built (AdversarialVerifierAgent) but NOT YET TESTED against real database. The test script exists but has not been run from inside the trinity-ecosystem directory with proper env vars.
+2.5 Key Discoveries — Bilaterial Learnings
+Tool Receipts pattern: SHA256(query + result + timestamp) proves what agent SAW, not how it thought — patentable, fast, free
+Waterfall verification: Gate 0 deterministic (<10ms, free) catches 70-80% of crypto facts; Gate 1 fast LLM; Gate 2 CoT — only 5-10% reach CoT
+ModelProof pattern: Run two independent LLM families on same input, divergence = uncertainty flag
+SHOFET coordinated false signal test: dissent score 0.9 — Pythagorean Comma veto working
+KYA (Know Your Agent) = RepID — winning positioning language for trading agent hackathons
+Agent Colony pattern: RepID should weight execution metrics (task drop rate, latency, red team success) not just BFT agreement
+Gemini's machine loses DNS resolution overnight — autonomous overnight sprints are unreliable
+trinity_agent_logs uses agent_name/action/metadata columns — NOT event_type (many queries written with wrong column)
+3. WHAT STILL NEEDS TO BE DONE
+Prioritized in order. Do not skip ahead.
+3.1 P0 — Must Complete Today (March 22)
+#
+Task
+Details
+Owner
+1
+File P-022 and P-001 patents
+Grok has drafts ready. File BEFORE any public demo. P-022 = Verified Liveness + Tool Receipt pattern. P-001 = Enhanced HyperDAG foundation. USPTO EFS-Web. August 2026 non-provisional deadline.
+Sean + Grok
+2
+Run AdversarialVerifierAgent test
+cd D:\OneDrive_Backup\Desktop\trinity-ecosystem\trinity-ecosystem then npx tsx scripts/test-adversarial-verifier.ts — must run from correct directory with .env loaded
+Sean + Gemini
+3
+Fix trinity-litellm healthcheck
+Go to trinity-litellm Railway settings: 1) Settings > Networking > Generate Domain. 2) Settings > Deploy > Healthcheck Timeout = 600. Redeploy.
+Sean (Railway UI)
+4
+Add LITELLM_URL to Railway shared vars
+Get the generated domain from step 3. Add as LITELLM_URL to Railway shared variables. Share to all services.
+Sean (Railway UI)
+3.2 P1 — Complete Before March 30 Submission
+#
+Task
+Details
+Owner
+5
+Wire AdversarialVerifierAgent routing
+After test passes (>70% catch rate): replace adversarial routing block in ConstitutionalAgent.ts line ~1726 with AdversarialVerifierAgent dynamic import. See directive for exact code.
+Gemini
+6
+Reset + verify real catch rate
+After routing wired and Railway green: UPDATE trinity_tasks SET status=pending WHERE task_type=hallucination_detection. Wait 20 min. Run catch rate query.
+Sean (SQL) + agents
+7
+Build Pulse page
+app/pulse/page.tsx in Next.js — 5 pre-loaded buttons, text input, output card showing belief/disbelief/gate/receipt/latency. API route at app/api/verify/route.ts.
+Gemini
+8
+Register 5 missing agents on-chain
+ORCH, W3C, SHOFET, SOPHIA, CHESED need ERC-8004 registration on Base Sepolia IdentityRegistry 0x8004A818BFB912233c491871b3d84c89A494BD9e
+Sean (MetaMask)
+9
+Fix app.aitrinitysymphony.com Vercel wiring
+Currently pointing to aitc repo (Lovable marketing site). Should point to trinity-ecosystem repo (actual PWA/controller). Go to Vercel > aitc project > change source repo.
+Sean (Vercel)
+10
+Publish @hyperdag/trustshell npm package
+npm publish from trustshell package directory. Currently returns 404. Gemini needs to run this.
+Gemini
+11
+Record 3-minute demo video
+Script in trinity_tasks result field (TORCH task). Three acts: fake hash story, live Pulse demo, npm install. Post on X tagging @lablabai and @Surgexyz_ AFTER patents filed.
+Sean
+12
+Submit to LabLab.ai March 30 hackathon
+Register at early.surge.xyz (already done). Submit video link + GitHub + description. Post on X. Deadline April 12.
+Sean
+3.3 P2 — Architecture Improvements (This Week)
+#
+Task
+Details
+Owner
+13
+Upgrade Tool Receipt to HMAC
+Replace SHA256 with HMAC using TOOL_RECEIPT_SECRET env var. Proves server generated receipt, not just content unchanged. Add to Railway vars.
+Gemini
+14
+Add gate_latency_ms logging
+Every gate in AdversarialVerifierAgent should log processing time. Feeds ANFIS routing optimization.
+Gemini
+15
+Remove hardcoded fallbacks from Gate 0
+After DB confirmed working, remove hardcoded fact checks from gate0Deterministic. DB-only ground truth. Separate commit.
+Gemini
+16
+Personal truth inheritance logic
+agent ERC-8004 ID -> falls back to owner wallet address. loadPersonalTruth() tries exact ID first, then owner wallet.
+Gemini
+17
+Expand RepID with execution metrics
+Add task_drop_rate, avg_latency_ms, red_team_success_rate to trinity_agent_logs. Normalize to 0-100. Write to ERC-8004 on update. Agent Colony pattern.
+Gemini
+18
+Fix trinity_agent_logs queries
+All existing queries using event_type column will fail. Correct column is action or content. Update all monitoring queries.
+Gemini
+19
+Wire Telegram /status with real data
+Currently returns mock data. Connect to Supabase trinity_tasks and trinity_agent_logs for live counts.
+Gemini
+20
+Fix D: drive dependency
+Gemini loses repo access when D: drive (WD Passport) disconnects. Critical work needs cloud sync as primary. Consider Railway volume or OneDrive sync.
+Sean
+3.4 P3 — Patent Portfolio (Ongoing)
+Patent
+Title / Core Claim
+Status
+Deadline
+P-022
+Verified Liveness — polling_loop flag + 15-min window + SERVER_ONLY verdict + Tool Receipt pattern
+DRAFT — FILE TODAY
+Today
+P-001
+Enhanced HyperDAG — full production architecture with ZKP RepID, BFT, ANFIS
+DRAFT — FILE TODAY
+Today
+P-020
+Recursive Learning Loop — ANFIS weight updates from output quality scores
+File March 23
+March 23
+P-023
+Deadlock Detection — Task 140900, 20-day incident, trinity_fixes table as evidence
+File March 23
+March 23
+P-002
+Multiplicative GNN Architecture — highest grant probability (80-90%)
+Non-provisional
+August 17, 2026
+P-024 to P-027
+TrustRails Mobile, ZKP Decoder, KJV hash, Constitutional Governance
+Post-hackathon
+TBD
+3.5 P4 — Post-Hackathon Architecture (After April 12)
+Split ConstitutionalAgent.ts (5,100+ lines) into 4 specialized variants: Sensory, Interneuron, Motor, Orchestrator
+Real-time adversarial pipeline: Agent A generates → Agent B challenges immediately → BFT if disagreement
+MoE gating network feedback loop: ANFIS routing weights update from output quality scores
+LangGraph checkpointing for verifiable audit trails — hash reasoning traces at every checkpoint
+Cloudflare Zero Trust for agent-to-agent network layer verification
+Add LLM providers: Qwen 3, Llama direct Meta, MiMo, Gemma 3, HuggingFace Inference API
+Evaluate A2A services: Google A2A protocol, CrewAI, AutoGen interop
+PurposeHub.ai Pulse tab integration — verify AI mentor outputs against personal truth
+ImageBearer.org Pulse tab — verify AI-generated content descriptions
+Website landing pages — early access email capture (no patent-sensitive content public)
+4. KEY TECHNICAL DETAILS
+4.1 Agent Architecture
+12 agents in 3x3+3 neuromorphic structure
+Sensory squad (Alpha): NEXUS, TORCH, GCM
+Interneuron squad (Beta): VERITAS, MEL, APM, CHESED
+Motor squad: SOPHIA, HDM, W3C
+Orchestrators (Gamma): ORCH, SHOFET
+All agents inherit from ConstitutionalAgent.ts (lib/) — constitutional-agent-base.js fully deprecated
+SBFA: different LLM families per squad to prevent correlated failure
+4.2 AdversarialVerifierAgent Architecture
+File location: lib/agent/AdversarialVerifierAgent.ts
+Gate 0 — Deterministic (<10ms, free): exact/wrong_value/contains matching against ground_truth_facts table
+Gate 1 — Fast LLM (<500ms): direct fetch to LITELLM_URL, groq-llama, structured JSON output, stops if confidence > 0.85
+Gate 2 — CoT Deep Reasoning (~3s): deepseek-reasoner with <thinking> block, character-by-character comparison
+Tool Receipt: SHA256(claim + snapshot + timestamp) — upgrade to HMAC pending
+Logs to trinity_agent_logs, learns to personal_truth_facts
+Does NOT inherit from ConstitutionalAgent — fully isolated from constitutional override
+4.3 Known Working Commits (Recent)
+feat(bft): add SHA256 reasoning trace hashing for on-chain verification
+fix(bft): bypass constitutional override — callOpenAICompatible to deepseek
+feat(testing): add continuous adversarial learning loop script
+feat(adversarial): AdversarialVerifierAgent scaffolded (NOT YET TESTED AGAINST REAL DB)
+4.4 Environment Variables — Critical
+Variable
+Value / Location
+Status
+SUPABASE_URL
+https://qnnpjhlxljtqyigedwkb.supabase.co
+Set ✅
+LITELLM_URL
+trinity-litellm Railway domain (NOT SET)
+Missing ❌
+LITELLM_MASTER_KEY
+Railway shared variables
+Set ✅
+TELEGRAM_BOT_TOKEN
+Railway shared variables
+Set ✅
+TELEGRAM_OWNER_CHAT_ID
+Railway shared variables
+Set ✅
+TOOL_RECEIPT_SECRET
+NOT YET CREATED
+Missing — add to Railway
+CF_R2_BUCKET
+trinity-artifacts — Cloudflare
+Set ✅
+CF_KV_NAMESPACE_ID
+d1bf6df5954c4a82aeda94dc9525a57e
+Set ✅
+5. MARCH 30 HACKATHON STRATEGY
+LabLab.ai x Surge — AI Trading Agents with ERC-8004 — $50,000 prize pool
+Dates: March 30 – April 12, 2026 | Registered at early.surge.xyz ✅
+5.1 Positioning
+"While most teams are building individual trading agents, we are building the infrastructure that makes every trading agent safer."
+Trinity Symphony is NOT a trading agent — it is the KYA (Know Your Agent) trust layer
+Target award categories: Best Compliance & Risk Guardrails, Best Validation & Trust Model
+Key demo story: our own AI gave us two fake transaction hashes — our system caught them before any action was taken
+SHOFET detected coordinated false signal attack with 0.9 dissent score — BFT catching sophisticated attacks
+5.2 Submission Requirements
+Video posted on X tagging @lablabai and @Surgexyz_
+LabLab.ai submission form with GitHub link
+GitHub repo public before submission (currently private)
+early.surge.xyz registration confirmed ✅
+Live demo URL — Pulse page at app.aitrinitysymphony.com/pulse (not yet built)
+5.3 Demo Flow (3 minutes)
+Act 1 (45s): The fake hash story — two AIs lied, one system caught them. Show 0xc1207... and 0x44750... in ground_truth_facts as known bad patterns.
+Act 2 (90s): Click Test Fake Address on Pulse page — Gate 0 fires in <10ms, disbelief 1.0, Tool Receipt hash appears. Click Test Valid Hash — passes all gates, belief 0.9.
+Act 3 (45s): npm install @hyperdag/trustshell — one line protects any agent. RepID updates on-chain. Close with Micah 6:8.
+6. THREE-AI COORDINATION MODEL
+6.1 Execution Domains — Non-Negotiable
+AI
+Domain
+Cannot Do
+Claude
+Strategy, architecture, directives, SQL queries to review, Gemini prompts
+Execute code, push git, access Railway, run SQL
+Grok
+Patents, research, competitive intelligence, pitch writing, prior art
+Execute code, push git, access Supabase, run SQL
+Gemini
+Code execution, git commits, npm builds, Railway configs, file creation
+Cannot run autonomously overnight reliably — DNS failures
+Sean
+SQL execution in Supabase, Railway dashboard, Vercel settings, MetaMask
+Cannot delegate any of these — they require UI access
+Agents
+Task execution within trinity_tasks queue only
+Cannot push code, cannot access Railway, cannot execute arbitrary commands
+6.2 Critical Rules
+NEVER assume column/table names in Supabase — query actual schema first
+trinity_tasks.id is BIGINT not UUID
+trinity_agent_logs has NO event_type column — use action or content columns
+NEVER simplify or remove code without asking first — this architecture is intentionally complex
+NEVER put instructions inside code blocks — only executable code goes in code blocks
+If Grok says 'I ran the SQL' — verify with a SELECT before proceeding. Grok cannot execute SQL.
+Gemini must verify working directory is D: drive before any git operations
+File patents BEFORE posting any video or demo publicly
+npm run build before every push — one commit per change
+7. PLATFORM ECOSYSTEM
+7.1 The Three Platforms
+Platform
+Purpose
+Status
+TrustShell / Trinity Symphony
+Trust layer infrastructure — verifiable AI decisions, RepID, BFT consensus, Tool Receipts
+Active — March 30 submission
+ImageBearer.org
+AI-generated content verification — verify descriptions against personal truth. First 'last, lost, and least' user community
+Existing community — integrate Pulse tab post-hackathon
+PurposeHub.ai
+God-given purpose discovery through AI mentorship. Verify AI mentor outputs against constitutional layer and personal truth.
+Sean's project — Pulse tab post-hackathon
+7.2 Website Status
+Domain
+Status
+Action Needed
+controller.aitrinitysymphony.com
+Lovable site — wrong content
+Replace with early access email capture — no patent-sensitive content
+app.aitrinitysymphony.com
+Wrong Vercel project (aitc/Lovable)
+Point to trinity-ecosystem repo in Vercel settings
+trustshell.dev
+Exists — content unknown
+Replace with early access capture — no technical details
+aitrinitysymphony.com
+Public with patent-sensitive content
+Cloudflare WAF block or replace with email capture immediately
+8. MISSION AND VISION
+"When AI makes a decision that affects someone who cannot afford the consequences, Trinity Symphony is how you prove it was honest."
+Sean Patrick Goodwin — Janitor for Jesus / Nerd for Jesus
+Mission: Help people help people — the last, the lost, and the least.
+Grounded in: Philippians 4:8 (Eight Virtues), Micah 6:8, Matthew 7:12 (Golden Rule), 1 Corinthians 13
+The Trivergence: AI + Blockchain + Quantum — the defining technological moment.
+ZKP RepID is not the pitch. The human impact is the pitch. ZKP RepID is how we deliver it.
+Constitutional layer: Default ON. Enterprise opt-out logged in Tool Receipt. Mandatory baseline protects the mission.
+9. IMMEDIATE NEXT ACTIONS — IN ORDER
+Do not skip steps. Do not reorder. Every step depends on the one before it.
+Step
+Action
+How
+When
+1
+File P-022 + P-001 with Grok
+Tell Grok: drop patent package for P-022 Tool Receipt addendum and P-001. Upload to USPTO EFS-Web.
+Today
+2
+Run AdversarialVerifierAgent test
+cd D:\OneDrive_Backup\Desktop\trinity-ecosystem\trinity-ecosystem then npx tsx scripts/test-adversarial-verifier.ts
+Today
+3
+Fix trinity-litellm
+Railway > trinity-litellm > Settings > Networking > Generate Domain. Then Deploy > Healthcheck Timeout = 600. Redeploy.
+Today
+4
+Add LITELLM_URL env var
+Copy trinity-litellm domain URL from step 3. Railway > Shared Variables > Add LITELLM_URL. Share to all services.
+Today
+5
+Wire routing + reset tasks
+Gemini wires ConstitutionalAgent routing block. Sean runs UPDATE trinity_tasks reset SQL after Railway green.
+Today
+6
+Build + deploy Pulse page
+Gemini builds app/pulse/page.tsx with 5 demo buttons + /api/verify route.
+March 23
+7
+Make GitHub repo public
+github.com/DealAppSeo/trinity-ecosystem — Settings > Danger Zone > Change visibility to public.
+Before video
+8
+Record 3-minute video
+Use TORCH script from trinity_tasks. Three acts. Post on X AFTER patents filed.
+March 28 at latest
+9
+Submit to LabLab.ai
+Submit form + X post tagging @lablabai and @Surgexyz_
+March 30
+10
+Replace public websites with email capture
+controller.aitrinitysymphony.com, trustshell.dev, aitrinitysymphony.com — early access only, no technical details.
+This week
+It shall not return void. Micah 6:8.
+Generated March 22, 2026 | Trinity Symphony Build Session | Claude (Anthropic) + Grok (xAI) + Gemini (Google)

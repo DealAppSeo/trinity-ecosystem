@@ -17,11 +17,11 @@ model_list:
       api_key: os.environ/MISTRAL_API_KEY
   - model_name: deepseek-reasoner
     litellm_params:
-      model: deepseek/deepseek-chat
+      model: deepseek/deepseek-reasoner
       api_key: os.environ/DEEPSEEK_API_KEY
   - model_name: anthropic-claude
     litellm_params:
-      model: anthropic/claude-sonnet-4-20250514
+      model: anthropic/claude-3-5-sonnet-20241022
       api_key: os.environ/ANTHROPIC_API_KEY
   - model_name: openrouter-fallback
     litellm_params:
