@@ -57,7 +57,7 @@ export default function ConductorPage() {
 
     // Derived stats for UI if API fails or for instant updates
     const filteredAgents = agents.filter(a => a.agent_name !== 'trinity-ecosystem' && a.agent_name !== 'trinity-science');
-    const onlineCount = filteredAgents.filter(a => ['online', 'blue', 'amber'].includes(a.status)).length;
+    const onlineCount = stats?.online_agents || 0;
     const busyCount = filteredAgents.filter(a => (a as any).current_task_summary && (a as any).current_task_summary !== 'Idle' && (a as any).status !== 'offline').length;
 
     // Ecosystem/Network Entities
@@ -146,8 +146,8 @@ export default function ConductorPage() {
         setTimeout(refresh, 1000);
     };
 
-    const handleHITLApprove = async (id: string) => {
-        const promise = supabase.from('trinity_tasks').update({ status: 'doing', metadata: { approved_by: 'FOUNDER' } }).eq('id', id).then(({ error }) => { if (error) throw error; });
+    const handleHITLApprove = async (title: string) => {
+        const promise = supabase.from('trinity_tasks').update({ status: 'approved', metadata: { approved_by: 'FOUNDER' } }).eq('title', title).then(({ error }) => { if (error) throw error; });
         toast.promise(promise, {
             loading: 'Approving task...',
             success: 'Task approved and released!',
@@ -155,8 +155,8 @@ export default function ConductorPage() {
         });
     };
 
-    const handleHITLReject = async (id: string) => {
-        const promise = supabase.from('trinity_tasks').update({ status: 'cancelled', metadata: { rejected_by: 'FOUNDER' } }).eq('id', id).then(({ error }) => { if (error) throw error; });
+    const handleHITLReject = async (title: string) => {
+        const promise = supabase.from('trinity_tasks').update({ status: 'cancelled', metadata: { rejected_by: 'FOUNDER' } }).eq('title', title).then(({ error }) => { if (error) throw error; });
         toast.promise(promise, {
             loading: 'Rejecting task...',
             success: 'Task rejected and stalled.',
@@ -362,7 +362,7 @@ export default function ConductorPage() {
                         )}>
                             <HITLActionCenter
                                 pendingEvents={tasks.filter(t => t.status === 'pending_clarification').map(t => ({
-                                    id: t.id,
+                                    id: t.title,
                                     title: t.title,
                                     type: (t as any).task_type === 'phone_validation' ? 'phone' : 'clarification',
                                     agent: t.claimed_by || 'Unknown',

@@ -43,6 +43,7 @@ function JoinContent() {
 
         if (cleanPassword === SYMPHONY_KEY || cleanPassword.toUpperCase() === MASTER_KEY) {
             console.log('👑 Founder Access Verified');
+            localStorage.setItem('trinity_admin_key', cleanPassword);
             grantAccess('founder');
             return;
         }

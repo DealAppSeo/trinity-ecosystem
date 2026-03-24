@@ -1704,7 +1704,7 @@ Return ONLY: {"error_found": true/false, "confidence": 0.0-1.0, "what_is_wrong":
         const { data: task, error } = await query
             .in('status', ['pending', 'todo', 'pending_clarification'])
             .is('claimed_by', null)
-            .or(`metadata->retry_after.is.null,metadata->retry_after.lte.${new Date().toISOString()}`)
+            .or(`metadata->>retry_after.is.null,metadata->>retry_after.lte.${new Date().toISOString()}`)
             // If expert, prioritize clarification tasks (mentorship)
             .order('status', { ascending: false })
             .order('priority', { ascending: false })

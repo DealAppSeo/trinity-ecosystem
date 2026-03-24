@@ -156,7 +156,13 @@ export const useTrinityController = () => {
             });
             const unifiedStats = statsRes.ok ? await statsRes.json() : null;
 
-            const calculatedActiveAgents = enrichedAgents.filter((a: any) => ['active', 'online', 'green', 'blue', 'amber'].includes(a.status)).length;
+            // Fetch Active Agents from logs (1-hour window)
+            const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+            const { data: logsData } = await supabase.from('trinity_agent_logs')
+                .select('agent_name')
+                .gt('created_at', oneHourAgo);
+            const calculatedActiveAgents = logsData ? new Set(logsData.map((l: any) => l.agent_name)).size : 0;
+            
             const calculatedCompleted = enrichedAgents.reduce((acc: number, curr: any) => acc + (curr.tasks_completed || 0), 0);
 
             setStats({

@@ -86,13 +86,13 @@ export default function FoundersDashboard() {
 
     useEffect(() => {
         // Load key from localStorage on mount
-        const savedKey = localStorage.getItem('TRINITY_ADMIN_KEY');
+        const savedKey = localStorage.getItem('trinity_admin_key');
         if (savedKey) setAdminKey(savedKey);
     }, []);
 
     const saveKey = (key: string) => {
         setAdminKey(key);
-        localStorage.setItem('TRINITY_ADMIN_KEY', key);
+        localStorage.setItem('trinity_admin_key', key);
     };
 
     useEffect(() => {

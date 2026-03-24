@@ -13,7 +13,7 @@ export function ZKPRepIDBadge({ agentName, minRep }: { agentName: string; minRep
     if (!proof) return <div className="animate-pulse h-10 w-32 bg-obsidian-surface rounded-lg" />;
 
     return (
-        <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-obsidian-elevated border border-accent-violet/30 shadow-glow-violet/5 h-full min-h-[160px]">
+        <div className="relative z-0 overflow-hidden flex flex-col items-center justify-center p-6 rounded-2xl bg-obsidian-elevated border border-accent-violet/30 shadow-glow-violet/5 h-full min-h-[160px]">
             <div className="w-full flex items-center justify-center mb-4 scale-125">
                 <div
                     className="w-full h-auto"

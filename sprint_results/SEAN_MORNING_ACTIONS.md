@@ -2,7 +2,14 @@
 
 Good morning Sean! The autonomous overnight sprint was executed successfully across all 9 directives. Here are the precise manual interactions required from you to fully unlock the new architecture:
 
-1. **Run pgvector SQL in Supabase:**
+1. **Fix NPM Publish (Top Blocker):**
+   The @hyperdag/trustshell package is being treated as private. From the `trustshell` directory in your terminal, run:
+   ```bash
+   npm login
+   npm publish --access public
+   ```
+
+2. **Run pgvector SQL in Supabase:**
    Access the Supabase SQL editor and execute the schema created in `scripts/setup-pgvector.sql`. This permanently adds the `embedding vector(1536)` column to your GraphRAG.
 
 2. **Fix Vercel Routing:**
