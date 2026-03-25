@@ -2543,6 +2543,9 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             }
 
             // Mark Completed
+            // CHANGE 4 - COMPLETION HOOK
+            await this.generateTaskReceipt(task, 'done');
+            
             const { error: doneError } = await this.supabase
                 .from('trinity_tasks')
                 .update({
@@ -3550,6 +3553,27 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                         throw error;
                     } else {
                         artifactId = data?.id;
+                    }
+
+                    // CHANGE 1 - VERIFICATION GATE
+                    if (artifactId) {
+                        let verified = false;
+                        for (let attempt = 0; attempt < 2; attempt++) {
+                            const { data: verifyData } = await clientToUse
+                                .from('trinity_artifacts')
+                                .select('id')
+                                .eq('id', artifactId)
+                                .single();
+                            if (verifyData?.id) {
+                                verified = true;
+                                break;
+                            }
+                            await new Promise(r => setTimeout(r, 300));
+                        }
+                        if (!verified) {
+                            await this.emitHelpRequest(undefined, 'ARTIFACT_INSERT_VERIFICATION_FAILED', `[VERIFICATION_GATE] Row ${artifactId} not found after insert`);
+                            throw new Error(`[VERIFICATION_GATE] Row ${artifactId} not found after insert`);
+                        }
                     }
 
                     console.log(`[ARTIFACT] Saved to DB: ${safeTitle} -> ${artifactId || 'OK'}`);
@@ -4990,6 +5014,9 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                     status: 'pending_clarification',
                     result: `[SOS] ${errorCode}: ${details}. Requested intercession from ${this.squad} peers.`
                 }).eq('id', task.id);
+                // CHANGE 4 - ESCALATION HOOKS
+                await this.rewardHumility(task);
+                await this.generateTaskReceipt(task, 'escalated');
 
                 try {
                     const { HITLDispatcher } = await import('../hitl/HITLDispatcher');
