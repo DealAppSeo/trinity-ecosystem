@@ -510,6 +510,11 @@ export class ConstitutionalAgent {
         });
     }
 
+    
+    async trackProviderPerformance(provider: string, success: boolean, latency: number): Promise<void> {
+        // Stub — full implementation in Phase 2
+    }
+
     async rewardHumility(task: any) {
         if (!task || !task.id) return;
         const threshold = parseFloat(process.env.HUMILITY_THRESHOLD || '0.6');
@@ -3666,7 +3671,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
                         agent: this.name,
                         creator_agent: this.name,
                         status: 'created',
-                        storage_location: 'supabase',
+                        storage_location: artifactUrl || `agent://${this.name}/${Date.now()}`,
                         // [PHASE 25] MCP v2 SECURE CHAINING (Grok's Phase 5)
                         metadata: {
                             mcp_version: '2.0',
