@@ -399,6 +399,42 @@ export class ConstitutionalAgent {
         }
     }
 
+    
+    async runSystemHeartbeat(): Promise<void> {
+        const [agentHealth, taskQueue, receipts] = await Promise.all([
+          this.supabase.from('trinity_agent_logs')
+            .select('agent_name, created_at')
+            .gte('created_at', new Date(Date.now() - 86400000).toISOString())
+            .order('created_at', { ascending: false }),
+          this.supabase.from('trinity_tasks')
+            .select('agent_assigned, status')
+            .gte('created_at', new Date(Date.now() - 86400000).toISOString()),
+          this.supabase.from('trinity_agent_logs')
+            .select('agent_name, created_at')
+            .eq('action', 'task_lifecycle_receipt')
+            .order('created_at', { ascending: false })
+            .limit(5)
+        ]);
+        
+        const activeAgents = [...new Set(agentHealth.data?.map(r => r.agent_name) || [])].length;
+        const receiptCount = receipts.data?.length || 0;
+        
+        await this.supabase.from('sprint_reports').insert({
+          agent_name: this.name,
+          report_type: 'system_heartbeat',
+          content: {
+            active_agents_24h: activeAgents,
+            receipt_count: receiptCount,
+            task_summary: taskQueue.data?.reduce((acc: any, t: any) => {
+              acc[t.status] = (acc[t.status] || 0) + 1;
+              return acc;
+            }, {}),
+            timestamp: new Date().toISOString(),
+            alert: activeAgents === 0 ? 'CRITICAL: No agent activity in 24 hours' : null
+          }
+        });
+    }
+
     async rewardHumility(task: any) {
         if (!task || !task.id) return;
         const threshold = parseFloat(process.env.HUMILITY_THRESHOLD || '0.6');
@@ -4290,7 +4326,8 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 });
             }
 
-            const forcedModel = options?.forceModel || this.router.detectSpecializedRequest(task as any);
+            const isSpecialized = task ? ['research', 'verification', 'content', 'learning'].includes((task as any).task_type || '') : false;
+            const forcedModel = options?.forceModel || (isSpecialized ? 'specialized' : null);
 
             // [LATENCY AS OPPORTUNITY] - Removed non-existent applyLatencyLogic
 
@@ -5496,7 +5533,13 @@ ${task.description}
                 alerts++;
             }
         }
+        
+        const { data: recentHB } = await this.supabase.from('sprint_reports').select('id').eq('report_type', 'system_heartbeat').gte('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()).limit(1);
+        if (!recentHB || recentHB.length === 0) {
+            await this.runSystemHeartbeat();
+        }
         return alerts;
+
     }
 
     private async missionShofet(): Promise<number> {
