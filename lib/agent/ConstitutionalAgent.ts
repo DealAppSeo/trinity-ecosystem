@@ -344,6 +344,58 @@ export class ConstitutionalAgent {
         return Object.keys(PROVIDERS).filter(k => process.env[PROVIDERS[k].envKey]).sort((a, b) => PROVIDERS[a].priority - PROVIDERS[b].priority);
     }
 
+
+    // CHANGE 2 & 3 - VERIFICATION HELPERS
+    async generateTaskReceipt(task: any, status: string) {
+        if (!task || !task.id) return;
+        const payload = JSON.stringify({
+            task_id: task.id,
+            agent: this.name,
+            status,
+            result_preview: (task.result || '').substring(0, 500),
+            timestamp: new Date().toISOString()
+        });
+        const crypto = require('crypto');
+        const hmac = crypto
+            .createHmac('sha256', process.env.TOOL_RECEIPT_SECRET || 'dev-secret')
+            .update(payload)
+            .digest('hex');
+        await this.supabase.from('trinity_agent_logs').insert({
+            agent_name: this.name,
+            action: 'task_lifecycle_receipt',
+            content: `HMAC receipt for task ${task.id} status: ${status}`,
+            metadata: { task_id: task.id, status, payload, hmac }
+        });
+    }
+
+    async rewardHumility(task: any) {
+        if (!task || !task.id) return;
+        const threshold = parseFloat(process.env.HUMILITY_THRESHOLD || '0.6');
+        if ((task.certainty || 0) < threshold) {
+            await this.supabase.from('trinity_agent_logs').insert({
+                agent_name: this.name,
+                action: 'humility_reward',
+                content: `Agent admitted uncertainty on task ${task.id}`,
+                metadata: {
+                    task_id: task.id,
+                    certainty: task.certainty,
+                    repid_delta: 150
+                }
+            });
+            // Update the RepID in the registry
+            const { data: agentData } = await this.supabase
+                .from('trinity_agent_registry')
+                .select('reputation_score')
+                .eq('agent_name', this.name)
+                .single();
+            if (agentData) {
+                await this.supabase.from('trinity_agent_registry')
+                    .update({ reputation_score: (agentData.reputation_score || 0) + 150 })
+                    .eq('agent_name', this.name);
+            }
+        }
+    }
+
     // ============================================
     // GOVERNANCE PROTOCOLS (RepID)
     // ============================================
