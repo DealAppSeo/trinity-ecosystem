@@ -2839,7 +2839,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                         await this.escalateTask(task.id, `Exceeded max attempts (${maxAttempts}). Last Error: ${errorMsg}`);
                     } else {
                         console.log(`[${this.name}] Spawning Surgical Analysis...`);
-                        await this.spawnMaintenanceTask(`Analysis: ${task.title}. Error: ${errorMsg.substring(0, 500)}`);
+                        await this.spawnMaintenanceTask(`Analysis: ${task.title}. Error: ${errorMsg.substring(0, 500)}`, task);
                     }
                 }
             } catch (e: any) {
@@ -2973,12 +2973,33 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
         }
     }
 
-    async spawnMaintenanceTask(reason?: string) {
+    async spawnMaintenanceTask(reason?: string, task?: any) {
         // [ANTIGRAVITY] RECURSION GUARD: Never spawn a healing task FROM a healing task
         const isHealing = reason?.includes('[HEALING]') || reason?.includes('[ANTIFRAGILE]');
         if (isHealing) return;
 
         // [ANTIGRAVITY] Loop Dampening: Check Throttle
+        
+        function getMaxSpawnDepth(repidScore: number): number {
+            if (repidScore < 100) return 0;   // Probation
+            if (repidScore < 500) return 1;   // Bronze
+            if (repidScore < 2000) return 2;  // Silver
+            if (repidScore < 5000) return 3;  // Gold
+            if (repidScore < 8000) return 5;  // Platinum
+            return 8;                         // Diamond
+        }
+
+        const currentDepth = typeof task?.metadata === 'string' ? JSON.parse(task.metadata).spawn_depth || 0 : (task?.metadata?.spawn_depth || 0);
+        const maxDepth = getMaxSpawnDepth(this.repidScore);
+        if (currentDepth >= maxDepth) {
+            await this.supabase.from('sprint_reports').insert({
+                agent_name: this.name,
+                report_type: 'SPAWN_LIMIT_REACHED',
+                content: { task_id: task?.id || 'unknown', depth: currentDepth, max: maxDepth }
+            });
+            return;
+        }
+
         const canSpawn = await this.canCreateHealingTask();
         if (!canSpawn) {
             console.log(`[${this.name}] ðŸ›¡ï¸ Maintenance/Healing task suppressed by loop stabilizer.`);
@@ -3007,7 +3028,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 status: 'pending',
                 task_type: 'genesis',
                 priority: Math.min(100, Math.max(0, selected.priority || 1)), // Clamp priority
-                metadata: { source: 'maintenance_genesis', agent: this.name, automated: true }
+                metadata: { source: 'maintenance_genesis', agent: this.name, automated: true, spawn_depth: currentDepth + 1 }
             }]);
             console.log(`[GENESIS] ðŸ› ï¸ Maintenance seeded: ${selected.title}`);
         } catch (e) {
@@ -4394,7 +4415,24 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
                 }
             });
 
-            let sortedProviders = await this.router.route(task as any, this.availableProviders, options?.timlAllocation);
+            
+            const LLM_PRIORITY = [
+                { provider: 'groq', key: process.env.GROQ_API_KEY, direct: true },
+                { provider: 'cerebras', key: process.env.CEREBRAS_API_KEY, direct: true },
+                { provider: 'deepseek', key: process.env.DEEPSEEK_API_KEY, direct: true },
+                { provider: 'gemini', key: process.env.GEMINI_API_KEY, direct: true },
+                { provider: 'openrouter', key: process.env.OPENROUTER_API_KEY, direct: true },
+                { provider: 'together', key: process.env.TOGETHER_API_KEY, direct: true },
+                { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY, direct: true },
+                { provider: 'openai', key: process.env.OPENAI_API_KEY, direct: true },
+                { provider: 'litellm', key: process.env.LITELLM_URL, proxy: true }
+            ];
+
+            let sortedProviders = LLM_PRIORITY.filter(p => !!p.key).map(p => p.provider);
+            if (sortedProviders.length === 0) {
+                sortedProviders = await this.router.route(task as any, this.availableProviders, options?.timlAllocation);
+            }
+
 
             // [PHASE 10] Apply Arbitrage Priority Rotation
             if (this.arbitrageConfig) {
@@ -4596,6 +4634,7 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
         else if (provider === 'openrouter') providerPromise = this.callOpenRouter(systemPrompt, prompt, tools, modelOverride);
         else if (provider === 'deepinfra') providerPromise = this.callDeepInfra(systemPrompt, prompt, tools);
         else if (provider === 'siliconflow') providerPromise = this.callSiliconFlow(systemPrompt, prompt, tools);
+        else if (provider === 'litellm') providerPromise = this.callOpenAICompatible(process.env.LITELLM_URL ? process.env.LITELLM_URL + '/v1/chat/completions' : liteLlmUrl + '/v1/chat/completions', process.env.LITELLM_MASTER_KEY || 'sk-proxy', modelOverride || 'groq/llama-3.1-70b-versatile', systemPrompt, prompt, tools);
         else if (provider === 'kimi') {
             const isThinking = prompt.toLowerCase().includes('reason') || prompt.toLowerCase().includes('logic') || prompt.toLowerCase().includes('complex') || prompt.toLowerCase().includes('analyze');
             providerPromise = this.callOpenAICompatible('https://api.moonshot.ai/v1/chat/completions', process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || 'kimi', modelOverride || 'kimi-k2.5', systemPrompt, prompt, tools, 'kimi', { thinking: isThinking });
