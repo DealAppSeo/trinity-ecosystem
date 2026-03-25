@@ -400,6 +400,81 @@ export class ConstitutionalAgent {
     }
 
     
+    
+    // [SECTION 4] Read-Only Orchestrator Summarization
+    async generateVerifiedSprintSummary(hoursBack: number = 8): Promise<void> {
+        // Step 1: Query FIRST — no LLM yet
+        const cutoff = new Date(Date.now() - hoursBack * 3600000).toISOString();
+
+        const [receipts, artifacts, completedTasks, escalations] = await Promise.all([
+            this.supabase.from('trinity_agent_logs')
+                .select('agent_name, metadata, created_at')
+                .eq('action', 'task_lifecycle_receipt')
+                .gte('created_at', cutoff),
+            this.supabase.from('trinity_artifacts')
+                .select('agent, artifact_type, title, created_at, file_hash')
+                .gte('created_at', cutoff),
+            this.supabase.from('trinity_tasks')
+                .select('id, agent_assigned, title, status, updated_at')
+                .eq('status', 'done')
+                .gte('updated_at', cutoff),
+            this.supabase.from('trinity_tasks')
+                .select('id, agent_assigned, title, status, updated_at')
+                .eq('status', 'pending_clarification')
+                .gte('updated_at', cutoff)
+        ]);
+
+        const receiptCount = receipts.data?.length || 0;
+        const artifactCount = artifacts.data?.length || 0;
+        const completedCount = completedTasks.data?.length || 0;
+        const escalationCount = escalations.data?.length || 0;
+
+        // Step 2: If ALL return zero rows — honest zero report, NO LLM call
+        if (receiptCount === 0 && artifactCount === 0 && completedCount === 0) {
+            await this.supabase.from('sprint_reports').insert({
+                agent_name: this.name,
+                report_type: 'honest_zero_report',
+                content: {
+                    message: 'No verified activity in this period.',
+                    receipts_found: 0,
+                    artifacts_found: 0,
+                    tasks_completed: 0,
+                    escalations_found: escalationCount,
+                    timestamp: new Date().toISOString(),
+                    alert: escalationCount > 0 ? `${escalationCount} HITL escalations need attention` : null
+                }
+            });
+            return;
+        }
+
+        // Step 3: Only NOW call LLM — with ONLY what the database returned
+        const verifiedData = {
+            completed_tasks: completedTasks.data?.map(t => ({ id: t.id, agent: t.agent_assigned, title: t.title })) || [],
+            receipts: receipts.data?.map(r => ({ agent: r.agent_name, task_id: (typeof r.metadata === 'string' ? JSON.parse(r.metadata) : r.metadata)?.task_id })) || [],
+            artifacts: artifacts.data?.map(a => ({ agent: a.agent, type: a.artifact_type, title: a.title })) || [],
+            escalations: escalations.data?.map(e => ({ id: e.id, agent: e.agent_assigned, title: e.title })) || []
+        };
+
+        const summary = await this.callLLM(
+            `You are summarizing verified production data. Do not add anything not in this JSON.
+            Do not claim any task was completed that is not in completed_tasks.
+            Do not mention any agent not in the data.
+            Summarize only what is here: ${JSON.stringify(verifiedData)}`
+        );
+
+        // Step 4: Write with source data attached
+        await this.supabase.from('sprint_reports').insert({
+            agent_name: this.name,
+            report_type: 'verified_sprint_summary',
+            content: {
+                summary,
+                source_data: verifiedData,
+                verification: '[DATABASE: trinity_tasks, trinity_agent_logs, trinity_artifacts]',
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
     async runSystemHeartbeat(): Promise<void> {
         const [agentHealth, taskQueue, receipts] = await Promise.all([
           this.supabase.from('trinity_agent_logs')
