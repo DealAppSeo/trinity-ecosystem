@@ -368,6 +368,37 @@ export class ConstitutionalAgent {
         });
     }
 
+    
+    // [DIRECTIVE 1] Checkpoint/Pause Pattern
+    async executeWithCheckpoints(task: any, stages: Function[]): Promise<void> {
+        const metadata = typeof task.metadata === 'string' ? JSON.parse(task.metadata || '{}') : (task.metadata || {});
+        const checkpoint = metadata.checkpoint || 0;
+        for (let i = checkpoint; i < stages.length; i++) {
+            try {
+                const result = await stages[i](task);
+                
+                metadata.checkpoint = i + 1;
+                metadata.stage_results = metadata.stage_results || {};
+                metadata.stage_results[i] = result;
+                
+                await this.supabase.from('trinity_tasks').update({
+                    metadata
+                }).eq('id', task.id);
+            } catch (err: any) {
+                if (err.message?.includes('timeout') || err.message?.includes('context') || err.message?.includes('aborted')) {
+                    metadata.checkpoint = i;
+                    metadata.pause_reason = err.message;
+                    await this.supabase.from('trinity_tasks').update({
+                        status: 'paused',
+                        metadata
+                    }).eq('id', task.id);
+                    return;
+                }
+                throw err;
+            }
+        }
+    }
+
     async rewardHumility(task: any) {
         if (!task || !task.id) return;
         const threshold = parseFloat(process.env.HUMILITY_THRESHOLD || '0.6');
@@ -1728,7 +1759,7 @@ Return ONLY: {"error_found": true/false, "confidence": 0.0-1.0, "what_is_wrong":
     }
 
     async getNextTask(strictlyAssigned = false) {
-        console.log(`[${this.name}] ðŸ” POLL START: strictlyAssigned=${strictlyAssigned}, status=['pending', 'todo', 'pending_clarification']`);
+        console.log(`[${this.name}] ðŸ” POLL START: strictlyAssigned=${strictlyAssigned}, status=['pending', 'todo', 'pending_clarification', 'paused']`);
         // [ANTIGRAVITY] CONCURRENCY GUARD: If already busy, don't pick up more work.
         if (this.currentTaskId) {
             return null;
@@ -1754,7 +1785,7 @@ Return ONLY: {"error_found": true/false, "confidence": 0.0-1.0, "what_is_wrong":
         const isExpert = (this.reputationScore || 0) > 80;
 
         const { data: task, error } = await query
-            .in('status', ['pending', 'todo', 'pending_clarification'])
+            .in('status', ['pending', 'todo', 'pending_clarification', 'paused'])
             .is('claimed_by', null)
             .or(`metadata->>retry_after.is.null,metadata->>retry_after.lte.${new Date().toISOString()}`)
             // If expert, prioritize clarification tasks (mentorship)
@@ -1969,7 +2000,7 @@ ${result.substring(0, 2000)}
                 started_at: new Date().toISOString()
             })
             .eq('id', taskId)
-            .in('status', ['pending', 'todo', 'pending_clarification']) // FIX: Allow claiming todo/clarification tasks
+            .in('status', ['pending', 'todo', 'pending_clarification', 'paused']) // FIX: Allow claiming todo/clarification tasks
             .is('claimed_by', null)
             .select();
 
@@ -3419,6 +3450,21 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
     }
 
     // [ANTIGRAVITY] Enhanced Artifact Saver (Single Source of Truth)
+    
+    // [DIRECTIVE 2] Universal Database Write Verification
+    async verifyDatabaseWrite(table: string, rowId: number | string, idColumn: string = 'id'): Promise<boolean> {
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const { data } = await this.supabase
+                .from(table)
+                .select(idColumn)
+                .eq(idColumn, rowId)
+                .single();
+            if (data) return true;
+            await new Promise(r => setTimeout(r, 300));
+        }
+        return false;
+    }
+
     async saveArtifact(taskId: string | number, content: string | { path: string, content: string }[], type: string = 'text', title?: string, accessLevel: string = 'protected') {
         const safeTaskId = String(taskId || 'self-gen-' + Date.now());
         const safeTitle = title || `Artifact ${safeTaskId}`;
