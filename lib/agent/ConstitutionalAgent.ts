@@ -1247,8 +1247,9 @@ export class ConstitutionalAgent {
                         const isHealing = stuck.title.includes('[HEALING]') || stuck.title.includes('[ANTIFRAGILE]');
 
                         await this.supabase.from('trinity_tasks').update({
-                            status: isHealing ? 'failed' : 'pending_clarification',
-                            result: `[WATCHDOG] Stalled during execution by ${this.name}. ${isHealing ? 'Healing task terminated to prevent loop.' : 'Possible provider hang or tool lock.'}`
+                            status: isHealing ? 'failed' : 'pending',
+                            claimed_by: null,
+                            result: `[WATCHDOG] Stalled during execution by ${this.name}. ${isHealing ? 'Healing task terminated to prevent loop.' : 'Released for retry — possible provider hang or tool lock.'}`
                         }).eq('id', stuck.id);
                     }
                 }
@@ -1282,9 +1283,9 @@ export class ConstitutionalAgent {
                                 await this.log('squad_watchdog_hijack', `Releasing task ${task.id} from stale peer ${task.claimed_by}`, { taskId: task.id, peer: task.claimed_by });
 
                                 await this.supabase.from('trinity_tasks').update({
-                                    status: 'pending_clarification',
+                                    status: 'pending',
                                     claimed_by: null,
-                                    result: `[SQUAD-WATCHDOG] Revoked from stale agent ${task.claimed_by} by ${this.name}.`
+                                    result: `[SQUAD-WATCHDOG] Revoked from stale agent ${task.claimed_by} by ${this.name}. Released for retry.`
                                 }).eq('id', task.id);
                             }
                         }
@@ -1901,11 +1902,10 @@ Return ONLY: {"error_found": true/false, "confidence": 0.0-1.0, "what_is_wrong":
         const isExpert = (this.reputationScore || 0) > 80;
 
         const { data: task, error } = await query
-            .in('status', ['pending', 'todo', 'pending_clarification', 'paused'])
+            .in('status', ['pending', 'todo', 'paused'])
             .is('claimed_by', null)
             .or(`metadata->>retry_after.is.null,metadata->>retry_after.lte.${new Date().toISOString()}`)
-            // If expert, prioritize clarification tasks (mentorship)
-            .order('status', { ascending: false })
+            .order('priority', { ascending: false })
             .order('priority', { ascending: false })
             .order('created_at', { ascending: true })
             .limit(1)
@@ -2116,7 +2116,7 @@ ${result.substring(0, 2000)}
                 started_at: new Date().toISOString()
             })
             .eq('id', taskId)
-            .in('status', ['pending', 'todo', 'pending_clarification', 'paused']) // FIX: Allow claiming todo/clarification tasks
+            .in('status', ['pending', 'todo', 'paused']) // FIX-002: removed pending_clarification to break infinite claim loop
             .is('claimed_by', null)
             .select();
 
@@ -2162,9 +2162,9 @@ ${result.substring(0, 2000)}
         const { error } = await this.supabase
             .from('trinity_tasks')
             .update({
-                status: 'pending_clarification',
+                status: 'pending',
                 claimed_by: null,
-                result: `[ESCALATED] Agent ${this.name} reached a bottleneck. \n\nReason: ${reason}`,
+                result: `[ESCALATED] Agent ${this.name} reached a bottleneck — released for retry. \n\nReason: ${reason}`,
                 metadata: {
                     escalated_by: this.name,
                     escalation_time: new Date().toISOString(),
