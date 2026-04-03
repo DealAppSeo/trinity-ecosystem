@@ -1172,15 +1172,15 @@ export class ConstitutionalAgent {
             console.error(`[${this.name}] âŒ MCP Initialization Failed (Continuing):`, e.message);
         }
 
-        // [ANTIGRAVITY] ARBITRAGE: Heartbeat interval removed to slash DB load.
-        // We now rely on 'State-on-Change' updates and UptimeRobot pings.
-        /*
+        // [FIX] Heartbeat interval restored. The previous removal caused "green but brain-dead"
+        // agents — Railway health checks passed but Supabase heartbeats stopped, making all
+        // agents appear offline in the dashboard. Interval set to 2 minutes (was 15s, too aggressive).
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = setInterval(async () => {
             try {
                 await this.heartbeat();
             } catch (e) { console.error('[HEARTBEAT] Interval error', e) }
-        }, 15 * 1000);
-        */
+        }, 2 * 60 * 1000);
 
         // 3x3: Check Survivor Status on startup
         await this.checkSurvivorStatus();

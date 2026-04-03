@@ -13,6 +13,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
+    "start:agent": "npx tsx scripts/run-agent.ts ${AGENT_NAME:-ORCH}",
     "lint": "eslint",
     "sprint:db": "npx tsx scripts/sprint/setup_sprint_db.ts",
     "sprint:tier1": "npx tsx scripts/sprint/tier1_warmup.ts",

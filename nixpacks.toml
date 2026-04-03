@@ -5,4 +5,6 @@ nixPkgs = ["nodejs_20", "npm-9_x"]
 cmds = ["npm ci --legacy-peer-deps", "npm run build"]
 
 [start]
-cmd = "npm start"
+# If AGENT_NAME is set, run in agent mode; otherwise run the Next.js web app.
+# Railway agent services should set AGENT_NAME env var (e.g. AGENT_NAME=VERITAS).
+cmd = "if [ -n \"$AGENT_NAME\" ]; then npm run start:agent; else npm start; fi"
