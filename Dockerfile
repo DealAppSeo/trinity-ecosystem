@@ -45,6 +45,7 @@ COPY --from=builder /app/tsconfig*.json ./
 RUN npm ci --production --legacy-peer-deps
 
 ENV NODE_ENV=production
+ENV PORT=3000
 EXPOSE 3000
 
 CMD ["npm", "start"]
