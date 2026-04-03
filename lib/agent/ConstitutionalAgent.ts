@@ -2875,20 +2875,42 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                     belief: evaluation.score / 100,
                     disbelief: evaluation.score < 50 ? (50 - evaluation.score) / 100 : 0,
                     uncertainty: evaluation.score > 90 ? 0.05 : 0.2,
-                    metadata: {
-                        provider: (task as any).metadata?.provider_used || 'unknown',
-                        certainty: evaluation.score / 100,
-                        evaluation: evaluation,
-                        processedBy: this.name,
-                        version: this.version,
-                        tenacity_failover: !!(task as any).metadata?.provider_used && (task as any).metadata.provider_used !== 'openai'
-                    }
+                    metadata: (() => {
+                        const meta = typeof task.metadata === 'string' ? JSON.parse(task.metadata || '{}') : (task.metadata || {});
+                        return {
+                            ...meta,
+                            provider_used: meta.provider_used || 'unknown',
+                            certainty: evaluation.score / 100,
+                            evaluation: evaluation,
+                            processedBy: this.name,
+                            version: this.version,
+                            tenacity_failover: !!meta.provider_used && meta.provider_used !== 'openai'
+                        };
+                    })()
                 })
                 .eq('id', task.id);
 
             if (doneError) {
                 console.error(`[${this.name}] âŒ Failed to mark task ${task.id} as 'done':`, doneError.message);
                 throw new Error(`Database Update Failed: ${doneError.message}`);
+            }
+
+            // [GMPD] Write to team_coordination_log for Sean's mobile /sprint visibility
+            try {
+                await this.supabase.from('team_coordination_log').insert({
+                    posted_by: this.name,
+                    message_type: 'done',
+                    content: `Completed: ${task.title.substring(0, 80)}`,
+                    sprint: 'sprint1',
+                    requires_sean_action: false,
+                    metadata: {
+                        task_id: task.id,
+                        score: evaluation.score,
+                        provider: (() => { try { const m = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : task.metadata; return m?.provider_used || 'unknown'; } catch { return 'unknown'; } })()
+                    }
+                });
+            } catch (e: any) {
+                console.warn(`[COORD] coordination_log write failed: ${e.message}`);
             }
 
             // [HACKATHON] Adaptive Learning Loop (Runs every 10 tasks)
