@@ -1,0 +1,339 @@
+# TRINITY GLOBAL MASTER PLAN DIRECTIVE (GMPD)
+# Version: 1.0.0 | Last Updated: 2026-04-03
+# Status: DRAFT — Awaiting ratification by Sean Goodwin
+#
+# THIS DOCUMENT MUST BE LOADED AT THE START OF EVERY CHAT SESSION.
+# No agent, AI, or human may issue directives that contradict this document.
+# Changes require explicit approval from Sean Goodwin + verification against
+# the living org chart before implementation.
+
+# ═══════════════════════════════════════════════════════════════
+# SECTION 1: HARD RULES (NON-NEGOTIABLE)
+# ═══════════════════════════════════════════════════════════════
+
+hard_rules:
+  rule_1_verify_before_acting:
+    text: "Before any system diagnosis, check a MINIMUM of 3 data sources. State what each shows. If they conflict, STOP and ask Sean."
+    applies_to: [claude, gemini, grok, all_agents]
+    enforcement: "Any directive issued without verification is void."
+
+  rule_2_no_assumptions:
+    text: "Never assume a system is broken, a table is the right one, or a repo is canonical without explicit verification."
+    applies_to: [claude, gemini, grok, all_agents]
+    enforcement: "If you catch yourself saying 'I think' or 'probably', STOP. Verify."
+
+  rule_3_check_the_gmpd:
+    text: "Before making any architectural change, check this document. If the change contradicts the GMPD, it requires Sean's approval."
+    applies_to: [claude, gemini, grok, all_agents]
+    enforcement: "Unapproved architectural changes must be reverted."
+
+  rule_4_no_cascading_directives:
+    text: "No AI may send directives to another AI without Sean's awareness. State 'I recommend telling X to do Y' instead of sending it directly."
+    applies_to: [claude, gemini, grok]
+    enforcement: "Sean is the only one who dispatches cross-AI directives."
+
+  rule_5_sprint_before_rebuild:
+    text: "Never reorganize repos, migrate runtimes, or restructure architecture during an active sprint deadline. Ship first, refactor after."
+    applies_to: [claude, gemini, grok, all_agents]
+    enforcement: "Architecture changes only in designated refactor windows."
+
+  rule_6_notification_on_limits:
+    text: "When any free tier or paid plan limit is approached (80% usage), notify Sean via Telegram AND email immediately."
+    applies_to: [all_services]
+    channels: [telegram, email]
+    threshold_warning: 0.80
+    threshold_critical: 0.95
+
+# ═══════════════════════════════════════════════════════════════
+# SECTION 2: CANONICAL ARCHITECTURE (LIVING ORG CHART)
+# ═══════════════════════════════════════════════════════════════
+
+# This is the SINGLE SOURCE OF TRUTH for what controls what.
+# Every AI and agent must reference this before making changes.
+
+architecture:
+  # ─── LAYER 0: PROTOCOL (IP lives here) ───
+  hyperdag_protocol:
+    description: "Foundation protocol layer. All patents assigned here."
+    owns:
+      - "Plonky3 ZKP circuits"
+      - "ERC-8004 Identity + Reputation registries"
+      - "ANFIS LASSO routing engine (Rust Brain)"
+      - "DAG consensus + BFT"
+      - "x402 payment transport"
+      - "Federated learning pricing mechanism"
+      - "Pythagorean Comma BFT veto"
+    publishes:
+      - "@hyperdag/core (npm + Rust crate)"
+    language: "Rust (primary) + TypeScript (bindings)"
+    repo: "TBD — hyperdag-protocol"
+    status: "planning"
+    patents: [P-002, P-013, P-015, P-016, P-018, P-024, P-025, P-026, P-027]
+
+  # ─── LAYER 1: AGENT INFRASTRUCTURE ───
+  ai_trinity_symphony:
+    description: "12-agent neuromorphic swarm runtime"
+    owns:
+      - "Constitutional Agent framework (V5 TypeScript)"
+      - "SBFA anti-hallucination (multi-LLM diversity)"
+      - "Bilateral learning + LAO"
+      - "Agent task loop, BFT consensus, RepID"
+      - "Federated pattern extraction"
+    imports_from: ["@hyperdag/core"]
+    publishes: "@trinitysymphony/agents"
+    language: "TypeScript (primary) + Rust (ANFIS engine, future)"
+    repo: "DealAppSeo/trinity-ecosystem"
+    status: "active — agents running on Railway"
+    current_runtime: "trinity-shared-temp (V4 JS) — migration to trinity-ecosystem planned"
+
+  # ─── LAYER 2: TRUST INFRASTRUCTURE ───
+  trustshell:
+    description: "Thin ZKP wrapper — first HyperDAG licensee"
+    owns:
+      - "AES-256-GCM key encryption (BYOK)"
+      - "ZKP proof generation/verification"
+      - "RepID credential wrapping"
+    imports_from: ["@hyperdag/core"]
+    publishes: "@hyperdag/trustshell (npm)"
+    repo: "TBD — trustshell"
+    status: "planning"
+
+  trustrails:
+    description: "Compliance UI + API — first TrustShell consumer"
+    owns:
+      - "KYA/KYB compliance receipts"
+      - "DBT → SBT pipeline UI"
+      - "2FA → 4FA verification flow"
+      - "Institutional risk configuration"
+      - "Vertical licenses (Banking, CRE, Healthcare)"
+    imports_from: ["@hyperdag/trustshell"]
+    repo: "DealAppSeo/trustrails-dev"
+    domain: "trustenvoy.dev / trustrails.dev"
+    status: "active — 403 on API endpoints needs fix"
+    mvp_target: "2026-04-17 (CRE vertical)"
+
+  # ─── LAYER 3: PRODUCT APPS ───
+  products:
+    ai_social_mirror:
+      description: "Healing + identity app"
+      imports_from: ["@hyperdag/trustshell", "@trinitysymphony/agents"]
+      status: "planned"
+    purpose_hub:
+      description: "Mission alignment platform"
+      imports_from: ["@hyperdag/trustshell"]
+      domain: "purposehub.ai"
+      status: "planned"
+    trust_squad:
+      description: "Team trust verification"
+      imports_from: ["@hyperdag/trustshell"]
+      status: "planned"
+
+# ─── DEPENDENCY FLOW (who calls whom) ───
+dependency_flow: |
+  Products (TrustRails, SocialMirror, PurposeHub)
+    ↓ imports
+  TrustShell (@hyperdag/trustshell)
+    ↓ imports
+  HyperDAG Protocol (@hyperdag/core)
+    ↑ consumed by
+  AI Trinity Symphony (agent swarm)
+    ↑ orchestrates
+  12 Constitutional Agents (Railway services)
+
+# ─── DATABASE TABLES (verified sources of truth) ───
+database:
+  agent_health_tables:
+    primary: "agent_heartbeat"        # WHERE AGENTS ACTUALLY WRITE
+    secondary: "trinity_agent_registry" # SSOT for registry/status
+    legacy: "trinity_heartbeat"         # STALE — do not use for diagnosis
+    logs: "trinity_agent_logs"          # Activity audit trail
+    note: "ALWAYS check agent_heartbeat AND trinity_agent_logs before concluding agent health"
+
+  task_tables:
+    tasks: "trinity_tasks"
+    artifacts: "trinity_artifacts"
+    benchmarks: "trinity_agent_benchmarks"
+    retros: "trinity_retros"
+
+  trust_tables:
+    receipts: "x402_receipts"
+    compliance: "kya_compliance_receipts"  # In trustrails-dev, not trinity-ecosystem
+
+  identity_tables:
+    dbt_records: "dbt_records"
+    sbt_tokens: "sbt_tokens"
+
+# ─── SMART CONTRACTS (Base Sepolia) ───
+contracts:
+  identity_registry: "0x8004A818BFB912233c491871b3d84c89A494BD9e"
+  reputation_registry: "0x8004B663056A597Dffe9eCcC1965A193B7388713"
+  chain: "base-sepolia (84532)"
+  deployer_wallet: "0xdf6b8215D193b11B4903d223729c3CF7A6de271d"
+  explorer: "https://sepolia.basescan.org"
+
+# ═══════════════════════════════════════════════════════════════
+# SECTION 3: AI ROLES & RESPONSIBILITIES
+# ═══════════════════════════════════════════════════════════════
+
+ai_team:
+  claude_code:
+    role: "Primary codebase engineer for trinity-ecosystem"
+    access: ["DealAppSeo/trinity-ecosystem"]
+    strengths: "TypeScript, code review, architectural analysis, git operations"
+    limitations: "Cannot access trustrails-dev, trinity-shared-temp, or Supabase directly"
+    rules:
+      - "Always verify before diagnosing"
+      - "Never send directives to Gemini without Sean's approval"
+      - "State what you CAN'T verify when giving assessments"
+
+  gemini:
+    role: "Multi-repo engineer, DB access, Railway operations"
+    access: ["trinity-shared-temp", "trinity-symphony-shared", "trustrails-dev", "Supabase"]
+    strengths: "Cross-repo changes, SQL, Railway deploys, rapid prototyping"
+    limitations: "Has made verification errors — must check 3 sources before diagnosing"
+    rules:
+      - "Check agent_heartbeat + trinity_agent_logs + trinity_agent_registry before ANY health diagnosis"
+      - "Never declare agents dead without cross-referencing all three tables"
+      - "State which tables you checked in every diagnosis"
+
+  grok:
+    role: "Research, patent drafting, strategic analysis"
+    strengths: "Deep research, IP strategy, competitive analysis"
+    rules:
+      - "Patents assigned to HyperDAG Protocol LLC, not product companies"
+      - "Verify technical claims against actual codebase before including in filings"
+
+# ═══════════════════════════════════════════════════════════════
+# SECTION 4: SPRINT DIRECTIVES (time-sensitive)
+# ═══════════════════════════════════════════════════════════════
+
+# Sprint directives are the TOP 3 priorities after GMPD compliance.
+# Updated by Sean. AI team executes in order.
+
+current_sprint:
+  name: "April 2026 — Hackathon + CRE MVP"
+  deadline: "2026-04-17 (CRE MVP) / 2026-04-30 (Four.Meme hackathon)"
+
+  directive_1:
+    title: "TrustRails.dev CRE MVP (end-to-end)"
+    deadline: "2026-04-17"
+    requirements:
+      - "Fix trustenvoy.dev 403 — API endpoints must return 200"
+      - "2FA → 4FA verification flow working"
+      - "DBT → SBT conversion on-chain (Base Sepolia)"
+      - "ZKP RepID badge generation and verification"
+      - "KYA compliance receipt linked to on-chain tx"
+      - "CRE-specific risk configuration UI"
+      - "Sean as first verified SBT holder"
+    owner: "Gemini (trustrails-dev) + Claude (trustshell crypto)"
+
+  directive_2:
+    title: "Patent provisional filings"
+    items:
+      - "P-013: KYA On-Chain Receipts"
+      - "P-014: Pythagorean Comma CIP"
+      - "P-015: Federated Learning Pricing"
+      - "P-016: Meta-verification (AI fact-checking AI)"
+    owner: "Grok (drafting) + Sean (filing)"
+
+  directive_3:
+    title: "Four.Meme hackathon submission"
+    deadline: "2026-04-30"
+    requirements:
+      - "Agents producing hackathon artifacts (in progress — 919 tasks done)"
+      - "DoraHacks submission content"
+      - "Live demo with on-chain verification"
+    owner: "Agent swarm (running) + Sean (review/submit)"
+
+# ═══════════════════════════════════════════════════════════════
+# SECTION 5: VERIFICATION PROTOCOL
+# ═══════════════════════════════════════════════════════════════
+
+# Before ANY system change, run this checklist:
+
+verification_checklist:
+  before_diagnosis:
+    - "Check agent_heartbeat for last_ping timestamps"
+    - "Check trinity_agent_logs for recent activity"
+    - "Check trinity_agent_registry for status"
+    - "If all three agree → proceed with diagnosis"
+    - "If they conflict → STOP, report conflict, ask Sean"
+
+  before_code_change:
+    - "Read the file first (never edit blind)"
+    - "Check GMPD section 2 for architectural constraints"
+    - "Verify the change doesn't contradict dependency_flow"
+    - "State which repo owns the code being changed"
+
+  before_directive:
+    - "State what you verified and from where"
+    - "State what you CANNOT verify"
+    - "Recommend the directive to Sean — don't send it yourself"
+    - "If urgent, flag urgency but still wait for Sean's go"
+
+# ═══════════════════════════════════════════════════════════════
+# SECTION 6: BACKGROUND BUILD — OPTIMAL ARCHITECTURE
+# ═══════════════════════════════════════════════════════════════
+
+# This runs in parallel, using only FREE TIER resources that would
+# otherwise go idle. When paid tier limits approach 80%, notify Sean.
+
+background_build:
+  name: "Rust Dual-Repo Hybrid Architecture"
+  description: |
+    The ultimate target architecture. Built incrementally using idle
+    compute cycles. Does NOT block sprint work. Does NOT get priority
+    over sprint directives.
+
+  target_repos:
+    hyperdag_core:
+      language: "Rust"
+      contains: "ZKP circuits, ANFIS engine, DAG consensus, x402 transport"
+      priority: "Build ANFIS LASSO router in Rust first"
+
+    hyperdag_agents:
+      language: "Rust + TypeScript FFI"
+      contains: "Agent directive engine, scoring, routing inputs"
+      priority: "After ANFIS router is proven"
+
+    trustshell_sdk:
+      language: "TypeScript (wraps Rust core via WASM)"
+      contains: "BYOK encryption, ZKP proof API, RepID credentials"
+      priority: "After hyperdag_core publishes crate"
+
+  resource_policy:
+    free_tier_only: true
+    notification_threshold: 0.80
+    notification_channels: [telegram, email]
+    idle_compute_only: true
+    never_blocks_sprint: true
+
+# ═══════════════════════════════════════════════════════════════
+# SECTION 7: TOOLS & GUARDRAILS
+# ═══════════════════════════════════════════════════════════════
+
+tools_needed:
+  for_organization:
+    - "This GMPD document (loaded at start of every session)"
+    - "SYSTEM_MAP.yaml in each repo (machine-readable org chart)"
+    - "Sprint board (Supabase trinity_tasks with priority tagging)"
+
+  for_verification:
+    - "BFT BS Detector: /api/verify endpoint that checks claims against DB"
+    - "Triple-source health check script"
+    - "Pre-directive checklist (Section 5 above)"
+
+  for_notifications:
+    - "Telegram bot (existing) for alerts"
+    - "Email notifications for tier limit warnings"
+    - "Agent heartbeat dashboard (existing Railway UI)"
+
+# ═══════════════════════════════════════════════════════════════
+# SECTION 8: CHANGE LOG
+# ═══════════════════════════════════════════════════════════════
+
+changelog:
+  - date: "2026-04-03"
+    author: "Claude Code + Sean Goodwin"
+    change: "Initial GMPD created. Sprint directives set. Hard rules established."
+    reason: "Gemini misdiagnosed agent health by checking wrong table. Cost hours of misdirected work. This document prevents recurrence."
