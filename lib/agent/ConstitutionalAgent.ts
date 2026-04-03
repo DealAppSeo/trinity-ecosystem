@@ -2213,7 +2213,168 @@ ${result.substring(0, 2000)}
 
         if (type && localTypes.includes(type)) return true;
         if (title && localTitles.some(t => title.includes(t))) return true;
+
+        // Detect SQL tasks that agents should execute directly, not pass to LLM
+        if (this.containsExecutableSQL(task)) return true;
+
         return false;
+    }
+
+    private containsExecutableSQL(task: Task): boolean {
+        const desc = (task.description || '').toUpperCase();
+        const sqlKeywords = ['INSERT INTO', 'UPDATE ', 'SELECT ', 'DELETE FROM', 'CREATE TABLE', 'ALTER TABLE', 'UPSERT'];
+        const hasSql = sqlKeywords.some(kw => desc.includes(kw));
+        const isSelfHealing = task.task_type === 'self-healing' || task.task_type === 'directive' || task.task_type === 'system';
+        return hasSql && (isSelfHealing || (task.title || '').includes('[SQL]') || (task.title || '').includes('[HEALING]'));
+    }
+
+    private async executeTaskSQL(task: Task): Promise<string> {
+        const desc = task.description || '';
+        console.log(`[SQL-EXEC] 🔧 Executing SQL from task ${task.id}: ${task.title}`);
+
+        // Extract SQL statements from description (between backticks or raw)
+        const sqlStatements: string[] = [];
+
+        // Match ```sql ... ``` blocks
+        const codeBlocks = desc.match(/```(?:sql)?\s*([\s\S]*?)```/gi);
+        if (codeBlocks) {
+            for (const block of codeBlocks) {
+                const sql = block.replace(/```(?:sql)?/gi, '').replace(/```/g, '').trim();
+                if (sql) sqlStatements.push(sql);
+            }
+        }
+
+        // If no code blocks, try to extract raw SQL statements
+        if (sqlStatements.length === 0) {
+            const rawMatch = desc.match(/(INSERT INTO|UPDATE |SELECT |DELETE FROM|UPSERT INTO)[\s\S]*?;/gi);
+            if (rawMatch) sqlStatements.push(...rawMatch);
+        }
+
+        // Fallback: treat entire description as SQL if it starts with a keyword
+        if (sqlStatements.length === 0) {
+            const trimmed = desc.trim();
+            if (/^(INSERT|UPDATE|SELECT|DELETE|UPSERT|CREATE|ALTER)/i.test(trimmed)) {
+                sqlStatements.push(trimmed);
+            }
+        }
+
+        if (sqlStatements.length === 0) {
+            return `[SQL-EXEC] No executable SQL found in task description. Completed as no-op.`;
+        }
+
+        // Safety: block destructive operations (DROP, TRUNCATE)
+        for (const sql of sqlStatements) {
+            const upper = sql.toUpperCase();
+            if (upper.includes('DROP ') || upper.includes('TRUNCATE ')) {
+                console.warn(`[SQL-EXEC] ⛔ BLOCKED destructive SQL in task ${task.id}: ${sql.substring(0, 80)}`);
+                await this.log('sql_blocked', `Blocked destructive SQL: ${sql.substring(0, 200)}`, { taskId: task.id });
+                return `[SQL-EXEC] BLOCKED: Destructive SQL (DROP/TRUNCATE) not allowed via agent execution.`;
+            }
+        }
+
+        const results: string[] = [];
+        for (const sql of sqlStatements) {
+            try {
+                console.log(`[SQL-EXEC] Running: ${sql.substring(0, 100)}...`);
+                const { data, error } = await this.supabase.rpc('exec_sql', { query: sql }).maybeSingle();
+
+                if (error) {
+                    // Fallback: try direct table operations for simple INSERT/UPDATE
+                    const directResult = await this.executeDirectSupabase(sql);
+                    results.push(directResult);
+                } else {
+                    results.push(`OK: ${JSON.stringify(data).substring(0, 200)}`);
+                }
+            } catch (e: any) {
+                // Fallback to direct Supabase operations
+                try {
+                    const directResult = await this.executeDirectSupabase(sql);
+                    results.push(directResult);
+                } catch (e2: any) {
+                    results.push(`ERROR: ${e2.message}`);
+                    console.error(`[SQL-EXEC] Failed: ${e2.message}`);
+                }
+            }
+        }
+
+        const summary = `[SQL-EXEC] Executed ${sqlStatements.length} statement(s) by ${this.name}:\n${results.join('\n')}`;
+        await this.log('sql_executed', summary, { taskId: task.id, statementCount: sqlStatements.length });
+        return summary;
+    }
+
+    private async executeDirectSupabase(sql: string): Promise<string> {
+        const upper = sql.trim().toUpperCase();
+
+        // Parse simple INSERT INTO table (col1, col2) VALUES (val1, val2)
+        const insertMatch = sql.match(/INSERT\s+INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i);
+        if (insertMatch) {
+            const table = insertMatch[1];
+            const cols = insertMatch[2].split(',').map(c => c.trim().replace(/['"]/g, ''));
+            const vals = insertMatch[3].split(',').map(v => {
+                const trimmed = v.trim().replace(/^['"]|['"]$/g, '');
+                if (trimmed === 'true') return true;
+                if (trimmed === 'false') return false;
+                if (trimmed === 'null' || trimmed === 'NULL') return null;
+                if (!isNaN(Number(trimmed)) && trimmed !== '') return Number(trimmed);
+                return trimmed;
+            });
+
+            const obj: Record<string, any> = {};
+            cols.forEach((col, i) => { obj[col] = vals[i] !== undefined ? vals[i] : null; });
+
+            const { error } = await this.supabase.from(table).insert(obj);
+            if (error) throw error;
+            return `INSERT OK: ${table} (${cols.join(', ')})`;
+        }
+
+        // Parse simple UPDATE table SET col=val WHERE col=val
+        const updateMatch = sql.match(/UPDATE\s+(\w+)\s+SET\s+(.+?)\s+WHERE\s+(.+)/i);
+        if (updateMatch) {
+            const table = updateMatch[1];
+            const setParts = updateMatch[2].split(',').map(s => s.trim());
+            const whereParts = updateMatch[3].replace(/;$/, '').split(/\s+AND\s+/i);
+
+            const updates: Record<string, any> = {};
+            for (const part of setParts) {
+                const [col, ...rest] = part.split('=');
+                const val = rest.join('=').trim().replace(/^['"]|['"]$/g, '');
+                updates[col.trim()] = val === 'true' ? true : val === 'false' ? false : val === 'null' ? null : val;
+            }
+
+            let query = this.supabase.from(table).update(updates);
+            for (const w of whereParts) {
+                const [col, ...rest] = w.split('=');
+                const val = rest.join('=').trim().replace(/^['"]|['"]$/g, '').replace(/;$/, '');
+                query = query.eq(col.trim(), val);
+            }
+
+            const { error } = await query;
+            if (error) throw error;
+            return `UPDATE OK: ${table}`;
+        }
+
+        // Parse simple SELECT
+        if (upper.startsWith('SELECT')) {
+            const selectMatch = sql.match(/SELECT\s+(.+?)\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+LIMIT\s+(\d+))?/i);
+            if (selectMatch) {
+                const table = selectMatch[2];
+                let query = this.supabase.from(table).select(selectMatch[1] === '*' ? '*' : selectMatch[1]);
+                if (selectMatch[3]) {
+                    const whereParts = selectMatch[3].replace(/;$/, '').replace(/\s+LIMIT\s+\d+/i, '').split(/\s+AND\s+/i);
+                    for (const w of whereParts) {
+                        const [col, ...rest] = w.split('=');
+                        const val = rest.join('=').trim().replace(/^['"]|['"]$/g, '');
+                        query = query.eq(col.trim(), val);
+                    }
+                }
+                const limit = selectMatch[4] ? parseInt(selectMatch[4]) : 10;
+                const { data, error } = await query.limit(limit);
+                if (error) throw error;
+                return `SELECT OK: ${(data || []).length} rows from ${table}`;
+            }
+        }
+
+        throw new Error(`Cannot parse SQL for direct execution: ${sql.substring(0, 80)}`);
     }
 
     async handleLocal(task: Task) {
@@ -2227,10 +2388,16 @@ ${result.substring(0, 2000)}
         if (task.task_type === 'heartbeat') await this.heartbeat();
 
         if (task.task_type === 'self-healing' || task.title.includes('[HEALING]')) {
-            // Log the healing
-            console.log(`[LOCAL] ðŸ©º Processed healing task ${task.id}`);
+            console.log(`[LOCAL] 🩺 Processed healing task ${task.id}`);
             result = `[HEALING] System repaired by ${this.name}`;
-            this.sessionMetrics.tasksCompleted++; // Count it
+            this.sessionMetrics.tasksCompleted++;
+        }
+
+        // [FIX] Direct SQL execution for tasks containing SQL statements.
+        // These were getting escalated to pending_clarification because LLMs
+        // can't execute SQL — they just describe what the SQL would do.
+        if (this.containsExecutableSQL(task)) {
+            result = await this.executeTaskSQL(task);
         }
 
         // [ANTIGRAVITY] ROBUST STATUS UPDATE
