@@ -1,0 +1,81 @@
+version: "1.0"
+canonical_agent_repo: "DealAppSeo/trinity-ecosystem"
+trust_infrastructure_repo: "DealAppSeo/trustrails-dev"
+deprecated_repos:
+  - "DealAppSeo/trinity-shared-temp"
+  - "DealAppSeo/trinity-symphony-shared"
+
+# Entry Points
+agent_entry_point: "scripts/run-agent.ts"
+web_entry_point: "next start"
+railway_start_command: "npm run start:agent"
+
+# Infrastructure
+supabase_project: "qnnpjhlxljtqyigedwkb"
+chain: "base-sepolia"
+chain_id: 84532
+rpc_url: "https://sepolia.base.org"
+
+# Agent Registry
+agent_names:
+  - trinity-orch
+  - trinity-w3c
+  - trinity-shofet
+  - trinity-torch
+  - trinity-veritas
+  - trinity-gcm
+  - trinity-chesed
+  - trinity-mel
+  - trinity-apm
+  - trinity-sophia
+  - trinity-nexus
+  - trinity-hdm
+
+# Squad Topology (3x3)
+squads:
+  ORCHESTRATION:
+    - trinity-orch
+    - trinity-w3c
+    - trinity-shofet
+  ALPHA:
+    - trinity-torch
+    - trinity-veritas
+    - trinity-gcm
+  BETA:
+    - trinity-chesed
+    - trinity-mel
+    - trinity-apm
+  GAMMA:
+    - trinity-sophia
+    - trinity-nexus
+    - trinity-hdm
+
+# Database Interfaces (Contracts)
+interfaces:
+  heartbeat_table: "trinity_heartbeat"
+  registry_table: "trinity_agent_registry"
+  tasks_table: "trinity_tasks"
+  artifacts_table: "trinity_artifacts"
+  logs_table: "trinity_agent_logs"
+  benchmarks_table: "trinity_agent_benchmarks"
+  retros_table: "trinity_retros"
+  receipts_table: "x402_receipts"
+
+# Smart Contracts (Base Sepolia)
+contracts:
+  identity_registry: "0x8004A818BFB912233c491871b3d84c89A494BD9e"
+  reputation_registry: "0x8004B663056A597Dffe9eCcC1965A193B7388713"
+
+# Heartbeat Configuration
+heartbeat:
+  interval_ms: 120000  # 2 minutes
+  zombie_threshold_ms: 300000  # 5 minutes
+  survivor_alert_threshold_min: 10
+
+# Migration Status
+migration:
+  status: "in_progress"
+  current_runtime: "trinity-shared-temp (V4 JS)"
+  target_runtime: "trinity-ecosystem (V5 TS)"
+  pilot_agent: "trinity-veritas"
+  migrated_agents: []

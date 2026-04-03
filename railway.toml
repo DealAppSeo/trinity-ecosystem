@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# Agent services: set AGENT_NAME env var in Railway service settings.
+# Web controller: leave AGENT_NAME unset to run Next.js.
+startCommand = "if [ -n \"$AGENT_NAME\" ]; then npm run start:agent; else npm start; fi"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
