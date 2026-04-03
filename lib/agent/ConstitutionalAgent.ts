@@ -2527,22 +2527,24 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             // 4. [LEARN] Evaluation & Escalation Logic
             let evaluation = await this.evaluateResult(task, result.output);
             
-            // [PHASE 1] FAST-FAIL GATE: confidence < 0.80 -> HITL flag, stop
-            if (evaluation.score < 80) {
-                console.log(`[ANTIGRAVITY] 🚨 FAST-FAIL GATE: Confidence (${evaluation.score}) < 80. Flagging HITL and Stopping.`);
+            // [PHASE 1] FAST-FAIL GATE: Only flag genuine failures (score < 20)
+            // Previous threshold of 80 was catching nearly everything because most
+            // well-formed outputs score 50-75. Lowered to 20 to match ANTIGRAVITY fix.
+            if (evaluation.score < 20) {
+                console.log(`[ANTIGRAVITY] 🚨 FAST-FAIL GATE: Confidence (${evaluation.score}) < 20. Flagging HITL and Stopping.`);
                 await this.supabase.from('trinity_tasks').update({
                     status: 'pending_hitl',
-                    result: `[FAST-FAIL] Confidence too low (${evaluation.score}%). Require Human In The Loop.`
+                    result: `[FAST-FAIL] Confidence critically low (${evaluation.score}%). Require Human In The Loop.`
                 }).eq('id', task.id);
-                
+
                 await notificationManager.notifyUser({
                     title: `Fast-Fail Gate Triggered: ${this.name}`,
-                    message: `Task ${task.id} confidence < 80%. Require HITL.`,
+                    message: `Task ${task.id} confidence critically low (${evaluation.score}%). Require HITL.`,
                     type: 'warning',
                     agentName: this.name,
                     taskId: task.id
                 });
-                return { success: false, error: 'Fast-fail confidence < 80%', escalated: true };
+                return { success: false, error: 'Fast-fail confidence < 20%', escalated: true };
             }
 
             let lowBelief = evaluation.score < 40;
@@ -3322,38 +3324,63 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
 
     async evaluateResult(task: Task, output: string): Promise<{ score: number; handoff_required: boolean; handoff_to?: string }> {
         // [ANTIGRAVITY] STANDARDIZED SCORING: 0-100
-        let score = 50; // Default neutral (50/100)
+        // Signals: (1) Artifact produced, (2) Output substance, (3) Task-type relevance, (4) Completion indicators
+        let score = 0;
         let handoff = false;
         let targetAgent = '';
 
         const lowerOutput = output.toLowerCase();
 
-        // 1. Truth Score (Veritas Check)
-        if (task.task_type === 'research') {
-            if (lowerOutput.includes('http') || lowerOutput.includes('citation')) score += 30;
-            if (output.length > 200) score += 10;
-            handoff = true;
-            targetAgent = 'trinity-veritas'; // Truth verify
-        }
+        // ── SIGNAL 1: Artifact Production (+30) ──
+        // Did the agent call save_artifact or produce structured content?
+        const hasArtifactCall = lowerOutput.includes('artifact saved') || lowerOutput.includes('artifact:') || lowerOutput.includes('db://trinity_artifacts');
+        const hasStructuredContent = output.includes('```') || output.includes('# ') || output.includes('## ');
+        if (hasArtifactCall) score += 30;
+        else if (hasStructuredContent) score += 15;
 
-        // 2. Empathy Score (Chesed Check)
+        // ── SIGNAL 2: Output Substance (+25) ──
+        // Meaningful output length (scaled, caps at 500 chars for full credit)
+        const substanceScore = Math.min(25, Math.floor((output.length / 500) * 25));
+        score += substanceScore;
+
+        // ── SIGNAL 3: Task-Relevant Keywords (+25) ──
+        // Extract keywords from task title (words > 3 chars) and check presence in output
+        const taskKeywords = (task.title + ' ' + (task.description || '')).toLowerCase()
+            .split(/\s+/).filter(w => w.length > 3 && !['task', 'the', 'this', 'that', 'with', 'from', 'should'].includes(w));
+        const keywordHits = taskKeywords.filter(kw => lowerOutput.includes(kw)).length;
+        const keywordScore = taskKeywords.length > 0
+            ? Math.min(25, Math.floor((keywordHits / Math.min(taskKeywords.length, 8)) * 25))
+            : 10; // No keywords extractable = neutral
+        score += keywordScore;
+
+        // ── SIGNAL 4: Completion Indicators (+20) ──
+        const completionPhrases = ['complete', 'done', 'finished', 'implemented', 'created', 'generated', 'saved', 'result'];
+        const hasCompletion = completionPhrases.some(p => lowerOutput.includes(p));
+        const hasError = lowerOutput.includes('error') || lowerOutput.includes('failed') || lowerOutput.includes('cannot');
+        if (hasCompletion && !hasError) score += 20;
+        else if (hasCompletion && hasError) score += 5;
+        else if (!hasError) score += 10; // Neutral — no explicit completion but no errors
+
+        // ── TASK-TYPE BONUSES ──
+        if (task.task_type === 'research') {
+            if (lowerOutput.includes('http') || lowerOutput.includes('citation') || lowerOutput.includes('source')) score += 5;
+            handoff = true;
+            targetAgent = 'trinity-veritas';
+        }
+        if (task.task_type === 'code') {
+            if (lowerOutput.includes('function') || lowerOutput.includes('class') || lowerOutput.includes('const ')) score += 5;
+        }
         if (task.title.includes('Impact') || task.title.includes('Humanitarian')) {
             const empathyWords = ['help', 'community', 'care', 'support', 'understand'];
             const matches = empathyWords.filter(w => lowerOutput.includes(w)).length;
-            score += (matches * 10);
+            if (matches >= 2) score += 5;
             handoff = true;
             targetAgent = 'trinity-chesed';
         }
 
-        // 3. Coding Score
-        if (task.task_type === 'code') {
-            if (lowerOutput.includes('function') || lowerOutput.includes('class')) score += 40;
-            if (lowerOutput.includes('try') || lowerOutput.includes('catch')) score += 10; // Error handling
-        }
-
         return {
-            score: Math.min(99, score),
-            handoff_required: handoff && this.name !== targetAgent, // Don't handoff to self
+            score: Math.max(5, Math.min(99, score)),
+            handoff_required: handoff && this.name !== targetAgent,
             handoff_to: targetAgent
         };
     }
@@ -3479,6 +3506,44 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
 
                 if (retros && retros.length > 0) {
                     wisdom += `\n[RETROSPECTIVES]: \n` + retros.map((r: any) => `- ${r.content.substring(0, 200)}`).join('\n') + '\n';
+                }
+
+                // D-pre. Federated Pattern Retrieval (Cross-Agent Learning)
+                try {
+                    const taskKeywords = task.title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+                    if (taskKeywords.length > 0) {
+                        const { data: patterns } = await this.supabase
+                            .from('trinity_artifacts')
+                            .select('title, content, creator_agent')
+                            .eq('artifact_type', 'pattern')
+                            .neq('creator_agent', this.name)
+                            .order('created_at', { ascending: false })
+                            .limit(10);
+
+                        if (patterns && patterns.length > 0) {
+                            // Filter patterns relevant to this task
+                            const relevant = patterns.filter((p: any) => {
+                                try {
+                                    const parsed = JSON.parse(p.content);
+                                    return parsed.patterns?.some((pat: string) =>
+                                        taskKeywords.some((kw: string) => pat.includes(kw) || kw.includes(pat.split('_')[0]))
+                                    );
+                                } catch { return false; }
+                            }).slice(0, 3);
+
+                            if (relevant.length > 0) {
+                                wisdom += `\n[FEDERATED PATTERNS (Cross-Agent Learning)]:\n`;
+                                for (const p of relevant) {
+                                    try {
+                                        const parsed = JSON.parse(p.content);
+                                        wisdom += `- Agent ${parsed.agent} (${parsed.squad}): ${parsed.patterns.join(', ')} — "${parsed.outputExcerpt?.substring(0, 100)}..."\n`;
+                                    } catch { /* skip malformed */ }
+                                }
+                            }
+                        }
+                    }
+                } catch (e: any) {
+                    console.warn(`[WISDOM] Federated pattern retrieval failed: ${e.message}`);
                 }
 
                 // D. Global Blackboard (Redis Hot Tier)
@@ -3948,10 +4013,44 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     }
 
     async extractPatterns(taskTitle: string, output: string) {
+        // [FEDERATED LEARNING] Extract reusable patterns and share across the swarm
         const keywords = (taskTitle + ' ' + output).toLowerCase();
-        if (keywords.includes('api') && keywords.includes('endpoint')) {
-            this.sessionMetrics.patternsLearned++;
-            console.log(`[${this.name}] ðŸ§  LOGIC PATTERN DETECTED: API usage`);
+        const patterns: string[] = [];
+
+        if (keywords.includes('api') && keywords.includes('endpoint')) patterns.push('api_integration');
+        if (keywords.includes('error') && keywords.includes('fix')) patterns.push('error_recovery');
+        if (keywords.includes('deploy') || keywords.includes('railway')) patterns.push('deployment');
+        if (keywords.includes('research') && (keywords.includes('http') || keywords.includes('source'))) patterns.push('web_research');
+        if (keywords.includes('consensus') || keywords.includes('verify')) patterns.push('bft_consensus');
+        if (keywords.includes('report') || keywords.includes('analysis')) patterns.push('report_generation');
+
+        if (patterns.length > 0) {
+            this.sessionMetrics.patternsLearned += patterns.length;
+            console.log(`[${this.name}] PATTERNS DETECTED: ${patterns.join(', ')}`);
+
+            // Persist to shared knowledge base for federated learning
+            try {
+                await this.supabase.from('trinity_artifacts').insert({
+                    task_id: this.currentTaskId ? parseInt(this.currentTaskId) : null,
+                    title: `[PATTERN] ${patterns.join(', ')} -- ${this.name}`,
+                    content: JSON.stringify({
+                        patterns,
+                        agent: this.name,
+                        squad: this.wisdom.squad,
+                        taskTitle,
+                        outputExcerpt: output.substring(0, 300),
+                        timestamp: new Date().toISOString()
+                    }),
+                    artifact_type: 'pattern',
+                    creator_agent: this.name,
+                    agent: this.name,
+                    status: 'created',
+                    access_level: 'public',
+                    storage_location: `pattern://${this.name}/${Date.now()}`
+                });
+            } catch (e: any) {
+                console.warn(`[PATTERN] Failed to persist: ${e.message}`);
+            }
         }
     }
 
