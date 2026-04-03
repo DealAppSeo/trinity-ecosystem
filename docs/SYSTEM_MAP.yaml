@@ -1,0 +1,40 @@
+# HyperDAG Ecosystem — System Map
+# GMPD v1.1 | April 3, 2026
+version: "1.1"
+canonical_agent_repo: "DealAppSeo/trinity-ecosystem"
+trust_repo: "DealAppSeo/trustrails-dev"
+deprecated:
+  - "DealAppSeo/trinity-shared-temp"
+  - "DealAppSeo/trinity-symphony-shared"
+supabase_project: "qnnpjhlxljtqyigedwkb"
+health_check_tables:
+  primary: "agent_heartbeat"
+  secondary: "trinity_agent_logs"
+  tertiary: "trinity_tasks"
+  do_not_use_alone: "trinity_heartbeat"
+agent_names:
+  - trinity-torch
+  - trinity-veritas
+  - trinity-gcm
+  - trinity-mel
+  - trinity-chesed
+  - trinity-apm
+  - trinity-hdm
+  - trinity-sophia
+  - trinity-nexus
+  - trinity-orch
+  - trinity-shofet
+  - trinity-w3c
+ai_roles:
+  claude: "Strategy, monitoring, session documentation"
+  gemini: "trustrails-dev code, Railway redeployment"
+  cc: "trinity-ecosystem code, bug fixes"
+  grok: "Patents, research, hackathon strategy"
+hard_rules:
+  - "3-source verification before any diagnosis"
+  - "No raw SQL in task descriptions"
+  - "No architecture changes during sprint deadlines"
+  - "Only Sean redirects AI roles"
+sprint_1_deadline: "2026-04-10"
+cre_demo_deadline: "2026-04-17"
+hackathon_deadline: "2026-04-30"
