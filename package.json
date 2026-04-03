@@ -2,6 +2,9 @@
   "name": "trinity-symphony",
   "version": "8.1.3",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "workspaces": [
     "packages/*"
   ],
@@ -9,7 +12,7 @@
     "clean": "rm -rf .next node_modules/.cache && npm cache clean --force",
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p ${PORT:-3000}",
     "lint": "eslint",
     "sprint:db": "npx tsx scripts/sprint/setup_sprint_db.ts",
     "sprint:tier1": "npx tsx scripts/sprint/tier1_warmup.ts",
