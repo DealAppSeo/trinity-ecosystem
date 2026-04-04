@@ -1,4 +1,5 @@
 model_list:
+  # ── TIER 1: Free / Near-Free (ANFIS default routing) ──
   - model_name: cerebras-llama
     litellm_params:
       model: cerebras/llama3.1-70b
@@ -7,18 +8,34 @@ model_list:
     litellm_params:
       model: groq/llama-3.1-70b-versatile
       api_key: os.environ/GROQ_API_KEY
-  - model_name: fireworks-llama
+  - model_name: hf/phi-4-mini
     litellm_params:
-      model: fireworks_ai/accounts/fireworks/models/llama-v3p1-70b-instruct
-      api_key: os.environ/FIREWORKS_API_KEY
-  - model_name: mistral-medium
+      model: huggingface/microsoft/Phi-4-mini-instruct
+      api_key: os.environ/HUGGINGFACE_API_TOKEN
+  - model_name: hf/qwen-2.5-72b
     litellm_params:
-      model: mistral/mistral-medium-latest
-      api_key: os.environ/MISTRAL_API_KEY
+      model: huggingface/Qwen/Qwen2.5-72B-Instruct
+      api_key: os.environ/HUGGINGFACE_API_TOKEN
   - model_name: deepseek-reasoner
     litellm_params:
       model: deepseek/deepseek-reasoner
       api_key: os.environ/DEEPSEEK_API_KEY
+  - model_name: together-fallback
+    litellm_params:
+      model: together_ai/meta-llama/Llama-3-70b-chat-hf
+      api_key: os.environ/TOGETHER_API_KEY
+  - model_name: fireworks-llama
+    litellm_params:
+      model: fireworks_ai/accounts/fireworks/models/llama-v3p1-70b-instruct
+      api_key: os.environ/FIREWORKS_API_KEY
+
+  # ── TIER 2: Balanced ──
+  - model_name: mistral-medium
+    litellm_params:
+      model: mistral/mistral-medium-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  # ── TIER 3: Elite (paid, use sparingly) ──
   - model_name: anthropic-claude
     litellm_params:
       model: anthropic/claude-3-5-sonnet-20241022
@@ -27,10 +44,12 @@ model_list:
     litellm_params:
       model: openrouter/auto
       api_key: os.environ/OPENROUTER_API_KEY
-  - model_name: together-fallback
+
+  # ── EMBEDDINGS (free via HF Inference API) ──
+  - model_name: hf/jina-embeddings
     litellm_params:
-      model: together_ai/meta-llama/Llama-3-70b-chat-hf
-      api_key: os.environ/TOGETHER_API_KEY
+      model: huggingface/jinaai/jina-embeddings-v3
+      api_key: os.environ/HUGGINGFACE_API_TOKEN
 
 litellm_settings:
   drop_params: true

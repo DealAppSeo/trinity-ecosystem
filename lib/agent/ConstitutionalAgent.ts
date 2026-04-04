@@ -37,14 +37,15 @@ const MCP_BASE_URL = 'https://raw.githubusercontent.com/dealappseo/trinity-ecosy
 // LLM TIERS & COST OPTIMIZATION
 // ============================================
 const LLM_TIERS: Record<string, number> = {
-    'groq': 1,      // Tier 1: Fast/Free (Llama 3.3)
-    'cerebras': 1,  // Tier 1: Ultra-Fast (Llama 3.1)
-    'deepseek': 1,  // Tier 1: Cost-Efficient (DeepSeek V3/R1)
+    'groq': 1,        // Tier 1: Fast/Free (Llama 3.3)
+    'cerebras': 1,    // Tier 1: Ultra-Fast (Llama 3.1)
+    'deepseek': 1,    // Tier 1: Cost-Efficient (DeepSeek V3/R1)
+    'huggingface': 1, // Tier 1: Free HF Inference API (Phi-4, Qwen)
     'siliconflow': 1, // Tier 1: Economy Arbitrage
-    'deepinfra': 1,  // Tier 1: Economy Arbitrage
-    'gemini': 2,    // Tier 2: Balanced (Flash)
-    'anthropic': 3, // Tier 3: Elite (Sonnet/Opus)
-    'openai': 3     // Tier 3: Elite (GPT-4o)
+    'deepinfra': 1,   // Tier 1: Economy Arbitrage
+    'gemini': 2,      // Tier 2: Balanced (Flash)
+    'anthropic': 3,   // Tier 3: Elite (Sonnet/Opus)
+    'openai': 3       // Tier 3: Elite (GPT-4o)
 };
 
 const GOLDEN_RATIO_THRESHOLD = 0.61803398875;

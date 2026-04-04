@@ -2,8 +2,14 @@
   "version": 2,
   "name": "trustshell-landing",
   "builds": [
-    { "src": "package.json", "use": "@vercel/next" }
+    {
+      "src": "package.json",
+      "use": "@vercel/next",
+      "config": { "installCommand": "npm install --legacy-peer-deps" }
+    }
   ],
+  "buildCommand": "next build",
+  "installCommand": "npm install --legacy-peer-deps",
   "headers": [
     {
       "source": "/(.*)",
