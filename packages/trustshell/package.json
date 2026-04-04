@@ -1,0 +1,26 @@
+{
+  "name": "@hyperdag/trustshell",
+  "version": "0.1.0",
+  "description": "ZKP reputation credentials, BYOK encryption, and trust primitives for the HyperDAG protocol",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": ["hyperdag", "trustshell", "zkp", "repid", "byok", "trust"],
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  },
+  "peerDependencies": {
+    "@hyperdag/core": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@hyperdag/core": {
+      "optional": true
+    }
+  }
+}
