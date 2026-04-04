@@ -1,0 +1,29 @@
+{
+  "name": "@hyperdag/core",
+  "version": "0.1.0",
+  "description": "HyperDAG Protocol — ZKP circuits, ERC-8004 identity, ANFIS LASSO routing, DAG consensus, x402 transport",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --test src/**/*.test.ts"
+  },
+  "keywords": [
+    "hyperdag",
+    "zkp",
+    "plonky3",
+    "erc-8004",
+    "anfis",
+    "dag-consensus",
+    "bft",
+    "x402",
+    "federated-learning"
+  ],
+  "license": "BUSL-1.1",
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
