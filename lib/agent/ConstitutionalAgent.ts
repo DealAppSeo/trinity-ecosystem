@@ -3962,7 +3962,7 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
 
                     const primaryPayload = {
                         ...payload,
-                        content: content,
+                        content: normalizeContent,
                         file_path: artifactUrl,
                         external_url: artifactUrl,
                         creator_agent: this.name
