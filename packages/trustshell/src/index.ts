@@ -1,14 +1,14 @@
 /**
- * @hyperdag/trustshell v0.1.0
+ * @hyperdag/trustshell v0.2.0
  *
- * ZKP reputation credentials, BYOK encryption, and trust primitives
- * for the HyperDAG protocol.
+ * ZKP reputation credentials, BYOK encryption, onboarding flywheel,
+ * and trust primitives for the HyperDAG protocol.
  *
  * Architecture:
  *   HyperDAG Protocol (@hyperdag/core)
  *     └── TrustShell (@hyperdag/trustshell)  ← you are here
- *           └── TrustRails (trustrails-dev)
- *           └── AI Trinity Symphony (trinity-ecosystem)
+ *           └── TrustRails (compliance UI)
+ *           └── AI Trinity Symphony (agent swarm)
  *           └── Other consumers
  */
 
@@ -37,3 +37,18 @@ export {
   type ZKPProofResult,
   type ZKPVerifyResult
 } from './zkp';
+
+// Onboarding — Progressive trust flywheel (Stage 1: email only → Stage 5: full ZKP RepID)
+export {
+  initOnboarding,
+  advanceStage,
+  recordAction,
+  completeVerification,
+  generateRepIDProof,
+  getOnboardingStatus,
+  STAGE_CONFIG,
+  type OnboardingStage,
+  type OnboardingState,
+  type OnboardingAction,
+  type StageRequirements
+} from './onboarding';
