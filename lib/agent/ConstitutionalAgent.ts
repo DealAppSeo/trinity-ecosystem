@@ -2800,7 +2800,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 : '';
 
             // [ANTIGRAVITY] Artifact Logic: Only save summary if NO artifact link was returned by LLM
-            if (!externalArtifactUrl && ((task.task_type && ['content', 'research', 'code', 'design', 'data', 'report'].includes(task.task_type)) || task.requires_external_artifact)) {
+            if (!externalArtifactUrl && result.output && ((task.task_type && ['content', 'research', 'code', 'design', 'data', 'report'].includes(task.task_type)) || task.requires_external_artifact)) {
                 // [ANTIGRAVITY] Map task_type to artifact type
                 const typeMap: Record<string, string> = {
                     'code': 'code',
@@ -2831,7 +2831,7 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
             }
 
             // [ANTIGRAVITY] MANDATORY ARTIFACT ENFORCEMENT & SMART PARSING
-            if (!externalArtifactUrl) {
+            if (!externalArtifactUrl && result.output) {
                 console.log(`[ANTIGRAVITY] ðŸ›¡ï¸ No artifact produced for task ${task.id}. Attempting smart-parse...`);
 
                 let extractedContent = result.output;
@@ -3858,6 +3858,10 @@ Return JSON ONLY: { "improvement_required": boolean, "critique": "bullet points 
     }
 
     async saveArtifact(taskId: string | number, content: string | { path: string, content: string }[], type: string = 'text', title?: string, accessLevel: string = 'protected') {
+        if (!content || (typeof content === 'string' && content.trim().length === 0)) {
+            console.warn(`[ARTIFACT] ⚠️ Skipping save — null/empty content for task ${taskId}`);
+            return null;
+        }
         const safeTaskId = String(taskId || 'self-gen-' + Date.now());
         const safeTitle = title || `Artifact ${safeTaskId}`;
         const normalizeContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
