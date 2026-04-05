@@ -2082,6 +2082,20 @@ ${result.substring(0, 2000)}
                   }
                 }
 
+                // [V4 PORT] VIRTUE FILTER — pre-execution safety gate
+                const virtueCheck = this.passesVirtueFilter(task);
+                if (!virtueCheck.passes) {
+                    console.log(`[${this.name}] ⚠️ VIRTUE VIOLATION: ${virtueCheck.violations.join(', ')}`);
+                    this.sessionMetrics.virtueRefusals = (this.sessionMetrics.virtueRefusals || 0) + 1;
+                    await this.log('virtue_violation', `Refused task #${task.id}: ${virtueCheck.violations.join(', ')}`, { taskId: task.id, violations: virtueCheck.violations });
+                    await this.supabase.from('trinity_tasks').update({
+                        status: 'failed',
+                        result: `[VIRTUE FILTER] Task refused: ${virtueCheck.violations.join('; ')}`,
+                        claimed_by: null
+                    }).eq('id', task.id);
+                    return { success: false, error: 'Virtue violation', violations: virtueCheck.violations };
+                }
+
                 // TRY LOCAL FIRST
                 if (this.canHandleLocally(task)) {
                     console.log(`[LOCAL] âš¡ Handling ${task.id} without LLM (Tier 1)`);
@@ -2692,9 +2706,23 @@ If you are doing a business or strategic task, you MUST prioritize generating a 
                 }
             }
 
+            // [V4 PORT] EMPTY RESULT RESCUE — prevent silent failures from null/empty LLM output
+            if (!result.output || result.output.trim().length === 0) {
+                console.warn(`[${this.name}] ⚠️ Empty result from LLM for task ${task.id}. Rescuing...`);
+                await this.supabase.from('trinity_tasks').update({
+                    status: 'failed',
+                    result: `[EMPTY_OUTPUT] LLM returned empty response. Task released for retry.`,
+                    claimed_by: null,
+                    completed_at: new Date().toISOString(),
+                    completed_by: this.name
+                }).eq('id', task.id);
+                await this.log('empty_result_rescue', `Empty LLM output for task ${task.id}`, { taskId: task.id, title: task.title });
+                return { success: false, error: 'Empty LLM output — task released for retry' };
+            }
+
             // 4. [LEARN] Evaluation & Escalation Logic
             let evaluation = await this.evaluateResult(task, result.output);
-            
+
             // [PHASE 1] FAST-FAIL GATE: Only flag genuine failures (score < 20)
             // Previous threshold of 80 was catching nearly everything because most
             // well-formed outputs score 50-75. Lowered to 20 to match ANTIGRAVITY fix.
@@ -4203,7 +4231,57 @@ See \`docs/STARTUP_DOCTRINE.md\` for full protocol.
     }
 
     async reportGenome() {
-        // ... (Keep existing stub)
+        if (this.sessionMetrics.tasksCompleted % 50 !== 0) return;
+        try {
+            await this.supabase.from('trinity_evolution_log').insert({
+                agent: this.name,
+                metric_name: 'agent_genome',
+                metric_value: this.sessionMetrics.tasksCompleted,
+                context: {
+                    version: this.version,
+                    uptime: Date.now() - this.sessionMetrics.startTime,
+                    sessionMetrics: this.sessionMetrics,
+                    providers: this.availableProviders,
+                    wisdom: this.wisdom,
+                    primaryVirtue: this.wisdom?.primaryVirtue
+                },
+                created_at: new Date().toISOString()
+            });
+            console.log(`[${this.name}] 🧬 Genome reported (${this.sessionMetrics.tasksCompleted} tasks)`);
+        } catch (e) {
+            // Non-fatal
+        }
+    }
+
+    /**
+     * [V4 PORT] Virtue Filter — checks task against 8 constitutional virtues before execution.
+     * Refuses tasks involving fabrication, harm, deception, exploitation, or cruelty.
+     */
+    passesVirtueFilter(task: any): { passes: boolean; violations: string[] } {
+        const violations: string[] = [];
+        const text = `${task.title} ${task.description || ''}`.toLowerCase();
+        if (text.includes('fabricate') || text.includes('make up') || text.includes('invent fake')) {
+            violations.push('TRUE: Task involves fabrication');
+        }
+        if (text.includes('harm') || text.includes('damage') || text.includes('destroy') || text.includes('hurt')) {
+            violations.push('NOBLE: Task may cause harm');
+        }
+        if (text.includes('deceive') || text.includes('lie to') || text.includes('trick') || text.includes('mislead')) {
+            violations.push('RIGHT: Task involves deception');
+        }
+        if (text.includes('steal') || text.includes('pirate') || text.includes('crack') || text.includes('bypass security')) {
+            violations.push('RIGHT: Task may be unethical');
+        }
+        if (text.includes('spam') || text.includes('manipulate') || text.includes('exploit users')) {
+            violations.push('PURE: Task has hidden agenda');
+        }
+        if (text.includes('punish') || text.includes('revenge') || text.includes('retaliate')) {
+            violations.push('LOVELY: Task seeks punishment over restoration');
+        }
+        if (text.includes('mock') || text.includes('ridicule') || text.includes('humiliate')) {
+            violations.push('ADMIRABLE: Task lacks respect');
+        }
+        return { passes: violations.length === 0, violations };
     }
 
     async extractPatterns(taskTitle: string, output: string) {
