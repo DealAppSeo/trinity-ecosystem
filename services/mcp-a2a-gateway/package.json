@@ -1,0 +1,12 @@
+{
+  "name": "mcp-a2a-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

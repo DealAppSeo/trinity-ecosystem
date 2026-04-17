@@ -1,0 +1,677 @@
+PART 1 — FILE INVENTORY
+filepath | size | last_modified
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env | 143 | 2026-03-18T03:58:35
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local | 1342 | 2026-04-02T08:37:22
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.eslintrc.json | 42 | 2026-03-27T06:09:32
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.gitignore | 9 | 2026-03-27T05:39:18
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.vercel\project.json | 115 | 2026-03-27T05:39:18
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.vercel\README.txt | 520 | 2026-03-27T05:39:18
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 1578 | 2026-04-04T10:11:30
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 6256 | 2026-03-27T07:04:34
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\villain\route.ts | 4872 | 2026-03-27T07:04:34
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 1121 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\pay\route.ts | 5139 | 2026-03-27T07:04:34
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\receipts\route.ts | 637 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\repid\configure\route.ts | 1375 | 2026-03-27T07:04:34
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 1338 | 2026-03-27T07:04:34
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 3243 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\vault\route.ts | 577 | 2026-03-27T07:04:34
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\dashboard\page.tsx | 3333 | 2026-03-27T04:00:52
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\globals.css | 314 | 2026-03-26T20:30:35
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\layout.tsx | 372 | 2026-03-26T20:20:06
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\page.tsx | 661 | 2026-03-26T20:20:31
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\NEXUS\github_collaboration_targets.md | 1876 | 2026-03-31T22:10:10
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\NEXUS\hackathon_list_2026.md | 1916 | 2026-03-31T22:10:07
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\NEXUS\zurich_pitch_script.md | 2085 | 2026-03-31T22:10:40
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\TORCH\rust_migration_plan.md | 1655 | 2026-03-31T22:09:26
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\TORCH\trustrails_one_pager.md | 2147 | 2026-03-31T22:10:33
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\VERITAS\supabase_schema_complete.md | 1681 | 2026-03-31T22:10:38
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\audit_output.txt | 249204 | 2026-04-17T00:43:52
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql | 2710 | 2026-04-04T10:35:03
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\build_output.txt | 4092 | 2026-03-27T06:57:50
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\CLAUDE_HANDOFF_TRINITY.md | 4350 | 2026-04-05T10:36:26
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 3925 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\InstitutionalControls.tsx | 15212 | 2026-03-27T03:55:08
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx | 3098 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\RiskSlider.tsx | 4806 | 2026-03-26T20:24:45
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\SystemTrustScore.tsx | 4608 | 2026-03-27T07:10:47
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 2843 | 2026-03-31T04:18:40
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\fix-env.js | 1460 | 2026-03-27T07:05:52
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\fix-routes.js | 786 | 2026-03-27T06:58:19
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\fix-routes2.js | 1073 | 2026-03-27T07:02:43
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 11707 | 2026-04-04T10:11:18
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts | 3923 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\FireblocksPreAuth.ts | 2546 | 2026-03-26T20:26:48
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\index.ts | 579 | 2026-03-26T20:26:50
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 5338 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 3984 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\SolanaExecutor.ts | 3938 | 2026-03-27T00:23:44
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\types.ts | 2358 | 2026-03-26T20:25:31
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 4056 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts | 2590 | 2026-03-27T07:08:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\eip712.ts | 4072 | 2026-04-07T09:54:04
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\IdentityRegistry.json | 19561 | 2026-04-08T06:49:12
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\merkle.ts | 2010 | 2026-04-07T09:56:45
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 7087 | 2026-04-07T10:04:34
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\ValidationRegistry.json | 9659 | 2026-04-08T07:04:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\litellm.Dockerfile | 226 | 2026-04-06T20:23:07
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\next-env.d.ts | 233 | 2026-03-27T05:56:36
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\next.config.mjs | 200 | 2026-03-27T06:10:06
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\package-lock.json | 414894 | 2026-04-09T08:47:47
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\package.json | 929 | 2026-04-09T08:47:47
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\public\agent-registration.json | 1133 | 2026-04-07T10:00:41
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\query.js | 1208 | 2026-03-31T04:24:54
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\README.md | 2379 | 2026-03-26T20:30:04
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rest_insert.js | 2560 | 2026-04-06T02:38:04
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rest_insert_2.js | 1516 | 2026-04-06T13:32:28
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rust-brain\Cargo.toml | 128 | 2026-04-09T01:03:46
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rust-brain\Dockerfile | 343 | 2026-04-09T01:03:55
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rust-brain\src\bft_consensus.rs | 607 | 2026-03-31T22:09:31
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rust-brain\src\main.rs | 501 | 2026-03-31T22:09:28
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rust-brain\src\pythagorean_comma.rs | 641 | 2026-03-31T22:09:33
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rust-brain\src\task_queue.rs | 423 | 2026-03-31T22:09:35
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 1821 | 2026-03-26T20:31:13
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 6152 | 2026-04-09T08:46:46
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\create-solana-wallet.js | 473 | 2026-03-27T00:00:19
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\do-airdrop.js | 1043 | 2026-03-27T00:03:03
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\mint-devnet-usdc.js | 2557 | 2026-03-27T03:47:15
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-agent0.ts | 4735 | 2026-03-26T22:31:00
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js | 4957 | 2026-04-08T06:50:06
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\retry-airdrop.js | 892 | 2026-03-27T00:30:09
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\setup-solana.ts | 2987 | 2026-03-26T22:26:29
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\package.json | 213 | 2026-04-09T05:15:03
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 3877 | 2026-04-09T05:15:28
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\zkp-postcard\Cargo.toml | 1307 | 2026-04-09T01:10:20
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\zkp-postcard\Dockerfile | 453 | 2026-04-09T03:48:53
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\zkp-postcard\src\circuit.rs | 4353 | 2026-04-09T04:36:19
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\zkp-postcard\src\main.rs | 6392 | 2026-04-09T01:11:05
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 2803 | 2026-04-01T21:38:43
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\.temp\cli-latest | 7 | 2026-04-04T10:32:59
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\config.toml | 484 | 2026-04-04T10:32:42
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\.npmrc | 221 | 2026-04-04T10:32:42
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\deno.json | 85 | 2026-04-04T10:32:42
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 4044 | 2026-04-04T10:33:20
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\temp_dispatch.js | 2777 | 2026-04-06T02:23:05
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 6140 | 2026-04-08T21:36:45
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-science\backtest.py | 8819 | 2026-04-07T10:05:31
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-science\signal_fetcher.py | 8654 | 2026-04-07T18:58:20
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-science\veto_engine.py | 5095 | 2026-04-07T09:48:40
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-science\__pycache__\signal_fetcher.cpython-313.pyc | 9601 | 2026-04-07T09:48:30
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-science\__pycache__\veto_engine.cpython-313.pyc | 5674 | 2026-04-07T10:06:39
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 6862 | 2026-04-17T00:44:10
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tsconfig.json | 574 | 2026-03-26T20:19:56
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tsconfig.tsbuildinfo | 410064 | 2026-04-09T08:51:12
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\ts_errors.txt | 9030 | 2026-04-09T08:51:29
+
+PART 2 — CONSTITUTIONAL LAYER FILES
+filename | line number | exact matching line
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local | 8 | AGENT_SOPHIA_PRIVKEY=3sFtj7Xty9sUgFso5PhNWi57FuNgjfYBo72Vggnr67m8U33t5KZHNd3hsgQCdq4mT6TyKEzogQPanRfDmsHg1aXo
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local | 9 | AGENT_SOPHIA_PUBKEY=43TSvktkyt3Fjb1C7eAkzW94GoFpD3Gi3ukGZhNA8FND
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 27 | belief: v.belief,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 28 | disbelief: v.disbelief,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 37 | // ── BEAT 2: THE HERO (SOPHIA succeeds) ─────────────────────────────────
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 38 | console.log('\n[DEMO BEAT 2] Happy path: SOPHIA executes compliant payment');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 42 | agentName:         'SOPHIA',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 52 | agent:          'SOPHIA',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 64 | message:        'SOPHIA earned Gold tier and holds an active SBT binding verified human liability. BFT consensus passed. Fireblocks pre-authorized.',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 71 | body: JSON.stringify({ vaultId: 'demo-vault-001', agentName: 'SOPHIA', action: 'rebalance', amountUSDC: 15000 }),
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 77 | agent:      'SOPHIA',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 86 | console.log('\n[DEMO BEAT 4] Institutional Control: SOPHIA requests high-value transfer ($75,000)');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 90 | agentName:         'SOPHIA',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 100 | agent:      'SOPHIA',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | 106 | message:    'SOPHIA is verified and capable, but $75,000 exceeds the $50k single-signature threshold. The API securely suspends execution (HTTP 202) p
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\pay\route.ts | 103 | process.env.AGENT_SOPHIA_PRIVKEY || '',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\repid\configure\route.ts | 21 | 'SOPHIA',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\repid\configure\route.ts | 30 | story: 'Adjust weights to see how SOPHIA\'s RepID changes in real time.',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\repid\configure\route.ts | 31 | aminaConservative: 'Set humanCustodyScore to 0.45 — SOPHIA\'s RepID emphasizes human oversight.',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\repid\configure\route.ts | 32 | portfolioBalanced: 'Set x402SuccessRate to 0.25 — SOPHIA\'s RepID emphasizes payment performance.',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 16 | .select('agent_name, repid_score, repid_tier, insurance_coverage, human_custody_verified');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 23 | const totalWeight = agents.reduce((s, a) => s + a.repid_score, 0);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\NEXUS\hackathon_list_2026.md | 22 | 16. **AI Engineer World's Fair** - San Francisco. Focus on LLM coordination and constitutional agents.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\TORCH\rust_migration_plan.md | 4 | This document outlines the migration of TrustRails core orchestration and consensus logic from Node.js (`constitutional-agent-base.js`, `SolanaExecuto
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\VERITAS\supabase_schema_complete.md | 9 | - **Key Columns**: `agent_name`, `status`, `x402_id`, `repid_score`, `sponsor_id`.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\VERITAS\supabase_schema_complete.md | 15 | - **Triggers**: `trinity_tasks_task_category_check` (Requires `title` inclusion to bypass `pending_clarification`).
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\VERITAS\supabase_schema_complete.md | 26 | - **Status**: ACTIVE. Interval restoration deployed in `ConstitutionalAgentV4`.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql | 15 | WHEN 'SOPHIA' THEN v_buddy_agent := 'NEXUS';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql | 16 | WHEN 'NEXUS' THEN v_buddy_agent := 'SOPHIA';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\CLAUDE_HANDOFF_TRINITY.md | 14 | - **SOPHIA**: The Lead Orchestrator & Executioner. (For the Hackathon, she executes the Kraken CLI trades).
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\CLAUDE_HANDOFF_TRINITY.md | 25 | It utilizes **Multiplicative GNN (Graph Neural Network) algorithms** to calculate reputations, track transaction states, and manage the `ANFIS/LASSO` 
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\CLAUDE_HANDOFF_TRINITY.md | 58 | 1. **Kraken MCP Integration:** Wire the Kraken CLI (which has a built-in MCP server) into our existing Supabase Edge Function `agent-tools` or directl
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\CLAUDE_HANDOFF_TRINITY.md | 59 | 2. **EIP-712:** Format `TradeIntents` so they can pass from `NEXUS` -> `VERITAS` -> `SHOFET` -> `SOPHIA`.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 29 | .order('repid_score', { ascending: false });
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 51 | const pct   = (agent.repid_score / 10000) * 100;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 75 | {Number(agent.repid_score).toLocaleString()}
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx | 64 | RepID: {r.agent_repid_score}
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\RiskSlider.tsx | 95 | <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>SOPHIA RepID with your weights</div>
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 38 | agent_assigned: 'SOPHIA',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 15 | const PHI = 0.618033988749895;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 23 | belief: number;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 24 | disbelief: number;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 50 | beta:  { provider: 'anthropic', model: 'anthropic/claude-haiku-4-5-20251001', weight: PHI },
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 51 | gamma: { provider: 'deepseek', model: 'deepseek/deepseek-chat', weight: PHI * PHI },
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 67 | {"belief": 0.0-1.0, "disbelief": 0.0-1.0, "output": "one sentence assessment"}
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 69 | belief + disbelief should sum to approximately 1.0.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 70 | If claim contradicts known facts, set disbelief high.`;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 98 | belief: Math.min(1, Math.max(0, parsed.belief || 0.5)),
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 99 | disbelief: Math.min(1, Math.max(0, parsed.disbelief || 0.5)),
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 108 | belief: 0.5, disbelief: 0.5, weight: config.weight,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 122 | const beliefs = votes.map(v => v.belief);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 123 | const maxBelief = Math.max(...beliefs);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 124 | const minBelief = Math.min(...beliefs);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 125 | const avgBelief = beliefs.reduce((s, b) => s + b, 0) / beliefs.length;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 134 | + `Avg belief=${avgBelief.toFixed(3)} > 0.85. Unanimous high confidence = coordinated bias risk. `
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 176 | // φ-weighted belief score
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 178 | (s, v) => s + (v.belief * v.weight), 0
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 181 | const weightedDisbelief = votes.reduce(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 182 | (s, v) => s + (v.disbelief * v.weight), 0
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 189 | const consensus_reached = !comma.veto && weightedBelief >= PHI;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 190 | const hitl_required = comma.veto || (!consensus_reached && weightedDisbelief < PHI);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 194 | .filter(v => v.belief > v.disbelief)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 198 | .filter(v => v.disbelief > v.belief)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 208 | threshold: PHI,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 232 | description: `Claim requires human review.\n\nClaim: "${claim}"\n\nBFT Score: ${(weightedBelief*100).toFixed(1)}% (threshold: 61.8%)\n\nReason: ${comm
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 251 | belief: v.belief,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 252 | disbelief: v.disbelief,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 291 | gamma: 'SOPHIA', // Gamma squad representative
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 300 | ? vote.belief > vote.disbelief
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 301 | : vote.disbelief > vote.belief;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts | 67 | agent_repid_score:    receipt.agentRepidScore,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 22 | repidScore:           data.repid_score,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 136 | repid_score:           newScore,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\SolanaExecutor.ts | 41 | const secretBytesStr = process.env.AGENT_SOPHIA_SECRET_BYTES;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\SolanaExecutor.ts | 42 | if (!secretBytesStr) throw new Error("Missing AGENT_SOPHIA_SECRET_BYTES array in environment");
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\types.ts | 31 | threshold:         number;    // 0.618 golden ratio
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\eip712.ts | 3 | * Signs TradeIntents (SOPHIA) and ConstitutionalRefusals (SHOFET)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\eip712.ts | 93 | * SOPHIA signs a TradeIntent (execute decision)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 76 | .select('repid_score')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 81 | return Number(data.repid_score);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 99 | repid_score: newRepId,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 176 | const agentId = 1n; // SOPHIA's agent ID
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 184 | // SOPHIA signs TradeIntent
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 243 | await updateRepId('trinity-sophia', 'constitutional_refusal', REPID_DELTAS.CONSTITUTIONAL_REFUSAL,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\public\agent-registration.json | 3 | "name": "SOPHIA-TrustTrader",
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\public\agent-registration.json | 28 | "constitutional": {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 42 | "repid_score": data.repid_score,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 36 | const SOPHIA_TOKEN_ID = 3747n;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 109 | type: 'constitutional-refusal',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 127 | SOPHIA_TOKEN_ID,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\create-solana-wallet.js | 7 | console.log("AGENT_SOPHIA_PUBKEY=" + sophia.publicKey.toBase58());
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\create-solana-wallet.js | 11 | fs.writeFileSync('.env.local', `AGENT_SOPHIA_PRIVKEY=${privKey}\n`);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\do-airdrop.js | 8 | const privKeyMatch = envContent.match(/AGENT_SOPHIA_PRIVKEY=(.*)/);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\do-airdrop.js | 19 | fs.appendFileSync('.env.local', `\nAGENT_SOPHIA_PUBKEY=${pubkey}\n`);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\mint-devnet-usdc.js | 9 | const privKeyMatch = envContent.match(/AGENT_SOPHIA_PRIVKEY=(.*)/);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\mint-devnet-usdc.js | 10 | if (!privKeyMatch) throw new Error("Missing AGENT_SOPHIA_PRIVKEY");
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\mint-devnet-usdc.js | 18 | if (!envContent.includes('AGENT_SOPHIA_SECRET_BYTES')) {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\mint-devnet-usdc.js | 20 | envContent += `\nAGENT_SOPHIA_SECRET_BYTES=${bytesArray}\n`;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\mint-devnet-usdc.js | 41 | console.log('Minted 100,000 USDC to SOPHIA');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-agent0.ts | 14 | { name: 'SOPHIA', squad: 'Gamma', role: 'Treasury management and programmable payment execution',num: 7 },
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js | 28 | name: 'SOPHIA',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js | 141 | repid_score: r.agent.repid.score,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\retry-airdrop.js | 6 | const pubkeyMatch = envContent.match(/AGENT_SOPHIA_PUBKEY=(.*)/);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\setup-solana.ts | 19 | console.log(`  SOPHIA: ${sophia.publicKey.toBase58()}`);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\setup-solana.ts | 24 | console.log('🔄 Requesting SOL Airdrop for SOPHIA...');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\setup-solana.ts | 31 | console.log('✓ 2 SOL Airdropped to SOPHIA');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\setup-solana.ts | 46 | // 4. Mint 1M USDC to SOPHIA
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\setup-solana.ts | 47 | console.log('🔄 Minting 1,000,000 Mock USDC to SOPHIA...');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\setup-solana.ts | 58 | AGENT_SOPHIA_PRIVKEY=${bs58.encode(sophia.secretKey)}
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 28 | .select('email, erc8004_token_id, repid_score, credential_type')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 37 | repid: a.repid_score,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 37 | JWT-gated packet containing constitutional decision history, trade parameters, and conservatorship details. Opened by trading counterparties before si
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 56 | Most trading bots maximize returns. TrustTrader maximizes **constitutional compliance**.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 58 | 13 market signals mapped to the **Circle of Fifths**. When collective dissonance exceeds the **Pythagorean Comma threshold** (531441/524288 = 1.013643
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 70 | | SOPHIA RepID | 7,800+ |
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 81 | | **SOPHIA** | [3747](https://sepolia.basescan.org/tx/0x5abc007b8e400dc1cee787a6e5ab356126d8cb345dab5e1289e47be06561961f) | 7,800+ | Constitutional tr
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 102 | - **Agents**: Trinity Symphony 12-agent constitutional swarm on Railway
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 111 | | [trinity-symphony-shared](https://github.com/DealAppSeo/trinity-symphony-shared) | 12-agent constitutional swarm |
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 36 | const p2 = ["constitutional","ConstitutionalAgent","belief","disbelief","uncertainty","pending_clarification","0.621","0.618","PHI","VERSION 8","VERSI
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 123 | log("(Skipped if constitutional-agent-base.js not found)");
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 124 | let cabFile = Object.keys(fileContents).find(p => p.endsWith('constitutional-agent-base.js'));
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 130 | log("no constitutional-agent-base.js found in repo");
+
+PART 3 — TASK CLAIMING LOGIC
+filename | line number | exact matching line
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 8 | const { claim, context } = await req.json();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 9 | if (!claim) {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 10 | return NextResponse.json({ error: 'claim required' }, { status: 400 });
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 12 | const result = await bftEngine.vote(claim, context || '');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 14 | claim,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 40 | // GET: Test with a known wrong claim
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | 42 | const testClaim = req.nextUrl.searchParams.get('claim')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 9 | const { agent_name, agent_id_onchain } = await req.json();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 11 | if (!agent_name || !agent_id_onchain) {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 26 | .eq('agent_name', agent_name);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 32 | return NextResponse.json({ success: true, agent_name, agent_id_onchain });
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 16 | .select('agent_name, repid_score, repid_tier, insurance_coverage, human_custody_verified');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\VERITAS\supabase_schema_complete.md | 9 | - **Key Columns**: `agent_name`, `status`, `x402_id`, `repid_score`, `sponsor_id`.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\VERITAS\supabase_schema_complete.md | 14 | - **Key Columns**: `id`, `agent_assigned`, `task_type`, `priority`, `status`, `metadata`, `result`.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\VERITAS\supabase_schema_complete.md | 20 | - **Key Columns**: `receipt_id`, `agent_name`, `solana_tx_hash`, `audit_hash`, `bft_consensus_weight`, `kya_verified`.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql | 28 | task_type,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 53 | <div key={agent.agent_name} style={{
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 62 | {agent.agent_name}
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx | 53 | <span style={{ color: '#f8fafc', fontWeight: 600 }}>{r.agent_name}</span>
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 15 | task_type: 'overnight_sprint_task',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 23 | task_type: 'overnight_sprint_task',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 31 | task_type: 'overnight_sprint_task',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 39 | task_type: 'overnight_sprint_task',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 56 | claim: string,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 62 | const prompt = `Evaluate this claim for factual accuracy. Be skeptical.
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 64 | Claim: "${claim}"
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 70 | If claim contradicts known facts, set disbelief high.`;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 163 | async vote(claim: string, context: string = ''): Promise<BFTResult> {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 168 | this.queryProvider('alpha', claim, context),
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 169 | this.queryProvider('beta', claim, context),
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 170 | this.queryProvider('gamma', claim, context),
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 202 | .update(`BFT|${claim}|${weightedBelief.toFixed(4)}|${Date.now()}`)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 220 | await this.persistConsensus(claim, result);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 232 | description: `Claim requires human review.\n\nClaim: "${claim}"\n\nBFT Score: ${(weightedBelief*100).toFixed(1)}% (threshold: 61.8%)\n\nReason: ${comm
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 242 | private async persistConsensus(claim: string, result: BFTResult): Promise<void> {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 247 | asset: `CLAIM:${claim.substring(0, 50).replace(/[^A-Z0-9_]/gi, '_').toUpperCase()}`,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 312 | .eq('agent_name', agentName);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts | 66 | agent_name:           receipt.agentName,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 17 | .eq('agent_name', agentName)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 21 | agentName:            data.agent_name,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 39 | .eq('agent_name', agentName)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 142 | .eq('agent_name', agentName);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 145 | agent_name: agentName,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 81 | agent_name:      req.agentName,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts | 47 | agent_name: agentName,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 77 | .eq('agent_name', agentName)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 103 | .eq('agent_name', agentName);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 132 | agent_name: params.agentName,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 156 | agent_name: agentName,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\README.md | 15 | - **ZKP Identity Binding**: Honest stubs simulating Soulprint Groth16 zkML proofs, allowing agents to claim compliance without doxxing operator custod
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 17 | // We read the agent_name from the environment (e.g. AGENT_NAME=TORCH)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 26 | .eq('agent_name', agentName)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 38 | "name": data.agent_name,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-agent0.ts | 83 | agent_name: a.name,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 9 | status: 'claimed' | 'processing' | 'veritas_gate' | 'done' | 'failed';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 28 | const claimTaskNode = async (state: MotorTaskState) => ({ status: 'processing' as const });
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 41 | motorGraph.addNode('claim', claimTaskNode);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 48 | motorGraph.setEntryPoint('claim');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 49 | motorGraph.addEdge('claim', 'process');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 25 | const { tool, agent_name, task_id, params } = body;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 27 | if (!tool || !agent_name) {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 89 | agent: agent_name,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 37 | const p3 = ["claim","status = 'doing'","status = 'pending'","status = 'failed'","status = 'done'","claimed_by","agent_name","task_type"];
+
+PART 4 — DATABASE WRITE LOCATIONS
+filename | line number | exact matching line
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local | 1 | # SUPABASE
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local | 2 | NEXT_PUBLIC_SUPABASE_URL=https://qnnpjhlxljtqyigedwkb.supabase.co
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local | 3 | NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6ImFub24iLCJ
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local | 4 | SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubnBqaGx4bGp0cXlpZ2Vkd2tiIiwicm9sZSI6InNlcnZpY2Vfcm9
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 6 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 15 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 16 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 17 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 20 | const { data, error } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 21 | .from('agent_kya_registry')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | 22 | .update({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\pay\route.ts | 147 | return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\receipts\route.ts | 5 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\receipts\route.ts | 7 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\receipts\route.ts | 8 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\receipts\route.ts | 9 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\receipts\route.ts | 13 | const { data } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\receipts\route.ts | 14 | .from('kya_compliance_receipts')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 3 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 8 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 9 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 10 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 13 | const { data } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 14 | .from('institution_config')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 29 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 30 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 31 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 34 | const { error } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 35 | .from('institution_config')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | 36 | .update(config)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 5 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 7 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 8 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 9 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 14 | const { data: agents } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 15 | .from('agent_kya_registry')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 32 | const { data: receipts } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts | 33 | .from('kya_compliance_receipts')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\TORCH\rust_migration_plan.md | 13 | | `@supabase/supabase-js` | `postgrest`, `reqwest` | Database I/O |
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql | 26 | INSERT INTO trinity_tasks (
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql | 39 | 'https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/agent-tools',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql | 63 | INSERT INTO ground_truth_facts (category, fact_key, fact_value, match_type, description)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql | 66 | 'https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/agent-tools',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql | 69 | 'Authorization: Bearer [SUPABASE_ANON_KEY from env]',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 7 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 9 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 10 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 11 | process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 26 | const { data } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 27 | .from('agent_kya_registry')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 34 | const sub = supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx | 40 | return () => { supabase.removeChannel(sub); };
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx | 7 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx | 9 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx | 10 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx | 11 | process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx | 25 | const sub = supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx | 32 | return () => { supabase.removeChannel(sub); };
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\SystemTrustScore.tsx | 8 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\SystemTrustScore.tsx | 10 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\SystemTrustScore.tsx | 11 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\SystemTrustScore.tsx | 12 | process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy_anon_key'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\SystemTrustScore.tsx | 26 | const sub = supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\SystemTrustScore.tsx | 32 | return () => { supabase.removeChannel(sub); };
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 1 | const { createClient } = require('@supabase/supabase-js');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 7 | const envUrl = envContent.match(/NEXT_PUBLIC_SUPABASE_URL=(.*)/)?.[1]?.trim() || envContent.match(/SUPABASE_URL=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 8 | const envKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY=(.*)/)?.[1]?.trim() || envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 10 | const supabase = createClient(envUrl, envKey);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | 48 | const { data, error } = await supabase.from('trinity_tasks').insert(tasks);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\fix-env.js | 29 | if (content.includes('process.env.NEXT_PUBLIC_SUPABASE_URL!')) {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\fix-env.js | 30 | content = content.replace(/process\.env\.NEXT_PUBLIC_SUPABASE_URL!/g, "process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co'");
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\fix-env.js | 33 | if (content.includes('process.env.SUPABASE_SERVICE_ROLE_KEY!')) {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\fix-env.js | 34 | content = content.replace(/process\.env\.SUPABASE_SERVICE_ROLE_KEY!/g, "process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'");
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 6 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 9 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 10 | process.env.NEXT_PUBLIC_SUPABASE_URL!,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 11 | process.env.SUPABASE_SERVICE_ROLE_KEY!
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 202 | .update(`BFT|${claim}|${weightedBelief.toFixed(4)}|${Date.now()}`)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 228 | await supabase.from('autonomous_tasks').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 244 | await supabase.from('prediction_consensus').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 307 | await supabase.from('agent_repid')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts | 308 | .update({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts | 4 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts | 8 | private supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts | 9 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts | 10 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts | 64 | await this.supabase.from('kya_compliance_receipts').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts | 96 | return crypto.createHmac('sha256', secret).update(data).digest('hex');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 4 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 8 | private supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 9 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 10 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 14 | const { data, error } = await this.supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 15 | .from('agent_kya_registry')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 36 | const { data } = await this.supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 37 | .from('kya_compliance_receipts')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 133 | await this.supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 134 | .from('agent_kya_registry')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 135 | .update({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts | 144 | await this.supabase.from('trinity_agent_logs').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 4 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 31 | private supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 32 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 33 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 45 | const { data } = await this.supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 46 | .from('institution_risk_config')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 94 | const { data: config } = await this.supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 95 | .from('institution_risk_config')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 125 | await this.supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts | 126 | .from('institution_risk_config')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\SolanaExecutor.ts | 44 | const secretKey = Uint8Array.from(JSON.parse(secretBytesStr));
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\SolanaExecutor.ts | 79 | data:      Buffer.from(memo, 'utf8'),
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 4 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 10 | private supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 11 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 12 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 19 | const { data: vault } = await this.supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 20 | .from('permissioned_vaults')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 79 | await this.supabase.from('vault_access_log').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts | 6 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts | 19 | private supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts | 20 | process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts | 21 | process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts | 46 | await this.supabase.from('trinity_agent_logs').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts | 64 | const hex     = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts | 65 | return `Qm${Buffer.from(hex).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 44)}`;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\merkle.ts | 35 | return Buffer.from(hash.slice(2), 'hex');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\merkle.ts | 41 | return Buffer.from(hash.slice(2), 'hex');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 6 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 17 | const supabaseUrl = process.env.SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 18 | const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 20 | const supabase = createClient(supabaseUrl, supabaseKey);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 53 | const { data, error } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 54 | .from('trusttrader_signals')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 74 | const { data, error } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 75 | .from('agent_repid')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 96 | await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 97 | .from('agent_repid')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 98 | .update({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 105 | await supabase.from('agent_repid_history').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 129 | await supabase.from('trade_execution_log').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts | 155 | await supabase.from('repid_merkle_events').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\package.json | 14 | "@supabase/supabase-js": "latest",
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\query.js | 1 | const { createClient } = require('@supabase/supabase-js');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\query.js | 7 | const envUrl = envContent.match(/NEXT_PUBLIC_SUPABASE_URL=(.*)/)?.[1]?.trim() || envContent.match(/SUPABASE_URL=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\query.js | 8 | const envKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY=(.*)/)?.[1]?.trim() || envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\query.js | 10 | const supabase = createClient(envUrl, envKey);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\query.js | 14 | const { data, error } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\query.js | 15 | .from('trinity_tasks')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rest_insert.js | 7 | const envUrl = envContent.match(/NEXT_PUBLIC_SUPABASE_URL=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rest_insert.js | 8 | const envKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rest_insert.js | 17 | 8. CAN I SELF-REPORT BUILD FAILURES to escalation_log: Yes, I can use the supabase client in node scripts to insert records directly into the escalati
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rest_insert_2.js | 12 | const envUrl = envContent.match(/NEXT_PUBLIC_SUPABASE_URL=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rest_insert_2.js | 13 | const envKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 5 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 12 | const supabase = createClient(
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 13 | process.env.NEXT_PUBLIC_SUPABASE_URL!,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 14 | process.env.SUPABASE_SERVICE_ROLE_KEY!
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 23 | const { data } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts | 24 | .from('agent_kya_registry')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 9 | const { createClient } = require('@supabase/supabase-js');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 32 | const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 33 | const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 48 | if (!SUPABASE_KEY) {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 49 | console.error('ERROR: SUPABASE_SERVICE_ROLE_KEY not set in .env.local');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 63 | const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 64 | const { data: pending, error } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 65 | .from('validation_artifacts')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 85 | const { data: decisions } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 86 | .from('trade_execution_log')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 114 | const requestURI = 'data:application/json;base64,' + Buffer.from(payload).toString('base64');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 136 | const { error: updateErr } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 137 | .from('validation_artifacts')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 138 | .update({ tx_hash: tx.hash })
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js | 65 | return 'data:application/json;base64,' + Buffer.from(JSON.stringify(card)).toString('base64');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\package.json | 10 | "@supabase/supabase-js": "^2.45.0"
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 7 | const { createClient } = require('@supabase/supabase-js');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 10 | const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 11 | const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 13 | const supabase = SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 19 | res.json({ status: 'healthy', service: 'mcp-a2a-gateway', version: '1.0.0', supabase: !!supabase });
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 24 | if (!supabase) return res.status(503).json({ error: 'No Supabase connection' });
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 26 | const { data, error } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 27 | .from('repid_credentials')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 38 | card_url: `https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/agent-card`,
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 48 | const resp = await fetch('https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/agent-card');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 58 | if (!supabase) return res.status(503).json({ error: 'No Supabase connection' });
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 63 | const { data, error } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 64 | .from('ai_dispatch')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 65 | .insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 83 | if (!supabase) return res.status(503).json({ error: 'No Supabase connection' });
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 88 | const { data, error } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 89 | .from('trinity_tasks')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 90 | .insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 106 | if (!supabase) return res.status(503).json({ error: 'No Supabase connection' });
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 108 | const { data } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 109 | .from('agent_mcp_catalog')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 117 | console.log(`Supabase: ${supabase ? 'connected' : 'NOT CONNECTED'}`);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 2 | import { createClient } from '@supabase/supabase-js';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 63 | export async function saveCheckpoint(supabase: any, state: MotorTaskState, nodeName: string) {
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 64 | const { data } = await supabase
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 65 | .from('trinity_langgraph_checkpoints')
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\src\graphs\motor-squad-graph.ts | 66 | .insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\deno.json | 3 | "@supabase/functions-js": "jsr:@supabase/functions-js@^2"
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 2 | import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 18 | const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 19 | const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 22 | const sbClient = createClient(supabaseUrl, supabaseKey);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 35 | const dbUrl = Deno.env.get('SUPABASE_DB_URL') || Deno.env.get('DATABASE_URL');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts | 88 | const { error } = await sbClient.from('trinity_artifacts').insert({
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\temp_dispatch.js | 1 | const { createClient } = require('@supabase/supabase-js');
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\temp_dispatch.js | 18 | const envUrl = envContent.match(/NEXT_PUBLIC_SUPABASE_URL=(.*)/)?.[1]?.trim() || envContent.match(/SUPABASE_URL=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\temp_dispatch.js | 19 | const envKey = envContent.match(/SUPABASE_SERVICE_ROLE_KEY=(.*)/)?.[1]?.trim() || envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=(.*)/)?.[1]?.trim();
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\temp_dispatch.js | 26 | const supabase = createClient(envUrl, envKey);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\temp_dispatch.js | 35 | 8. CAN I SELF-REPORT BUILD FAILURES to escalation_log: Yes, I can use the supabase client in node scripts to insert records directly into the escalati
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\temp_dispatch.js | 48 | const { error } = await supabase.from('ai_dispatch').insert([record]);
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 16 | - [Agent Card (A2A + ERC-8004)](https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/agent-card)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 17 | - [ZKP Postcard Proof](https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/zkp-repid-proof?agent_id=3747&threshold=5000)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 18 | - [x402 Gate](https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/x402-gate?agent_id=3747)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 19 | - [Compliance Report](https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/generate-compliance-report)
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 38 | const p4 = ["INSERT INTO","UPDATE trinity_tasks","UPDATE agent","supabase","SUPABASE",".from(",".insert(",".update("];
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 155 | const h = crypto.createHash('md5').update(fileContents[filepath]).digest('hex');
+
+PART 5 — DIRECTIVE SOURCES
+filename | line number | exact matching line
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\artifacts\TORCH\rust_migration_plan.md | 8 | - **Rust (Target)**: Memory-safe concurrency using `tokio` will allow dedicated asynchronous task polling. Cryptographic functions will see a ~15-20x 
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\InstitutionalControls.tsx | 21 | // Control groups by persona
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\InstitutionalControls.tsx | 26 | persona: 'Bank President / CEO',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\InstitutionalControls.tsx | 37 | persona: 'CTO / Head of Technology',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\InstitutionalControls.tsx | 48 | persona: 'CFO / Treasurer',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\InstitutionalControls.tsx | 59 | persona: 'Chief Compliance Officer',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\InstitutionalControls.tsx | 70 | persona: 'Any authorized signer',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\InstitutionalControls.tsx | 86 | persona: 'Family Office / Fund Manager / UHNWI',
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\InstitutionalControls.tsx | 228 | Controls for: <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{currentGroup.persona}</span>
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts | 52 | const reason = 'Vault requires human custody binding — 4FA soulbound token required';
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 39 | const p5 = ["directive","soul","SOUL","persona","PERSONA","instructions","system_prompt","systemPrompt","getPrompt","buildPrompt"];
+
+PART 6 — ENVIRONMENT AND CONFIG
+Variables / Hardcoded URLs
+
+Config file: C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env
+  Var: TELEGRAM_BOT_TOKEN
+  Var: TELEGRAM_OWNER_CHAT_ID
+  Var: TELEGRAM_CHAT_ID
+
+Config file: C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local
+  Var: NEXT_PUBLIC_SUPABASE_URL
+  Var: NEXT_PUBLIC_SUPABASE_ANON_KEY
+  Var: SUPABASE_SERVICE_ROLE_KEY
+  Var: SOLANA_RPC_URL
+  Var: AGENT_SOPHIA_PRIVKEY
+  Var: AGENT_SOPHIA_PUBKEY
+  Var: COUNTERPARTY_ALPHA_PUBKEY
+  Var: COUNTERPARTY_BETA_PUBKEY
+  Var: NEXT_PUBLIC_APP_URL
+  Var: INTERNAL_ROUTE_SECRET
+  Var: USDC_DEVNET_MINT
+  Var: TRINITY_DEPLOYER
+  Var: TRINITY_DEPLOYER_PUBLIC_WALLET
+  Var: TRINITY_MCP_TOKEN
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local: https://qnnpjhlxljtqyigedwkb.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local: https://api.devnet.solana.com
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\.env.local: https://trustrails.dev
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\receipts\route.ts: https://dummy.supabase.co
+
+Config file: C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\repid\configure\route.ts
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql: https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/agent-tools
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\buddy_system.sql: https://n8n-production-68cf.up.railway.app/webhook
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\AgentRepIDGrid.tsx: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\LiveReceiptFeed.tsx: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\components\trustrails\SystemTrustScore.tsx: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\fix-env.js: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trust\BFTEngine.ts: https://trinity-litellm.railway.app
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ComplianceReceipt.ts: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\FireblocksPreAuth.ts: https://api.fireblocks.io/v1/transactions/preauth
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\KYAValidator.ts: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\RepIDConfig.ts: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\SolanaExecutor.ts: https://api.devnet.solana.com
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\SolanaExecutor.ts: https://explorer.solana.com/tx/${txHash}?cluster=devnet
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\VaultPermission.ts: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trustshell\ZKPAttestation.ts: https://dummy.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\trade_pipeline.ts: https://qnnpjhlxljtqyigedwkb.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\next-env.d.ts: https://nextjs.org/docs/app/building-your-application/configuring/typescript
+
+Config file: C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\next.config.mjs
+
+Config file: C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\package.json
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\public\agent-registration.json: https://eips.ethereum.org/EIPS/eip-8004#registration-v1
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\public\agent-registration.json: https://trusttrader.dev/sophia.png
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\public\agent-registration.json: https://trusttrader.dev/trade
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\public\agent-registration.json: https://trusttrader.dev/mcp
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\agent-card-snippet.ts: https://w3id.org/agent-card/v1
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js: https://sepolia.base.org
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js: https://qnnpjhlxljtqyigedwkb.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\mint-devnet-usdc.js: https://api.devnet.solana.com
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-agent0.ts: https://sepolia.base.org
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-agent0.ts: https://aitrinitysymphony.com/images/${a.name.toLowerCase(
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-agent0.ts: https://trinity-${a.name.toLowerCase(
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-agent0.ts: https://trustrails.dev/api/trustrails/internal/update-agent
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js: https://eips.ethereum.org/EIPS/eip-8004#registration-v1
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js: https://trusttrader.dev/agents/${agent.name.toLowerCase(
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js: https://trusttrader.dev/mcp/${agent.name.toLowerCase(
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js: https://sepolia.basescan.org/tx/${hash}
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\retry-airdrop.js: https://devnet.genesysgo.net/
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\retry-airdrop.js: https://api.devnet.solana.com
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\retry-airdrop.js: https://rpc.ankr.com/solana_devnet
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\setup-solana.ts: https://api.devnet.solana.com
+
+Config file: C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\package.json
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js: https://qnnpjhlxljtqyigedwkb.supabase.co
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js: https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/agent-card
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts: https://deno.land/std@0.177.0/http/server.ts
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts: https://esm.sh/@supabase/supabase-js@2.39.3
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts: https://deno.land/x/postgres@v0.17.0/mod.ts
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts: https://api.tavily.com/search
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\supabase\functions\agent-tools\index.ts: https://trinity-litellm.railway.app
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://img.shields.io/badge/License-Apache_2.0-blue.svg
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://img.shields.io/badge/Chain-Base_Sepolia-blue
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://img.shields.io/badge/Standard-ERC--8004-purple
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://eips.ethereum.org/EIPS/eip-8004
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://trusttrader.dev
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://sepolia.basescan.org/tx/0x806261e09c9e5526b7feb280ec29e2aa42ee89de47998895053e1c451a3649f5
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/agent-card
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/zkp-repid-proof?agent_id=3747&threshold=5000
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/x402-gate?agent_id=3747
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://qnnpjhlxljtqyigedwkb.supabase.co/functions/v1/generate-compliance-report
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://sepolia.basescan.org/tx/0x5abc007b8e400dc1cee787a6e5ab356126d8cb345dab5e1289e47be06561961f
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://sepolia.basescan.org/tx/0xf0763a657fbbcd7f7beaadbb585e1121996247c54a4d8ff0c5a4506bc437df3c
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://sepolia.basescan.org/tx/0xbca05ff1f59fc85303dd1d8d4fd6daf7f1d862ef0f4ca372f6106fff52a6ffa9
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://sepolia.basescan.org/tx/0x5ce0f4ab37ac43a70016e18ab81253635eaafde23ecbe94aeed7ad63385abc3b
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://github.com/DealAppSeo/hyperdag-protocol
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://github.com/DealAppSeo/trinity-ecosystem
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://github.com/DealAppSeo/trinity-symphony-shared
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://github.com/DealAppSeo/trustrails-dev
+  URL in C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md: https://lablab.ai
+
+Config file: C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tsconfig.json
+
+PART 7 — DUPLICATE OR CONFLICTING DEFINITIONS
+function/class name | file 1 | file 2
+POST | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\demo\villain\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\internal\update-agent\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\pay\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\repid\configure\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\vault\route.ts
+GET | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trust\bft\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\receipts\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\repid\configure\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\settings\route.ts | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\app\api\trustrails\system-trust\route.ts
+run | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\dispatch_overnight.js | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\query.js | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rest_insert.js | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rest_insert_2.js | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\temp_dispatch.js
+main | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\retry-airdrop.js | C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\setup-solana.ts
+
+PART 8 — IMPORT/REQUIRE MAP
+(Skipped if constitutional-agent-base.js not found)
+no constitutional-agent-base.js found in repo
+
+PART 9 — RECENT MODIFICATIONS
+filepath | last_modified timestamp
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js | 2026-04-17T00:44:10.418Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\audit_output.txt | 2026-04-17T00:43:52.411Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\ts_errors.txt | 2026-04-09T08:51:29.626Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tsconfig.tsbuildinfo | 2026-04-09T08:51:12.474Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\package-lock.json | 2026-04-09T08:47:47.795Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\package.json | 2026-04-09T08:47:47.137Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\broadcast.js | 2026-04-09T08:46:46.153Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\server.js | 2026-04-09T05:15:28.594Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\mcp-a2a-gateway\package.json | 2026-04-09T05:15:03.678Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\zkp-postcard\src\circuit.rs | 2026-04-09T04:36:19.122Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\zkp-postcard\Dockerfile | 2026-04-09T03:48:53.209Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\zkp-postcard\src\main.rs | 2026-04-09T01:11:05.000Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\services\zkp-postcard\Cargo.toml | 2026-04-09T01:10:20.474Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rust-brain\Dockerfile | 2026-04-09T01:03:55.252Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\rust-brain\Cargo.toml | 2026-04-09T01:03:46.504Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\tmp-hyperdag-readme.md | 2026-04-08T21:36:45.626Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\ValidationRegistry.json | 2026-04-08T07:04:53.241Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\scripts\register-agents-erc8004.js | 2026-04-08T06:50:06.617Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\lib\trusttrader\IdentityRegistry.json | 2026-04-08T06:49:12.139Z
+C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity-science\signal_fetcher.py | 2026-04-07T18:58:20.628Z
+
+PART 10 — ANOMALIES
+TODO/FIXME broken behavior comments:
+  C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js:174 | log("TODO/FIXME broken behavior comments:");
+  C:\Users\Cash4\OneDrive\Desktop\trinity-ecosystem\trinity_audit.js:179 | if (/(TODO|FIXME)/i.test(l) && /(broken|fail|error|fix|not working|bug)/i.test(l)) {
