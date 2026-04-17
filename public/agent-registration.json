@@ -1,0 +1,36 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "SOPHIA-TrustTrader",
+  "description": "Constitutional AI trading agent using Pythagorean Comma BFT veto and Unity Score (Logic\u00d7Chaos\u00d7Beauty)^(1/\u03c6). 13 market signals mapped to Circle of Fifths. Trades the agent REFUSES and PROVES it refused is the product.",
+  "image": "https://trusttrader.dev/sophia.png",
+  "services": [
+    {
+      "name": "web",
+      "endpoint": "https://trusttrader.dev/trade"
+    },
+    {
+      "name": "MCP",
+      "endpoint": "https://trusttrader.dev/mcp",
+      "version": "2025-06-18"
+    }
+  ],
+  "x402Support": true,
+  "active": true,
+  "supportedTrust": [
+    "reputation",
+    "crypto-economic"
+  ],
+  "identity": {
+    "agentRegistry": "eip155:84532:0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "chain": "Base Sepolia",
+    "chainId": 84532
+  },
+  "constitutional": {
+    "vetoMechanism": "Pythagorean Comma BFT",
+    "commaGap": 0.013643264,
+    "signalCount": 13,
+    "unityFormula": "(Logic × Chaos × Beauty)^(1/φ)",
+    "executeThreshold": 0.95,
+    "reputationScale": "0-10000 RepID"
+  }
+}

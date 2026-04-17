@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir C:UsersCash4)",
+      "Bash(findstr -i trinity)",
+      "Read(//c/Users/Cash4/**)",
+      "Bash(git -C /c/Users/Cash4/OneDrive/Desktop/trinity-ecosystem remote -v)",
+      "Bash(gh repo:*)",
+      "Bash(git -C /c/Users/Cash4/OneDrive/Desktop/trinity-ecosystem branch -a)",
+      "Bash(git ls-remote:*)",
+      "Bash(curl -s https://raw.githubusercontent.com/DealAppSeo/trinity-symphony-shared/main/railway.toml)",
+      "Bash(curl -s https://raw.githubusercontent.com/DealAppSeo/trinity-ecosystem/main/railway.toml)",
+      "Bash(git -C /c/Users/Cash4 log --oneline)",
+      "Bash(git -C /c/Users/Cash4 show 45d382e3 --stat)",
+      "Bash(git -C /c/Users/Cash4 show 1a298f64 --stat)",
+      "Bash(git -C /c/Users/Cash4 show 45d382e3:railway.toml)",
+      "Bash(git -C /c/Users/Cash4 remote -v)",
+      "Bash(git -C /c/Users/Cash4 log --oneline -5)",
+      "Bash(git -C /c/Users/Cash4/OneDrive/Desktop/trinity-ecosystem log --oneline -5)",
+      "Bash(git -C /c/Users/Cash4 diff nixpacks.toml)",
+      "Bash(git push:*)",
+      "Bash(git -C /c/Users/Cash4 ls-files railway.toml nixpacks.toml Procfile Dockerfile)",
+      "Bash(git -C /c/Users/Cash4 diff railway.toml)",
+      "Bash(grep -rn AGENT_NAME /c/Users/Cash4 --include=*.sh --include=*.js --include=Dockerfile --include=*.toml --include=Procfile)",
+      "Bash(grep -rn start:agent /c/Users/Cash4 --include=*.json --include=*.sh --include=*.js)",
+      "Bash(grep -rn AGENT_NAME /c/Users/Cash4 --include=*.sh --include=*.js --include=Dockerfile --include=*.toml --include=Procfile --include=*.yaml --include=*.yml --include=*.json)",
+      "Bash(grep -rn start:agent /c/Users/Cash4 --include=*.json --include=*.sh --include=*.js --include=*.toml --include=*.yaml)"
+    ]
+  }
+}
