@@ -1,15 +1,15 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
   "/api/trust/bft/route": "app/api/trust/bft/route.js",
-  "/page": "app/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/api/trustrails/demo/villain/route": "app/api/trustrails/demo/villain/route.js",
-  "/api/trustrails/demo/route": "app/api/trustrails/demo/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/api/trustrails/internal/update-agent/route": "app/api/trustrails/internal/update-agent/route.js",
+  "/api/trustrails/demo/villain/route": "app/api/trustrails/demo/villain/route.js",
   "/api/trustrails/receipts/route": "app/api/trustrails/receipts/route.js",
-  "/api/trustrails/settings/route": "app/api/trustrails/settings/route.js",
+  "/api/trustrails/demo/route": "app/api/trustrails/demo/route.js",
   "/api/trustrails/vault/route": "app/api/trustrails/vault/route.js",
   "/api/trustrails/repid/configure/route": "app/api/trustrails/repid/configure/route.js",
+  "/api/trustrails/settings/route": "app/api/trustrails/settings/route.js",
+  "/api/trustrails/pay/route": "app/api/trustrails/pay/route.js",
   "/api/trustrails/system-trust/route": "app/api/trustrails/system-trust/route.js",
-  "/api/trustrails/pay/route": "app/api/trustrails/pay/route.js"
+  "/page": "app/page.js",
+  "/dashboard/page": "app/dashboard/page.js"
 }

@@ -112,6 +112,28 @@ app.get('/mcp/tools', async (req, res) => {
   res.json({ tools: data || [], count: (data || []).length });
 });
 
+// MCP Tool Call Event
+app.post('/mcp/call', async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: 'No Supabase connection' });
+
+  const { source_agent, target_agent, mcp_name, tool_name, args } = req.body;
+
+  const { data, error } = await supabase
+    .from('trinity_mcp_events')
+    .insert({
+      event_type: 'mcp_call',
+      source_agent: source_agent || 'unknown',
+      target_agent: target_agent || 'mcp-server',
+      payload: { mcp_name, tool_name, args },
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString() // 24 hours
+    })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ dispatched: true, event_id: data?.id });
+});
+
 app.listen(PORT, () => {
   console.log(`MCP A2A Gateway listening on port ${PORT}`);
   console.log(`Supabase: ${supabase ? 'connected' : 'NOT CONNECTED'}`);
