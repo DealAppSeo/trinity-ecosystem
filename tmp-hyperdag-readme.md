@@ -79,7 +79,7 @@ High-RepID Conservators stake reputation to back agents. Optional financial stak
 | Agent | Token ID | RepID | Role |
 |-------|----------|-------|------|
 | **SOPHIA** | [3747](https://sepolia.basescan.org/tx/0x5abc007b8e400dc1cee787a6e5ab356126d8cb345dab5e1289e47be06561961f) | 7,800+ | Constitutional trading |
-| **RAVEN** | [3748](https://sepolia.basescan.org/tx/0xf0763a657fbbcd7f7beaadbb585e1121996247c54a4d8ff0c5a4506bc437df3c) | 2,100 | Risk analysis |
+| **NEXUS** | [3748](https://sepolia.basescan.org/tx/0xf0763a657fbbcd7f7beaadbb585e1121996247c54a4d8ff0c5a4506bc437df3c) | 2,100 | Risk analysis |
 | **ATLAS** | [3749](https://sepolia.basescan.org/tx/0xbca05ff1f59fc85303dd1d8d4fd6daf7f1d862ef0f4ca372f6106fff52a6ffa9) | 1,800 | Signal processing |
 | **GUARDIAN** | [3750](https://sepolia.basescan.org/tx/0x5ce0f4ab37ac43a70016e18ab81253635eaafde23ecbe94aeed7ad63385abc3b) | 1,400 | Compliance |
 
@@ -122,3 +122,5 @@ Apache 2.0
 *"Act justly. Love mercy. Walk humbly." -- Micah 6:8*
 
 *Built for the [LabLab AI Trading Agents Hackathon](https://lablab.ai) -- April 2026*
+
+2026-05-19: Updated agent roster — RAVEN -> NEXUS (legacy doc reference correction; NEXUS is production canonical)
