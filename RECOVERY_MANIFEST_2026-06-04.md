@@ -28,9 +28,23 @@
 - The 3 anfis files are now present in the tree on this branch (recoverable for Sean/Claude to review/commit if desired).
 - No constitutional/ dir restored (git/on-disk insufficient).
 
+## Clue integration (added per 2026-06-04 update under Phase 1)
+The same TrustRails overwrite likely hit both app.aitrinitysymphony.com (tab title "TrustRails – SSL Trust Layer… on Solana") and the trinity-ecosystem repo on the same day. So in history, look specifically for the commit where TrustRails content was added and the ANFIS routing + constitutional content was removed in the same change — correlate by date. That commit is the prime suspect for the deletion; its parent holds the lost ANFIS/constitution files.
+
+**Investigation of clue:**
+- Prime suspect commit per clue (TrustRails addition/restore that correlates with content changes): 5523937d9d8951b76dcd5959d50e9056803fb4d6 "restore: full trinity-ecosystem codebase" (Fri Apr 17 2026).
+  - Added large TrustRails content: app/api/trustrails/demo/route.ts, villain, pay, receipts, settings, system-trust, vault, internal/*, repid/configure, and many .next build artifacts for TrustRails routes.
+  - Also added constitutional content (from shared): shared/constitutional-agent-base.js (1389 lines), nomenclature-constitution.js/ts, torch/veritas/w3c/ConstitutionalAgentV4.js.
+  - No D for ANFIS (ANFIS source added later in May in 0da0d4d) or for a "larger" local constitutional folder in this commit's diff (it brought in the shared version).
+- Date correlation: 5523937 Apr 17 (TrustRails heavy restore); ANFIS source touched/added in 0da0d4d May 13 (which also touched some TrustRails .next files as M). No single commit in searched history (post-fetch, name-status walks, rev-list transitions) showed *both* TrustRails A *and* D for ANFIS source + constitutional folder in the exact same change after the ANFIS add date.
+- Parent of 5523937 (7bc1b24aaf2d4c1b282b4e38112a7b91e3630233 "fix(zkp-postcard)..."): inspected ls-tree; no ANFIS or constitutional dir in parent tree. Checkout from parent for paths failed (pathspec no match).
+- Additional post-May 13 commits inspected (110d405, 0e5de34, 674f378 etc.): some have no ANFIS in tree (post-loss), but no clear D + TrustRails A pair matching the exact clue for constitutional removal + ANFIS removal in one TrustRails addition commit.
+- Conclusion for recovery: The clue pointed to 5523937 as the TrustRails overwrite event. Git history did not yield a commit with the simultaneous removal of "larger" constitutional + ANFIS in the TrustRails addition change (history may be partial or the larger folder was local/untracked or removed outside a single tracked commit). ANFIS source recovered separately from 0da0d4d (the commit that had it). Constitutional remains UNRECOVERABLE-via-git.
+
 ## Recommendations
 - If more history (private remote refs, other clones with full reflog) exists, re-run `git fsck --lost-found; git log --all --diff-filter=D -- '**/constitutional*'` on a fuller clone.
 - For the full larger constitutional: use the April-10 Railway image as primary fallback. Extract and compare to shared/CONSTITUTION.md + the recovered ConstitutionalAgent refs.
 - The recovered anfis-routing-service/server.js + package* provide the "source lost" bridge (Node to rust-brain ANFIS).
+- Per clue, the parent of the identified TrustRails overwrite (5523937) or the 0da0d4d commit (for ANFIS) are the best git sources; fallback to Railway deploy image for complete pre-loss state.
 
-*All per sprint Phase 1; citations in XC_REPORT_2026-06-04.md. Micah 6:8.*
+*All per sprint Phase 1 (clue integrated); citations in XC_REPORT_2026-06-04.md. Micah 6:8.*
