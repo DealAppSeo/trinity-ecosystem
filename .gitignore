@@ -21,3 +21,6 @@ target/
 *.rmeta
 *.rlib
 *.d
+
+# Claude Code local worktrees/settings — never ship to the build
+.claude/
