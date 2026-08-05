@@ -1,26 +1,53 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Added 2026-08-04. This repo had NO .gitignore, which is why the deploy broke.
+#
+# `.next/` — the Next.js BUILD OUTPUT — was committed (65 files). A committed
+# build directory ships a stale Server Action manifest, and Next resolves
+# incoming action ids against it. That is the direct cause of the runtime flood:
+#
+#     Error: Failed to find Server Action "6607bb17".
+#     This request might be from an older or newer deployment.
+#
+# The message is accurate and was pointing at the repo the whole time: the
+# deployment really did contain actions from an older build, because the older
+# build was checked in. Never commit .next/.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Build output
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment — .env and .env.local were TRACKED here. Both are empty at HEAD,
+# but history at 5523937d (2026-04-17) carried a real TELEGRAM_BOT_TOKEN.
+# Untracking is not rotation: that token is still in git history and should be
+# rotated regardless of this file.
+.env
+.env*.local
+.env.production
+!.env.example
+
+# Agent/tool scratch. A committed .claude/worktrees tree (including a nested
+# copy of another repo) previously bloated the build context to 61.7 MB and made
+# railpack discover phantom package.json files outside the project root.
+.claude/worktrees/
+.claude/settings.local.json
+
+# Logs / OS / editor
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Vercel / coverage
 .vercel
-node_modules
-
-target/
-services/zkp-postcard/target/
-rust-brain/target/
-*.pdb
-*.exe
-
-target/
-*.pdb
-*.exe
-*.dll
-*.rmeta
-*.rlib
-
-target/
-*.pdb
-*.exe
-*.dll
-*.rmeta
-*.rlib
-*.d
-
-# Claude Code local worktrees/settings — never ship to the build
-.claude/
+coverage/
