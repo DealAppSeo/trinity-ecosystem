@@ -1,16 +1,13 @@
 // lib/trustshell/VaultPermission.ts
 // TrustShell Sprint — Created March 26 2026 by Gemini
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import type { VaultAccessRequest, VaultAccessResult } from './types';
 import { KYAValidator } from './KYAValidator';
 import { BFTAuthorizer } from './BFTAuthorizer';
 
 export class VaultPermissionGate {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
-  );
+  private get supabase() { return getSupabaseAdmin(); }
   private kya    = new KYAValidator();
   private bft    = new BFTAuthorizer();
 

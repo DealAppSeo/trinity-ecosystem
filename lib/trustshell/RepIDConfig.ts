@@ -1,7 +1,7 @@
 // lib/trustshell/RepIDConfig.ts
 // TrustShell Sprint — Created March 26 2026 by Gemini
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export interface RepIDWeights {
   bftAccuracy:        number;
@@ -28,10 +28,7 @@ export interface RepIDCalculationResult {
 }
 
 export class RepIDCalculator {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
-  );
+  private get supabase() { return getSupabaseAdmin(); }
 
   private readonly DEFAULT_WEIGHTS: RepIDWeights = {
     bftAccuracy:        0.40,

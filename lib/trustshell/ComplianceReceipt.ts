@@ -1,14 +1,11 @@
 // lib/trustshell/ComplianceReceipt.ts
 // TrustShell Sprint — Created March 26 2026 by Gemini
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import type { ComplianceReceipt, KYAComplianceResult, BFTConsensusProof } from './types';
 
 export class ComplianceReceiptGenerator {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
-  );
+  private get supabase() { return getSupabaseAdmin(); }
 
   async generate(params: {
     kyaResult:       KYAComplianceResult;

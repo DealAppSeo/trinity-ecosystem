@@ -5,12 +5,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy_anon_key'
-);
+import { getSupabaseBrowser } from '@/lib/supabase-browser';
 
 export function SystemTrustScore() {
   const [data, setData] = useState<any>(null);
@@ -21,6 +16,7 @@ export function SystemTrustScore() {
   };
 
   useEffect(() => {
+    const supabase = getSupabaseBrowser();
     load();
     // Real-time: refresh when any agent RepID changes
     const sub = supabase
