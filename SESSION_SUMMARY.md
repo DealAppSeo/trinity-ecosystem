@@ -24,7 +24,8 @@ Check these in order. Do not trust this file over live state — it is a snapsho
 | npm credential | repid-engine → Settings → Secrets and variables → Actions | `NPM_TOKEN` **absent** |
 | npm cred, live check | Actions → `release-trust-demo` → Run workflow → `dry_run=true` | run 31468096879: absent |
 | Vercel builds | project `ai-trinity-symphony-landing` (`prj_EtbAAh789ySdcT0AZc8cgZNui3lt`) | prod `READY` at 5b919a9 |
-| Vercel env vars | that project → Settings → Environment Variables | `SUPABASE_SERVICE_ROLE_KEY` **missing** |
+| Vercel env vars | that project → Settings → Environment Variables | server key **missing** — see #2 below |
+| Supabase API keys | project `qnnpjhlxljtqyigedwkb` (AITrinitySymphony) → Settings → API Keys | legacy `anon` **disabled**; 5 `sb_publishable_…` active |
 | Railway reachability | `repid-engine-production.up.railway.app` | **403 to CONNECT** from cloud sessions |
 | RepID substrate | `repid_score_events` (Supabase) | 152,136 rows / 104 agents |
 
@@ -102,10 +103,18 @@ verified, not-checked and failed are three different things.
    `@hyperdag`) → repid-engine → Settings → Secrets and variables → Actions.
    `@hyperdag/trust-demo@0.1.0` cannot publish until this exists. #410 and #414 merging
    did **not** change this.
-2. **Set `SUPABASE_SERVICE_ROLE_KEY`** in the Vercel project (Preview + Production).
-   #14 removed the *build's* dependency on it, not the *runtime's* — routes now throw a
-   named configuration error instead of rendering empty, which is clearer but is not data.
-   `NEXT_PUBLIC_SUPABASE_URL` is already set; the service-role key is not.
+2. **Set the Supabase server key** in the Vercel project (Preview + Production) as
+   `SUPABASE_SECRET_KEY` — an `sb_secret_…` key from Supabase → Settings → API Keys.
+   #14 removed the *build's* dependency on it, not the *runtime's* — routes throw a named
+   configuration error instead of rendering empty, which is clearer but is not data.
+   `NEXT_PUBLIC_SUPABASE_URL` is already set.
+   **Do not use `SUPABASE_SERVICE_ROLE_KEY`.** This project has moved to Supabase's newer
+   API keys and the legacy `anon` JWT is **disabled** (verified 2026-08-11 against project
+   `qnnpjhlxljtqyigedwkb`; five `sb_publishable_…` keys active, legacy anon
+   `disabled: true`). The legacy service_role key is its disabled counterpart. An earlier
+   revision of this file said to set the service-role key — that was wrong for this
+   project. #16 updates both helpers to accept the new names, legacy still tolerated.
+   Browser side wants `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_…`).
 3. **Network policy**: allow `repid-engine-production.up.railway.app` from cloud sessions,
    or the live-flow E2E can never run from here and #414 stays unproven against reality.
 4. **HOLD still in force** since 2026-07-21; fleet 0/12 live since 2026-07-17T22:18Z.
