@@ -4,12 +4,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getSupabaseBrowser } from '@/lib/supabase-browser';
 
 const TIER_COLORS: Record<string, string> = {
   Platinum: '#e2e8f0',
@@ -22,6 +17,7 @@ export function AgentRepIDGrid() {
   const [agents, setAgents] = useState<any[]>([]);
 
   useEffect(() => {
+    const supabase = getSupabaseBrowser();
     const load = async () => {
       const { data } = await supabase
         .from('agent_kya_registry')

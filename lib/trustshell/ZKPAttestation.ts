@@ -3,7 +3,7 @@
 // Uses Soulprint for real ZKP proofs (564ms, 0 bytes PII)
 // ezkl FL-GNN circuit is Phase 2
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export interface ZKPAttestation {
   proofCID:         string;   // IPFS CID of ZKP proof
@@ -16,10 +16,7 @@ export interface ZKPAttestation {
 }
 
 export class ZKPAttestationService {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
-  );
+  private get supabase() { return getSupabaseAdmin(); }
 
   async generateKYAAttestation(
     agentName:   string,

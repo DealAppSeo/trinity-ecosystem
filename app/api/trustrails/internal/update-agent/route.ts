@@ -3,7 +3,7 @@
 // Proxy route to allow local setup scripts to update the production database
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req: NextRequest) {
   const { agent_name, agent_id_onchain } = await req.json();
@@ -12,10 +12,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
-  );
+  const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
     .from('agent_kya_registry')

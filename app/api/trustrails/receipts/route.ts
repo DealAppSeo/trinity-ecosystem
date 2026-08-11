@@ -2,15 +2,11 @@
 // TrustShell Sprint — Created March 26 2026 by Gemini
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
-);
 
 export async function GET() {
-  const { data } = await supabase
+  const { data } = await getSupabaseAdmin()
     .from('kya_compliance_receipts')
     .select('*')
     .order('created_at', { ascending: false })

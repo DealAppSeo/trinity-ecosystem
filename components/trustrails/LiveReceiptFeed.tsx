@@ -4,17 +4,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getSupabaseBrowser } from '@/lib/supabase-browser';
 
 export function LiveReceiptFeed() {
   const [receipts, setReceipts] = useState<any[]>([]);
 
   useEffect(() => {
+    const supabase = getSupabaseBrowser();
     const load = async () => {
       const res = await fetch('/api/trustrails/receipts');
       const data = await res.json();

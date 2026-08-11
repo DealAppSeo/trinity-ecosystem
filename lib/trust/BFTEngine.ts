@@ -3,13 +3,8 @@
 // Writes to: prediction_consensus (0 rows → live data tonight)
 // Also writes: agent_repid updates after each vote
 
-import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // The golden ratio — our BFT threshold (NOT 0.667)
 const PHI = 0.618033988749895;
@@ -225,7 +220,7 @@ If claim contradicts known facts, set disbelief high.`;
 
     // If HITL required — create autonomous task for Sean
     if (hitl_required) {
-      await supabase.from('autonomous_tasks').insert({
+      await getSupabaseAdmin().from('autonomous_tasks').insert({
         created_by: 'BFT_ENGINE',
         assigned_to: 'sean',
         title: `HITL Review: ${comma.veto ? 'Pythagorean Comma Veto' : 'BFT Threshold Not Met'}`,
@@ -241,7 +236,7 @@ If claim contradicts known facts, set disbelief high.`;
 
   private async persistConsensus(claim: string, result: BFTResult): Promise<void> {
     try {
-      await supabase.from('prediction_consensus').insert({
+      await getSupabaseAdmin().from('prediction_consensus').insert({
         cycle_started_at: new Date(Date.now() - 3000).toISOString(),
         cycle_completed_at: new Date().toISOString(),
         asset: `CLAIM:${claim.substring(0, 50).replace(/[^A-Z0-9_]/gi, '_').toUpperCase()}`,
@@ -304,7 +299,7 @@ If claim contradicts known facts, set disbelief high.`;
       // Decay: 5% daily, applied here as per P-029
       // In practice this runs nightly, not per-vote
 
-      await supabase.from('agent_repid')
+      await getSupabaseAdmin().from('agent_repid')
         .update({
           last_activity: new Date().toISOString(),
           // credibility_delta will be set properly when ground truth confirmed

@@ -1,14 +1,11 @@
 // app/api/trustrails/settings/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(req: NextRequest) {
   const institutionId = req.nextUrl.searchParams.get('institution') || 'default';
   
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy'
-  );
+  const supabase = getSupabaseAdmin();
 
   const { data } = await supabase
     .from('institution_config')
@@ -26,10 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy'
-  );
+  const supabase = getSupabaseAdmin();
 
   const { error } = await supabase
     .from('institution_config')
