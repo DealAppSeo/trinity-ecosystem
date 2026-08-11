@@ -3,7 +3,7 @@
  * Orchestrates: Signals → Veto Engine → EIP-712 Sign → Merkle → RepID → Log
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import {
   signTradeIntent,
   signConstitutionalRefusal,
@@ -14,10 +14,6 @@ import {
 import { addLeafAndCommit, type MerkleLeafData } from './merkle';
 import type { Hex, Address } from 'viem';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://qnnpjhlxljtqyigedwkb.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // RepID scoring constants
 const REPID_DELTAS = {
@@ -50,7 +46,7 @@ interface PipelineResult {
  * Fetch latest signals from trusttrader_signals table.
  */
 async function fetchLatestSignals(): Promise<Record<string, number>> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseAdmin()
     .from('trusttrader_signals')
     .select('signal_name, normalized')
     .order('fetched_at', { ascending: false })
@@ -71,7 +67,7 @@ async function fetchLatestSignals(): Promise<Record<string, number>> {
  * Fetch agent RepID score from agent_repid table.
  */
 async function fetchRepId(agentName: string): Promise<number> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseAdmin()
     .from('agent_repid')
     .select('repid_score')
     .eq('agent_name', agentName)
@@ -93,7 +89,7 @@ async function updateRepId(
   const currentRepId = await fetchRepId(agentName);
   const newRepId = Math.max(0, Math.min(10000, currentRepId + delta));
 
-  await supabase
+  await getSupabaseAdmin()
     .from('agent_repid')
     .update({
       repid_score: newRepId,
@@ -102,7 +98,7 @@ async function updateRepId(
     })
     .eq('agent_name', agentName);
 
-  await supabase.from('agent_repid_history').insert({
+  await getSupabaseAdmin().from('agent_repid_history').insert({
     agent_id: agentName,
     repid_delta: delta,
     payment_proof_hash: '0x_repid_update',
@@ -126,7 +122,7 @@ async function logTradeDecision(params: {
   signature: string;
   merkleHash: string;
 }): Promise<void> {
-  await supabase.from('trade_execution_log').insert({
+  await getSupabaseAdmin().from('trade_execution_log').insert({
     asset: params.pair.split('/')[0],
     execution_mode: 'paper',
     agent_name: params.agentName,
@@ -152,7 +148,7 @@ async function logMerkleEvent(
   leafHash: string,
   treeDepth: number
 ): Promise<void> {
-  await supabase.from('repid_merkle_events').insert({
+  await getSupabaseAdmin().from('repid_merkle_events').insert({
     agent_name: agentName,
     merkle_root: merkleRoot,
     leaf_hash: leafHash,

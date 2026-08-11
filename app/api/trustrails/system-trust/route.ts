@@ -2,16 +2,12 @@
 // TrustRails Sprint — Created March 26 2026 by Gemini
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key'
-);
 
 export async function GET() {
   // Pull all 12 agent RepID scores
-  const { data: agents } = await supabase
+  const { data: agents } = await getSupabaseAdmin()
     .from('agent_kya_registry')
     .select('agent_name, repid_score, repid_tier, insurance_coverage, human_custody_verified');
 
@@ -29,7 +25,7 @@ export async function GET() {
 
   // Recent payment stats
   const since24h = new Date(Date.now() - 86_400_000).toISOString();
-  const { data: receipts } = await supabase
+  const { data: receipts } = await getSupabaseAdmin()
     .from('kya_compliance_receipts')
     .select('payment_amount_usdc, bft_passed')
     .gte('created_at', since24h);
