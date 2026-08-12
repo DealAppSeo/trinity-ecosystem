@@ -11,13 +11,20 @@
 // whichever is configured. This runs only on the server, so a computed lookup
 // is fine here — unlike the browser helper, nothing needs static inlining.
 //
-// The legacy service_role JWT is NOT known to be revoked. An earlier comment
+// The legacy service_role JWT is NOT known to be retired. An earlier comment
 // here asserted it was disabled; that was never measured, and secret keys are
-// not readable through any API, so it cannot be checked from code. A copy of
-// one such JWT for this project sits in git history (`.env.local`, tracked
-// 2026-04-17 to 2026-07-25) with an `exp` in 2035. Until it is revoked in the
-// dashboard, treat a legacy JWT in the environment as a live credential —
-// hence the warning below rather than a silent accept.
+// not readable through any API, so it cannot be checked from inside the app. A
+// copy of one such JWT for this project sits in git history (`.env.local`,
+// tracked 2026-04-17 to 2026-07-25) with an `exp` in 2035.
+//
+// "Disabled" would not settle it either. Supabase's disable-legacy-API-keys
+// switch is reversible and does not change the token — it is signed by the
+// project's JWT secret, which can no longer be rotated. Re-enabling legacy keys
+// makes that history copy work again. Only migrating to JWT signing keys and
+// revoking the old one retires it. So a legacy JWT in the environment is
+// treated as a live credential here — hence the warning below rather than a
+// silent accept. `npm run check:legacy-key` measures the current state from a
+// machine that can reach the API; docs/KEY-ROTATION.md has the remediation.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 

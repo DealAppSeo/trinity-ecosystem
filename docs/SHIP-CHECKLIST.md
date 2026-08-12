@@ -167,9 +167,14 @@ npm run check   # secret scan + auth policy (11 assertions) + tsc
 
 ## 7. Still open — decide, don't forget
 
-- **Rotate the `service_role` key.** A complete JWT valid until 2035 is
-  recoverable from git history. Steps in `docs/KEY-ROTATION.md`. The repo is
-  private with zero forks, which is what makes this urgent-but-not-emergency.
+- **Settle the legacy `service_role` key.** A complete JWT valid until 2035 is
+  recoverable from git history. Run `npm run check:legacy-key` **from a laptop**
+  (a cloud session is proxy-blocked and reports `NOT MEASURED`) — it says
+  whether the API still accepts it. Two things that were wrong in earlier
+  revisions of this list: the legacy JWT secret **can no longer be rotated**,
+  and disabling legacy API keys is **reversible, not a revoke**. Full picture in
+  `docs/KEY-ROTATION.md`. The repo is private with zero forks, which is what
+  keeps this urgent-but-not-emergency.
 - **Run one BFT evaluation against real providers.** The consensus path is wired
   and type-correct but has never executed — the LiteLLM proxy is Railway-hosted
   and unreachable from cloud sessions, so it could not be verified here.

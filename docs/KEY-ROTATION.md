@@ -34,14 +34,75 @@ Three things bound the severity:
 
 **Unverified:** whether the legacy `service_role` JWT is still accepted by the
 API. Secret keys are not readable through any Supabase API, and the PostgREST
-host is proxy-denied from cloud sessions (`curl` returns HTTP 000). Treat it as
-live until revoked in the dashboard. Do not let any doc claim otherwise without
-a measurement behind it — that claim was made once already and was wrong.
+host is proxy-denied from cloud sessions. Treat it as live until measured. Do
+not let any doc claim otherwise without a measurement behind it — that claim was
+made once already and was wrong.
 
-## Rotating the Supabase secret key
+Measure it in five seconds, from a laptop (not a cloud session):
 
-This is the one that matters. Order matters: add the new key everywhere *before*
-revoking the old one, or you take the app down between steps.
+```bash
+npm run check:legacy-key
+```
+
+It pulls the historical JWTs out of git history, probes PostgREST with each, and
+prints one of four states. **The proxy answers a blocked host with HTTP 403**,
+which is indistinguishable from an auth rejection by status code alone, so the
+script checks that the response actually came from PostgREST before calling
+anything a rejection. From a cloud session it prints `NOT MEASURED` and exits 2.
+
+## Deactivated is not revoked
+
+The single most important thing on this page, and the thing that decides whether
+you still have work to do.
+
+Supabase's **Settings → API Keys → disable legacy API keys** switch is
+[explicitly reversible](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys):
+*"You can re-activate them if you find a client you missed, so this step is
+reversible."* The token is not changed by it. The legacy `anon` and
+`service_role` keys are signed by the project's JWT secret, and that secret is
+untouched — so flipping the switch back makes the exact string sitting in this
+repo's history a working RLS-bypassing credential again.
+
+So there are three real states, and the middle one is where this project most
+likely is:
+
+| State | What it means | What's left to do |
+| :-- | :-- | :-- |
+| **Live** | Legacy keys enabled. The history copy works. | Disable legacy keys today. |
+| **Disarmed** | Legacy keys disabled. History copy rejected. | Don't re-enable. Retire it when convenient. |
+| **Retired** | Signing key rotated *and revoked*. Token is dead. | Nothing. |
+
+The `anon` half of this pair was measured as rejected earlier, and the dashboard
+control is one switch covering both — so *disarmed* is the likely state. That is
+an inference from one measurement plus how the control works, not a measurement
+of the `service_role` key itself. `npm run check:legacy-key` settles it.
+
+## You can no longer rotate the legacy JWT secret
+
+Supabase's own guidance is blunt about this: *"it is no longer possible to rotate
+the legacy anon, service and JWT secrets."* Earlier revisions of this document
+said to "revoke the legacy `service_role` JWT in the dashboard" — **there is no
+such button.** The two things you can actually do:
+
+1. **Disable legacy API keys** (reversible, immediate, zero downtime once
+   nothing depends on them). This is the disarm.
+2. **Migrate to asymmetric [JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys),
+   then rotate and *revoke* the previous key.** This is the retire, and it is a
+   separate migration from the publishable/secret key migration you have already
+   done. Rotating alone is not enough — Supabase notes that without the explicit
+   revoke, *"older keys will still be valid."*
+
+Step 2 also affects user sessions: until you move to signing keys, the access
+tokens Supabase Auth issues to your users are signed by that same shared secret.
+Plan it as a migration, not a checkbox.
+
+## Rotating a new-style secret key (`sb_secret_…`)
+
+Not currently needed — no `sb_secret_…` value appears in the working tree or in
+history (`scan-secrets.mjs` is clean). Keep for when it is.
+
+Order matters: add the new key everywhere *before* deleting the old one, or you
+take the app down between steps. **Deleting a secret key is irreversible.**
 
 1. **Issue** — Supabase → project `qnnpjhlxljtqyigedwkb` → Settings → API Keys →
    create an `sb_secret_…` key.
@@ -58,8 +119,9 @@ revoking the old one, or you take the app down between steps.
    `SUPABASE_SERVICE_KEY`, `SUPABASE_KEY`. A stale legacy value left on one host
    silently wins there and nowhere else, which is the hardest kind of bug to
    see.
-7. **Redeploy both hosts**, then **revoke** the legacy `service_role` JWT in the
-   dashboard.
+7. **Redeploy both hosts**, then **delete** the superseded `sb_secret_…` key in
+   the dashboard. (For the *legacy* `service_role` JWT the equivalent step is
+   disabling legacy API keys — see above. There is no revoke button for it.)
 8. Confirm: the server logs should carry no `[supabase-admin] … legacy
    service_role JWT` warning. That warning fires once per process whenever a
    legacy JWT is in use.
@@ -84,9 +146,15 @@ the variable alone changes nothing in an already-built bundle.
 `git rm` removes a file from the current tree, not from history. Anyone who can
 clone can `git log -p` a deleted secret back out. Rewriting history
 (`filter-repo`, force-push) invalidates every open branch and clone and is not
-worth it here: once the credential is revoked, the copy in history is inert.
+worth it here: once the credential is *retired*, the copy in history is inert.
 
-**Rotate first. Consider purging history only if a rotation is impossible.**
+Note the word. If legacy keys are merely **disabled**, the history copy is not
+inert — it is dormant, and one dashboard toggle away from working. That is fine
+as a steady state for a private repo with zero forks; it is not the same as
+done, and it should not be recorded as done.
+
+**Disable first. Retire when you migrate to signing keys. Consider purging
+history only if neither is possible.**
 
 ## How these got committed
 

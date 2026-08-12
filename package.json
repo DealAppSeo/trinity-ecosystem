@@ -9,6 +9,7 @@
     "lint": "next lint",
     "check:auth": "node scripts/check-auth-policy.mjs",
     "check:secrets": "node scripts/scan-secrets.mjs",
+    "check:legacy-key": "node scripts/check-legacy-key.mjs",
     "check": "npm run check:secrets && npm run check:auth && npx tsc --noEmit"
   },
   "dependencies": {
