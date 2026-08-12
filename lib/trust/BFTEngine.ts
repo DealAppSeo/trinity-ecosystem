@@ -22,6 +22,19 @@ interface BFTVote {
   latency_ms: number;
 }
 
+/** What the panel is told about a payment it is being asked to authorise. */
+export interface PaymentAuthorizationRequest {
+  paymentId:        string;
+  agentName:        string;
+  amountUSDC:       number;
+  recipientAddress: string;
+  purpose:          string;
+  repidScore:       number;
+  repidTier:        string;
+  maxWithdrawal:    number;
+  humanCustody:     boolean;
+}
+
 interface BFTResult {
   consensus_reached: boolean;
   consensus_score: number;
@@ -46,15 +59,9 @@ export class BFTEngine {
     gamma: { provider: 'deepseek', model: 'deepseek/deepseek-chat', weight: PHI * PHI },
   };
 
-  private async queryProvider(
-    squad: 'alpha' | 'beta' | 'gamma',
-    claim: string,
-    context: string
-  ): Promise<BFTVote> {
-    const config = this.SQUAD_PROVIDERS[squad];
-    const start = Date.now();
-
-    const prompt = `Evaluate this claim for factual accuracy. Be skeptical.
+  /** The original question: is this claim factually accurate? */
+  private buildClaimPrompt(claim: string, context: string): string {
+    return `Evaluate this claim for factual accuracy. Be skeptical.
 Context: ${context}
 Claim: "${claim}"
 
@@ -63,6 +70,43 @@ Respond ONLY with JSON (no other text):
 
 belief + disbelief should sum to approximately 1.0.
 If claim contradicts known facts, set disbelief high.`;
+  }
+
+  /**
+   * A different question for the payment path: should this transfer be
+   * authorised? Asking "is this factually accurate" about a payment produces
+   * noise — the panel has to be asked the decision it is actually making.
+   */
+  private buildAuthorizationPrompt(req: PaymentAuthorizationRequest): string {
+    return `You are one of three independent reviewers authorising an autonomous agent payment.
+Judge only what is below. Be skeptical; you are a control, not an assistant.
+
+Agent:              ${req.agentName}
+Reputation (RepID): ${req.repidScore} / 10000 (${req.repidTier})
+Amount:             ${req.amountUSDC} USDC
+Per-transaction cap:${req.maxWithdrawal} USDC
+Recipient:          ${req.recipientAddress}
+Stated purpose:     ${req.purpose || '(none given)'}
+Human custody bound:${req.humanCustody ? 'yes' : 'no'}
+
+Respond ONLY with JSON (no other text):
+{"belief": 0.0-1.0, "disbelief": 0.0-1.0, "output": "one sentence justification"}
+
+belief    = confidence this payment SHOULD be authorised.
+disbelief = confidence it should be REFUSED.
+They should sum to approximately 1.0.
+
+Refuse when the amount is disproportionate to the stated purpose, the purpose is
+missing or vague for the size of the transfer, the reputation does not support the
+amount, or custody is absent for a large transfer.`;
+  }
+
+  private async queryProvider(
+    squad: 'alpha' | 'beta' | 'gamma',
+    prompt: string
+  ): Promise<BFTVote> {
+    const config = this.SQUAD_PROVIDERS[squad];
+    const start = Date.now();
 
     try {
       const response = await fetch(
@@ -154,15 +198,83 @@ If claim contradicts known facts, set disbelief high.`;
     };
   }
 
+  /**
+   * Run the real panel against a payment authorisation.
+   *
+   * Same three providers, same golden-ratio weighting and same Pythagorean
+   * Comma check as vote() — only the question differs. Returns the full
+   * BFTResult so the caller records what was asked, who said what, and why.
+   *
+   * Note what the Comma veto means here. It fires on *unanimous high
+   * confidence* (gap < 0.05 with average belief > 0.85): three providers
+   * agreeing strongly is treated as possible coordinated failure and escalated
+   * to a human, not waved through. On the payment path that means a
+   * straightforward, obviously-fine transfer can be vetoed. That may be exactly
+   * right, or the threshold may need tuning for this question — which is the
+   * argument for running this in observe mode first and measuring the real
+   * veto rate before it gates anything.
+   */
+  async authorizePayment(req: PaymentAuthorizationRequest): Promise<BFTResult> {
+    const prompt = this.buildAuthorizationPrompt(req);
+
+    const votes = await Promise.all([
+      this.queryProvider('alpha', prompt),
+      this.queryProvider('beta', prompt),
+      this.queryProvider('gamma', prompt),
+    ]);
+
+    const totalWeight = votes.reduce((s, v) => s + v.weight, 0);
+    const weightedBelief = votes.reduce((s, v) => s + v.belief * v.weight, 0) / totalWeight;
+    const weightedDisbelief = votes.reduce((s, v) => s + v.disbelief * v.weight, 0) / totalWeight;
+
+    const comma = this.checkPythagoreanComma(votes);
+
+    const consensus_reached = !comma.veto && weightedBelief >= PHI;
+    const hitl_required = comma.veto || (!consensus_reached && weightedDisbelief < PHI);
+
+    const winningVote =
+      votes.filter(v => v.belief > v.disbelief).sort((a, b) => b.weight - a.weight)[0] || votes[0];
+
+    const claim =
+      `Authorise ${req.amountUSDC} USDC from ${req.agentName} ` +
+      `(RepID ${req.repidScore}/${req.repidTier}) to ${req.recipientAddress} for "${req.purpose}"`;
+
+    const proof_hash = crypto
+      .createHash('sha256')
+      .update(`BFTPAY|${req.paymentId}|${weightedBelief.toFixed(4)}|${votes.map(v => v.belief.toFixed(3)).join(',')}`)
+      .digest('hex');
+
+    const result: BFTResult = {
+      consensus_reached,
+      consensus_score: weightedBelief,
+      threshold: PHI,
+      winning_output: winningVote.output,
+      dissenting_providers: votes.filter(v => v.disbelief > v.belief).map(v => v.provider),
+      pythagorean_veto_fired: comma.veto,
+      comma_gap: comma.comma_gap,
+      comma_severity: comma.severity,
+      hitl_required,
+      proof_hash,
+      votes,
+    };
+
+    // Same audit trail as vote(). persistConsensus swallows its own errors, so
+    // a failure here degrades the record, never the caller.
+    await this.persistConsensus(claim, result);
+
+    return result;
+  }
+
   // Main BFT vote — runs 3 providers, checks consensus + Pythagorean Comma
   async vote(claim: string, context: string = ''): Promise<BFTResult> {
     const start = Date.now();
 
     // SBFA: run 3 different LLM families in parallel
+    const prompt = this.buildClaimPrompt(claim, context);
     const [alphaVote, betaVote, gammaVote] = await Promise.all([
-      this.queryProvider('alpha', claim, context),
-      this.queryProvider('beta', claim, context),
-      this.queryProvider('gamma', claim, context),
+      this.queryProvider('alpha', prompt),
+      this.queryProvider('beta', prompt),
+      this.queryProvider('gamma', prompt),
     ]);
 
     const votes = [alphaVote, betaVote, gammaVote];

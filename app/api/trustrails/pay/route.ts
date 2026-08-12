@@ -7,6 +7,7 @@ import {
   SolanaExecutor, FireblocksPreAuth,
   ZKPAttestationService, RepIDCalculator
 } from '@/lib/trustshell';
+import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
 
 export async function POST(req: NextRequest) {
   const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();
@@ -82,10 +83,26 @@ export async function POST(req: NextRequest) {
     const paymentId = crypto.randomUUID();
     const ruleHash  = await sha256(`${agentName}:${amountUSDC}:${recipientAddress}:${purpose}`);
 
+    const maxWithdrawal = kyaResult.repidScore > 7500 ? 100000 : 50000;
+
+    // The panel needs the actual decision context, not just an amount — the
+    // recipient, the stated purpose and the agent's standing are what a
+    // reviewer weighs. In observe mode this returns immediately without
+    // consulting anything; in enforce mode it runs the three providers inline.
+    const authorizationContext = {
+      paymentId,
+      agentName,
+      amountUSDC,
+      maxWithdrawal,
+      recipientAddress,
+      purpose: purpose ?? '',
+      repidScore: kyaResult.repidScore,
+      repidTier: kyaResult.repidTier,
+      humanCustody: kyaResult.humanCustodyBound,
+    };
+
     const bftProof = await bft.authorize(
-      paymentId, agentName, amountUSDC,
-      kyaResult.repidScore > 7500 ? 100000 : 50000,
-      purpose
+      paymentId, agentName, amountUSDC, maxWithdrawal, purpose, authorizationContext
     );
 
     if (!bftProof.passed) {
@@ -125,6 +142,13 @@ export async function POST(req: NextRequest) {
       confirmed:         execution.confirmed,
     });
 
+    // Step 4b: queue the consensus evaluation. Only meaningful in observe mode
+    // — in enforce mode the verdict is already on the proof above. Queued after
+    // the receipt so bft_passed has somewhere to be written back to.
+    if (!bftProof.evaluated) {
+      await bft.enqueue(receipt.receiptId, authorizationContext);
+    }
+
     // Step 5: Fireblocks Pre-Auth (demonstrates architecture)
     const fbPreAuth = await fireblocks.generatePreAuth(receipt);
 
@@ -155,6 +179,11 @@ export async function POST(req: NextRequest) {
         evaluated: bftProof.evaluated,
         status:    bftProof.evaluated ? (bftProof.passed ? 'passed' : 'failed') : 'NOT CHECKED',
         reason:    bftProof.notEvaluatedReason,
+        mode:      bftEnforcementMode(),
+        // In observe mode the verdict arrives later; say where to look for it
+        // rather than leaving NOT CHECKED looking permanent.
+        pending:   !bftProof.evaluated,
+        resolvesVia: !bftProof.evaluated ? 'POST /api/trustrails/bft/process' : undefined,
       },
       message:
         `KYA-verified payment of ${amountUSDC} USDC by ${agentName} ` +
