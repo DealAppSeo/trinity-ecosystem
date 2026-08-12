@@ -17,6 +17,27 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { authenticate, authErrorResponse } from '@/lib/auth';
 import { bftEngine } from '@/lib/trust/BFTEngine';
 
+/**
+ * Accept a scheduler as well as a user or service principal.
+ *
+ * Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}`, which
+ * authenticate() would try to verify as a Supabase JWT and reject. Any other
+ * scheduler (Railway, GitHub Actions, an external cron) can use the
+ * `x-internal-secret` path that authenticate() already handles.
+ *
+ * Fails closed the same way everything else does: if neither secret is
+ * configured, the scheduler path simply does not exist and the normal
+ * authentication rules apply.
+ */
+async function authenticateOrCron(req: NextRequest): Promise<void> {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const header = req.headers.get('authorization');
+    if (header === `Bearer ${cronSecret}`) return;
+  }
+  await authenticate(req);
+}
+
 /** Cap per invocation so one call cannot run unbounded provider fan-out. */
 const DEFAULT_BATCH = 5;
 const MAX_BATCH = 25;
@@ -25,7 +46,7 @@ const MAX_ATTEMPTS = 3;
 
 export async function POST(req: NextRequest) {
   try {
-    await authenticate(req);
+    await authenticateOrCron(req);
 
     const requested = Number(req.nextUrl.searchParams.get('limit') ?? DEFAULT_BATCH);
     const batch = Number.isFinite(requested)

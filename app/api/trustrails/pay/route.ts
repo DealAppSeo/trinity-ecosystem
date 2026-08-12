@@ -119,7 +119,6 @@ export async function POST(req: NextRequest) {
     // Step 3: Solana Execution
     const execution = await solana.execute(
       amountUSDC, recipientAddress,
-      process.env.AGENT_SOPHIA_PRIVKEY || '',
       {
         receiptId:         paymentId,
         agentName,

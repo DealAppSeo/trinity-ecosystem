@@ -39,7 +39,10 @@ export class SolanaExecutor {
   async execute(
     amountUSDC:      number,
     toAddress:       string,
-    signerPrivKey:   string,
+    // The signing key comes from AGENT_SOPHIA_SECRET_BYTES below, not from a
+    // caller-supplied string. The old `signerPrivKey` parameter was never read
+    // — callers were passing AGENT_SOPHIA_PRIVKEY (the key recoverable from git
+    // history) into a value that was discarded. Removed so nothing reads it.
     complianceData:  {
       receiptId:       string;
       agentName:       string;
