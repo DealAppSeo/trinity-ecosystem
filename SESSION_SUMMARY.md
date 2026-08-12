@@ -126,7 +126,11 @@ verified, not-checked and failed are three different things.
    **Do not use `SUPABASE_SERVICE_ROLE_KEY`.** This project has moved to Supabase's newer
    API keys and the legacy `anon` JWT is **disabled** (verified 2026-08-11 against project
    `qnnpjhlxljtqyigedwkb`; five `sb_publishable_…` keys active, legacy anon
-   `disabled: true`). The legacy service_role key is its disabled counterpart. An earlier
+   `disabled: true`). **The status of the legacy service_role key is UNVERIFIED** — secret
+   keys are not readable through any API, so it was never measured. An earlier revision of
+   this file asserted it was disabled too; that was an inference from the anon key, not a
+   fact, and the Railway deployment at `app.aitrinitysymphony.com` was serving live data
+   on 2026-08-12, which may well be running on a legacy service_role key. An earlier
    revision of this file said to set the service-role key — that was wrong for this
    project. #16 updates both helpers to accept the new names, legacy still tolerated.
    Browser side wants `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_…`).
