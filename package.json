@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:auth": "node scripts/check-auth-policy.mjs",
+    "check:secrets": "node scripts/scan-secrets.mjs",
+    "check": "npm run check:secrets && npm run check:auth && npx tsc --noEmit"
   },
   "dependencies": {
     "@solana/spl-token": "latest",

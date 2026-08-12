@@ -5,6 +5,7 @@
 'use client';
 
 import { useState } from 'react';
+import { apiPost, ApiError } from '@/lib/api-fetch';
 
 const PRESETS = {
   'AMINA Conservative (MiCA)': { bftAccuracy: 0.20, veritasCatchRate: 0.20, x402SuccessRate: 0.10, latencyOpportunity: 0.05, humanCustodyScore: 0.45 },
@@ -12,24 +13,44 @@ const PRESETS = {
   'Default TrustRails':         { bftAccuracy: 0.40, veritasCatchRate: 0.30, x402SuccessRate: 0.15, latencyOpportunity: 0.10, humanCustodyScore: 0.05 },
 };
 
-export function RiskSlider({ onRepIDChange }: { onRepIDChange?: (score: number) => void }) {
+export function RiskSlider({
+  onRepIDChange,
+  institutionId = 'default',
+}: {
+  onRepIDChange?: (score: number) => void;
+  institutionId?: string;
+}) {
   // @ts-ignore
   const [weights, setWeights] = useState(PRESETS['Default TrustRails']);
   const [sophiaRepID, setSophiaRepID] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const apply = async () => {
     setLoading(true);
-    const res = await fetch('/api/trustrails/repid/configure', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ institutionId: 'demo-judge', weights }),
-    });
-    const data = await res.json();
-    const newScore = data.sophiaRepIDWithNewWeights?.repidScore;
-    setSophiaRepID(newScore);
-    onRepIDChange?.(newScore);
-    setLoading(false);
+    setError(null);
+    try {
+      // Was hardcoded to 'demo-judge', an institution that does not exist in
+      // institution_risk_config — so every "apply" wrote weights nobody reads.
+      // The response was never checked, so it looked like it worked.
+      const data = await apiPost<{ preview?: { result?: { repidScore?: number } } }>(
+        '/api/trustrails/repid/configure',
+        { institutionId, weights }
+      );
+      const newScore = data.preview?.result?.repidScore ?? null;
+      setSophiaRepID(newScore);
+      if (newScore !== null) onRepIDChange?.(newScore);
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.isUnauthenticated
+          ? 'Sign in to change risk weights.'
+          : e instanceof Error
+            ? e.message
+            : String(e)
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const scoreColor = !sophiaRepID ? '#64748b' :
@@ -90,6 +111,12 @@ export function RiskSlider({ onRepIDChange }: { onRepIDChange?: (score: number) 
       </button>
 
       {/* Live result */}
+      {error && (
+        <p style={{ color: '#fca5a5', fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>
+          {error}
+        </p>
+      )}
+
       {sophiaRepID && (
         <div style={{ marginTop: 16, textAlign: 'center', background: '#0f172a', borderRadius: 8, padding: 16 }}>
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>SOPHIA RepID with your weights</div>
