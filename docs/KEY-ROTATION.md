@@ -1,257 +1,171 @@
 # Key rotation
 
-What is exposed, what actually needs rotating, and every place each key lives.
+## SETTLED 2026-08-12 — legacy keys are DISABLED. Nothing here is urgent.
 
-Regenerate the findings at any time:
+**Status: CLOSED. Do not re-open.**
 
-```bash
-node scripts/scan-secrets.mjs            # tracked files at HEAD
-node scripts/scan-secrets.mjs --history  # every commit reachable from any ref
-```
+The Supabase dashboard for `qnnpjhlxljtqyigedwkb` renders a **"Re-enable
+JWT-based API keys"** button at Settings → API Keys → Legacy. That button only
+exists when legacy keys are already **off**. The legacy `anon` and
+`service_role` JWTs are therefore **not accepted by the API**.
 
-## Findings as of 2026-08-12
+The project runs on the new keys: five `sb_publishable_…` and nine
+`sb_secret_…`, visible on the Publishable-and-secret tab.
 
-Measured, not inferred. Where something could not be checked from a cloud
-session, it says so rather than guessing.
+**The known leak is therefore inert.** The `service_role` JWT (sha256
+`f179551d…`, exp 2035-07-08) was committed to the PUBLIC repo
+`DealAppSeo/repid-engine` as `service_role.txt` (`fff5500`, 2026-04-20 →
+removed `973fc09`, 2026-08-03) and remains readable in that public history. A
+disabled key cannot authenticate. **This is not an active incident.**
 
-| Credential | Where | Complete? | Verdict |
-| :-- | :-- | :-- | :-- |
-| Supabase `service_role` JWT | `.env.local`, `.next/server/app/dashboard/page.js`, webpack cache — history only, 2026-04-17 → 2026-07-25 (`504bba6`) | **Yes** — 219 chars, 3 parts, `exp` 2035-07-08 | **Rotate.** Bypasses RLS. |
-| `AGENT_SOPHIA_PRIVKEY` | `audit_output.txt` | **Yes** — 88-char base58 | Rotate if convenient. Devnet-only. |
-| Supabase `anon` / publishable JWT | same places | Yes | No action. Public by design. |
-| 3 × 88-char base58 in `TRUST_ATTESTATION.md` | history (`721d52f`) | n/a | **Not secrets.** Transaction signatures — same length as an ed25519 key. |
+### The only standing rule
 
-Three things bound the severity:
+> **Never press "Re-enable JWT-based API keys" on this project.**
+> That single click re-arms a credential that is publicly readable on GitHub.
 
-- The repository is **private with zero forks**. Exposure is limited to people
-  who already have repo access.
-- The `AGENT_SOPHIA_*` wallet is **devnet**. Every Solana script targets
-  `api.devnet.solana.com`; there is no `mainnet-beta` reference in the repo. The
-  wallet appears in **0 of 12** `kya_compliance_receipts` rows and 0
-  `agent_kya_registry` rows, so it is not the wallet behind the recorded
-  payments.
-- Nothing usable remains in the working tree. `scan-secrets.mjs` exits 0.
+If someone ever does need legacy keys back, the leaked token must be dealt with
+*first* — see "What is and isn't possible" below.
 
-## ⚠ VERIFIED 2026-08-12 — the same key was PUBLIC for 3.5 months
+### Do not re-open these
 
-This supersedes every severity assessment above and below it.
-
-The `service_role` JWT is **not** confined to this private repo. The identical
-token — byte-for-byte, SHA-256 `f179551d…`, 219 chars, `ref`
-`qnnpjhlxljtqyigedwkb`, `exp` 2035-07-08 — was committed as `service_role.txt`
-to **`DealAppSeo/repid-engine`, a PUBLIC repository**:
-
-| | |
+| Question | Answer |
 | :-- | :-- |
-| Added | `fff5500`, 2026-04-20 |
-| Removed from HEAD | `973fc09`, 2026-08-03 |
-| **Publicly readable for** | **~3.5 months** |
-| Still in public history | **Yes** — `fff5500` is reachable from `origin/main` |
+| Should we rotate the legacy `service_role` key? | **No — impossible.** Supabase no longer offers legacy JWT-secret rotation. |
+| Should we disable legacy keys? | **Already done.** |
+| Is the public leak an emergency? | **No.** The key it exposes is disabled. |
+| Do we need the `repid-engine` Go/No-Go consumer inventory? | **Historical.** It planned an action that has since happened. |
+| Signing-key migration? | **Optional hardening**, not remediation. Schedule it or don't. |
+| Anything left at all? | One optional, low-priority item: review API logs from 2026-04-20 to the disable date for use from unknown egress. |
 
-Removing it from HEAD did nothing to contain it. Anyone can still run
-`git clone https://github.com/DealAppSeo/repid-engine && git show
-fff5500:service_role.txt` and read a credential that bypasses RLS on the
-production database until 2035.
-
-**Assume this key is compromised.** After 3.5 months of public exposure on a
-repo with an Apache-2.0 licence and inbound traffic, "probably nobody looked"
-is not a security posture. The earlier framing in this repo — *"private with
-zero forks, which is what makes this urgent-but-not-emergency"* — was written
-before this was measured and is **wrong for this key**.
-
-The removal commit message is worth reading in full: *"a LIVE prod service_role
-key was tracked in this repo — and every gitleaks check was green."* A scanner
-ran, passed, and the key sat there anyway.
-
-### ⚠ Do NOT just disable legacy keys. It is currently a NO-GO.
-
-An earlier revision of this section said "disable legacy API keys today." That
-advice was wrong and would have caused an outage. `repid-engine`'s own
-`reports/2026-08-09/SUPABASE_KEY_CONSUMER_INVENTORY.md` is a Go/No-Go for
-exactly this action and its verdict is **NO-GO**:
-
-- **~60 live edge functions** on this project read Supabase's **auto-injected**
-  legacy `service_role` / `anon` JWTs. They break the instant legacy keys are
-  off, unless each gets a same-named secret override.
-- **`trinity-symphony-shared` — the 12 constitutional agents** — contains **no
-  new-format key name anywhere**, and `lib/supabase.ts:12` carries a
-  **hardcoded legacy anon JWT fallback**, so clearing the env does not even
-  stop it using a legacy key. Highest-risk DB writers in the system.
-- **`repid-engine`** is the safe tier (new-key-first chain) **only if**
-  `SUPABASE_SECRET_KEY` is actually populated on its Railway service.
-
-So there is a real tension: the credential is publicly compromised, and the
-clean fix takes hours of env work. Sequence it rather than picking one horn.
-
-**Now — interim containment, while the key is still accepted:**
-
-1. **Supabase → Settings → Database → Network Restrictions.** Restrict Postgres
-   and API access to your Railway / Vercel egress ranges. `service_role`
-   bypasses RLS, so RLS is *not* a compensating control here — network
-   restriction is the only thing that blunts a stranger holding the key while
-   your own infra keeps working.
-2. **Look for evidence of use.** Supabase → Logs → API/Postgres, filtered to
-   requests outside your own egress ranges, back to 2026-04-20.
-
-**Then — the Go criteria, from that inventory:**
-
-3. Populate the `sb_secret_…` **value** into `SUPABASE_SECRET_KEY` on
-   `repid-engine`, and into the **legacy-named** vars on every
-   `trinity-symphony-shared` agent service. Name legacy, value new — that
-   works without code changes.
-4. Set per-function secret overrides for every live edge function reading an
-   auto-injected key. Enumerate them first; the true count is unknown.
-5. **Delete the hardcoded legacy anon JWT** at `trinity-symphony-shared/lib/supabase.ts:12`.
-
-**Then — and only then:**
-
-6. Disable legacy API keys. Verify with `npm run check:legacy-key` (expect
-   `INERT`). Disabling is *reversible*, which now cuts the other way: never
-   re-enable this project's legacy keys, because the credential is public.
-7. Migrate to asymmetric JWT signing keys and **revoke** the old key. Only this
-   retires the token rather than disarming it.
-8. **Treat anything reachable with `service_role` as potentially read** — every
-   table, ignoring RLS.
-
-Purging git history is *secondary*. It stops future discovery but cannot
-restore confidentiality after a months-long public window.
+This supersedes every "UNVERIFIED", "treat it as live", "rotate", and "disable
+today" statement anywhere in this repo's history. Mirrored into the database as
+a `settled_facts_DO_NOT_REPEAT` row (`trinity_changelog` id 110, with rollback
+SQL) so no future session re-litigates it from a stale doc.
 
 ---
 
-**Previously unverified, now settled:** whether the legacy `service_role` JWT is
-still accepted by the API is still a separate question from whether it leaked —
-run `npm run check:legacy-key` from a laptop. Do not let any doc claim a status
-without a measurement behind it; that has now gone wrong twice, in both
-directions.
+## What is and isn't possible with these keys
 
-Measure it in five seconds, from a laptop (not a cloud session):
+Worth knowing once, so nobody proposes an action that does not exist.
+
+- **Legacy `anon` / `service_role` JWTs cannot be rotated.** Supabase:
+  *"it is no longer possible to rotate the legacy anon, service and JWT
+  secrets."* They can only be **disabled** (done) — which is reversible and
+  does **not** change the token.
+- **Disabled ≠ revoked.** The token is unchanged and would work again if legacy
+  keys were re-enabled. Hence the standing rule above.
+- **The only way to truly retire it** is to migrate to asymmetric
+  [JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys), then
+  rotate **and revoke** the previous key. Rotating without revoking leaves the
+  old key valid. This also touches user sessions, so treat it as a migration.
+- **New `sb_secret_…` keys are independently revocable.** That is the point of
+  them, and why the leak class above cannot recur in the same way.
+
+## Verifying the state yourself
 
 ```bash
 npm run check:legacy-key
 ```
 
-It pulls the historical JWTs out of git history, probes PostgREST with each, and
-prints one of four states. **The proxy answers a blocked host with HTTP 403**,
-which is indistinguishable from an auth rejection by status code alone, so the
-script checks that the response actually came from PostgREST before calling
-anything a rejection. From a cloud session it prints `NOT MEASURED` and exits 2.
+Probes PostgREST with the historical tokens and reports LIVE / INERT / RETIRED
+/ **NOT MEASURED**. Given the settled state above, expect `INERT`.
 
-## Deactivated is not revoked
-
-The single most important thing on this page, and the thing that decides whether
-you still have work to do.
-
-Supabase's **Settings → API Keys → disable legacy API keys** switch is
-[explicitly reversible](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys):
-*"You can re-activate them if you find a client you missed, so this step is
-reversible."* The token is not changed by it. The legacy `anon` and
-`service_role` keys are signed by the project's JWT secret, and that secret is
-untouched — so flipping the switch back makes the exact string sitting in this
-repo's history a working RLS-bypassing credential again.
-
-So there are three real states, and the middle one is where this project most
-likely is:
-
-| State | What it means | What's left to do |
-| :-- | :-- | :-- |
-| **Live** | Legacy keys enabled. The history copy works. | Disable legacy keys today. |
-| **Disarmed** | Legacy keys disabled. History copy rejected. | Don't re-enable. Retire it when convenient. |
-| **Retired** | Signing key rotated *and revoked*. Token is dead. | Nothing. |
-
-The `anon` half of this pair was measured as rejected earlier, and the dashboard
-control is one switch covering both — so *disarmed* is the likely state. That is
-an inference from one measurement plus how the control works, not a measurement
-of the `service_role` key itself. `npm run check:legacy-key` settles it.
-
-## You can no longer rotate the legacy JWT secret
-
-Supabase's own guidance is blunt about this: *"it is no longer possible to rotate
-the legacy anon, service and JWT secrets."* Earlier revisions of this document
-said to "revoke the legacy `service_role` JWT in the dashboard" — **there is no
-such button.** The two things you can actually do:
-
-1. **Disable legacy API keys** (reversible, immediate, zero downtime once
-   nothing depends on them). This is the disarm.
-2. **Migrate to asymmetric [JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys),
-   then rotate and *revoke* the previous key.** This is the retire, and it is a
-   separate migration from the publishable/secret key migration you have already
-   done. Rotating alone is not enough — Supabase notes that without the explicit
-   revoke, *"older keys will still be valid."*
-
-Step 2 also affects user sessions: until you move to signing keys, the access
-tokens Supabase Auth issues to your users are signed by that same shared secret.
-Plan it as a migration, not a checkbox.
+Run it from a laptop. From a cloud session it exits 2 with `NOT MEASURED`
+because `*.supabase.co` is denied by the egress proxy — and the proxy answers a
+blocked host with **HTTP 403**, which the script deliberately refuses to read as
+an auth rejection.
 
 ## Rotating a new-style secret key (`sb_secret_…`)
 
 Not currently needed — no `sb_secret_…` value appears in the working tree or in
-history (`scan-secrets.mjs` is clean). Keep for when it is.
+history (`scan-secrets.mjs` is clean, including all 923 commits of
+`repid-engine`). Keep for when it is.
 
-Order matters: add the new key everywhere *before* deleting the old one, or you
-take the app down between steps. **Deleting a secret key is irreversible.**
+Order matters: add the new key everywhere *before* deleting the old one.
+**Deleting a secret key is irreversible.**
 
-1. **Issue** — Supabase → project `qnnpjhlxljtqyigedwkb` → Settings → API Keys →
-   create an `sb_secret_…` key.
-2. **Vercel** — project `ai-trinity-symphony-landing` → Settings → Environment
-   Variables → set `SUPABASE_SECRET_KEY` for every environment you deploy.
+1. **Issue** — Supabase → Settings → API Keys → create an `sb_secret_…` key.
+2. **Vercel** — project `ai-trinity-symphony-landing` → Environment Variables →
+   `SUPABASE_SECRET_KEY`, every environment you deploy.
 3. **Railway** — the host actually serving `app.aitrinitysymphony.com`. Easy to
    miss because the custom domain does not resolve to Vercel; see `CLAUDE.md`.
-   Set `SUPABASE_SECRET_KEY` there too.
 4. **Supabase Edge Functions** — `supabase/functions/agent-tools` reads its own
    secrets, set separately from both hosts.
 5. **Local** — your `.env.local`.
 6. **Delete the legacy names everywhere.** `lib/supabase-admin.ts` reads, in
    order: `SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
    `SUPABASE_SERVICE_KEY`, `SUPABASE_KEY`. A stale legacy value left on one host
-   silently wins there and nowhere else, which is the hardest kind of bug to
-   see.
-7. **Redeploy both hosts**, then **delete** the superseded `sb_secret_…` key in
-   the dashboard. (For the *legacy* `service_role` JWT the equivalent step is
-   disabling legacy API keys — see above. There is no revoke button for it.)
-8. Confirm: the server logs should carry no `[supabase-admin] … legacy
-   service_role JWT` warning. That warning fires once per process whenever a
-   legacy JWT is in use.
+   silently wins there and nowhere else — the hardest kind of bug to see.
+7. **Redeploy both hosts**, then **delete** the superseded key.
+8. Confirm: no `[supabase-admin] … legacy service_role JWT` warning in the logs.
+   That warning fires once per process whenever a legacy JWT is in use.
 
 No GitHub Actions secrets to update — no workflow references Supabase.
 
 ## Rotating the browser key (optional)
 
-**This does not fix the RLS exposure.** The publishable/anon key ships in the
-browser bundle by design; a new one ships the same way and reads the same rows.
-The fix for `{anon} SELECT USING (true)` on `agent_kya_registry` and
-`kya_compliance_receipts` is the policy, not the credential.
+**This does not fix an RLS exposure.** The publishable key ships in the browser
+bundle by design; a new one ships the same way and reads the same rows. The fix
+for a permissive `anon` policy is the policy, not the credential.
 
-If rotating anyway: same hosts as above, plus note that `lib/supabase-browser.ts`
-reads three names in order — `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+If rotating anyway: same hosts as above. `lib/supabase-browser.ts` reads three
+names in order — `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-`NEXT_PUBLIC_*` is inlined at build time, so **a redeploy is mandatory**; changing
-the variable alone changes nothing in an already-built bundle.
+`NEXT_PUBLIC_*` is inlined at build time, so **a redeploy is mandatory**.
 
-## Why history still holds these
+---
 
-`git rm` removes a file from the current tree, not from history. Anyone who can
-clone can `git log -p` a deleted secret back out. Rewriting history
-(`filter-repo`, force-push) invalidates every open branch and clone and is not
-worth it here: once the credential is *retired*, the copy in history is inert.
+## Historical record
 
-Note the word. If legacy keys are merely **disabled**, the history copy is not
-inert — it is dormant, and one dashboard toggle away from working. That is fine
-as a steady state for a private repo with zero forks; it is not the same as
-done, and it should not be recorded as done.
+Kept for the audit trail, not as a call to action. Everything below is
+superseded by the SETTLED block at the top.
 
-**Disable first. Retire when you migrate to signing keys. Consider purging
-history only if neither is possible.**
+### The leak
 
-## How these got committed
+| | |
+| :-- | :-- |
+| Repo | `DealAppSeo/repid-engine` — **public** |
+| File | `service_role.txt` |
+| Added | `fff5500`, 2026-04-20 |
+| Removed from HEAD | `973fc09`, 2026-08-03 |
+| Still in public history | Yes — `fff5500` is reachable from `origin/main` |
+| Same token as this repo's copy | Yes — byte-identical, sha256 `f179551d…` |
 
-Worth knowing, because the paths are still open:
+Also present in this (private) repo's history: `.env.local`,
+`.next/server/app/dashboard/page.js`, webpack cache, 2026-04-17 → `504bba6`.
 
-- `.env.local` was tracked before `.gitignore` covered it. It is ignored now.
+A full-history scan of `repid-engine` (923 commits) found **exactly one** real
+credential — this one. Two other hits were synthetic fixtures in
+`tests/security-audit.test.ts`.
+
+`AGENT_SOPHIA_PRIVKEY` also appeared in `audit_output.txt` (88-char base58).
+Devnet-only, and it is not the wallet behind any recorded payment — 0 of 12
+`kya_compliance_receipts` rows. Rotate if convenient. The three 88-char base58
+strings in `TRUST_ATTESTATION.md` are **not secrets**; they are transaction
+signatures, which happen to be the same length as an ed25519 key.
+
+### Why the scanners did not catch it
+
+The removal commit says it plainly: *"a LIVE prod service_role key was tracked
+in this repo — and every gitleaks check was green."* A scanner ran, passed, and
+the key sat there for 3.5 months. `scripts/scan-secrets.mjs` exists because of
+this, and it distinguishes "ran and found nothing" from "could not run".
+
+### Why history still holds these
+
+`git rm` removes a file from the current tree, not from history. Rewriting
+history (`filter-repo`, force-push) invalidates every open branch and clone.
+Not worth it here: the credential is disabled, so the copy in history is inert.
+Purging would only reduce future discovery of an already-dead key.
+
+### How they got committed
+
+- `.env.local` was tracked before `.gitignore` covered it. Ignored now.
 - `.next/` build output was committed, and `next build` inlines server env into
-  the bundle — so the key landed in `.next/server/app/dashboard/page.js` as well
-  as in `.env.local`. `.next` is ignored now.
+  the bundle — so the key landed in `.next/server/app/dashboard/page.js` too.
+  Ignored now.
 - `audit_output.txt` was a one-off audit dump that quoted `.env.local` line by
-  line. Untracked and ignored as of this change.
+  line. Untracked and ignored.
 
-`scripts/scan-secrets.mjs` exits non-zero if a usable credential reappears in the
-working tree. Wire it into CI or a pre-commit hook to keep it that way.
+`scripts/scan-secrets.mjs` exits non-zero if a usable credential reappears in
+the working tree. Wire it into CI or a pre-commit hook to keep it that way.

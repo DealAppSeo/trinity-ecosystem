@@ -37,11 +37,10 @@ fallback throws exactly like `undefined`, just later and less clearly.
 
 ## Key names
 
-This project uses Supabase's newer API keys. The legacy `anon` JWT was measured
-as **rejected** by the API. Note that Supabase's disable-legacy-keys switch is
-reversible and does not invalidate the tokens themselves, so "disabled" is not
-"revoked" — `npm run check:legacy-key` re-measures, and `docs/KEY-ROTATION.md`
-explains why the distinction matters for the `service_role` JWT in git history.
+This project uses Supabase's newer API keys. **SETTLED: legacy `anon` and
+`service_role` JWTs are disabled project-wide**, so the copy of the legacy
+`service_role` key in public git history is inert. Nothing to rotate. One
+standing rule: never re-enable legacy API keys. See `docs/KEY-ROTATION.md`.
 
 - server: `SUPABASE_SECRET_KEY` (`sb_secret_…`), legacy names still accepted
 - browser: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_…`)

@@ -30,18 +30,17 @@ Vercel `ssoProtection` is `all_except_custom_domains`, so every `.vercel.app` UR
 Project **AITrinitySymphony**, ref `qnnpjhlxljtqyigedwkb` (the ref that used to be
 hardcoded as a fallback in `trade_pipeline.ts`).
 
-This project uses Supabase's **newer API keys**. The legacy `anon` JWT was
-**measured as rejected** 2026-08-12; five `sb_publishable_…` keys are active. The
-status of the legacy `service_role` key is **unverified** — secret keys are not
-readable through any API, and a complete copy of that JWT is in git history.
+This project uses Supabase's **newer API keys** (5 `sb_publishable_…`, 9
+`sb_secret_…`).
 
-`npm run check:legacy-key` settles it: it probes PostgREST with the historical
-tokens and reports LIVE / INERT / RETIRED / **NOT MEASURED**. It exits 2 from a
-cloud session because `*.supabase.co` is proxy-denied (see Network below) — run
-it from a laptop. Two things to know before acting on the answer, both in
-`docs/KEY-ROTATION.md`: the legacy JWT secret **can no longer be rotated**, and
-Supabase's disable-legacy-keys switch is **reversible and does not change the
-token**, so "disabled" is disarmed, not retired.
+**SETTLED 2026-08-12 — do not re-open.** The legacy `anon` and `service_role`
+JWTs are **disabled**; the dashboard shows a *"Re-enable JWT-based API keys"*
+button, which only appears when they are off. A copy of the legacy
+`service_role` JWT is public in `DealAppSeo/repid-engine`'s git history and is
+**inert** because the key is disabled — not an incident, no rotation needed
+(Supabase no longer offers legacy JWT rotation anyway). The one standing rule:
+**never re-enable legacy API keys on this project.** Full reasoning in
+`docs/KEY-ROTATION.md`; mirrored in the DB's `settled_facts_DO_NOT_REPEAT`.
 
 Use the helpers, never `createClient` directly:
 

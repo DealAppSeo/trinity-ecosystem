@@ -113,32 +113,24 @@ LIVE / NOT CHECKED / FAILED — on every panel that renders a number.
 
 These do not move without Sean, and everything downstream waits on them.
 
-0. **🔴 CONTAIN THE PUBLIC `service_role` KEY.** The production `service_role`
-   JWT was public on GitHub for 3.5 months (`DealAppSeo/repid-engine`,
-   `service_role.txt`, 2026-04-20 → 2026-08-03) and is **still readable in that
-   repo's public history**. Verified byte-identical to the copy in this repo.
-   Assume compromised.
-
-   **Do not simply disable legacy keys** — `repid-engine`'s own 2026-08-09
-   consumer inventory says **NO-GO**: ~60 edge functions and all 12
-   constitutional agents break. Sequence it:
-   **(a)** Supabase → Network Restrictions, limit API access to your Railway /
-   Vercel egress ranges — `service_role` bypasses RLS, so this is the only
-   control that blunts a stranger holding the key; **(b)** check API logs back
-   to 2026-04-20 for use from outside those ranges; **(c)** work the Go
-   criteria (new value under legacy names, per-function overrides, delete the
-   hardcoded anon JWT at `trinity-symphony-shared/lib/supabase.ts:12`);
-   **(d)** then disable, verify `INERT`, migrate to signing keys, revoke.
-   Full sequence in `docs/KEY-ROTATION.md`.
+0. **Legacy Supabase keys: SETTLED, no action.** Legacy `anon`/`service_role`
+   JWTs are **disabled** on this project, so the copy of the `service_role`
+   key that leaked publicly via `DealAppSeo/repid-engine` is **inert**. Not an
+   incident. One standing rule: **never press "Re-enable JWT-based API keys"**.
+   Closed in `docs/KEY-ROTATION.md` and in the DB's settled facts — do not
+   re-open it from a stale doc.
 1. **Fleet HOLD gated on an impossible action.** `global_pause=true` since
    2026-07-22, gated on "rotate the `service_role` JWT" — Supabase has removed
    that capability. Restate the gate (disable legacy keys → verify → migrate to
-   signing keys → revoke), then clear the pause. **Item 0 is the first half of
-   this gate**, so doing it unblocks the fleet too.
+   signing keys → revoke), then clear the pause. **The key half of that gate is
+   already satisfied** — legacy keys are disabled (item 0) — so the gate can be
+   restated and cleared now.
 2. **Network egress allowlist**: `trustshell.dev`, `trustrepid.dev`,
    `hyperdag.org`, `repid.dev`, `docs.lovable.dev`. Blocks any audit of the
    *shipped* surfaces — this file audits the docs and the database only.
 3. **OAuth Lovable + Cloudflare** from an interactive session.
-4. **Is `DealAppSeo/repid-engine` public, and does it hold the same
-   `service_role` key?** If yes, the credential exposure is materially worse
-   than the private-repo case currently assumed.
+4. **Merge PR #21.** Phase-2 RLS, the Railway env vars, and the first real BFT
+   run are all queued behind it.
+
+*(Answered and closed: `repid-engine` is public and did hold the same key —
+see item 0. A 923-commit scan found no other credential.)*

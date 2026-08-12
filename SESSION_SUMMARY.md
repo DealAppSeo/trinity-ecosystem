@@ -126,7 +126,7 @@ verified, not-checked and failed are three different things.
    **Do not use `SUPABASE_SERVICE_ROLE_KEY`.** This project has moved to Supabase's newer
    API keys and the legacy `anon` JWT is **disabled** (verified 2026-08-11 against project
    `qnnpjhlxljtqyigedwkb`; five `sb_publishable_…` keys active, legacy anon
-   `disabled: true`). **The status of the legacy service_role key is UNVERIFIED** — secret
+   `disabled: true`). **SETTLED 2026-08-12: the legacy service_role key is DISABLED along with anon (the dashboard offers "Re-enable JWT-based API keys"), so the copy in public git history is inert — see docs/KEY-ROTATION.md. Formerly UNVERIFIED** — secret
    keys are not readable through any API, so it was never measured. An earlier revision of
    this file asserted it was disabled too; that was an inference from the anon key, not a
    fact, and the Railway deployment at `app.aitrinitysymphony.com` was serving live data

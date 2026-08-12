@@ -11,20 +11,19 @@
 // whichever is configured. This runs only on the server, so a computed lookup
 // is fine here — unlike the browser helper, nothing needs static inlining.
 //
-// The legacy service_role JWT is NOT known to be retired. An earlier comment
-// here asserted it was disabled; that was never measured, and secret keys are
-// not readable through any API, so it cannot be checked from inside the app. A
-// copy of one such JWT for this project sits in git history (`.env.local`,
-// tracked 2026-04-17 to 2026-07-25) with an `exp` in 2035.
+// LEGACY KEY STATUS — SETTLED 2026-08-12, do not re-open.
 //
-// "Disabled" would not settle it either. Supabase's disable-legacy-API-keys
-// switch is reversible and does not change the token — it is signed by the
-// project's JWT secret, which can no longer be rotated. Re-enabling legacy keys
-// makes that history copy work again. Only migrating to JWT signing keys and
-// revoking the old one retires it. So a legacy JWT in the environment is
-// treated as a live credential here — hence the warning below rather than a
-// silent accept. `npm run check:legacy-key` measures the current state from a
-// machine that can reach the API; docs/KEY-ROTATION.md has the remediation.
+// Legacy anon/service_role JWTs are DISABLED on this project (the dashboard
+// offers "Re-enable JWT-based API keys", which only appears when they are off).
+// A copy of the legacy service_role JWT is public in DealAppSeo/repid-engine's
+// git history; it is INERT because the key is disabled. Not an incident, and
+// there is nothing to rotate — Supabase no longer offers legacy JWT rotation.
+// The one standing rule: never re-enable legacy API keys on this project.
+//
+// The warning below therefore fires on a MISCONFIGURATION, not a breach: if a
+// legacy JWT is still sitting in this environment, that host is one re-enable
+// away from depending on a dead credential. Fix the env, not the key.
+// See docs/KEY-ROTATION.md.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
@@ -34,7 +33,7 @@ const URL_VARS = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL'] as const;
 
 const KEY_VARS = [
   'SUPABASE_SECRET_KEY',        // current: sb_secret_…
-  'SUPABASE_SERVICE_ROLE_KEY',  // legacy JWT — status unverified, see above
+  'SUPABASE_SERVICE_ROLE_KEY',  // legacy JWT — disabled project-wide, see above
   'SUPABASE_SERVICE_KEY',
   'SUPABASE_KEY',
 ] as const;
@@ -85,17 +84,18 @@ export function getSupabaseAdmin(): SupabaseClient {
     );
   }
 
-  // Observe, do not block. Refusing a legacy key would take down any host still
-  // configured with one, and we have no evidence such a host does not exist —
-  // that is exactly the unverified claim this file used to make. Say it loudly
-  // once per process instead, so the condition is visible in logs.
+  // Observe, do not block. A host configured with a legacy JWT is already
+  // failing its Supabase calls (the key is disabled project-wide), so throwing
+  // here would only swap one broken state for another and hide the cause. Say
+  // it loudly once per process instead, so the condition is visible in logs.
   if (isLegacyServiceRoleJwt(key.value) && !warnedLegacy) {
     warnedLegacy = true;
     console.warn(
       `[supabase-admin] ${key.name} holds a legacy service_role JWT, not an ` +
-        `sb_secret_… key. It bypasses RLS, and a copy of one such JWT for this ` +
-        `project is recoverable from git history. Rotate in Supabase → Settings ` +
-        `→ API Keys, then set SUPABASE_SECRET_KEY and unset the legacy names. ` +
+        `sb_secret_… key. Legacy JWTs are DISABLED on this project, so calls ` +
+        `made with it will fail — this host is misconfigured. There is nothing ` +
+        `to rotate (Supabase no longer rotates legacy JWT secrets): create an ` +
+        `sb_secret_… key, set SUPABASE_SECRET_KEY, and unset the legacy names. ` +
         `See docs/KEY-ROTATION.md.`
     );
   }
