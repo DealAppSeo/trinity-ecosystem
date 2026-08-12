@@ -30,9 +30,17 @@ export async function GET() {
     .select('payment_amount_usdc, bft_passed')
     .gte('created_at', since24h);
 
-  const totalVolume24h   = (receipts || []).filter(r => r.bft_passed).reduce((s, r) => s + Number(r.payment_amount_usdc), 0);
-  const totalTxns24h     = (receipts || []).filter(r => r.bft_passed).length;
-  const blockedTxns24h   = (receipts || []).filter(r => !r.bft_passed).length;
+  // bft_passed is three-state: true (consensus passed), false (consensus
+  // failed), null (never evaluated — the authorizer is a placeholder on the
+  // payment path). `!r.bft_passed` would fold null in with false and report
+  // every unevaluated receipt as a blocked transaction, which is exactly the
+  // rounding-silence-up-to-a-verdict problem the rest of this branch removes.
+  const rows            = receipts || [];
+  const passedRows      = rows.filter(r => r.bft_passed === true);
+  const totalVolume24h  = passedRows.reduce((s, r) => s + Number(r.payment_amount_usdc), 0);
+  const totalTxns24h    = passedRows.length;
+  const blockedTxns24h  = rows.filter(r => r.bft_passed === false).length;
+  const unevaluatedTxns24h = rows.filter(r => r.bft_passed === null || r.bft_passed === undefined).length;
 
   // System status
   const status =
@@ -55,6 +63,8 @@ export async function GET() {
     tagline:           status === 'TRUSTED'
       ? 'All agents KYA-verified and operating within earned limits'
       : 'System monitoring active — some agents below institutional threshold',
+    // Reported separately so "not checked" is never displayed as "blocked".
+    unevaluatedTxns24h,
     agentCount:        agents.length,
     tierDistribution:  tiers,
     humanCustodyVerified: agents.filter(a => a.human_custody_verified).length,

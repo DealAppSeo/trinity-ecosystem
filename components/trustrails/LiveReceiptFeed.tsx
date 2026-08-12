@@ -5,16 +5,26 @@
 
 import { useEffect, useState } from 'react';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
+import { apiFetch, ApiError } from '@/lib/api-fetch';
 
 export function LiveReceiptFeed() {
   const [receipts, setReceipts] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
     const load = async () => {
-      const res = await fetch('/api/trustrails/receipts');
-      const data = await res.json();
-      setReceipts(data.receipts || []);
+      try {
+        const data = await apiFetch<{ receipts: any[] }>('/api/trustrails/receipts');
+        setReceipts(data.receipts || []);
+        setError(null);
+      } catch (e) {
+        setError(
+          e instanceof ApiError && e.isUnauthenticated
+            ? 'Sign in to view compliance receipts.'
+            : e instanceof Error ? e.message : String(e)
+        );
+      }
     };
     load();
 
@@ -27,6 +37,15 @@ export function LiveReceiptFeed() {
 
     return () => { supabase.removeChannel(sub); };
   }, []);
+
+  if (error) {
+    return (
+      <div style={{ background: '#0f172a', borderRadius: 12, padding: 20 }}>
+        <p style={{ color: '#fca5a5', fontSize: 13, margin: '0 0 8px' }}>{error}</p>
+        <a href="/login" style={{ color: '#86efac', fontSize: 13, textDecoration: 'none' }}>Go to sign in →</a>
+      </div>
+    );
+  }
 
   return (
     <div>
