@@ -51,3 +51,7 @@ Thumbs.db
 # Vercel / coverage
 .vercel
 coverage/
+
+# Stale audit dump: contained a complete devnet Solana secret key and local
+# filesystem paths. Regenerate locally if needed; never commit it.
+audit_output.txt

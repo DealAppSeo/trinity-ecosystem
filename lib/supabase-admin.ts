@@ -10,6 +10,14 @@
 // service_role JWT. Both are accepted, newest first, so the app works
 // whichever is configured. This runs only on the server, so a computed lookup
 // is fine here — unlike the browser helper, nothing needs static inlining.
+//
+// The legacy service_role JWT is NOT known to be revoked. An earlier comment
+// here asserted it was disabled; that was never measured, and secret keys are
+// not readable through any API, so it cannot be checked from code. A copy of
+// one such JWT for this project sits in git history (`.env.local`, tracked
+// 2026-04-17 to 2026-07-25) with an `exp` in 2035. Until it is revoked in the
+// dashboard, treat a legacy JWT in the environment as a live credential —
+// hence the warning below rather than a silent accept.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
@@ -19,23 +27,40 @@ const URL_VARS = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL'] as const;
 
 const KEY_VARS = [
   'SUPABASE_SECRET_KEY',        // current: sb_secret_…
-  'SUPABASE_SERVICE_ROLE_KEY',  // legacy JWT, disabled on this project
+  'SUPABASE_SERVICE_ROLE_KEY',  // legacy JWT — status unverified, see above
   'SUPABASE_SERVICE_KEY',
   'SUPABASE_KEY',
 ] as const;
 
-function firstSet(names: readonly string[]): string | undefined {
+function firstSet(names: readonly string[]): { name: string; value: string } | undefined {
   for (const name of names) {
     const value = process.env[name];
-    if (value) return value;
+    if (value) return { name, value };
   }
   return undefined;
 }
 
+// A legacy Supabase key is a JWT: three dot-separated base64url segments whose
+// payload carries `"role":"service_role"`. A current key is an opaque
+// `sb_secret_…` string. Detecting the shape is enough — we never verify the
+// signature, only report which kind of credential is in use.
+function isLegacyServiceRoleJwt(key: string): boolean {
+  const parts = key.split('.');
+  if (parts.length !== 3 || !key.startsWith('eyJ')) return false;
+  try {
+    const payload = Buffer.from(parts[1], 'base64url').toString('utf8');
+    return JSON.parse(payload).role === 'service_role';
+  } catch {
+    return false;
+  }
+}
+
+let warnedLegacy = false;
+
 export function getSupabaseAdmin(): SupabaseClient {
   if (client) return client;
 
-  const url = firstSet(URL_VARS);
+  const url = firstSet(URL_VARS)?.value;
   const key = firstSet(KEY_VARS);
 
   // Fail loudly and name the variable. The fallbacks this replaced pointed a
@@ -49,11 +74,25 @@ export function getSupabaseAdmin(): SupabaseClient {
   if (!key) {
     throw new Error(
       `Supabase is not configured: set SUPABASE_SECRET_KEY (an sb_secret_… key). ` +
-        `Also read, in order: ${KEY_VARS.join(', ')}. The legacy service_role ` +
-        `key is disabled on this project.`
+        `Also read, in order: ${KEY_VARS.join(', ')}.`
     );
   }
 
-  client = createClient(url, key);
+  // Observe, do not block. Refusing a legacy key would take down any host still
+  // configured with one, and we have no evidence such a host does not exist —
+  // that is exactly the unverified claim this file used to make. Say it loudly
+  // once per process instead, so the condition is visible in logs.
+  if (isLegacyServiceRoleJwt(key.value) && !warnedLegacy) {
+    warnedLegacy = true;
+    console.warn(
+      `[supabase-admin] ${key.name} holds a legacy service_role JWT, not an ` +
+        `sb_secret_… key. It bypasses RLS, and a copy of one such JWT for this ` +
+        `project is recoverable from git history. Rotate in Supabase → Settings ` +
+        `→ API Keys, then set SUPABASE_SECRET_KEY and unset the legacy names. ` +
+        `See docs/KEY-ROTATION.md.`
+    );
+  }
+
+  client = createClient(url, key.value);
   return client;
 }
