@@ -11,7 +11,7 @@ export interface FireblocksPreAuthPayload {
   agentKYAVerified:   boolean;
   agentRepidScore:    number;
   agentRepidTier:     string;
-  bftConsensusWeight: number;
+  bftConsensusWeight: number | null;   // null when BFT was not evaluated
   bftPassed:          boolean;
   zkpAttestationCID:  string;
   humanCustodyBound:  boolean;
@@ -36,7 +36,7 @@ export class FireblocksPreAuth {
       agentKYAVerified:    receipt.kyaVerified,
       agentRepidScore:     receipt.agentRepidScore,
       agentRepidTier:      receipt.agentRepidTier,
-      bftConsensusWeight:  receipt.bftProof.consensusWeight,
+      bftConsensusWeight:  receipt.bftProof.consensusWeight,   // null when unevaluated
       bftPassed:           receipt.bftProof.passed,
       zkpAttestationCID:   receipt.zkpProofCID,
       humanCustodyBound:   receipt.humanCustodyBound,

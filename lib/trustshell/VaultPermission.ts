@@ -59,7 +59,9 @@ export class VaultPermissionGate {
         vault.max_withdrawal_usdc, `vault_${req.action}`
       );
       if (!bftProof.passed) {
-        const reason = `BFT consensus failed (${(bftProof.consensusWeight * 100).toFixed(1)}% < ${(bftProof.threshold * 100)}% threshold)`;
+        const reason = bftProof.evaluated
+          ? `BFT consensus failed (${((bftProof.consensusWeight ?? 0) * 100).toFixed(1)}% < ${bftProof.threshold * 100}% threshold)`
+          : `BFT consensus NOT CHECKED: ${bftProof.notEvaluatedReason}`;
         await this.logAccess(req, 'denied', profile.repidScore, vault.min_repid_required, reason);
         return { permitted: false, reason, agentRepid: profile.repidScore, minRequired: vault.min_repid_required };
       }

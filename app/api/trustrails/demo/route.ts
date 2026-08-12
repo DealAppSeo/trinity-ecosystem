@@ -55,13 +55,21 @@ export async function POST(req: NextRequest) {
     result:         'APPROVED',
     solanaTxHash:   payment.receipt?.solanaTxHash,
     explorerUrl:    payment.receipt?.solanaExplorerUrl,
-    bftConsensus:   payment.receipt?.bftProof?.consensusWeight,
+    bftConsensus:   payment.receipt?.bftProof?.consensusWeight ?? null,
+    bftEvaluated:   payment.receipt?.bftProof?.evaluated ?? false,
+    bftStatus:      payment.bft?.status ?? 'NOT CHECKED',
+    settlement:     payment.settlement?.status ?? 'unknown',
     zkpProofCID:    payment.receipt?.zkpProofCID,
     auditHash:      payment.receipt?.auditHash,
     fireblocksRef:  payment.receipt?.fireblocksPreAuthId,
     insuranceCoverage: payment.receipt?.insuranceCoverage,
     liabilityModel: 'SBT (Soulbound Token) Human Custody',
-    message:        'SOPHIA earned Gold tier and holds an active SBT binding verified human liability. BFT consensus passed. Fireblocks pre-authorized.',
+    // Was hardcoded to "BFT consensus passed." regardless of whether any vote
+    // ran. It never did — the authorizer is a placeholder. Report the state.
+    message:
+      'SOPHIA earned Gold tier and holds an active SBT binding verified human liability. ' +
+      `BFT consensus: ${payment.bft?.status ?? 'NOT CHECKED'}. ` +
+      `Settlement: ${payment.settlement?.status ?? 'unknown'}. Fireblocks pre-authorized.`,
   });
 
   // ── BEAT 3: THE VAULT (Track 1) ─────────────────────────────────────────

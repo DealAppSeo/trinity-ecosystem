@@ -4,11 +4,10 @@
 // This is the most important demo endpoint — leads the demo video
 
 import { NextResponse } from 'next/server';
-import { KYAValidator, BFTAuthorizer } from '@/lib/trustshell';
+import { KYAValidator } from '@/lib/trustshell';
 
 export async function POST() {
   const kya = new KYAValidator();
-  const bft = new BFTAuthorizer();
 
   const villainScenarios = [
     // Villain 1: Low-RepID agent tries to access Gold-tier vault
