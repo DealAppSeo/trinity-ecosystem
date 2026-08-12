@@ -21,8 +21,8 @@ Check these in order. Do not trust this file over live state — it is a snapsho
 | Preflight / HOLD | `v_agent_preflight` (Supabase) | HOLD, `global_pause=true` |
 | Fleet liveness | agent heartbeat tables | 0/12 live since 2026-07-17T22:18Z |
 | Open PRs | `DealAppSeo/repid-engine`, `DealAppSeo/trinity-ecosystem` | **none open** — all merged |
-| npm credential | repid-engine → Settings → Secrets and variables → Actions | `NPM_TOKEN` **absent** |
-| npm cred, live check | Actions → `release-trust-demo` → Run workflow → `dry_run=true` | run 31468096879: absent |
+| npm credential | repid-engine → Settings → Secrets and variables → **Actions** tab | `NPM_TOKEN` **set** |
+| npm cred, live check | Actions → `release-trust-demo` → Run workflow → `dry_run=true` | run 31553742477: **valid, `seangoodwin`** |
 | Vercel builds | project `ai-trinity-symphony-landing` (`prj_EtbAAh789ySdcT0AZc8cgZNui3lt`) | prod `READY` at 5b919a9 |
 | Vercel env vars | that project → Settings → Environment Variables | server key **missing** — see #2 below |
 | Supabase API keys | project `qnnpjhlxljtqyigedwkb` (AITrinitySymphony) → Settings → API Keys | legacy `anon` **disabled**; 5 `sb_publishable_…` active |
@@ -99,10 +99,25 @@ verified, not-checked and failed are three different things.
 
 ## BLOCKED_FOR_SEAN — nothing here can be done by an agent
 
-1. **Add `NPM_TOKEN`** (npmjs.com → Access Tokens → Automation; account must own
-   `@hyperdag`) → repid-engine → Settings → Secrets and variables → Actions.
-   `@hyperdag/trust-demo@0.1.0` cannot publish until this exists. #410 and #414 merging
-   did **not** change this.
+1. ~~**Add `NPM_TOKEN`**~~ — **DONE 2026-08-12.** A new granular token is set as a
+   repository **secret** on repid-engine, and the live dry run
+   ([run 31553742477](https://github.com/DealAppSeo/repid-engine/actions/runs/31553742477))
+   verified it: `npm credential: valid, authenticated as seangoodwin`. All 14 steps green
+   in 20s, including the tarball smoke test (proof verified, 3 tampers rejected,
+   verifier v0.2.0).
+   *Worth knowing:* the first attempt failed because the token was added under the
+   **Variables** tab, not **Secrets**. `${{ secrets.NPM_TOKEN }}` then resolves to an empty
+   string and the run still goes green — reported as `NOT CHECKED`, which is exactly the
+   distinction #410 exists to preserve. If this ever reads NOT CHECKED again, check the tab
+   before regenerating the token.
+   **What is still NOT settled:** that `seangoodwin` may publish *this name*. npm offers no
+   way to ask about a name that does not exist yet. Circumstantial evidence is strong —
+   that account's `@hyperdag` scope already carries `trustshell@1.3.0`, `trustshell-mcp@1.0.0`
+   and `proof-verifier@0.2.0` — but the real publish is the only proof.
+   **The remaining step is a decision, not a task:** `git tag trust-demo-v0.1.0 && git push
+   origin trust-demo-v0.1.0` publishes for real. Irreversible — the version is burned on
+   landing and `0.1.0` can never be reused. `package.json` says `0.1.0`, so the tag guard
+   agrees. Do not do this on an agent's initiative.
 2. **Set the Supabase server key** in the Vercel project (Preview + Production) as
    `SUPABASE_SECRET_KEY` — an `sb_secret_…` key from Supabase → Settings → API Keys.
    #14 removed the *build's* dependency on it, not the *runtime's* — routes throw a named
@@ -125,8 +140,11 @@ verified, not-checked and failed are three different things.
 ## Next 3 commands
 
 ```bash
-# 1. Once NPM_TOKEN is added — re-run the dry run; expect "authenticated as: <account>"
-#    (repid-engine → Actions → release-trust-demo → Run workflow → dry_run=true)
+# 1. NPM_TOKEN is set and verified (run 31553742477, "authenticated as: seangoodwin").
+#    Re-run the dry run any time to re-confirm before releasing:
+#    repid-engine → Actions → release-trust-demo → Run workflow → dry_run=true
+#    To actually publish — IRREVERSIBLE, Sean's call only:
+#      git tag trust-demo-v0.1.0 && git push origin trust-demo-v0.1.0
 
 # 2. Once the Railway host is reachable — the honest E2E, post-rollout mode.
 #    This is the outstanding proof for #414.
