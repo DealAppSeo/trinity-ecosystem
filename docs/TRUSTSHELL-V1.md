@@ -1,0 +1,340 @@
+# TrustShell v1 — specification
+
+**Status:** draft for review. Nothing here is built yet.
+**Date:** 2026-08-12
+
+TrustShell turns an AI agent's assertions into receipts you can verify without
+trusting the agent or the vendor.
+
+## 0. Decisions
+
+| Question | Decision |
+| :-- | :-- |
+| Surface | Developer, via MCP server + CLI |
+| Posture | **Observe.** Shadow mode; never blocks an agent |
+| What is verified | Agent **actions**, **spend**, and **hallucination** |
+
+## 1. Why this and not "a better agent"
+
+The failure that needs a harness is not the agent that errors — you read the
+error. It is the agent that **reports success it has not earned.** This repo has
+a log of them. From one session:
+
+| Where | The false pass |
+| :-- | :-- |
+| repid-engine E2E | 6/6 green against a service that never issued a token or ran a round |
+| `next build` | green over two undefined `supabase` references |
+| `release-trust-demo` | green with no credential at all |
+| `scan-secrets.mjs --history` | *"No credential-shaped strings found"* — from a `git grep` that exited 128 and never ran |
+
+The last one happened while building the tool whose job is to detect this class
+of failure, roughly four hours before this document was written. None of the
+four were caught by the system reporting them. All four were caught by comparing
+the report against something independently measurable.
+
+That comparison is the product.
+
+## 2. Non-goals for v1
+
+Naming these prevents scope drift and prevents the marker from over-claiming.
+
+- **Not a fact-checker.** "Is this true about the world" is undecidable here.
+  "Is this assertion backed by evidence in this session" is decidable. Only the
+  second is in scope.
+- **Not a blocker.** No refusals, no gating, no interception. See §7.
+- **Not a consumer product.** A browser extension for chat UIs is a different
+  build; MCP cannot reach `chatgpt.com`.
+- **Not multi-vendor at v1.** Claude Code first, because its transcript format
+  is on disk and stable. Cursor and Claude Desktop follow once the receipt
+  schema has settled.
+
+## 3. Architecture: MCP is the interface, not the observer
+
+**The trap.** An MCP server is *called by* an agent. It cannot passively watch
+one. A design where the agent voluntarily calls `trustshell.claim(...)` verifies
+only the claims a cooperative agent chooses to declare — which is exactly the
+population that needs verifying least. Any spec that skips this point is
+describing something that cannot be built.
+
+**The actual observation substrate** is the session transcript, which Claude
+Code already writes to disk:
+
+```
+~/.claude/projects/<cwd-slug>/<session-id>.jsonl
+```
+
+Measured on the session that produced this document — 4,705 records, 13 MB:
+
+| Record / field | Count | Use |
+| :-- | --: | :-- |
+| `tool_use` blocks | 1,089 | what the agent actually did |
+| `tool_result` blocks | 1,087 | what actually came back |
+| assistant `text` blocks | 496 | the claims |
+| `thinking` blocks | 585 | excluded — not an assertion to the user |
+| orphan `tool_use` (no result) | 2 | matched the two user interruptions |
+| `tool_result` with no `tool_use` | **0** | referential integrity holds |
+
+Also present per record: `toolUseID`, `parentUuid`, `uuid`, `timestamp`,
+`sessionId`, `gitBranch`, `cwd`, `permissionMode`, `attributionMcpServer`,
+`attributionMcpTool`, `hookCount`, `hookErrors`, and per-turn
+`message.usage` (`input_tokens`, `output_tokens`, `cache_read_input_tokens`,
+`cache_creation_input_tokens`) with `message.model`.
+
+That is enough to reconstruct every action, its cost, and whether a claim has
+evidence behind it — with no cooperation from the agent.
+
+```
+                    ┌──────────────────────────────┐
+  agent session ───▶│ <session-id>.jsonl (on disk) │
+                    └──────────────┬───────────────┘
+                                   │  tail / on Stop hook
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │  trustshell observer         │  ← pure read, no interception
+                    │  actions │ spend │ claims    │
+                    └──────────────┬───────────────┘
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │  session receipt (signed)    │
+                    └──────┬────────────────┬──────┘
+                           ▼                ▼
+                    MCP tools / CLI    proof-verifier
+                    (query surface)    (anyone, offline)
+```
+
+**Ingest modes.** Batch (`Stop` hook, or `trustshell verify <session>`) for v1.
+Streaming (`tail -f` on the JSONL) is a v1.1 concern; nothing in the receipt
+schema depends on which is used.
+
+## 4. The three pillars
+
+### 4.1 Actions — did it do what it says?
+
+Cheap and fully decidable from the transcript. For each session emit:
+
+- every `tool_use` with its name, MCP attribution, timestamp, and whether a
+  `tool_result` returned
+- writes separated from reads: `Edit`/`Write`/`Bash` with side effects, versus
+  `Read`/`Grep`/`Glob`
+- files touched, reconciled against `git diff` for the same `gitBranch`
+- orphan invocations (denied, interrupted, in-flight) — reported, never hidden
+
+The reconciliation against `git diff` is what makes this more than a log: it
+catches an agent that says it edited a file when nothing changed on disk.
+
+### 4.2 Spend — what did it cost, and was it authorised?
+
+`message.usage` is recorded per turn. Summed over the session that produced this
+document: **2,111,919 output tokens**, 569,596,196 cache-read, 34,862,730
+cache-write, across 2,175 assistant turns on `claude-opus-5`.
+
+v1 reports cost per session, per model, and per tool. It does **not** enforce a
+budget.
+
+The authorisation half already exists elsewhere: the **x402 authority gate**
+(shadow-wired in repid-engine #424) and the `spending_limit_daily` /
+`spending_limit_per_tx` columns on `agent_kya_registry`. v1 records observed
+spend against those declared limits and flags divergence. That divergence data
+is precisely what would justify turning enforcement on later — which is the
+argument for shadow mode in one sentence.
+
+### 4.3 Hallucination — is the claim backed by evidence?
+
+The hard pillar, and the one that needs tiering rather than a single mechanism.
+
+A measurement that shaped this section: in the session above, `send_later` was
+**invoked 16 times** and **named in prose 12 times**. The A6 failure recorded in
+`LESSONS.md` — a claimed `send_later` failure and cron fallback that never
+happened — would **not** be caught by checking whether the tool was used. It was
+a fabricated *outcome* of a tool that genuinely ran. Name-presence detection
+would have passed it.
+
+So, three tiers, in increasing cost and decreasing certainty:
+
+| Tier | Detects | Method | Cost | Verdict strength |
+| :-- | :-- | :-- | :-- | :-- |
+| **T0** | Claims naming a tool, file, command, PR or URL with **no corresponding `tool_use` anywhere** in the session | String/AST extraction, set difference | ~free | Decidable |
+| **T1** | Claims of a **state** (test passed, file exists, deploy green, row count) whose linked `tool_result` is **absent or contradicts** | Claim→evidence linking by proximity + `toolUseID` | cheap | Decidable, with a false-positive rate to be measured |
+| **T2** | Claims whose supporting `tool_result` **exists but does not actually support the assertion** — the A6 class | Second model compares claim against cited evidence | one inference per claim | Probabilistic — needs a panel |
+
+**T2 is where the existing consensus machinery earns its place.**
+`lib/trust/cross-llm-verifier.ts` is already lazy and guarded, and the BFT/SBFA
+engine with the Pythagorean Comma veto already exists. A T2 verdict should be a
+panel of independent judges given *distinct lenses* (does the evidence exist; does
+it say what is claimed; would it reproduce), not N identical refuters — diversity
+catches failure modes redundancy cannot.
+
+**v1 ships T0 and T1 only.** T2 is specified here so the receipt schema has room
+for it, and gated behind a flag until its false-positive rate is measured on
+real sessions. Shipping a hallucination detector that cries wolf would destroy
+the marker's credibility faster than shipping nothing.
+
+**Calibration set.** `LESSONS.md` already contains dated, reproducible agent
+failures with ground truth. That is the initial eval set — including the four in
+§1. A detector that cannot catch A6 is not finished.
+
+## 5. The session receipt
+
+A new table. **`kya_compliance_receipts` is not it** — that table is
+payment-specific (`payment_amount_usdc`, `recipient_address`, `solana_tx_hash`,
+`fireblocks_preauth_id`) and should not be overloaded. What v1 copies is its
+*discipline*: a content hash, a rule hash, an explicit pass/fail per check, and a
+proof CID.
+
+```
+trustshell_session_receipts
+  receipt_id            text primary key   -- ts_<base32(audit_hash)[:16]>
+  session_id            text
+  cwd, git_branch,
+  git_head_sha          text               -- what the claims were about
+  started_at, ended_at  timestamptz
+  model                 text
+  ruleset_version       text               -- which checks ran
+  rule_hash             text               -- hash of the ruleset, as KYA does
+
+  -- actions
+  tool_calls            int
+  tool_results          int
+  orphan_calls          int
+  write_ops             int
+  files_touched         text[]
+  git_diff_reconciled   boolean
+
+  -- spend
+  input_tokens, output_tokens,
+  cache_read_tokens, cache_write_tokens  bigint
+  declared_limit_daily  numeric           -- from agent_kya_registry, if bound
+  limit_divergence      boolean
+
+  -- claims
+  claims_total          int
+  claims_verified       int
+  claims_unchecked      int               -- MUST be reported, see §6
+  claims_failed         int
+  findings              jsonb             -- [{tier, claim_span, evidence_ref, verdict}]
+
+  -- integrity
+  transcript_sha256     text              -- the input, pinned
+  audit_hash            text              -- hash of this receipt's canonical form
+  signature             text              -- ed25519 over audit_hash
+  zkp_proof_cid         text              -- nullable, T2/attestation path
+```
+
+`transcript_sha256` is what makes the receipt checkable: a verifier re-reads the
+same transcript, recomputes, and compares. `audit_hash` covers every field above
+it in canonical JSON form.
+
+## 6. The marker — three states, never two
+
+Every harnessed session renders one line, in the CLI and in any surface that
+consumes the receipt:
+
+```
+✓ VERIFIED    47 claims · 47 backed · 1,089 actions · 2.1M out    ts_9f3a2c8e1b7d4a06
+⚠ NOT CHECKED 47 claims · 31 backed · 16 unchecked                ts_…
+✗ FAILED       47 claims · 44 backed ·  3 contradicted            ts_…
+```
+
+**`NOT CHECKED` is the state that makes the other two mean anything.** A marker
+that only ever shows green is a trust badge, and trust badges are worthless. The
+SSL padlock's power was never the icon — it was that anyone could independently
+verify the certificate. `SystemTrustScore.tsx` already calls the padlock "the
+most important visual"; this is the same instinct, one layer deeper.
+
+Concretely: if T2 is disabled, every T2-class claim counts as **unchecked**, not
+verified. The receipt must never round silence up to success. That is the exact
+bug in §1.
+
+## 7. Shadow mode semantics
+
+Precise, so "observe" cannot drift:
+
+1. TrustShell **never** intercepts a tool call, mutates a request, or returns an
+   error that changes agent behaviour.
+2. It runs **after** the fact — on `Stop`, or on demand against a saved
+   transcript. Read-only on the transcript; it never writes to `~/.claude`.
+3. A TrustShell crash must not fail the session. Wrap the hook so a non-zero
+   exit is logged and swallowed.
+4. Enforcement is a **separate, later, opt-in** product decision, justified by
+   divergence data this mode collects. It is not a config flag hidden in v1.
+
+## 8. Independent verification
+
+The receipt is worthless if only TrustShell can check it. Two already-built
+pieces close this:
+
+- **`@hyperdag/proof-verifier@0.2.0`** (published) — verifies a receipt offline
+  from `transcript_sha256` + `audit_hash` + `signature`, with no network and no
+  TrustShell install.
+- **`@hyperdag/trust-demo@0.1.0`** (packed, verified locally, unpublished) —
+  already verifies a proof and rejects three tampers. This is the padlock's
+  substance: a stranger can check the claim without trusting the issuer.
+
+Publishing `trust-demo` requires an irreversible git tag and is a human
+decision. It is not on the v1 critical path, but it is the best demo asset here.
+
+## 9. Package layout
+
+| Package | State | v1 role |
+| :-- | :-- | :-- |
+| `@hyperdag/trustshell` | published 1.3.0 | core: parse, check, hash, sign |
+| `@hyperdag/trustshell-mcp` | published 1.0.0 | MCP surface — the vehicle already exists |
+| `@hyperdag/proof-verifier` | published 0.2.0 | offline receipt verification |
+| `@hyperdag/trust-demo` | packed, unpublished | tamper-rejection demo |
+| `trustshell init` | **new** | detect installed MCP clients, write config + `Stop` hook |
+
+**MCP tools exposed** (query surface, not the observer):
+`trustshell_verify_session`, `trustshell_get_receipt`, `trustshell_list_findings`,
+`trustshell_spend_summary`.
+
+**CLI:** `trustshell init`, `trustshell verify [session]`, `trustshell receipt <id>`,
+`trustshell watch`.
+
+`trustshell init` is the onboarding described in the original sketch — scan the
+environment, find which MCP clients are installed, write the config. It is
+mechanical, not clever, and it is the whole first-run experience.
+
+## 10. Milestones
+
+| # | Deliverable | Done when |
+| :-- | :-- | :-- |
+| M1 | Transcript parser | Reproduces the §3 table on any saved session; 0 phantom results |
+| M2 | Actions + spend receipt | Receipt emitted, `audit_hash` stable across re-runs of the same transcript |
+| M3 | `proof-verifier` accepts it | Third party verifies offline; tampering with any field fails |
+| M4 | T0 + T1 claim checking | Catches ≥1 real `LESSONS.md` entry; false-positive rate measured and published |
+| M5 | `trustshell init` + MCP tools | `npx trustshell init` → working in Claude Code, receipt visible in-session |
+| M6 | Dogfood | Run against 10 real sessions from this repo; publish what it found **and what it missed** |
+
+M6 is the deliverable that matters. "We ran it on our own agent and here is what
+it caught" is a stronger demo than any dashboard.
+
+## 11. What would make this fail
+
+Stated up front so they can be watched:
+
+- **Transcript format churn.** Claude Code's JSONL is not a public API. Mitigation:
+  pin a parser version, keep `transcript_sha256` so old receipts stay verifiable,
+  fail loudly on unknown record types rather than skipping them.
+- **T1 false positives.** Prose is not a claim language. If "the build is green"
+  cannot be reliably linked to its evidence, T1 degrades to noise. Mitigation:
+  measure before shipping; ship `NOT CHECKED` rather than a guess.
+- **Nobody wants receipts.** The honest risk. The buyer for "prove your agent did
+  what it said" may be compliance, not developers — and compliance does not
+  install MCP servers. M6 is partly a market test, not just an engineering one.
+- **The harness confabulates.** A verifier that reports a clean session it never
+  checked reproduces §1 inside the product. Mitigation: `claims_unchecked` is a
+  first-class field, and any internal error marks the receipt `NOT CHECKED`,
+  never `VERIFIED`.
+
+## 12. Open questions
+
+1. **Receipt storage** — Supabase table (queryable, needs RLS designed correctly
+   this time), local SQLite (private, no sharing), or both?
+2. **Signing key custody** — per-developer local key, or an org key? Local means
+   receipts are self-attested; org means a service must hold a key.
+3. **Does the marker belong in-session?** MCP tool output is visible to the
+   agent, which can then talk about its own score. Cleanest v1 is CLI/file
+   output only, out of the model's context. Recommend that.
+4. **RepID linkage** — bind a session receipt to an `agent_kya_registry` row, or
+   keep developer sessions entirely separate from the agent registry? These are
+   different trust domains and conflating them early would be hard to undo.
