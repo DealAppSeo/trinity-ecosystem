@@ -113,10 +113,18 @@ LIVE / NOT CHECKED / FAILED — on every panel that renders a number.
 
 These do not move without Sean, and everything downstream waits on them.
 
+0. **🔴 DISABLE LEGACY SUPABASE API KEYS. Today.** The production
+   `service_role` JWT was public on GitHub for 3.5 months
+   (`DealAppSeo/repid-engine`, `service_role.txt`, 2026-04-20 → 2026-08-03) and
+   is **still readable in that repo's public history**. Verified byte-identical
+   to the copy in this repo. Assume compromised. Supabase → Settings → API
+   Keys → disable legacy keys, then never re-enable them. Details and the
+   follow-on migration in `docs/KEY-ROTATION.md`.
 1. **Fleet HOLD gated on an impossible action.** `global_pause=true` since
    2026-07-22, gated on "rotate the `service_role` JWT" — Supabase has removed
    that capability. Restate the gate (disable legacy keys → verify → migrate to
-   signing keys → revoke), then clear the pause.
+   signing keys → revoke), then clear the pause. **Item 0 is the first half of
+   this gate**, so doing it unblocks the fleet too.
 2. **Network egress allowlist**: `trustshell.dev`, `trustrepid.dev`,
    `hyperdag.org`, `repid.dev`, `docs.lovable.dev`. Blocks any audit of the
    *shipped* surfaces — this file audits the docs and the database only.

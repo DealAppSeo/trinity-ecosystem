@@ -32,11 +32,61 @@ Three things bound the severity:
   payments.
 - Nothing usable remains in the working tree. `scan-secrets.mjs` exits 0.
 
-**Unverified:** whether the legacy `service_role` JWT is still accepted by the
-API. Secret keys are not readable through any Supabase API, and the PostgREST
-host is proxy-denied from cloud sessions. Treat it as live until measured. Do
-not let any doc claim otherwise without a measurement behind it — that claim was
-made once already and was wrong.
+## ⚠ VERIFIED 2026-08-12 — the same key was PUBLIC for 3.5 months
+
+This supersedes every severity assessment above and below it.
+
+The `service_role` JWT is **not** confined to this private repo. The identical
+token — byte-for-byte, SHA-256 `f179551d…`, 219 chars, `ref`
+`qnnpjhlxljtqyigedwkb`, `exp` 2035-07-08 — was committed as `service_role.txt`
+to **`DealAppSeo/repid-engine`, a PUBLIC repository**:
+
+| | |
+| :-- | :-- |
+| Added | `fff5500`, 2026-04-20 |
+| Removed from HEAD | `973fc09`, 2026-08-03 |
+| **Publicly readable for** | **~3.5 months** |
+| Still in public history | **Yes** — `fff5500` is reachable from `origin/main` |
+
+Removing it from HEAD did nothing to contain it. Anyone can still run
+`git clone https://github.com/DealAppSeo/repid-engine && git show
+fff5500:service_role.txt` and read a credential that bypasses RLS on the
+production database until 2035.
+
+**Assume this key is compromised.** After 3.5 months of public exposure on a
+repo with an Apache-2.0 licence and inbound traffic, "probably nobody looked"
+is not a security posture. The earlier framing in this repo — *"private with
+zero forks, which is what makes this urgent-but-not-emergency"* — was written
+before this was measured and is **wrong for this key**.
+
+The removal commit message is worth reading in full: *"a LIVE prod service_role
+key was tracked in this repo — and every gitleaks check was green."* A scanner
+ran, passed, and the key sat there anyway.
+
+**Immediate action, in order:**
+
+1. **Disable legacy API keys** in the Supabase dashboard (Settings → API Keys).
+   This is the only lever that takes effect immediately, and rotation is not
+   available — see below. It is also *reversible*, which now cuts the other
+   way: re-enabling legacy keys re-arms a credential that is publicly known.
+   Never re-enable this project's legacy keys.
+2. **Verify** with `npm run check:legacy-key` from a laptop. Expect `INERT`.
+3. **Migrate to asymmetric JWT signing keys, then revoke the old key.** This is
+   the only step that actually retires the token rather than disarming it.
+4. **Treat anything reachable with `service_role` as potentially read.** That is
+   every table, ignoring RLS.
+
+Purging git history is *secondary* here. It would stop future discovery, but
+the window has already been open for months, so it does not restore
+confidentiality — disabling the key does.
+
+---
+
+**Previously unverified, now settled:** whether the legacy `service_role` JWT is
+still accepted by the API is still a separate question from whether it leaked —
+run `npm run check:legacy-key` from a laptop. Do not let any doc claim a status
+without a measurement behind it; that has now gone wrong twice, in both
+directions.
 
 Measure it in five seconds, from a laptop (not a cloud session):
 
