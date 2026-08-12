@@ -55,3 +55,16 @@ coverage/
 # Stale audit dump: contained a complete devnet Solana secret key and local
 # filesystem paths. Regenerate locally if needed; never commit it.
 audit_output.txt
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Graphify knowledge-graph output. Deliberately NOT committed.
+#
+# graph.json is a derived index of the code. Committing it repeats the exact
+# mistake the top of this file documents: a checked-in build artefact goes
+# stale against the source it describes, and here the failure is quieter than
+# the .next/ one — an agent queries the graph, gets a confident answer about
+# code that no longer exists, and never sees an error. Rebuild instead:
+# `npm run graph` takes seconds and needs no LLM.
+# ─────────────────────────────────────────────────────────────────────────────
+graphify-out/
+headroom.db

@@ -10,7 +10,10 @@
     "check:auth": "node scripts/check-auth-policy.mjs",
     "check:secrets": "node scripts/scan-secrets.mjs",
     "check:legacy-key": "node scripts/check-legacy-key.mjs",
-    "check": "npm run check:secrets && npm run check:auth && npx tsc --noEmit"
+    "check": "npm run check:secrets && npm run check:auth && npx tsc --noEmit",
+    "graph": "graphify update .",
+    "mem:audit": "headroom audit-reads --path ~/.claude/projects",
+    "setup:context": "bash scripts/setup-context-tools.sh"
   },
   "dependencies": {
     "@solana/spl-token": "latest",
