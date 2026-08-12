@@ -113,13 +113,23 @@ LIVE / NOT CHECKED / FAILED — on every panel that renders a number.
 
 These do not move without Sean, and everything downstream waits on them.
 
-0. **🔴 DISABLE LEGACY SUPABASE API KEYS. Today.** The production
-   `service_role` JWT was public on GitHub for 3.5 months
-   (`DealAppSeo/repid-engine`, `service_role.txt`, 2026-04-20 → 2026-08-03) and
-   is **still readable in that repo's public history**. Verified byte-identical
-   to the copy in this repo. Assume compromised. Supabase → Settings → API
-   Keys → disable legacy keys, then never re-enable them. Details and the
-   follow-on migration in `docs/KEY-ROTATION.md`.
+0. **🔴 CONTAIN THE PUBLIC `service_role` KEY.** The production `service_role`
+   JWT was public on GitHub for 3.5 months (`DealAppSeo/repid-engine`,
+   `service_role.txt`, 2026-04-20 → 2026-08-03) and is **still readable in that
+   repo's public history**. Verified byte-identical to the copy in this repo.
+   Assume compromised.
+
+   **Do not simply disable legacy keys** — `repid-engine`'s own 2026-08-09
+   consumer inventory says **NO-GO**: ~60 edge functions and all 12
+   constitutional agents break. Sequence it:
+   **(a)** Supabase → Network Restrictions, limit API access to your Railway /
+   Vercel egress ranges — `service_role` bypasses RLS, so this is the only
+   control that blunts a stranger holding the key; **(b)** check API logs back
+   to 2026-04-20 for use from outside those ranges; **(c)** work the Go
+   criteria (new value under legacy names, per-function overrides, delete the
+   hardcoded anon JWT at `trinity-symphony-shared/lib/supabase.ts:12`);
+   **(d)** then disable, verify `INERT`, migrate to signing keys, revoke.
+   Full sequence in `docs/KEY-ROTATION.md`.
 1. **Fleet HOLD gated on an impossible action.** `global_pause=true` since
    2026-07-22, gated on "rotate the `service_role` JWT" — Supabase has removed
    that capability. Restate the gate (disable legacy keys → verify → migrate to

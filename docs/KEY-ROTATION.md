@@ -63,22 +63,58 @@ The removal commit message is worth reading in full: *"a LIVE prod service_role
 key was tracked in this repo — and every gitleaks check was green."* A scanner
 ran, passed, and the key sat there anyway.
 
-**Immediate action, in order:**
+### ⚠ Do NOT just disable legacy keys. It is currently a NO-GO.
 
-1. **Disable legacy API keys** in the Supabase dashboard (Settings → API Keys).
-   This is the only lever that takes effect immediately, and rotation is not
-   available — see below. It is also *reversible*, which now cuts the other
-   way: re-enabling legacy keys re-arms a credential that is publicly known.
-   Never re-enable this project's legacy keys.
-2. **Verify** with `npm run check:legacy-key` from a laptop. Expect `INERT`.
-3. **Migrate to asymmetric JWT signing keys, then revoke the old key.** This is
-   the only step that actually retires the token rather than disarming it.
-4. **Treat anything reachable with `service_role` as potentially read.** That is
-   every table, ignoring RLS.
+An earlier revision of this section said "disable legacy API keys today." That
+advice was wrong and would have caused an outage. `repid-engine`'s own
+`reports/2026-08-09/SUPABASE_KEY_CONSUMER_INVENTORY.md` is a Go/No-Go for
+exactly this action and its verdict is **NO-GO**:
 
-Purging git history is *secondary* here. It would stop future discovery, but
-the window has already been open for months, so it does not restore
-confidentiality — disabling the key does.
+- **~60 live edge functions** on this project read Supabase's **auto-injected**
+  legacy `service_role` / `anon` JWTs. They break the instant legacy keys are
+  off, unless each gets a same-named secret override.
+- **`trinity-symphony-shared` — the 12 constitutional agents** — contains **no
+  new-format key name anywhere**, and `lib/supabase.ts:12` carries a
+  **hardcoded legacy anon JWT fallback**, so clearing the env does not even
+  stop it using a legacy key. Highest-risk DB writers in the system.
+- **`repid-engine`** is the safe tier (new-key-first chain) **only if**
+  `SUPABASE_SECRET_KEY` is actually populated on its Railway service.
+
+So there is a real tension: the credential is publicly compromised, and the
+clean fix takes hours of env work. Sequence it rather than picking one horn.
+
+**Now — interim containment, while the key is still accepted:**
+
+1. **Supabase → Settings → Database → Network Restrictions.** Restrict Postgres
+   and API access to your Railway / Vercel egress ranges. `service_role`
+   bypasses RLS, so RLS is *not* a compensating control here — network
+   restriction is the only thing that blunts a stranger holding the key while
+   your own infra keeps working.
+2. **Look for evidence of use.** Supabase → Logs → API/Postgres, filtered to
+   requests outside your own egress ranges, back to 2026-04-20.
+
+**Then — the Go criteria, from that inventory:**
+
+3. Populate the `sb_secret_…` **value** into `SUPABASE_SECRET_KEY` on
+   `repid-engine`, and into the **legacy-named** vars on every
+   `trinity-symphony-shared` agent service. Name legacy, value new — that
+   works without code changes.
+4. Set per-function secret overrides for every live edge function reading an
+   auto-injected key. Enumerate them first; the true count is unknown.
+5. **Delete the hardcoded legacy anon JWT** at `trinity-symphony-shared/lib/supabase.ts:12`.
+
+**Then — and only then:**
+
+6. Disable legacy API keys. Verify with `npm run check:legacy-key` (expect
+   `INERT`). Disabling is *reversible*, which now cuts the other way: never
+   re-enable this project's legacy keys, because the credential is public.
+7. Migrate to asymmetric JWT signing keys and **revoke** the old key. Only this
+   retires the token rather than disarming it.
+8. **Treat anything reachable with `service_role` as potentially read** — every
+   table, ignoring RLS.
+
+Purging git history is *secondary*. It stops future discovery but cannot
+restore confidentiality after a months-long public window.
 
 ---
 
