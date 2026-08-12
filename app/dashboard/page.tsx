@@ -7,6 +7,7 @@ import { AgentRepIDGrid }   from '@/components/trustrails/AgentRepIDGrid';
 import { LiveReceiptFeed }  from '@/components/trustrails/LiveReceiptFeed';
 import { RiskSlider }       from '@/components/trustrails/RiskSlider';
 import { InstitutionalControls } from '@/components/trustrails/InstitutionalControls';
+import { OperationsPanel } from '@/components/trustrails/OperationsPanel';
 
 export default function Dashboard() {
   return (
@@ -48,6 +49,10 @@ export default function Dashboard() {
       {/* System Trust Score — THE SSL PADLOCK */}
       <SystemTrustScore />
 
+
+      {/* Operational history — 171k+ recorded events that the dashboard
+          previously ignored while showing two 12-row tables. */}
+      <OperationsPanel />
 
       {/* Complete Enterprise Control Matrix */}
       <div style={{ marginBottom: 32 }}>
