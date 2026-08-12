@@ -11,6 +11,7 @@
     "check:secrets": "node scripts/scan-secrets.mjs",
     "check:legacy-key": "node scripts/check-legacy-key.mjs",
     "check": "npm run check:secrets && npm run check:auth && npx tsc --noEmit",
+    "north": "node scripts/north-star.mjs",
     "graph": "graphify update .",
     "mem:audit": "headroom audit-reads --path ~/.claude/projects",
     "setup:context": "bash scripts/setup-context-tools.sh"
