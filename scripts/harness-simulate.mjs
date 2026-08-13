@@ -274,7 +274,7 @@ function runHarness(seed) {
   // little evidence stands behind it. Added after the first simulation run
   // scored Kendall tau 0.429 because a lucky 15-observation streak outranked a
   // 757-observation track record.
-  const ledger = new ReputationLedger({ prior: 5000, alpha: 0.06, confidenceK: 50, coldStartConfidence: 0.5 });
+  const ledger = new ReputationLedger({ prior: 5000, alpha: 0.06, confidenceK: 20, coldStartConfidence: 0.5 });
   const updateEarned = (id, good) => ledger.record(id, good);
 
   const profiles = () =>

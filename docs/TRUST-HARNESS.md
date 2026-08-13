@@ -44,20 +44,31 @@ frameworks actually do: greedy top-1 on a self-declared score.
 
 Seed 20260813:
 
+**Measured at `confidenceK` 20, the default since 2026-08-13.** The previous
+figures in this table were taken at 50; see the tuning note below.
+
 | metric | baseline | harness | delta |
 |---|---|---|---|
-| correctness rate | 41.9% | **89.0%** | +112.7% |
+| correctness rate | 41.9% | **92.3%** | +120.4% |
 | completion rate | 92.8% | 100.0% | +7.7% |
 | unrecovered failures | 143 | **0** | −100% |
-| calls per task | 1.26 | 1.03 | −18.0% |
-| load Gini (0 = even) | 0.824 | 0.696 | −15.4% |
-| max single-expert share | 79.4% | 66.0% | −16.9% |
-| p50 latency | 115 ms | 127 ms | +10.4% |
-| p95 latency | 10000 ms | 180 ms | −98.2% |
-| p99 latency | 10000 ms | 794 ms | −92.1% |
+| calls per task | 1.26 | 1.02 | −19.0% |
+| load Gini (0 = even) | 0.824 | 0.663 | −19.4% |
+| max single-expert share | 79.4% | 47.5% | −40.3% |
+| calls to the degraded expert | 0 | **0** | — |
+| calls to the crashed expert | 0 | **0** | — |
+| p50 latency | 115 ms | 115 ms | 0.0% |
+| p95 latency | 10000 ms | 161 ms | −98.4% |
+| p99 latency | 10000 ms | 179 ms | −98.2% |
 
-Across five seeds the harness scores 86.8–90.1% against a baseline of
-40.9–42.6%. The effect is not seed luck.
+Across the five published seeds the harness scores 91.0–92.9% against a baseline
+of 40.9–42.6%. The effect is not seed luck.
+
+**What changed when `confidenceK` went 50 → 20**, and it is more than the
+headline: correctness 89.0% → 92.3%, p99 **794 → 179 ms**, p50 127 → 115 ms,
+max single-expert share 66.0% → 47.5%, and calls to the silently-degraded expert
+**50 → 0**. Faster reaction to evidence means the harness stops feeding
+`decayer` before its 6× latency lands in the tail.
 
 **Read the delta column with care — two of these moved for reasons that are
 not the harness getting better.**
@@ -66,37 +77,44 @@ not the harness getting better.**
 was added on 2026-08-13 to exercise the timeout module, which took the world
 from 7 experts to 8. The harness went 88.8% → 89.0%, i.e. flat. The baseline
 went 48.3% → 41.9%, because a hanging expert that claims 9000 consumes its
-retry slot. The headline delta grew from +83.7% to +112.7% **entirely because
-the world got harder for the baseline specifically.** Comparing today's
-+112.7% against yesterday's +83.7% as though the harness improved would be
-measuring the workload, not the mechanism.
+retry slot. The delta grew from +83.7% to +112.7% **entirely because the world
+got harder for the baseline specifically**, and reading that as the harness
+improving would have been measuring the workload, not the mechanism. (It reads
++120.4% today, but for a different and legitimate reason — the `confidenceK`
+change below, which moved the harness arm rather than the baseline.)
 
-*The p95/p99 flip is an artefact of a chosen constant, not a speed-up.* The
-harness did not get faster — its p99 went 770 → 794 ms. The baseline's tail
-collapsed onto `RUN_TIMEOUT_MS` because hangs are 5.2% of its calls, so
-anything above the 95th percentile *is* a hang, and a hang costs exactly the
-run deadline we credit it with. Set that constant to 2000 and the baseline p99
-reads 2000. **A metric whose value equals one of your own configuration
-constants is not a measurement of anything.** The earlier p99 regression
-(+446%) remains the honest characterisation of the routing cost, and it is
-still visible here in p50.
+*The baseline's p95/p99 of 10000 ms is a chosen constant, not a measurement.*
+Its tail collapses onto `RUN_TIMEOUT_MS` because hangs are 5.2% of its calls, so
+anything above the 95th percentile *is* a hang and costs exactly the run
+deadline we credit it with. Set that constant to 2000 and the baseline p99 reads
+2000. **A metric whose value equals one of your own configuration constants is
+not a measurement of anything.** Compare against the 7-expert baseline's real
+141 ms instead.
 
-The real cost of correctness is still tail latency: exploring unknown experts
-and absorbing one degraded expert's 6× latency before the governor reacts. If
-p99 matters more than correctness for a given workload, lower
-`explorationRate` and tighten `degradedRatio` — but know which one you are
-trading.
+**The tail-latency cost was mostly a tuning artefact, not an inherent price.**
+This document argued for two revisions that correctness is bought with tail
+latency, quoting a +446% p99 regression (141 → 770 ms). Against that same 141 ms
+reference the harness now sits at **179 ms, +27%** — the residual cost of
+exploring unknowns, and roughly a sixth of what was claimed. The rest was
+`confidenceK` 50 reacting too slowly to `decayer`, so 50 calls landed on a
+6×-latency expert. At 20 that number is 0. The regression was real when
+measured; it was not intrinsic, and the earlier framing of it as the honest
+standing cost of correctness was too pessimistic.
 
 The two headline numbers:
 
-- **`boaster`: claims 10000, earned 4530, true quality 0.35.** The baseline
-  gave it 2000 of 2000 tasks. The harness gave it 49.
-- **`rookie`: claims 0, earned 6817, true quality 0.95.** The baseline never
-  called it once. The harness found it.
+- **`boaster`: claims 10000, earned 4287, true quality 0.35.** The baseline
+  gave it 2000 of 2000 tasks. The harness gave it 25.
+- **`rookie`: claims 0, earned 8516, true quality 0.95.** The baseline never
+  called it once. The harness gives it **737 of 2000** calls — second only to
+  `alpha`, and at `confidenceK` 50 it took 43.
 
-Kendall tau between learned rank and effective quality: **0.643** (0.619 in the
-7-expert world; the two are not directly comparable, since the ranking problem
-itself changed).
+Kendall tau between learned rank and effective quality: **0.643** — *unchanged*
+on this seed by the `confidenceK` move, despite correctness rising 3.3 points.
+The tau gain reported by the sweep (0.693 → 0.800) was a ten-seed mean in the
+counterfactual world; a single seed shows none of it. Correctness and ranking
+quality are not the same measurement and do not move together, which is the
+whole reason both are tracked.
 
 ### The timeout module, measured against itself
 
@@ -111,29 +129,33 @@ npm run sim:harness -- --no-timeout
 
 | seed | correctness off → on | hangs off → on | stall seconds off → on |
 |---|---|---|---|
-| 20260813 | 88.8% → 89.0% | 5 → 3 | 50.0 → 4.5 |
-| 1 | 88.7% → 89.3% | 10 → 6 | 100.0 → 9.0 |
-| 2 | 86.6% → 86.8% | 4 → 3 | 40.0 → 4.5 |
-| 3 | 86.8% → 86.8% | 2 → 2 | 20.0 → 3.0 |
-| 4 | 88.9% → 90.1% | 3 → 4 | 30.0 → 6.0 |
+| 20260813 | 91.8% → 92.3% | 4 → 1 | 40.0 → 1.5 |
+| 1 | 91.5% → 91.6% | 11 → 3 | 110.0 → 4.5 |
+| 2 | 91.6% → 91.0% | 2 → 1 | 20.0 → 1.5 |
+| 3 | 92.5% → 92.9% | 8 → 1 | 80.0 → 1.5 |
+| 4 | 92.0% → 92.0% | 0 → 0 | 0.0 → 0.0 |
 
-**Aggregate correctness moves +0.0 to +1.2 points, which is inside seed noise.**
+**Aggregate correctness moves −0.6 to +0.5 points, which is inside seed noise
+and includes one seed where it is nominally worse.**
 On this workload the module does not measurably improve the answer rate, and
 saying otherwise would be reporting a rounding error as a result. The reason is
 worth stating because it is a compliment to the rest of the harness: the router,
-the trust floor and the ledger already suppress `stalled` to about 0.2% of
+the trust floor and the ledger already suppress `stalled` to about 1.4% of
 traffic, so there is very little hang left for a timeout to catch.
 
 What the ablation *does* establish:
 
-- **Stall time falls 80–91%, every seed.** But the per-hang share of that is
-  exactly `1 − 1500/10000 = 85%` — the ratio of the two constants, true by
-  construction. Only the variation around 85% comes from hang counts.
-- **Nothing regresses.** Correctness, unrecovered failures and p99 are flat or
-  slightly better in all five seeds.
+- **Stall time falls 92–98% on every seed that had a hang at all**, and seed 4
+  now has none, so there is nothing to save there. The per-hang share of that
+  is exactly `1 − 1500/10000 = 85%` — the ratio of the two constants, true by
+  construction. Only the variation above 85% comes from hang counts.
+- **Nothing regresses beyond noise.** Seed 2 is nominally −0.6pp on correctness;
+  the seed spread is 2.3pp, so that is not a real regression, and it is recorded
+  rather than dropped because dropping the one unfavourable row is how a table
+  stops being evidence.
 - **No leaked attempts.** The simulation prints `timeouts.inFlight()` at the
-  end. With the policy on it is **0**; with `--no-timeout` it is **5** on seed
-  20260813 — exactly the five hangs, still held open at the end of the run.
+  end. With the policy on it is **0**; with `--no-timeout` it is **4** on seed
+  20260813 — exactly the four hangs, still held open at the end of the run.
   That is the clearest single demonstration of what the module does: without
   it those attempts are never resolved by anything, and each one is a slot and
   a reputation the rest of the harness will never get back.
@@ -155,16 +177,16 @@ Ten seeds, timeout off versus on:
 
 | metric | timeout OFF | timeout ON | delta |
 |---|---|---|---|
-| calls to veteran once bad | 446 | **6** | −98.7% |
-| hangs encountered | 220 | 3 | −98.5% |
-| wall clock lost to hangs | 2,195 s | 4.8 s | −99.8% |
-| p99 latency | 10,000 ms | 713 ms | −92.9% |
-| Kendall tau | 0.436 | **0.579** | +32.8% |
-| unrecovered failures | 2 | 0 | −94% |
-| correctness rate | 92.4% | 91.8% | **−0.61pp** |
+| calls to veteran once bad | 336 | **6** | −98.2% |
+| hangs encountered | 166 | 3 | −98.5% |
+| wall clock lost to hangs | 1,661 s | 3.8 s | −99.8% |
+| p99 latency | 10,000 ms | 434 ms | −95.7% |
+| Kendall tau | 0.629 | **0.657** | +4.5% |
+| unrecovered failures | 0 | 0 | — |
+| correctness rate | 94.0% | 93.5% | **−0.57pp** |
 
-**Correctness does not improve, and nominally falls.** The −0.61pp is inside the
-2.6pp seed spread, so it is not a real regression either — but the honest
+**Correctness does not improve, and nominally falls.** The −0.57pp is inside the
+2.3pp seed spread, so it is not a real regression either — but the honest
 statement is that **the timeout buys nothing in correctness here**. Without it a
 hang still costs the task nothing: the attempt is abandoned by the outer run
 deadline and the retry usually succeeds. Correctness is preserved at ruinous
@@ -173,9 +195,16 @@ cost, which is precisely why correctness is the wrong metric for this module.
 What it does buy is everything else, and the tau row is the one that matters
 most. **Without the timeout the reputation ledger is silently poisoned**: the
 veteran keeps a high earned score forever while delivering nothing, because a
-hang produces no outcome to learn from. Ranking quality collapses from 0.579 to
-0.436. A hang is not only wasted latency, it is a lie the ledger cannot detect —
+hang produces no outcome to learn from. Ranking quality falls from 0.657 to
+0.629. A hang is not only wasted latency, it is a lie the ledger cannot detect —
 and the ledger is the thing the whole harness rests on.
+
+**That tau gap narrowed sharply when `confidenceK` moved 50 → 20** — it was
+0.579 vs 0.436, and is now 0.657 vs 0.629. A ledger that reacts faster to the
+evidence it *does* get is less damaged by the evidence it never gets. The
+poisoning is real either way; a well-tuned ledger is simply less poisonable, and
+the earlier +32.8% figure overstated the module's contribution because it was
+measured against a badly-tuned control.
 
 **The scenario carries a validity guard, because the first two attempts at it
 silently failed.** It asserts the veteran took ≥200 calls and reached ≥0.80
@@ -365,13 +394,14 @@ only as good as that model.
   but it reshapes the task model and `router.ts` rather than adding to them —
   **judged architecturally significant on 2026-08-13 and left for Sean**, not
   skipped.
-- **Cold experts take almost no early traffic at default parameters.** Measured
-  while building the hang-under-trust scenario: across the first 60% of a run,
-  both `rookie` and a newly added expert took **0 calls**. Exploration is
-  nominally 12% but the entrenched incumbent absorbs it. The A/B sweep points
-  the same way — `confidenceK` 50→20 moves `rookie` from 105 calls to 752. This
-  is the cold-start problem still present in a milder form, and it is why no
-  newcomer can build trust inside a run.
+- **Cold experts and early traffic — largely fixed, not fully.** At
+  `confidenceK` 50 this was severe: across the first 60% of a run both `rookie`
+  and a newly added expert took **0 calls**, so no newcomer could build trust
+  inside a run at all. At 20, `rookie` takes 737 of 2000 calls and ends second
+  in the pool. What has NOT been re-measured is whether a newcomer added
+  mid-run can now earn trust — the hang-under-trust scenario still warm-starts
+  its veteran, and that warm start has not been retested against the new
+  default.
 - **Cancellation.** `TimeoutPolicy` reports expiry; it cannot cancel the
   underlying call, because it holds no handle on the transport. The caller must
   abandon the work itself, and nothing currently checks that it does.

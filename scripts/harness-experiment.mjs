@@ -158,7 +158,7 @@ const DEFAULTS = {
   ucbOptimism: 2500,
   prior: 5000,
   ledgerAlpha: 0.06,
-  confidenceK: 50,
+  confidenceK: 20,
   coldStartConfidence: 0.5,
 };
 
@@ -361,7 +361,10 @@ function runHarness(seed, over = {}) {
 // measuring something else, so refuse to report rather than report a number
 // that cannot be reproduced by the published simulator.
 
-const PUBLISHED = { seed: 20260813, correctnessRate: 0.89, p99: 794, tau: 0.643 };
+// Updated 2026-08-13 when confidenceK's default moved 50 -> 20. These are the
+// numbers harness-simulate.mjs now publishes; if this arm stops reproducing
+// them the sweep is measuring something the simulator does not.
+const PUBLISHED = { seed: 20260813, correctnessRate: 0.9225, p99: 179, tau: 0.643 };
 const guard = runHarness(PUBLISHED.seed);
 const guardOk =
   Math.abs(guard.correctnessRate - PUBLISHED.correctnessRate) < 0.0005 &&
@@ -370,9 +373,15 @@ const guardOk =
 
 console.log('\nValidity guard — does this arm reproduce harness-simulate.mjs at defaults?');
 console.log('-'.repeat(78));
+// Interpolate from PUBLISHED rather than repeating the numbers as literals.
+// They were literals until 2026-08-13, and the moment PUBLISHED was updated the
+// message read "correctness 92.3% (published 89.0%) ... => MATCH" — a guard
+// against drift that had itself drifted, and said MATCH while printing a
+// mismatch.
 console.log(
-  `  correctness ${(guard.correctnessRate * 100).toFixed(1)}% (published 89.0%), ` +
-    `p99 ${guard.p99} (794), tau ${guard.tau.toFixed(3)} (0.643) => ${guardOk ? 'MATCH' : 'DIVERGED'}`
+  `  correctness ${(guard.correctnessRate * 100).toFixed(1)}% (published ${(PUBLISHED.correctnessRate * 100).toFixed(1)}%), ` +
+    `p99 ${guard.p99} (${PUBLISHED.p99}), tau ${guard.tau.toFixed(3)} (${PUBLISHED.tau.toFixed(3)}) ` +
+    `=> ${guardOk ? 'MATCH' : 'DIVERGED'}`
 );
 if (!guardOk) {
   console.error('\nFAILED: the experiment arm has diverged from the simulator. Sweep aborted.');
@@ -414,7 +423,7 @@ const ARMS = [
   ['ucbOptimism 1000', { ucbOptimism: 1000 }],
   ['ucbOptimism 4000', { ucbOptimism: 4000 }],
   ['ucbOptimism 6000', { ucbOptimism: 6000 }],
-  ['confidenceK 20', { confidenceK: 20 }],
+  ['confidenceK 50 (old default)', { confidenceK: 50 }],
   ['confidenceK 100', { confidenceK: 100 }],
   ['ledgerAlpha 0.03', { ledgerAlpha: 0.03 }],
   ['ledgerAlpha 0.12', { ledgerAlpha: 0.12 }],

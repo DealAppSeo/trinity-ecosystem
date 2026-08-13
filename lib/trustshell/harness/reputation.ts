@@ -36,6 +36,32 @@ export interface ReputationConfig {
   /**
    * Observations at which evidence and prior carry equal weight.
    * Higher is more conservative — slower to trust, slower to condemn.
+   *
+   * DEFAULT 20, LOWERED FROM 50 ON 2026-08-13. Chosen by measurement rather
+   * than taste: `npm run experiment` swept it on train seeds, re-measured the
+   * winners on held-out seeds, and then re-ran them in a world with the
+   * deliberately-planted excellent expert removed. 20 was the only change that
+   * survived all three, and it moves three metrics the same way at once —
+   * correctness +1.86pp, Kendall tau 0.693 → 0.800, p99 811 → 202 ms.
+   *
+   * The mechanism is not "explore more". In the counterfactual world it gives
+   * the unknown expert FEWER calls than 50 did (21 vs 46); it reacts to
+   * evidence faster, which includes demoting a mediocre unknown sooner. Raising
+   * `explorationRate` looked like a comparable win across ten seeds and was an
+   * artefact of the planted gem — it is NOT in the defaults for that reason.
+   *
+   * THERE IS A FLOOR BELOW THIS AND IT IS NOT FAR. K is what weights evidence
+   * against the prior, so K → 0 approaches a raw EWMA, which is the original
+   * defect: 118 observations outranking 757. The sweep shows the turn already
+   * beginning — K=10 buys more correctness than K=20 (+2.33 vs +1.86pp) while
+   * ranking WORSE (tau 0.714 vs 0.800). Optimising the headline metric alone
+   * picks the wrong value. Do not lower this further without re-running the
+   * sweep and reading the tau column.
+   *
+   * NOT CHECKED: all of the above is simulator evidence. No live-LLM or
+   * `agent_repid` replay validates it, and the sweep says least about fleets
+   * where each expert sees far fewer than ~250 observations — precisely the
+   * regime where a low K is most dangerous.
    */
   confidenceK?: number;
   /**
@@ -59,7 +85,7 @@ export interface ReputationConfig {
 const DEFAULTS: Required<ReputationConfig> = {
   prior: 5000,
   alpha: 0.06,
-  confidenceK: 50,
+  confidenceK: 20,
   coldStartConfidence: 0.5,
 };
 

@@ -440,6 +440,81 @@ generous retry budget: with 3 attempts a hang is nearly free, so a fleet with no
 retries would likely show the timeout buying correctness too. Untested.
 
 
+### 11. APPLIED: `confidenceK` 50 → 20 (authorised by Sean)
+
+Recommended in entry 9 and left unapplied there because it changes a shipped
+default on simulator evidence alone. Authorised, so applied — and applying it
+meant re-measuring everything downstream, not flipping a constant.
+
+Changed in three places, because two of them would otherwise have silently
+disagreed with the shipped default: `reputation.ts` DEFAULTS, the explicit value
+`harness-simulate.mjs` passes, and the control in `harness-experiment.mjs` (a
+sweep whose control is not the shipped default measures deltas against a config
+nobody runs).
+
+**VERIFIED.** 186 assertions, 0 failures — nothing in the suites depended on the
+old value. tsc **25**, unchanged. `next build` clean. Portability 11 files.
+
+**MEASURED — seed 20260813, before → after:**
+
+| metric | cK 50 | cK 20 |
+|---|---|---|
+| correctness rate | 89.0% | **92.3%** |
+| p99 latency | 794 ms | **179 ms** |
+| p50 latency | 127 ms | 115 ms |
+| max single-expert share | 66.0% | 47.5% |
+| calls to the degraded expert | 50 | **0** |
+| calls to the crashed expert | 3 | **0** |
+| rookie calls | 43 | **737** |
+| Kendall tau | 0.643 | **0.643** |
+
+**The tau row is the honest one.** Correctness rose 3.3 points and ranking
+quality did not move at all on this seed. The +0.107 tau the sweep reported was
+a ten-seed mean in the counterfactual world; a single seed shows none of it.
+Reporting "correctness AND ranking improved" from the sweep alone would have
+been true on average and false here. Both are tracked precisely because they
+come apart.
+
+**A claim in this document was too pessimistic and is now corrected.** Two
+entries argued that correctness is bought with tail latency, quoting +446% p99
+(141 → 770 ms). Against the same 141 ms reference the harness now sits at 179 ms,
+**+27%** — about a sixth of the claimed cost. The rest was `confidenceK` 50
+reacting too slowly to `decayer`, so 50 calls per run landed on a 6×-latency
+expert; at 20 that is 0. The regression was real when measured. It was not
+intrinsic, and calling it the standing price of correctness overstated it.
+
+**A guard that had itself drifted.** `harness-experiment.mjs` opens by asserting
+it reproduces the simulator's published numbers. The assertion used the
+`PUBLISHED` constant but the printed message repeated those numbers as string
+literals, so the moment `PUBLISHED` was updated it printed
+`correctness 92.3% (published 89.0%) ... => MATCH` — a drift guard reporting a
+mismatch and the word MATCH in the same line. Now interpolated from `PUBLISHED`.
+**An anti-drift check is not exempt from drifting.**
+
+**Mirror-image confirmation.** With the control now at cK20, the sweep arm
+`confidenceK 50 (old default)` reads **−3.59pp** — the same magnitude the
+original sweep reported in the opposite direction, which is what internal
+consistency looks like. The `explorationRate` arms, meanwhile, have collapsed to
++0.28/+0.01pp ("FITTED TO TRAIN NOISE") and −0.38/−0.56pp in the no-gem world,
+independently reconfirming that the exploration result was an artefact of the
+planted gem. Good thing it was never applied.
+
+**Also updated:** the timeout ablation table and the hang-under-trust table were
+both re-run at the new default. The timeout's measured contribution SHRANK —
+hang-under-trust tau was 0.579 vs 0.436 and is now 0.657 vs 0.629. A ledger that
+reacts faster to the evidence it does get is less damaged by the evidence it
+never gets. **The earlier +32.8% overstated the module because it was measured
+against a badly-tuned control**, which is a general hazard: an ablation's result
+depends on how good the arm around it is.
+
+**NOT CHECKED.** Still simulator evidence only; no live-LLM or `agent_repid`
+replay. The sweep says least about fleets where each expert sees far fewer than
+~250 observations, which is exactly where a low K is most dangerous, and that
+regime is untested. Whether a newcomer added mid-run can now earn trust is also
+untested — the hang-under-trust scenario still warm-starts its veteran, and that
+warm start was not retested against the new default.
+
+
 ---
 
 ### Standing NOT CHECKED
