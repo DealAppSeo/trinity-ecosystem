@@ -42,6 +42,7 @@ const { CircuitBreakerRegistry } = await load('circuit-breaker');
 const { QuorumEvaluator } = await load('quorum');
 const { ReputationLedger } = await load('reputation');
 const { TimeoutPolicy } = await load('timeout');
+const { ContextTransformer, approximateTokens } = await load('transform');
 
 // The run/idle split. IDLE is short because it measures time since the last
 // observed progress; RUN has to be long enough for the slowest legitimate task,
@@ -491,6 +492,102 @@ console.log(`            ${RUN_TIMEOUT_MS}ms run deadline it is GENEROUSLY credi
 console.log(`  harness:  ${h.hangsHit} hang(s) — ${h.hangsByIdle} caught by the idle deadline, ${h.hangsByRun} by the run deadline.`);
 console.log(`            mean detection ${h.meanHangDetectMs.toFixed(0)}ms vs ${b.meanHangDetectMs.toFixed(0)}ms, a ${(b.meanHangDetectMs / Math.max(1, h.meanHangDetectMs)).toFixed(1)}x faster stall.`);
 console.log(`  attempts still in flight at end of run: ${timeouts.inFlight()} (a leak would show here)`);
+
+// ── context-bloat measurement ────────────────────────────────────────────────
+//
+// The routing arms above have no message dimension, so they cannot say anything
+// about `transform.ts`. This is a SEPARATE measurement on its own model: a
+// conversation that grows for TURNS turns, with a pinned system prompt and
+// tool-call pairs, measured with and without the transform. It does not touch
+// the routing simulation — those numbers are unchanged by construction.
+
+function runContextBloat(seed) {
+  const rng = new SeededRng(seed ^ 0xc0ffee);
+  const TURNS = 400;
+  const BUDGET = 4000;
+
+  const messages = [
+    { id: 'sys', role: 'system', content: 'S'.repeat(600 * 4), pinned: true },
+  ];
+  const transformer = new ContextTransformer(
+    new ManualClock(0),
+    { maxTokens: BUDGET, headKeep: 2, tailKeep: 6 },
+    approximateTokens
+  );
+
+  let peakUntransformed = 0;
+  let peakTransformed = 0;
+  let sumUntransformed = 0;
+  let sumTransformed = 0;
+  let ratioSum = 0;
+  let overBudget = 0;
+  let pairsSplit = 0;
+  let pinnedLost = 0;
+  let lastDropped = 0;
+  let lastKept = 0;
+  let totalMessages = 0;
+
+  for (let t = 0; t < TURNS; t += 1) {
+    const size = 40 + Math.floor(rng.next() * 160);
+    messages.push({ id: `u${t}`, role: 'user', content: 'u'.repeat(size * 4) });
+    // Every third turn is a tool call plus its result, sharing a pairId.
+    if (t % 3 === 0) {
+      messages.push({ id: `c${t}`, role: 'assistant', content: 'c'.repeat(30 * 4), pairId: `p${t}` });
+      messages.push({ id: `r${t}`, role: 'tool', content: 'r'.repeat(90 * 4), pairId: `p${t}` });
+    } else {
+      messages.push({ id: `a${t}`, role: 'assistant', content: 'a'.repeat(size * 4) });
+    }
+
+    const res = transformer.transform(messages);
+    sumUntransformed += res.originalTokens;
+    sumTransformed += res.retainedTokens;
+    ratioSum += res.compressionRatio;
+    peakUntransformed = Math.max(peakUntransformed, res.originalTokens);
+    peakTransformed = Math.max(peakTransformed, res.retainedTokens);
+    lastDropped = res.droppedIds.length;
+    lastKept = res.messages.length;
+    totalMessages = messages.length;
+    if (!res.withinBudget) overBudget += 1;
+
+    // Integrity invariants, checked on every single turn rather than asserted.
+    const kept = new Set(res.messages.map((m) => m.id));
+    if (!kept.has('sys')) pinnedLost += 1;
+    const byPair = new Map();
+    for (const m of messages) {
+      if (m.pairId === undefined) continue;
+      if (!byPair.has(m.pairId)) byPair.set(m.pairId, []);
+      byPair.get(m.pairId).push(kept.has(m.id));
+    }
+    for (const flags of byPair.values()) {
+      if (flags.some(Boolean) && !flags.every(Boolean)) pairsSplit += 1;
+    }
+  }
+
+  return {
+    turns: TURNS, budget: BUDGET,
+    peakUntransformed, peakTransformed,
+    meanUntransformed: sumUntransformed / TURNS,
+    meanTransformed: sumTransformed / TURNS,
+    meanRatio: ratioSum / TURNS,
+    lastDropped, lastKept, totalMessages, overBudget, pairsSplit, pinnedLost,
+  };
+}
+
+const ctx = runContextBloat(SEED);
+console.log(`\nContext-bloat control (separate model — does NOT touch the routing arms above)`);
+console.log('-'.repeat(76));
+console.log(`  ${ctx.turns} turns, ${ctx.budget}-token budget, pinned system prompt, tool pairs every 3rd turn`);
+console.log(row('peak context (tokens)', ctx.peakUntransformed, ctx.peakTransformed, (x) => String(Math.round(x)), true));
+console.log(row('mean context (tokens)', ctx.meanUntransformed, ctx.meanTransformed, (x) => String(Math.round(x)), true));
+console.log(`  mean compression ratio (retained/original): ${ctx.meanRatio.toFixed(3)}`);
+// Deliberately NOT a cumulative drop count. Each turn re-transforms the whole
+// conversation, so summing per-turn drops counts the same message hundreds of
+// times: it read 173800 for a run containing 1200 messages. A number that large
+// looks impressive and means nothing — the same wrong-metric shape this file
+// already carries two warnings about.
+console.log(`  final turn: ${ctx.lastKept} of ${ctx.totalMessages} messages retained (${ctx.lastDropped} dropped)`);
+console.log(`  INTEGRITY — pairs split: ${ctx.pairsSplit}  pinned lost: ${ctx.pinnedLost}  turns over budget: ${ctx.overBudget}`);
+console.log(`  (pairs split and pinned lost must both be 0; a non-zero value is a defect, not a tradeoff)`);
 
 console.log(`\nWhat the harness LEARNED (earned reputation, 0-10000)`);
 console.log('-'.repeat(76));

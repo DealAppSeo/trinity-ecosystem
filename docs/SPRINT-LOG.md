@@ -214,6 +214,81 @@ the module's upside is argued, not measured. Also: `TimeoutPolicy` reports
 expiry but cannot cancel the underlying call, and nothing verifies the caller
 abandons it. Logged as the top two items under "Not yet built".
 
+### 8. Sprint D — middle-out context compression (overnight routine, firing 2)
+
+Built `lib/trustshell/harness/transform.ts` plus
+`scripts/harness-transform-test.mjs`. **31 assertions, 0 failures; 186 across
+five suites. tsc 25, unchanged. next build clean. Portability 11 files.**
+
+**Backlog order deviated from, deliberately.** The authoritative list in
+`TRUST-HARNESS.md` had *sub-task routing granularity* as the top item. Routing
+per tool-call rather than per task reshapes the task model and `router.ts`,
+which trips the standing stop condition — architecturally significant, leave it
+for Sean. Took context-bloat control instead, which is additive and touches
+nothing existing. Following the stop protocol is not the same as skipping work.
+
+**What the module is actually for.** Dropping context is easy; dropping it
+*silently* is the silent-degradation failure in different clothes — answers get
+worse, the operator sees a smaller prompt and a green metric, and nothing says
+half the conversation was discarded. Every result carries what went in, what
+came out, which ids were dropped, and why.
+
+**MEASURED — context bloat, on its own model** (400 turns, 4000-token budget,
+pinned system prompt, tool pair every third turn; the routing arms are untouched
+and their numbers are byte-identical to 20d702f):
+
+| metric | untransformed | transformed | delta |
+|---|---|---|---|
+| peak context | 94,344 tokens | 4,000 tokens | −95.8% |
+| mean context | 48,705 tokens | 3,888 tokens | −92.0% |
+
+Mean compression ratio 0.159. Final turn retains 36 of 935 messages. Peak lands
+exactly on the budget, so the budget binds rather than aspires.
+
+**The integrity counters matter more than the compression.** Across all 400
+turns: **pairs split 0, pinned lost 0, turns over budget 0.** These are not
+tunable tradeoffs — a tool call separated from its result, or a discarded system
+prompt, makes the compression ratio look *better* while corrupting the
+conversation. Counted every turn, not asserted once.
+
+**A defect the tests found in the module, not the other way round.** The
+over-budget explanation named the floor as "pinned + head + tail" while omitting
+messages held by pair integrity — sending an operator to raise a limit that was
+never the binding constraint. Fixed so the basis names the full floor.
+
+**The wrong metric, third instance today — this time in my own reporting.** The
+first version of the measurement printed "messages dropped across the run:
+173800" for a conversation containing 935 messages, because each turn
+re-transforms everything and I summed per-turn drops. A large impressive number
+measuring nothing. Replaced with the final-turn retained/total.
+
+**MUTATION TESTED — and this is the part worth reading.** Six mutations. Five
+were caught immediately: droppable pinned content (3 failures), pair-integrity
+guard neutered (1), pairs ungrouped so a call splits from its result (2),
+summary tokens uncharged (1), ratio on message count (1), `withinBudget`
+hardcoded true (3), head protection removed (6).
+
+The sixth **exposed a genuine hole**. Pinned messages are guarded twice — kept
+out of the droppable set *and* put in the protected set — so removing the second
+guard alone passed all 30 assertions and looked like an equivalent mutant. It is
+not equivalent: the protected set also seeds pair protection, so a **pinned tool
+call would silently lose its result**. Added a 31st assertion; the mutation now
+fails. Writing more tests from the same mental model would never have found it —
+only deleting the code and watching what stayed green did.
+
+Two earlier mutation attempts were themselves invalid and had to be redone: one
+failed to compile (so its empty output briefly looked like a pass), and one
+removed only half the guard. **A mutation that does not compile is not evidence
+of anything**, and neither is one that leaves the mechanism intact.
+
+**NOT CHECKED.** No summariser is supplied — the module accepts one and charges
+its tokens, but the dropped middle is simply gone unless a caller provides one,
+and nothing measures whether a summary preserves what the dropped turns
+contained. That is the part needing an LLM and an eval. The 4-chars-per-token
+default estimator is crude by design; a caller with a real tokenizer should
+inject one. And the compression model is synthetic — message sizes come from a
+seeded RNG, not from real traffic.
+
 ---
 
 ### Standing NOT CHECKED

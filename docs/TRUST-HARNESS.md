@@ -33,6 +33,7 @@ weight, tier, payout.
 | `quorum.ts` | PBFT supermajority, rubric judging |
 | `replay.ts` | Self-healing state replay |
 | `timeout.ts` | Run/idle deadline split; catches an expert that hangs |
+| `transform.ts` | Middle-out context compression with a reported ratio |
 
 ## Measured results
 
@@ -145,6 +146,35 @@ manufactures the one signal they all need. Its value is bounded below by
 correctness (it does no harm) and is unbounded above in a world where a
 *trusted* expert starts hanging, which this simulation does not model.
 
+### Context-bloat control, measured on its own model
+
+The routing simulation has no message dimension, so it cannot say anything
+about `transform.ts`. This is a separate measurement in the same script: a
+conversation grown over 400 turns against a 4000-token budget, with a pinned
+system prompt and a tool-call pair every third turn.
+
+| metric | untransformed | transformed | delta |
+|---|---|---|---|
+| peak context | 94,344 tokens | 4,000 tokens | −95.8% |
+| mean context | 48,705 tokens | 3,888 tokens | −92.0% |
+
+Mean compression ratio (retained/original) **0.159**. On the final turn, 36 of
+935 messages are retained. Peak lands exactly on the budget, so the budget is
+the binding constraint rather than an aspiration.
+
+**The integrity counters matter more than the compression.** Across all 400
+turns: **pairs split 0, pinned messages lost 0, turns over budget 0.** Those are
+not tradeoffs that could be tuned — a tool call separated from its result, or a
+discarded system prompt, is a defect that would make the compression ratio look
+*better* while corrupting the conversation. They are counted every turn rather
+than asserted once.
+
+The reported drop count is deliberately **not** cumulative. Each turn
+re-transforms the whole conversation, so summing per-turn drops counted the same
+message hundreds of times and read 173,800 for a run containing 935 messages —
+a number that looks impressive and means nothing. Third instance today of the
+same wrong-metric shape, this time in the reporting rather than the code.
+
 ## Three build–measure–learn cycles, and what each taught
 
 The tau figure took three iterations. Each one is a defect the simulation found
@@ -245,6 +275,7 @@ npm run check:harness-portable     # dependency-free constraint
 npm run check:harness-routing      # 45 assertions
 npm run check:harness-consensus    # 46 assertions
 npm run check:harness-timeout      # 29 assertions
+npm run check:harness-transform    # 31 assertions
 npm run sim:harness                # E2E numbers
 npm run sim:harness -- --seed 7 --tasks 5000 --json
 npm run sim:harness -- --no-timeout   # ablate the timeout policy
@@ -253,10 +284,10 @@ npm run sim:harness -- --no-timeout   # ablate the timeout policy
 ### Verified 2026-08-13
 
 - `harness-routing` 45/45, `harness-consensus` 46/46, `harness-timeout` 29/29,
-  `mcp-fleet` 35/35 — **155 assertions, 0 failures**.
+  `harness-transform` 31/31, `mcp-fleet` 35/35 — **186 assertions, 0 failures**.
 - `npx tsc --noEmit` — 25 errors, unchanged from baseline, none in new code.
 - `npx next build` — clean.
-- Portability check — 10 files, no external imports.
+- Portability check — 11 files, no external imports.
 - Simulation across 5 seeds, results above.
 - `harness-timeout` mutation-tested: three mutations applied to `timeout.ts`
   and each was caught. Refreshing `startedAt` from a heartbeat (the mutation
@@ -264,6 +295,20 @@ npm run sim:harness -- --no-timeout   # ablate the timeout policy
   3 assertions; removing the idle deadline failed 12; leaving swept attempts in
   the map failed 5. A suite that still passes with the feature deleted is not
   evidence, so this was checked rather than assumed.
+- `harness-transform` mutation-tested: six mutations, five caught immediately —
+  droppable pinned content (3 failures), pair-integrity guard removed (1),
+  pairs ungrouped so a call can split from its result (2), summary tokens not
+  charged (1), ratio computed on message count (1), `withinBudget` hardcoded
+  true (3), head protection removed (6).
+
+  **The sixth mutation exposed a real coverage gap and is why this list is
+  worth reading.** Pinned messages are guarded twice — excluded from the
+  droppable set *and* added to the protected set — so removing the second guard
+  alone passed all 30 assertions and looked like an equivalent mutant. It is
+  not: the protected set is also what seeds pair protection, so a **pinned tool
+  call would silently lose its result**. A 31st assertion now covers it and the
+  mutation fails. Mutation testing found a hole that writing more tests from the
+  same mental model would not have.
 
 **NOT CHECKED:** anything against live LLM experts. Every number here is from
 the simulated world in `harness-simulate.mjs`, whose expert behaviour is a
@@ -282,8 +327,11 @@ only as good as that model.
 - **Cancellation.** `TimeoutPolicy` reports expiry; it cannot cancel the
   underlying call, because it holds no handle on the transport. The caller must
   abandon the work itself, and nothing currently checks that it does.
-- **Context-bloat control.** No message-transform layer yet; LangGraph's
-  middle-out compression with a reported compression ratio is the model.
+- **Summarisation quality.** `transform.ts` accepts a `summarise` callback and
+  charges its tokens, but supplies none — the dropped middle is simply gone
+  unless a caller provides one. Nothing measures whether a summary preserves
+  what the dropped turns contained, which is the part that would actually need
+  an LLM and an eval.
 - **Persistence.** Everything is in-memory behind interfaces (`FleetSource`,
   `CheckpointStore`). Postgres implementations are the obvious next step, and
   `circuit-breaker.ts` already mirrors the `circuit_breakers` table's columns.
