@@ -252,11 +252,11 @@ the earned authority exists to prevent.
 
 | # | What | State |
 |---|---|---|
-| M0 | Measure the corpus; `v_memory_recall_readiness` | **DONE** — changelog #117 |
+| M0 | Measure the corpus; `v_memory_recall_readiness` | **DONE** — changelog #117, corrected #118 |
 | M1 | Recall primitives: RRF, tiers, budget, utility, dedup shape | **DONE** — 44 assertions |
 | M2 | Memory as earned harness dimension | **DONE** — 7 settings |
 | M3 | Outcome tables + retrieval indexes | **WRITTEN, NOT APPLIED** — Sean-gated |
-| M4 | Embedding backfill — **the actual unblock** | Needs a model + budget decision |
+| M4 | Embedding backfill — the actual unblock | **DONE / DRAINING** — changelog #119 |
 | M5 | Dedup pass over 124/99/163 duplicates | Blocked on M4 (needs an index) |
 | M6 | Wire recall into the Railway agent loop | Blocked on M3; needs Railway access |
 | M7 | Receipts → earned grants | Blocked on TRUSTSHELL M2 (§12 Q1/Q2) |
@@ -271,6 +271,40 @@ the earned authority exists to prevent.
   (`connect_rejected` at the sandbox proxy) and holds no Railway token.
 - **M7** needs the two open TrustShell §12 decisions: receipt storage, and
   signing key custody.
+
+### How the backfill was actually done — and the near-miss that shaped it
+
+Three components, all in changelog #119:
+
+1. **`supabase/functions/embed-memory-backfill/index.ts`** — runs the model
+   inside the project, so 175 × 384 float32 (~283 KB of raw float data) never
+   crosses a network boundary or an agent's context window.
+2. **`memory_backfill_targets(p_limit)`** — `SECURITY DEFINER`, lists unembedded
+   nodes for the **twelve real fleet agents only**. `repid_agents` holds 176
+   rows, most of them `trinity-mock-it-seller-…` smoke agents; a naive
+   `LIKE 'trinity-%'` would have embedded all of them.
+3. **`cron.job` `memory-embed-backfill-drain`** — 18/min, self-guarded to a
+   no-op when zero targets remain. `limit=60` returns `WORKER_RESOURCE_LIMIT`;
+   partial progress is always durable because the target list is recomputed from
+   `embedding IS NULL` on every call, so a killed run just resumes.
+
+**The near-miss worth recording.** The obvious move was to embed locally in the
+agent container. That path *worked* — model loaded, 384 dims, unit norm, no
+errors anywhere. It would have looked like a complete success. The gate caught
+it: the locally available weights are the **fp32** export, and re-embedding a
+node whose vector was already stored scored **cosine 0.994** against it, not
+1.0. repid-engine calls `pipeline()` with no options, so production writes the
+**quantized** export. 0.994 is close enough to pass any eyeball check and far
+enough to degrade every ranking that compares the two — a corpus quietly split
+into two embedding spaces, with nothing anywhere reporting an error.
+
+Running inside Supabase, where the same default resolves, the same gate scored
+**0.9999999999999953**.
+
+The rule this earns: *an embedding backfill must reproduce an existing vector
+before it is allowed to write a new one.* Not "use the same model name" — the
+same model name produced a 0.994 mismatch. The check has to be empirical, and
+it has to run where the writing runs.
 
 ### The one decision that unblocks the most
 
