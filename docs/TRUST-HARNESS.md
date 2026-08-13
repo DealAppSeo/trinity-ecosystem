@@ -32,10 +32,11 @@ weight, tier, payout.
 | `circuit-breaker.ts` | Expert failure isolation with labelled fallback |
 | `quorum.ts` | PBFT supermajority, rubric judging |
 | `replay.ts` | Self-healing state replay |
+| `timeout.ts` | Run/idle deadline split; catches an expert that hangs |
 
 ## Measured results
 
-`npm run sim:harness` — 2000 tasks, 7 experts, virtual clock, deterministic.
+`npm run sim:harness` — 2000 tasks, 8 experts, virtual clock, deterministic.
 Both arms see an identical seeded workload; only the routing and
 fault-tolerance layers differ. The baseline is modelled on what the surveyed
 frameworks actually do: greedy top-1 on a self-declared score.
@@ -44,24 +45,43 @@ Seed 20260813:
 
 | metric | baseline | harness | delta |
 |---|---|---|---|
-| correctness rate | 48.3% | **88.8%** | +83.7% |
-| completion rate | 99.6% | 100.0% | +0.5% |
-| unrecovered failures | 9 | **0** | −100% |
-| calls per task | 1.25 | 1.03 | −17.4% |
-| load Gini (0 = even) | 0.800 | 0.646 | −19.2% |
-| max single-expert share | 80.0% | 63.4% | −20.8% |
-| p50 latency | 111 ms | 127 ms | +14.4% |
-| p95 latency | 132 ms | 180 ms | +36.4% |
-| p99 latency | 141 ms | **770 ms** | +446% |
+| correctness rate | 41.9% | **89.0%** | +112.7% |
+| completion rate | 92.8% | 100.0% | +7.7% |
+| unrecovered failures | 143 | **0** | −100% |
+| calls per task | 1.26 | 1.03 | −18.0% |
+| load Gini (0 = even) | 0.824 | 0.696 | −15.4% |
+| max single-expert share | 79.4% | 66.0% | −16.9% |
+| p50 latency | 115 ms | 127 ms | +10.4% |
+| p95 latency | 10000 ms | 180 ms | −98.2% |
+| p99 latency | 10000 ms | 794 ms | −92.1% |
 
-Across five seeds (1, 7, 20260813, 99991, 424242) the harness scores
-87.5–89.4% against a baseline of 47.9–49.5%. The effect is not seed luck.
+Across five seeds the harness scores 86.8–90.1% against a baseline of
+40.9–42.6%. The effect is not seed luck.
 
-**The p99 regression is real and is the honest cost.** The baseline is faster
-because it is confidently wrong: it sends 100% of traffic to `boaster`, which
-claims 10000, has true quality 0.35, and is the *fastest* expert in the pool.
-Buying correctness means spending tail latency on exploring unknown experts and
-on absorbing one degraded expert's 6× latency before the governor reacts. If
+**Read the delta column with care — two of these moved for reasons that are
+not the harness getting better.**
+
+*The baseline got worse, the harness did not get better.* The `stalled` expert
+was added on 2026-08-13 to exercise the timeout module, which took the world
+from 7 experts to 8. The harness went 88.8% → 89.0%, i.e. flat. The baseline
+went 48.3% → 41.9%, because a hanging expert that claims 9000 consumes its
+retry slot. The headline delta grew from +83.7% to +112.7% **entirely because
+the world got harder for the baseline specifically.** Comparing today's
++112.7% against yesterday's +83.7% as though the harness improved would be
+measuring the workload, not the mechanism.
+
+*The p95/p99 flip is an artefact of a chosen constant, not a speed-up.* The
+harness did not get faster — its p99 went 770 → 794 ms. The baseline's tail
+collapsed onto `RUN_TIMEOUT_MS` because hangs are 5.2% of its calls, so
+anything above the 95th percentile *is* a hang, and a hang costs exactly the
+run deadline we credit it with. Set that constant to 2000 and the baseline p99
+reads 2000. **A metric whose value equals one of your own configuration
+constants is not a measurement of anything.** The earlier p99 regression
+(+446%) remains the honest characterisation of the routing cost, and it is
+still visible here in p50.
+
+The real cost of correctness is still tail latency: exploring unknown experts
+and absorbing one degraded expert's 6× latency before the governor reacts. If
 p99 matters more than correctness for a given workload, lower
 `explorationRate` and tighten `degradedRatio` — but know which one you are
 trading.
@@ -70,10 +90,60 @@ The two headline numbers:
 
 - **`boaster`: claims 10000, earned 4530, true quality 0.35.** The baseline
   gave it 2000 of 2000 tasks. The harness gave it 49.
-- **`rookie`: claims 0, earned 7261, true quality 0.95.** The baseline never
+- **`rookie`: claims 0, earned 6817, true quality 0.95.** The baseline never
   called it once. The harness found it.
 
-Kendall tau between learned rank and effective quality: **0.619**.
+Kendall tau between learned rank and effective quality: **0.643** (0.619 in the
+7-expert world; the two are not directly comparable, since the ranking problem
+itself changed).
+
+### The timeout module, measured against itself
+
+The baseline-vs-harness table above cannot say what `timeout.ts` contributed,
+because it differs from the baseline in nine other ways at the same time. The
+honest test is an ablation — the same harness, same world, same seeds, with the
+timeout policy switched off:
+
+```bash
+npm run sim:harness -- --no-timeout
+```
+
+| seed | correctness off → on | hangs off → on | stall seconds off → on |
+|---|---|---|---|
+| 20260813 | 88.8% → 89.0% | 5 → 3 | 50.0 → 4.5 |
+| 1 | 88.7% → 89.3% | 10 → 6 | 100.0 → 9.0 |
+| 2 | 86.6% → 86.8% | 4 → 3 | 40.0 → 4.5 |
+| 3 | 86.8% → 86.8% | 2 → 2 | 20.0 → 3.0 |
+| 4 | 88.9% → 90.1% | 3 → 4 | 30.0 → 6.0 |
+
+**Aggregate correctness moves +0.0 to +1.2 points, which is inside seed noise.**
+On this workload the module does not measurably improve the answer rate, and
+saying otherwise would be reporting a rounding error as a result. The reason is
+worth stating because it is a compliment to the rest of the harness: the router,
+the trust floor and the ledger already suppress `stalled` to about 0.2% of
+traffic, so there is very little hang left for a timeout to catch.
+
+What the ablation *does* establish:
+
+- **Stall time falls 80–91%, every seed.** But the per-hang share of that is
+  exactly `1 − 1500/10000 = 85%` — the ratio of the two constants, true by
+  construction. Only the variation around 85% comes from hang counts.
+- **Nothing regresses.** Correctness, unrecovered failures and p99 are flat or
+  slightly better in all five seeds.
+- **No leaked attempts.** The simulation prints `timeouts.inFlight()` at the
+  end. With the policy on it is **0**; with `--no-timeout` it is **5** on seed
+  20260813 — exactly the five hangs, still held open at the end of the run.
+  That is the clearest single demonstration of what the module does: without
+  it those attempts are never resolved by anything, and each one is a slot and
+  a reputation the rest of the harness will never get back.
+
+So the case for the module is not the aggregate numbers. It is that a hang is
+invisible to every other layer — the breaker only learns from `recordFailure`,
+the governor only samples on completion, the ledger only learns from outcomes —
+and none of them fires on a call that simply never returns. The timeout
+manufactures the one signal they all need. Its value is bounded below by
+correctness (it does no harm) and is unbounded above in a world where a
+*trusted* expert starts hanging, which this simulation does not model.
 
 ## Three build–measure–learn cycles, and what each taught
 
@@ -174,18 +244,26 @@ Each has an assertion that fails if the rule is removed.
 npm run check:harness-portable     # dependency-free constraint
 npm run check:harness-routing      # 45 assertions
 npm run check:harness-consensus    # 46 assertions
+npm run check:harness-timeout      # 29 assertions
 npm run sim:harness                # E2E numbers
 npm run sim:harness -- --seed 7 --tasks 5000 --json
+npm run sim:harness -- --no-timeout   # ablate the timeout policy
 ```
 
 ### Verified 2026-08-13
 
-- `harness-routing` 45/45, `harness-consensus` 46/46, `mcp-fleet` 35/35 — **126
-  assertions, 0 failures**.
+- `harness-routing` 45/45, `harness-consensus` 46/46, `harness-timeout` 29/29,
+  `mcp-fleet` 35/35 — **155 assertions, 0 failures**.
 - `npx tsc --noEmit` — 25 errors, unchanged from baseline, none in new code.
 - `npx next build` — clean.
-- Portability check — 9 files, no external imports.
+- Portability check — 10 files, no external imports.
 - Simulation across 5 seeds, results above.
+- `harness-timeout` mutation-tested: three mutations applied to `timeout.ts`
+  and each was caught. Refreshing `startedAt` from a heartbeat (the mutation
+  that collapses the split into one deadline while still presenting two) failed
+  3 assertions; removing the idle deadline failed 12; leaving swept attempts in
+  the map failed 5. A suite that still passes with the feature deleted is not
+  evidence, so this was checked rather than assumed.
 
 **NOT CHECKED:** anything against live LLM experts. Every number here is from
 the simulated world in `harness-simulate.mjs`, whose expert behaviour is a
@@ -194,12 +272,16 @@ only as good as that model.
 
 ## Not yet built
 
-- **`TimeoutPolicy`** — the run/idle split from LangGraph is documented above
-  and not yet implemented. It is the highest-value remaining item, because idle
-  timeout is the only mechanism here that would catch an expert that hangs
-  without erroring.
 - **Sub-task routing granularity.** Routing is per task; the brief calls for
-  sub-step and tool-call granularity.
+  sub-step and tool-call granularity. Now the highest-value remaining item.
+- **A hang-under-trust scenario for the simulator.** `stalled` is demoted so
+  fast that the timeout has almost nothing to catch, which is why the ablation
+  above is within noise. The case the module is really for — a *high-earning*
+  expert that starts hanging, where reputation keeps sending it work — is not
+  modelled. Until it is, the module's upside is argued rather than measured.
+- **Cancellation.** `TimeoutPolicy` reports expiry; it cannot cancel the
+  underlying call, because it holds no handle on the transport. The caller must
+  abandon the work itself, and nothing currently checks that it does.
 - **Context-bloat control.** No message-transform layer yet; LangGraph's
   middle-out compression with a reported compression ratio is the model.
 - **Persistence.** Everything is in-memory behind interfaces (`FleetSource`,

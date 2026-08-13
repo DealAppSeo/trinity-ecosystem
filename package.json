@@ -24,6 +24,7 @@
     "check:harness-portable": "node scripts/harness-portability-check.mjs",
     "check:harness-routing": "node scripts/harness-routing-test.mjs",
     "check:harness-consensus": "node scripts/harness-consensus-test.mjs",
+    "check:harness-timeout": "node scripts/harness-timeout-test.mjs",
     "sim:harness": "node scripts/harness-simulate.mjs"
   },
   "dependencies": {

@@ -26,6 +26,12 @@ const arg = (name, fallback) => {
 const TASKS = arg('tasks', 2000);
 const SEED = arg('seed', 20260813);
 const AS_JSON = argv.includes('--json');
+// Ablation: run the harness arm with the timeout policy disabled, so a hang is
+// bounded only by the outer run deadline exactly as it is for the baseline.
+// This is the honest A/B for the timeout module specifically — comparing the
+// full harness against the naive baseline conflates it with every other
+// mechanism and would credit the timeout for wins it did not produce.
+const NO_TIMEOUT = argv.includes('--no-timeout');
 
 const { load } = compileHarness();
 const { ManualClock } = await load('types');
@@ -35,6 +41,13 @@ const { TrustRouter, SeededRng } = await load('router');
 const { CircuitBreakerRegistry } = await load('circuit-breaker');
 const { QuorumEvaluator } = await load('quorum');
 const { ReputationLedger } = await load('reputation');
+const { TimeoutPolicy } = await load('timeout');
+
+// The run/idle split. IDLE is short because it measures time since the last
+// observed progress; RUN has to be long enough for the slowest legitimate task,
+// which is exactly why it is useless as a hang detector on its own.
+const RUN_TIMEOUT_MS = 10_000;
+const IDLE_TIMEOUT_MS = 1_500;
 
 // ── the simulated world ──────────────────────────────────────────────────────
 //
@@ -54,12 +67,29 @@ const { ReputationLedger } = await load('reputation');
 function effectiveQuality(e) {
   const degradeFrom = e.degradesAt ?? 1;
   const failFrom = e.failsAt ?? 1;
-  const cut = Math.min(degradeFrom, failFrom);
+  const hangFrom = e.hangsAt ?? 1;
+  const cut = Math.min(degradeFrom, failFrom, hangFrom);
   const healthyShare = cut;
   const rest = 1 - cut;
-  // Degraded: quality * 0.4 and 10x errors. Failing: nothing succeeds at all.
-  const restQuality = e.failsAt !== undefined && failFrom <= degradeFrom ? 0 : e.trueQuality * 0.4;
   const healthyDelivered = e.trueQuality * (1 - e.errorRate);
+
+  // Degraded: quality * 0.4 and 10x errors. Failing: nothing succeeds at all.
+  // Hanging: the `hangRate` share of calls returns nothing at all, so the
+  // expert delivers only on the remainder.
+  //
+  // The hang term is NOT optional bookkeeping. Adding a hanging expert without
+  // it would rank the harness against a quality the expert never delivered,
+  // scoring it DOWN for correctly demoting a staller — the identical wrong-
+  // metric defect that produced the spurious tau 0.333 earlier today.
+  let restQuality;
+  if (e.failsAt !== undefined && failFrom <= degradeFrom && failFrom <= hangFrom) {
+    restQuality = 0;
+  } else if (e.hangsAt !== undefined && hangFrom <= degradeFrom && hangFrom <= failFrom) {
+    restQuality = healthyDelivered * (1 - e.hangRate);
+  } else {
+    restQuality = e.trueQuality * 0.4;
+  }
+
   return healthyShare * healthyDelivered + rest * restQuality;
 }
 
@@ -76,6 +106,11 @@ const EXPERTS = [
   // Genuinely excellent, but unknown. Cold-start handling decides whether it
   // is ever discovered.
   { id: 'rookie',  caps: ['hal'], trueQuality: 0.95, baseLatency: 100, errorRate: 0.01, claimedScore: 0,    capacity: 400, cold: true },
+  // HANGS from 50% onward, half its calls, and never errors while doing it.
+  // Invisible to the breaker (no failure), to the capacity governor (no
+  // completion, so no latency sample) and to the ledger (no outcome). It claims
+  // 9000 so the baseline — which believes claims — actually routes to it.
+  { id: 'stalled', caps: ['hal'], trueQuality: 0.85, baseLatency: 160, errorRate: 0.03, claimedScore: 9000, capacity: 400, hangsAt: 0.5, hangRate: 0.5 },
 ];
 
 const FALLBACK_QUALITY = 0.6; // generalist used when a breaker is open
@@ -89,6 +124,14 @@ function makeWorld(seed) {
       const degraded = expert.degradesAt !== undefined && progress >= expert.degradesAt;
       const failing = expert.failsAt !== undefined && progress >= expert.failsAt;
 
+      // A hang is not an error and not a slow success — it is the absence of
+      // any signal at all. The call simply never comes back, so `ok`,
+      // `correct` and `latencyMs` are all meaningless and the caller must
+      // discover it by deadline or not at all.
+      if (expert.hangsAt !== undefined && progress >= expert.hangsAt && rng.next() < expert.hangRate) {
+        return { latencyMs: 0, ok: false, correct: false, hang: true };
+      }
+
       const latency = failing
         ? expert.baseLatency * 0.5
         : expert.baseLatency * (degraded ? 6 : 1) * (0.8 + rng.next() * 0.4);
@@ -98,7 +141,7 @@ function makeWorld(seed) {
       const quality = degraded ? expert.trueQuality * 0.4 : expert.trueQuality;
       const correct = ok && rng.next() < quality;
 
-      return { latencyMs: Math.round(latency), ok, correct };
+      return { latencyMs: Math.round(latency), ok, correct, hang: false };
     },
   };
 }
@@ -132,6 +175,10 @@ function emptyMetrics() {
     callsToDegraded: 0,
     callsToCrasher: 0,
     rookieCalls: 0,
+    hangsHit: 0,
+    hangStallMs: 0,
+    hangsByIdle: 0,
+    hangsByRun: 0,
   };
 }
 
@@ -155,10 +202,21 @@ function runBaseline(seed) {
       if (!expert) break;
       const r = world.call(expert, progress);
       m.perExpert.set(expert.id, m.perExpert.get(expert.id) + 1);
-      m.latencies.push(r.latencyMs);
       if (expert.degradesAt !== undefined && progress >= expert.degradesAt) m.callsToDegraded += 1;
       if (expert.failsAt !== undefined && progress >= expert.failsAt) m.callsToCrasher += 1;
       if (expert.id === 'rookie') m.rookieCalls += 1;
+
+      if (r.hang) {
+        // The baseline has no idle deadline, so a hang is only ever bounded by
+        // the outer run deadline. It is GENEROUS to credit it with even that —
+        // a caller with no timeout mechanism at all never returns. The stall is
+        // charged as latency and the attempt is consumed.
+        m.hangsHit += 1;
+        m.hangStallMs += RUN_TIMEOUT_MS;
+        m.latencies.push(RUN_TIMEOUT_MS);
+        continue;
+      }
+      m.latencies.push(r.latencyMs);
 
       if (r.ok) {
         m.completed += 1;
@@ -195,6 +253,11 @@ function runHarness(seed) {
     thresholdFailures: 3,
     resetTimeoutMs: 30_000,
     successesToClose: 2,
+  });
+
+  const timeouts = new TimeoutPolicy(clock, {
+    runTimeoutMs: RUN_TIMEOUT_MS,
+    idleTimeoutMs: IDLE_TIMEOUT_MS,
   });
 
   const router = new TrustRouter(
@@ -260,15 +323,59 @@ function runHarness(seed) {
 
       limiter.tryConsume(id, 1);
       capacity.acquire(id);
+      const attempt = timeouts.begin(id, task.id);
       const r = world.call(expert, progress);
-      capacity.release(id);
 
-      capacity.observe(id, r.latencyMs, r.ok);
       m.perExpert.set(id, m.perExpert.get(id) + 1);
-      m.latencies.push(r.latencyMs);
       if (expert.degradesAt !== undefined && progress >= expert.degradesAt) m.callsToDegraded += 1;
       if (expert.failsAt !== undefined && progress >= expert.failsAt) m.callsToCrasher += 1;
       if (id === 'rookie') m.rookieCalls += 1;
+
+      if (r.hang && NO_TIMEOUT) {
+        // No idle deadline: the hang is bounded only by the run deadline, and
+        // because nothing ever completes there is no failure to record. The
+        // breaker, the capacity governor and the ledger all learn nothing.
+        m.hangsHit += 1;
+        m.hangStallMs += RUN_TIMEOUT_MS;
+        m.latencies.push(RUN_TIMEOUT_MS);
+        clock.advance(RUN_TIMEOUT_MS);
+        capacity.release(id);
+        continue;
+      }
+
+      if (r.hang) {
+        // No heartbeat ever arrives, so the idle deadline is what fires. Time
+        // genuinely passes while the caller waits for it — the detection is
+        // not free, and charging it here is what keeps the latency figures
+        // honest rather than flattering.
+        m.hangsHit += 1;
+        clock.advance(IDLE_TIMEOUT_MS);
+        const expired = timeouts.sweep();
+        capacity.release(id);
+
+        for (const e of expired) {
+          if (e.kind === 'idle') m.hangsByIdle += 1;
+          else m.hangsByRun += 1;
+          m.hangStallMs += e.elapsedMs;
+          m.latencies.push(e.elapsedMs);
+          // The signal the other layers could not otherwise obtain.
+          capacity.observe(e.attempt.expert, e.elapsedMs, false);
+          breakers.recordFailure(e.attempt.expert);
+          updateEarned(e.attempt.expert, false);
+        }
+        continue;
+      }
+
+      // A completed call closes its attempt, so it can never be swept as a
+      // hang. The clock is deliberately NOT advanced by the call duration:
+      // the pre-existing 100ms arrival interval is left exactly as it was so
+      // this run differs from the last one in the hang path alone, and the
+      // delta is attributable to the mechanism rather than to a retimed world.
+      timeouts.complete(attempt.id);
+      capacity.release(id);
+
+      capacity.observe(id, r.latencyMs, r.ok);
+      m.latencies.push(r.latencyMs);
 
       if (r.ok) {
         breakers.recordSuccess(id);
@@ -289,13 +396,13 @@ function runHarness(seed) {
     if (!done) m.failed += 1;
   }
 
-  return { m, ledger, breakers, capacity };
+  return { m, ledger, breakers, capacity, timeouts };
 }
 
 // ── run and report ───────────────────────────────────────────────────────────
 
 const baseline = runBaseline(SEED);
-const { m: harness, ledger, breakers, capacity } = runHarness(SEED);
+const { m: harness, ledger, breakers, capacity, timeouts } = runHarness(SEED);
 
 const summarise = (m) => {
   const counts = [...m.perExpert.values()];
@@ -315,6 +422,11 @@ const summarise = (m) => {
     p99LatencyMs: percentile(m.latencies, 99),
     loadGini: gini(counts),
     maxExpertShare: total === 0 ? 0 : Math.max(...counts) / total,
+    hangsHit: m.hangsHit,
+    hangStallMs: m.hangStallMs,
+    hangsByIdle: m.hangsByIdle,
+    hangsByRun: m.hangsByRun,
+    meanHangDetectMs: m.hangsHit === 0 ? 0 : m.hangStallMs / m.hangsHit,
     callsToDegradedExpert: m.callsToDegraded,
     callsToCrashedExpert: m.callsToCrasher,
     rookieCalls: m.rookieCalls,
@@ -358,6 +470,9 @@ console.log(row('max single-expert share', b.maxExpertShare, h.maxExpertShare, p
 console.log(row('calls to degraded expert', b.callsToDegradedExpert, h.callsToDegradedExpert, (x) => String(x), true));
 console.log(row('calls to crashed expert', b.callsToCrashedExpert, h.callsToCrashedExpert, (x) => String(x), true));
 console.log(row('calls to cold-start rookie', b.rookieCalls, h.rookieCalls));
+console.log(row('hangs encountered', b.hangsHit, h.hangsHit, (x) => String(x), true));
+console.log(row('mean hang detection (ms)', b.meanHangDetectMs, h.meanHangDetectMs, (x) => x.toFixed(0), true));
+console.log(row('wall clock lost to hangs (s)', b.hangStallMs / 1000, h.hangStallMs / 1000, (x) => x.toFixed(1), true));
 
 console.log(`\nLoad distribution (calls per expert)`);
 console.log('-'.repeat(76));
@@ -368,6 +483,14 @@ for (const e of EXPERTS) {
       `baseline ${String(b.perExpert[e.id]).padStart(5)}  harness ${String(h.perExpert[e.id]).padStart(5)}  ${bar(h.perExpert[e.id], h.totalCalls)}`
   );
 }
+
+console.log(`\nHang detection (the run/idle split)`);
+console.log('-'.repeat(76));
+console.log(`  baseline: no idle deadline. ${b.hangsHit} hang(s), each bounded only by the`);
+console.log(`            ${RUN_TIMEOUT_MS}ms run deadline it is GENEROUSLY credited with but does not implement.`);
+console.log(`  harness:  ${h.hangsHit} hang(s) — ${h.hangsByIdle} caught by the idle deadline, ${h.hangsByRun} by the run deadline.`);
+console.log(`            mean detection ${h.meanHangDetectMs.toFixed(0)}ms vs ${b.meanHangDetectMs.toFixed(0)}ms, a ${(b.meanHangDetectMs / Math.max(1, h.meanHangDetectMs)).toFixed(1)}x faster stall.`);
+console.log(`  attempts still in flight at end of run: ${timeouts.inFlight()} (a leak would show here)`);
 
 console.log(`\nWhat the harness LEARNED (earned reputation, 0-10000)`);
 console.log('-'.repeat(76));

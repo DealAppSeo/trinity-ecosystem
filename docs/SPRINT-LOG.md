@@ -129,6 +129,91 @@ input was being reported as an internal server error. Added `"target":
 **Also corrected** `app/api/CLAUDE.md`, which claimed a ~37-error tsc baseline.
 It is **25**. A stale baseline turns a regression into a rounding error.
 
+### 7. Sprint C — the run/idle timeout split (overnight routine, firing 1)
+
+Backlog item 1, the highest-value remaining item per `TRUST-HARNESS.md`. Built
+`lib/trustshell/harness/timeout.ts` plus `scripts/harness-timeout-test.mjs`.
+
+**The gap it closes.** A hang is invisible to every other layer, and this is
+structural rather than an oversight: `CircuitBreakerRegistry` only learns from
+`recordFailure`, `CapacityGovernor.observe` is only called on completion, and
+`ReputationLedger` only learns from outcomes. A call that never returns
+produces none of those, so a hanging expert keeps full slots, a closed breaker
+and an untouched reputation — forever. The timeout manufactures the one signal
+the other three already know how to consume, which is why **no existing module
+needed to change**. That was a deliberate choice: modifying `capacity.ts` or
+`router.ts` risked 91 passing assertions for no gain.
+
+**VERIFIED — mechanism.** 29 assertions, 0 failures. 155 across all four
+suites. `tsc --noEmit` **25**, unchanged. `next build` clean. Portability 10
+files.
+
+**VERIFIED — the tests are actually evidence.** Three mutations applied to
+`timeout.ts`, all caught: refreshing `startedAt` from a heartbeat failed 3
+assertions, removing the idle deadline failed 12, not deleting swept attempts
+failed 5. The first is the one that mattered — it collapses two deadlines into
+one *while still presenting an API with two*, and it is caught by the single
+test written for it. A suite that still passes with the feature deleted is not
+evidence; this was checked rather than asserted.
+
+**MEASURED — and smaller than it first looked.** Adding a `stalled` expert
+(claims 9000, hangs half its calls after the midpoint, never errors) moved the
+headline from +83.7% to +112.7%. That number is **not** an improvement and is
+not reported as one: the harness went 88.8% → 89.0%, i.e. flat, while the
+baseline fell 48.3% → 41.9% because a hanging expert eats its retry slot. The
+delta grew because the world got harder for the baseline specifically.
+
+The honest test is the ablation — same harness, same seeds, `--no-timeout`:
+
+| seed | correctness off → on | hangs off → on | stall seconds off → on |
+|---|---|---|---|
+| 20260813 | 88.8% → 89.0% | 5 → 3 | 50.0 → 4.5 |
+| 1 | 88.7% → 89.3% | 10 → 6 | 100.0 → 9.0 |
+| 2 | 86.6% → 86.8% | 4 → 3 | 40.0 → 4.5 |
+| 3 | 86.8% → 86.8% | 2 → 2 | 20.0 → 3.0 |
+| 4 | 88.9% → 90.1% | 3 → 4 | 30.0 → 6.0 |
+
+**Aggregate correctness gain is +0.0 to +1.2 points — inside seed noise.** On
+this workload the module does not measurably improve the answer rate. Stall
+time falls 80–91% on every seed, but the per-hang share of that is exactly
+`1 − 1500/10000 = 85%`, true by construction from the two constants. Nothing
+regressed on any seed.
+
+The crispest single result is the leak count. The simulation prints
+`timeouts.inFlight()` at the end of the run: **0** with the policy on, **5**
+with `--no-timeout` on seed 20260813 — exactly the five hangs, still held open
+when the run ends. Without the module nothing ever resolves them, and each is a
+capacity slot and a reputation observation the harness never gets back. That is
+a categorical difference rather than a percentage, which is why it survives the
+scrutiny the aggregate numbers did not.
+
+**REGRESSION NOT CLAIMED AS A WIN.** p95/p99 flipped from +446% (harness worse)
+to −92% (harness better). This is an artefact, not a speed-up. The harness's
+own p99 went 770 → 794 ms — slightly *worse*. The baseline's tail collapsed
+onto `RUN_TIMEOUT_MS` because hangs are 5.2% of its calls, so its p99 is
+literally a constant I chose; set it to 2000 and the baseline reads 2000. **A
+metric whose value equals one of your own configuration constants measures
+nothing.** The +446% p99 regression remains the honest characterisation of what
+correctness costs, and it is still visible in p50 (+10.4%).
+
+**The measurement trap this firing hit.** The first version of the ablation did
+not exist — the plan was to compare the new harness against the old baseline
+numbers. That would have credited the timeout module with a 112.7% delta it did
+not produce. Two of the three defects earlier today were measurement defects
+rather than logic defects; this was a third, caught before it was written down.
+Relatedly, `effectiveQuality()` had to learn about `hangsAt` in the same commit:
+without it the Kendall tau would have ranked the harness against quality
+`stalled` never delivered, scoring it **down** for correctly demoting a
+staller — the identical wrong-metric shape that produced the spurious tau 0.333.
+
+**NOT CHECKED.** The scenario the module actually exists for — a *high-earning*
+expert that starts hanging, where reputation keeps sending it work — is not
+modelled. `stalled` is demoted so fast there is almost nothing left to catch,
+which is precisely why the ablation is within noise. Until that scenario exists
+the module's upside is argued, not measured. Also: `TimeoutPolicy` reports
+expiry but cannot cancel the underlying call, and nothing verifies the caller
+abandons it. Logged as the top two items under "Not yet built".
+
 ---
 
 ### Standing NOT CHECKED
