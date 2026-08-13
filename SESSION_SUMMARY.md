@@ -33,6 +33,39 @@ unrecognised record types**. [VERIFIED 2026-08-13 03:09Z — run against
 **Earlier tonight:** `3c7eea7` (mainnet preconditions), `da8208e` (NORTH-STAR blocker list
 made live + Done section). PR **#22** open, draft, Vercel **Ready at `249af42`**.
 
+**Agent memory — research, measurement, and the recall path.** Deep dive on
+`TencentCloud/TencentDB-Agent-Memory` (MIT) and mapping it onto the RepID harness.
+Write-up in `docs/AGENT-MEMORY-SPEC.md`, primitives in `lib/trustshell/MemoryRecall.ts`,
+**44 assertions** in `scripts/check-memory-recall.mjs`, wired into `npm run check` as
+`check:memory`. **0 new `tsc` errors** (36 → 36; one I introduced — a Map-iterator spread
+that the repo target rejects — was caught by the diff and fixed).
+
+The finding that reordered the work: **Trinity has no recall problem it can measure,
+because it has never recalled anything.** [VERIFIED 2026-08-13 04:30Z via SQL]
+`access_count > 0` matches **0 of 429** rows in `agent_memory_nodes`;
+`trinity_skills.last_used_at` is null on all 14. Three months of writes, zero reads.
+Four blockers, ranked: (1) all **34** distinct `agent_memory_nodes.agent_id` values
+resolve to **no row** in `agents`, `trinity_agents`, `agent_kya_registry` *or*
+`conductor_state` — memory has no owner, so recall cannot be scoped; (2) 213 of 429 nodes
+embedded, **0 of 215** patterns embedded despite having the column; (3) nothing links a
+memory to an outcome; (4) no dedup ever ran — 215 patterns hold **52** distinct insights.
+Also: 13 of 22 memory tables are empty, including the whole warm/cold/glacier tier, and
+`trinity_learned_patterns` exists **twice** (`public` has `embedding`, `private` has
+`times_reused`) — two complementary halves of one table split across schemas.
+
+`v_memory_recall_readiness` created live (additive, reversible, **changelog #117**) so
+this stays visible instead of needing a bespoke query each session. It reports
+**FAILED on all four corpora** today.
+
+Seven memory settings added to the harness, three of them `earned`. The cut: recalling
+your *own* memory is baseline (floor is 5 items, not 0 — an agent denied it is amnesiac,
+which protects nobody); recalling *peers'* memory is the privilege, because that is where
+one agent's wrong conclusion becomes twelve agents'. Two upstream ideas deliberately
+inverted, both documented at their call sites: their extraction gate is **permissive when
+unconfigured** (ours denies), and their `usage_count` is a **popularity counter** that
+rewards being retrieved rather than being right (ours nets good against bad outcomes, so
+a harmful memory ranks *below* an unproven one — asserted).
+
 ## What M1 found — two spec corrections and one defect of mine
 
 1. **Spend in `TRUSTSHELL-V1.md` §4.2 was overcounted 2.36×.** It claimed 2,111,919
@@ -77,6 +110,13 @@ made live + Done section). PR **#22** open, draft, Vercel **Ready at `249af42`**
 | `HarnessProfile.ts` registry + resolver | **REAL** — 31 assertions, runs in `npm run check` |
 | `repid_permissions` ladder migration | **WRITTEN, NOT APPLIED** — Sean-gated, see below |
 | TrustShell M1 transcript parser | **REAL** — 42 assertions, runs in `npm run check`; verified against a live session |
+| `MemoryRecall.ts` primitives (RRF, tiers, budget, utility, dedup shape) | **REAL** — 44 assertions, runs in `npm run check` |
+| Memory dimension in the harness (7 settings, 3 earned) | **REAL** — resolves and refuses; asserted |
+| `v_memory_recall_readiness` | **REAL, LIVE** — changelog #117, reports FAILED on all four corpora |
+| Memory recall actually running in an agent loop | **NOT BUILT** — no executor; the plan compiles, nothing executes it. Needs Railway |
+| `memory_recall_log` / `memory_outcome_link` / identity repair | **WRITTEN, NOT APPLIED** — `20260813050000_memory_recall_path.sql`, Sean-gated |
+| Embedding backfill (216 nodes, 215 patterns) | **NOT DONE** — costs per row and permanently fixes a model choice |
+| `owner_agent_name` backfill | **NOT DERIVABLE** — the uuid→name mapping is not in this database; guessing it would fabricate provenance |
 | Session receipts (TrustShell M2–M4) | **NOT BUILT** — M1 reads the transcript; nothing emits, signs or verifies a receipt yet, so every earned setting still sits at its floor |
 | `repid_writes_require_receipt` enforcement | **NOT BUILT** — declared, nothing enforces it |
 | Compiling resolved `rule` settings into agent instructions | **NOT BUILT** |
@@ -107,6 +147,23 @@ Honest summary: until receipts exist, the harness is a fully tested implementati
    canonical way to file a gate contradicts the canonical planning surface. Logged here
    instead of adding to a deprecated table. Exact action: point `open_sean_gates` at
    `trinity_tasks`, or un-deprecate `autonomous_tasks` for this one purpose.
+4. **Apply `supabase/migrations/20260813050000_memory_recall_path.sql`.** Exact action:
+   run that file against `qnnpjhlxljtqyigedwkb`. It adds `owner_agent_name`, two outcome
+   counters and `last_outcome_at` to `agent_memory_nodes`; creates HNSW + trigram indexes;
+   creates `memory_recall_log` and `memory_outcome_link` with RLS enabled and **zero
+   policies** (deny-all to `anon`, service_role unaffected). Not applied here because it
+   alters base tables, which is beyond the additive-view allowance. Complete rollback SQL
+   is in the file header; no column is dropped and no row deleted, so rollback restores
+   the exact prior shape.
+5. **Where do the 34 orphan agent uuids come from?** Only repid-engine can answer — it
+   wrote those rows and this session cannot reach Railway. Until answered, memory cannot
+   be scoped per agent and the whole per-agent loadout in `docs/AGENT-MEMORY-SPEC.md` §4
+   is un-appliable. Exact action: grep repid-engine for the `agent_memory_nodes` writer
+   and report what it puts in `agent_id`. **This is the single highest-value unblock** —
+   items 4 and the entire memory roadmap sit behind it.
+6. **Decide the embedding model, once.** 216 nodes and 215 patterns need embedding.
+   Mixing embedding models within one index silently degrades every similarity score, so
+   this choice is effectively permanent. Exact action: name the model and the budget.
 
 ## Next 3 commands
 

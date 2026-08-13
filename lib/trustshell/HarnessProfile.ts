@@ -329,6 +329,104 @@ export const HARNESS_SETTINGS: readonly SettingSpec[] = [
     why: 'Real proofs and agent ids in git are unrecallable once pushed.',
   },
 
+  // -- Memory: the recall path ---------------------------------------------
+  //
+  // The six settings above govern what an agent may *believe* and *write*. None
+  // of them governs reading memory back, because until now nothing read memory
+  // back: on 2026-08-13 `agent_memory_nodes` held 429 rows with access_count>0
+  // on exactly zero of them. These five settings govern the read side.
+  //
+  // The cut between floor and earned is deliberate. Recalling your own memories
+  // is baseline — an agent denied it is amnesiac, which protects nobody. Reading
+  // *peers'* memories is the privilege, because that is where one agent's wrong
+  // conclusion becomes twelve agents' wrong conclusion.
+  {
+    key: 'memory.recall_scope',
+    dimension: 'memory',
+    authority: 'earned',
+    type: 'string',
+    default: 'own',
+    safeDirection: 'n/a',
+    compilesTo: 'db',
+    unlockedBy: 'session receipts showing recalled peer memories led to verified-good outcomes',
+    why: 'Cross-agent recall turns one agent\'s bad conclusion into the fleet\'s. Reading your own memory back is not a privilege; reading everyone else\'s is.',
+  },
+  {
+    key: 'memory.recall_max_items',
+    dimension: 'memory',
+    authority: 'earned',
+    type: 'number',
+    default: 5,
+    // Floor is 5, not 0, and `default` must equal it — see the guard in
+    // check-memory-recall.mjs. Zero would mean an agent with no receipts cannot
+    // read back even its own memories, which makes it amnesiac rather than
+    // untrusted. Least privilege here is "a few of your own", not "none".
+    min: 5,
+    max: 50,
+    safeDirection: 'lower',
+    compilesTo: 'setting',
+    unlockedBy: 'receipts showing recall at the current cap did not degrade task outcomes',
+    why: 'Context spent on memory is context not spent on the task. The cap is earned because a wider recall is only free if the extra items are actually good.',
+  },
+  {
+    key: 'memory.recall_char_budget',
+    dimension: 'memory',
+    authority: 'earned',
+    type: 'number',
+    default: 2000,
+    /** Floor matches `default` by the same rule as memory.recall_max_items. */
+    min: 2000,
+    max: 20000,
+    safeDirection: 'lower',
+    compilesTo: 'setting',
+    unlockedBy: 'receipts showing injected memory displaced no task-critical context',
+    why: 'An item cap alone does not bound injection — five long memories can swamp a window that fifty short ones would not.',
+  },
+  {
+    key: 'memory.recall_timeout_ms',
+    dimension: 'memory',
+    authority: 'user',
+    type: 'number',
+    default: 5000,
+    min: 100,
+    max: 30000,
+    safeDirection: 'lower',
+    compilesTo: 'setting',
+    why: 'Recall sits in front of every turn. Unbounded, a slow index converts a memory feature into a latency outage.',
+  },
+  {
+    key: 'memory.max_searches_per_turn',
+    dimension: 'memory',
+    authority: 'user',
+    type: 'number',
+    default: 3,
+    min: 0,
+    max: 20,
+    safeDirection: 'lower',
+    compilesTo: 'setting',
+    why: 'Without a ceiling an agent that finds nothing keeps rephrasing the same query. Three strikes and the honest answer is that the memory is not there.',
+  },
+  {
+    key: 'memory.extraction_assets',
+    dimension: 'memory',
+    authority: 'user',
+    type: 'string[]',
+    default: [],
+    safeDirection: 'n/a',
+    compilesTo: 'capability',
+    why: 'The write-side whitelist. Empty means extract nothing — the inverse of the upstream design, which treats missing config as permission to write everything.',
+  },
+  {
+    key: 'memory.reuse_credit_requires_outcome',
+    dimension: 'memory',
+    authority: 'constitutional',
+    type: 'boolean',
+    default: true,
+    safeDirection: 'n/a',
+    compilesTo: 'rule',
+    why: 'A retrieval counter rewards being retrieved, not being right, and is self-reinforcing. Credit must attach to an observed outcome or reputation becomes popularity.',
+  },
+
   // -- Reliability ---------------------------------------------------------
   {
     key: 'reliability.retry_network_max',
