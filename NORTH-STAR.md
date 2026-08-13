@@ -137,26 +137,42 @@ a non-issue, which is exactly how it gets shipped past.
 
 ## Blocked on a human
 
-These do not move without Sean, and everything downstream waits on them.
+Live list. Items move to *Done* the moment they are done — a stale blocker list
+is how a fleet stays paused for three weeks behind a gate nobody re-read.
 
-0. **Legacy Supabase keys: SETTLED, no action.** Legacy `anon`/`service_role`
-   JWTs are **disabled** on this project, so the copy of the `service_role`
-   key that leaked publicly via `DealAppSeo/repid-engine` is **inert**. Not an
-   incident. One standing rule: **never press "Re-enable JWT-based API keys"**.
-   Closed in `docs/KEY-ROTATION.md` and in the DB's settled facts — do not
-   re-open it from a stale doc.
-1. **Fleet HOLD gated on an impossible action.** `global_pause=true` since
-   2026-07-22, gated on "rotate the `service_role` JWT" — Supabase has removed
-   that capability. Restate the gate (disable legacy keys → verify → migrate to
-   signing keys → revoke), then clear the pause. **The key half of that gate is
-   already satisfied** — legacy keys are disabled (item 0) — so the gate can be
-   restated and cleared now.
-2. **Network egress allowlist**: `trustshell.dev`, `trustrepid.dev`,
-   `hyperdag.org`, `repid.dev`, `docs.lovable.dev`. Blocks any audit of the
-   *shipped* surfaces — this file audits the docs and the database only.
-3. **OAuth Lovable + Cloudflare** from an interactive session.
-4. **Merge PR #21.** Phase-2 RLS, the Railway env vars, and the first real BFT
-   run are all queued behind it.
+1. **Network egress allowlist**: `qnnpjhlxljtqyigedwkb.supabase.co`,
+   `repid-engine-production.up.railway.app`, `trustshell.dev`,
+   `trustrepid.dev`, `hyperdag.org`, `repid.dev`, `docs.lovable.dev`.
+   Set on the Claude Code environment. **Attempted 2026-08-13 and still
+   `connect_rejected`** — egress policy appears to bind at container start, so
+   a fresh session is the first thing to try. Until this lands, no agent
+   session can audit the *shipped* surfaces; this file grades docs and database
+   only.
+2. **`BASE_SEPOLIA_PRIVATE_KEY` is baked into `repid-engine`'s image** as a
+   build `ARG`/`ENV`. A funded wallet key in image layers, with nothing
+   disabled standing behind it. The most live credential issue open.
+3. **Railway env vars** on the service behind `app.aitrinitysymphony.com`:
+   `INTERNAL_ROUTE_SECRET`, `CRON_SECRET`. Without them the BFT worker cannot be
+   scheduled and every receipt stays `bft_passed = NULL`.
+4. **OAuth Cloudflare + Stripe** from an interactive session — a
+   non-interactive session cannot complete the handshake.
+5. **Deploy merged `main`, then apply the phase-2 RLS migration**
+   (`20260812220000_rls_phase2_after_deploy.sql`). ⚠ In that order. Reversed,
+   the agent grid and receipt feed go blank.
 
-*(Answered and closed: `repid-engine` is public and did hold the same key —
-see item 0. A 923-commit scan found no other credential.)*
+### Done — kept so they are not re-opened
+
+- **Legacy Supabase keys** — SETTLED. Disabled project-wide, so the publicly
+  leaked `service_role` JWT is inert. Not an incident. One standing rule:
+  **never press "Re-enable JWT-based API keys"**. `docs/KEY-ROTATION.md` plus
+  the DB's settled facts.
+- **Fleet HOLD** — cleared 2026-08-13. `verdict=GO`, `global_pause=false`,
+  first time since 2026-07-22. The gate ("rotate the `service_role` JWT") was
+  unsatisfiable as written and substantively met. `trinity_changelog` id 111,
+  rollback SQL included. *`orphaned_claims` is still 23,113 — the other half of
+  the original gate, and it does not block the fleet.*
+- **PR #21** — merged as `acc94c8`.
+- **Is `repid-engine` public and does it hold the same key?** — yes to both;
+  see the settled item above. A 923-commit scan plus seven more public repos
+  found no other credential.
+- **Ecosystem repos attached, scanned, graphed** — `npm run graph:ecosystem`.
