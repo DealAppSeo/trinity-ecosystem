@@ -318,3 +318,68 @@ closes. A closed question that is not written down is an open question.
   it reports SETTLED rather than NOT MEASURED forever from a blocked surface
   (D1). Open — needs a small evidence file the script can read, not just a
   probe.
+
+---
+
+## 2026-08-13 — session 01KzQZ, part 3 (claude-opus-5, cloud) — building M1
+
+### A8 — I shipped the house defect into the tool built to catch it
+
+The TrustShell M1 parser's first working run reported **"87 records on the
+active path, 5,421 off it."** Ninety-eight percent of a real session called
+abandoned. The number was wrong, and worse, it was *confident* — a plain
+integer in a census table, with nothing marking it as inferred.
+
+The bug: I modelled the transcript as one tree and reconstructed "what the
+session actually did" by walking `parentUuid` back from the final leaf. The
+transcript is a **forest** — 10 chain roots, 7 of them records whose parent is
+not in the file at all (compaction boundaries and session resumes), 85 branch
+points, 95 leaves. A single root-to-leaf walk reaches at most 1,484 of 5,547
+addressable records **by construction**. Everything else got labelled
+abandoned because the walk could not reach it.
+
+Two failures stacked, and the second is the one worth keeping:
+
+1. I assumed a data shape instead of measuring it. Cheap, ordinary, caught in
+   minutes.
+2. **I answered a question that has no answer in the data.** Nothing in the
+   transcript records which sibling won at a branch point. "Which records are
+   live" is not merely unmeasured, it is *undecidable from this input* — and I
+   emitted a precise-looking number for it anyway. That is A1–A7's shape exactly
+   (a system reporting something it has not earned), reproduced inside the
+   product whose stated purpose is catching it. §11 of `TRUSTSHELL-V1.md` even
+   names this risk — "the harness confabulates" — which I had read that hour.
+
+The fix was not a better heuristic. It was **deleting the field.** The census
+now reports what the graph demonstrably is (roots, dangling parents, leaves,
+branch points, longest chain) and reports no liveness verdict. Two assertions
+in `check-transcript-parser.mjs` now fail if `activePathRecords`,
+`abandonedRecords`, or `onActivePath` ever come back.
+
+What caught it: **the number was implausible on its face.** Not a test — the
+42 assertions all passed, because I had written them against my own wrong
+model, on a fixture I had built to match it. A green suite over a wrong premise
+is the four failures in `TRUSTSHELL-V1.md` §1 in miniature. What actually
+caught it was running the thing against real data and *reading the output*
+instead of the exit code.
+
+**The generalisation, and the reason this is A8 rather than a footnote:** when
+a field cannot be derived from the input, the correct output is not a best
+guess, a heuristic, or a caveat in prose beneath a confident number. It is **no
+field.** A missing field makes the next reader ask. A wrong field makes them
+build on it.
+
+### WHAT WENT RIGHT — the 2.36× overcount
+
+The same run caught a real error in the spec, which is the outcome M6 predicts.
+`TRUSTSHELL-V1.md` §4.2 claimed 2,111,919 output tokens for this session. That
+was a **per-record** sum. Claude Code repeats one turn's `usage` verbatim on
+every record of that turn, so the true figure is 1,389,855 across 1,507
+`requestId` groups — the naive sum inflates by 2.36×. [VERIFIED — 1,507 groups
+over 3,147 records; every group internally identical, zero groups differing.]
+
+The parser now reports both, named differently, with the ratio. The lesson is
+narrow and reusable: **when two plausible definitions of a metric differ by
+more than rounding, one field name for them is a bug.** Anyone re-deriving the
+number the other way has to be able to see why they disagree, or the receipt is
+not checkable — which is the whole product.

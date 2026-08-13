@@ -16,6 +16,27 @@ export {
   resolveHarnessProfile,
   personalisationReport,
 } from './HarnessProfile';
+export {
+  KNOWN_RECORD_TYPES,
+  KNOWN_BLOCK_TYPES,
+  OBSERVED_CORPUS,
+  PARSER_VERSION,
+  parseTranscript,
+  formatCensusTable,
+  formatSummary,
+} from './TranscriptParser';
+export type {
+  ToolEffect,
+  ToolOutcome,
+  ToolInvocation,
+  ModelSpend,
+  SpendSummary,
+  BlockCensus,
+  MalformedLine,
+  TranscriptCensus,
+  ParsedTranscript,
+  ParseOptions,
+} from './TranscriptParser';
 export type {
   Authority,
   Layer,

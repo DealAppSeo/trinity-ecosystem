@@ -389,7 +389,7 @@ Named so nothing here reads as further along than it is.
 | :-- | :-- |
 | `HarnessProfile.ts` registry + resolver | **built**, 31 assertions passing, 0 new `tsc` errors |
 | `repid_permissions` ladder | **written, not applied** — Sean-gated, see the migration header |
-| Session receipts feeding earned grants | **not built** — `TRUSTSHELL-V1.md` M1–M4 |
+| Session receipts feeding earned grants | **partly built** — `TRUSTSHELL-V1.md` M1 (transcript parser) done 2026-08-13; M2–M4 not started, so no receipt exists yet and every `earned` setting still resolves to its floor |
 | `repid_writes_require_receipt` enforcement | **not built** — the constraint is declared, nothing enforces it |
 | `repid_config` bounds enforcement | **not built** — why `can_modify_config` is false everywhere |
 | Compiling `rule` settings into agent instructions | **not built** — resolver output is not yet wired to anything |
