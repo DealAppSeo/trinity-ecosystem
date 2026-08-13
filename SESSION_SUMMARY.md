@@ -16,8 +16,44 @@ implementation in `lib/trustshell/HarnessProfile.ts`, **31 assertions** in
 `scripts/check-harness-profile.mjs`, wired into `npm run check`. **0 new `tsc` errors**
 (36 before, 36 after, none in the new files). REAL, not stub — but see the gap below.
 
+**`249af42` — TrustShell M1, the transcript parser.** The load-bearing gap named in
+`HARNESS-SPEC.md` §6: a receipt starts with reading what an agent actually did.
+`lib/trustshell/TranscriptParser.ts` is a pure function — transcript string in, census
+out, no file handle and no hash, because §7.2 requires the observer be read-only on
+`~/.claude` and because a live session is appended to *while it is read* (parsing a path
+twice gives two answers). **42 assertions** in `scripts/check-transcript-parser.mjs`
+against two synthetic fixtures, wired into `npm run check`. CLI:
+`node scripts/trustshell-parse.mjs <session.jsonl>`. **0 new `tsc` errors** (36 → 36).
+
+M1's acceptance criterion — *"reproduces the §3 table on any saved session; 0 phantom
+results"* — holds on the live session: 6,946 lines, **0 phantom, 0 malformed, 0
+unrecognised record types**. [VERIFIED 2026-08-13 03:09Z — run against
+`~/.claude/projects/-home-user-trinity-ecosystem/8c56e4c1….jsonl`]
+
 **Earlier tonight:** `3c7eea7` (mainnet preconditions), `da8208e` (NORTH-STAR blocker list
-made live + Done section). PR **#22** open, draft, mergeable clean, Vercel green.
+made live + Done section). PR **#22** open, draft, Vercel **Ready at `249af42`**.
+
+## What M1 found — two spec corrections and one defect of mine
+
+1. **Spend in `TRUSTSHELL-V1.md` §4.2 was overcounted 2.36×.** It claimed 2,111,919
+   output tokens; that was a **per-record** sum. Claude Code repeats a turn's `usage`
+   verbatim on every record of that turn. True figure **1,389,855** across 1,507
+   `requestId` groups. [VERIFIED — 1,507 groups over 3,147 records, every group
+   internally identical, zero differing.] Parser now reports both, named differently,
+   with the ratio.
+2. **`tool_result` blocks outnumber `tool_use` blocks.** §3's table implies
+   `results = uses − orphans`. A retried or rejected-then-approved call is delivered
+   **twice** under one `tool_use_id`: 1,562 uses − 2 orphans + 11 duplicates = 1,571
+   blocks. One call, two deliveries, one action. [VERIFIED]
+3. **LESSONS A8 — I shipped the house defect into the tool built to catch it.** The
+   parser's first run reported "87 records on the active path, 5,421 off it" — 98% of a
+   real session called abandoned, as a bare integer. The transcript is a **forest**
+   (10 roots, 7 of them compaction/resume seams, 85 branch points, 95 leaves), not one
+   tree, so a single leaf walk reaches 1,484 of 5,547 records by construction. Worse:
+   nothing in the format records which sibling won at a branch, so liveness is
+   **undecidable from this input** and I emitted a precise number for it anyway. Fixed
+   by **deleting the field**, not improving the guess. All 42 assertions passed while it
+   was wrong — I had written them against my own model. Reading the output caught it.
 
 ## Found live — three instances of the same defect
 
@@ -40,7 +76,8 @@ made live + Done section). PR **#22** open, draft, mergeable clean, Vercel green
 |---|---|
 | `HarnessProfile.ts` registry + resolver | **REAL** — 31 assertions, runs in `npm run check` |
 | `repid_permissions` ladder migration | **WRITTEN, NOT APPLIED** — Sean-gated, see below |
-| Session receipts feeding earned grants | **NOT BUILT** — every earned setting sits at its floor |
+| TrustShell M1 transcript parser | **REAL** — 42 assertions, runs in `npm run check`; verified against a live session |
+| Session receipts (TrustShell M2–M4) | **NOT BUILT** — M1 reads the transcript; nothing emits, signs or verifies a receipt yet, so every earned setting still sits at its floor |
 | `repid_writes_require_receipt` enforcement | **NOT BUILT** — declared, nothing enforces it |
 | Compiling resolved `rule` settings into agent instructions | **NOT BUILT** |
 | Per-user profile storage / onboarding surface | **NOT BUILT** — no table, no UI |
@@ -82,9 +119,18 @@ Honest summary: until receipts exist, the harness is a fully tested implementati
 # 2. Re-run the harness assertions after any edit to the registry.
 npm run check:harness
 
-# 3. Start the load-bearing gap: the transcript parser (TRUSTSHELL-V1.md M1).
-#    Until it exists, every `earned` setting resolves to its floor by design.
+# 3. M1 is done. Next is M2 — emit the §5 receipt from the parsed transcript, with an
+#    audit_hash stable across re-runs of the same pinned bytes. Start by reading what
+#    M1 already produces, then decide TRUSTSHELL-V1.md §12 Q1 (receipt storage) and
+#    Q2 (signing key custody) — both are open and both block M3.
+node scripts/trustshell-parse.mjs --latest --json | head -60
 ```
+
+**Watch item for M2.** The parser has been run against **one** session on one format
+revision. §11's first named risk is transcript format churn. `KNOWN_RECORD_TYPES` is
+documented as an observed census rather than a claim about the format; unknown types are
+reported, and `--strict` makes them fatal. A second real session on a different Claude
+Code version is the cheapest next piece of evidence, and nobody has run one.
 
 ---
 
