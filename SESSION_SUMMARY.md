@@ -44,11 +44,24 @@ The finding that reordered the work: **Trinity has no recall problem it can meas
 because it has never recalled anything.** [VERIFIED 2026-08-13 04:30Z via SQL]
 `access_count > 0` matches **0 of 429** rows in `agent_memory_nodes`;
 `trinity_skills.last_used_at` is null on all 14. Three months of writes, zero reads.
-Four blockers, ranked: (1) all **34** distinct `agent_memory_nodes.agent_id` values
-resolve to **no row** in `agents`, `trinity_agents`, `agent_kya_registry` *or*
-`conductor_state` — memory has no owner, so recall cannot be scoped; (2) 213 of 429 nodes
-embedded, **0 of 215** patterns embedded despite having the column; (3) nothing links a
-memory to an outcome; (4) no dedup ever ran — 215 patterns hold **52** distinct insights.
+**CORRECTED 05:20Z — see `LESSONS` A9.** I first reported that all 34
+`agent_memory_nodes.agent_id` values resolved to no agent registry and ranked "identity
+is broken" as defect #1. **That was wrong.** I checked four registries and missed
+`repid_agents`, the one the writing code uses. **34 of 34 owner ids and 429 of 429 nodes
+resolve** against it. Nothing to repair; view corrected (changelog #118), `owner_agent_name`
+dropped from the migration. Two neighbouring claims were understated, not wrong, and now
+rest on stronger evidence: "never recalled" holds on `access_count=0` **and**
+`accessed_at = created_at` on all 429 rows (two columns, different writers); and a recall
+path **does** exist and is deployed — `GET /api/v1/agents/:id/recall`, public, no auth —
+it has simply never returned a row.
+
+The real blocker, and it is sharper than the wrong one: `graph_rag_match_nodes` filters on
+`embedding IS NOT NULL`. Of 429 nodes, **204 belong to `test-agent-v11`** carrying **192 of
+the 213 embeddings**. The twelve production agents hold 184 nodes with **9 embeddings
+between them**, and **eight of the twelve have zero** — nexus, apm, hdm, orch, torch, w3c,
+gcm, mel. For those eight recall returns empty **by construction**, forever. Per-agent
+breakdown is live in `v_agent_memory_readiness`. Remaining defects: nothing links a memory
+to an outcome; no dedup ever ran (215 patterns hold **52** distinct insights).
 Also: 13 of 22 memory tables are empty, including the whole warm/cold/glacier tier, and
 `trinity_learned_patterns` exists **twice** (`public` has `embedding`, `private` has
 `times_reused`) — two complementary halves of one table split across schemas.
@@ -155,15 +168,18 @@ Honest summary: until receipts exist, the harness is a fully tested implementati
    alters base tables, which is beyond the additive-view allowance. Complete rollback SQL
    is in the file header; no column is dropped and no row deleted, so rollback restores
    the exact prior shape.
-5. **Where do the 34 orphan agent uuids come from?** Only repid-engine can answer — it
-   wrote those rows and this session cannot reach Railway. Until answered, memory cannot
-   be scoped per agent and the whole per-agent loadout in `docs/AGENT-MEMORY-SPEC.md` §4
-   is un-appliable. Exact action: grep repid-engine for the `agent_memory_nodes` writer
-   and report what it puts in `agent_id`. **This is the single highest-value unblock** —
-   items 4 and the entire memory roadmap sit behind it.
-6. **Decide the embedding model, once.** 216 nodes and 215 patterns need embedding.
-   Mixing embedding models within one index silently degrades every similarity score, so
-   this choice is effectively permanent. Exact action: name the model and the budget.
+5. ~~Where do the 34 orphan agent uuids come from?~~ **RESOLVED 05:20Z — the premise was
+   my error.** They were never orphaned; they are a clean FK into `repid_agents`. See
+   `LESSONS` A9. No action needed.
+6. **Embed the 175 unembedded production-agent nodes. THIS IS THE HIGHEST-VALUE UNBLOCK.**
+   It is the entire gap between "the memory feature exists" and "the memory feature
+   returns something" for eight of the twelve agents. Exact action: name the embedding
+   model and approve ~175 embedding calls. The model choice is effectively permanent —
+   the existing 213 vectors came from whatever `src/services/graph-rag/embedding-service.ts`
+   uses, and mixing models within one index silently degrades every similarity score
+   without erroring. Match it or re-embed everything; do not mix.
+7. **Railway access for this session** (see §Railway below) — the one credential gap that
+   blocks the agent-side work rather than the database side.
 
 ## Next 3 commands
 

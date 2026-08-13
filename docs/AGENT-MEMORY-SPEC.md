@@ -16,33 +16,74 @@ Trinity does not have a memory problem. It has a **recall** problem.
 Measured live 2026-08-13, now permanently queryable as
 `v_memory_recall_readiness` (additive view, changelog #117):
 
-| corpus | rows | retrievable | **ever read** | duplicate rows | orphan owner ids |
-|---|---:|---:|---:|---:|---:|
-| `agent_memory_nodes` | 429 | 213 | **0** | 124 | **34** |
-| `agent_learning_events` | 429 | 0 | **0** | 99 | 0 |
-| `trinity_learned_patterns` | 215 | 0 | **0** | 163 | 0 |
-| `trinity_skills` | 14 | 0 | **0** | 0 | 0 |
-
-`access_count > 0` matches **zero** of 429 memory nodes. `last_used_at` is null
-on all 14 skills. Three months of writes, not one read.
+| corpus | rows | retrievable | **ever read** | duplicate rows |
+|---|---:|---:|---:|---:|
+| `agent_memory_nodes` | 429 | 213 | **0** | 124 |
+| `agent_learning_events` | 429 | 0 | **0** | 99 |
+| `trinity_learned_patterns` | 215 | 0 | **0** | 163 |
+| `trinity_skills` | 14 | 0 | **0** | 0 |
 
 The corpus itself is fine — average content length 134–278 characters, only 17
 rows under 30 characters and 10 test-ish out of 429. Real material, written
 faithfully, never once retrieved.
 
-Four defects block a read path, ranked by what blocks what:
+### A correction, because the first version of this section was wrong
 
-1. **Identity is broken.** All 34 distinct `agent_memory_nodes.agent_id` values
-   resolve to no row in `agents`, `trinity_agents`, `agent_kya_registry` *or*
-   `conductor_state`. You cannot scope recall to an agent when the ownership key
-   points nowhere. Everything else waits on this.
-2. **Half the corpus is unreachable.** 213 of 429 nodes carry an embedding; 0 of
-   215 patterns do, despite having the column. A vector search today silently
-   misses 50% and 100% respectively — and returns a short list indistinguishable
-   from an honest miss.
-3. **Nothing links a memory to an outcome.** So reuse credit could only ever
+An earlier draft claimed a fifth defect and ranked it first: *"identity is
+broken — all 34 distinct `agent_memory_nodes.agent_id` values resolve to no
+agent registry."* **That was wrong.** It checked `agents`, `trinity_agents`,
+`agent_kya_registry` and `conductor_state`, and missed `repid_agents` — the
+registry the writing code actually uses (repid-engine
+`scripts/seed-squad-memories.ts`, `src/services/graph-rag/*`). Against
+`repid_agents`, **34 of 34 owner ids and 429 of 429 nodes resolve.** Identity
+was never broken. Logged as `LESSONS` A9; the live view has been corrected
+(changelog #118) and the `owner_agent_name` column dropped from the migration.
+
+Two claims also needed strengthening rather than retracting:
+
+- **"Never recalled" was inferred from a counter nothing had been shown to
+  write.** `access_count` appears in repid-engine only in type definitions and
+  SELECT lists — but `graph_rag_touch_node` (SECURITY DEFINER) does increment
+  it, and `retrieval-service.ts:91` does call it fire-and-forget. The claim now
+  rests on two independent columns written by different paths: `access_count=0`
+  **and** `accessed_at = created_at` on all 429 rows, zero moved.
+- **A recall path exists and is deployed.** `GET /api/v1/agents/:id/recall`,
+  public, no auth, with embeddings, `graph_rag_match_nodes` and edge expansion.
+  The earlier "there is simply no read path" was false. The path is built; it
+  has never successfully returned a row.
+
+### What is actually wrong
+
+1. **Retrievability, and it is far worse than the 50% aggregate suggests.**
+   `graph_rag_match_nodes` filters on `embedding IS NOT NULL`. Of 429 nodes,
+   **204 belong to `test-agent-v11`** and carry **192 of the 213 embeddings**.
+   The twelve production agents hold 184 nodes with **9 embeddings between
+   them** — and **eight of the twelve have zero**. Per
+   `v_agent_memory_readiness`:
+
+   | agent | nodes | retrievable | verdict |
+   |---|---:|---:|---|
+   | trinity-sophia | 30 | 3 | retrievable, never recalled |
+   | trinity-veritas | 23 | 2 | retrievable, never recalled |
+   | trinity-shofet | 18 | 2 | retrievable, never recalled |
+   | trinity-chesed | 15 | 2 | retrievable, never recalled |
+   | trinity-nexus | 16 | **0** | **inert** |
+   | trinity-apm | 14 | **0** | **inert** |
+   | trinity-hdm | 13 | **0** | **inert** |
+   | trinity-orch | 13 | **0** | **inert** |
+   | trinity-torch | 12 | **0** | **inert** |
+   | trinity-w3c | 12 | **0** | **inert** |
+   | trinity-gcm | 10 | **0** | **inert** |
+   | trinity-mel | 8 | **0** | **inert** |
+
+   For the eight marked inert, recall returns empty **by construction** — not
+   because nothing matched, but because nothing is eligible to match. This is
+   the whole reason the memory feature looks like it works and does nothing.
+
+2. **Nothing links a memory to an outcome**, so reuse credit could only ever
    count retrievals.
-4. **No dedup ran.** 429 nodes → 305 distinct contents. 429 events → 330
+
+3. **No dedup ran.** 429 nodes → 305 distinct contents. 429 events → 330
    distinct lessons. 215 patterns → **52** distinct insights (76% duplication).
 
 A fifth, structural: **13 of 22 memory tables are empty**, including the entire
@@ -214,8 +255,8 @@ the earned authority exists to prevent.
 | M0 | Measure the corpus; `v_memory_recall_readiness` | **DONE** — changelog #117 |
 | M1 | Recall primitives: RRF, tiers, budget, utility, dedup shape | **DONE** — 44 assertions |
 | M2 | Memory as earned harness dimension | **DONE** — 7 settings |
-| M3 | Identity repair + outcome tables | **WRITTEN, NOT APPLIED** — Sean-gated |
-| M4 | Embedding backfill (216 nodes, 215 patterns) | Blocked on M3 + cost decision |
+| M3 | Outcome tables + retrieval indexes | **WRITTEN, NOT APPLIED** — Sean-gated |
+| M4 | Embedding backfill — **the actual unblock** | Needs a model + budget decision |
 | M5 | Dedup pass over 124/99/163 duplicates | Blocked on M4 (needs an index) |
 | M6 | Wire recall into the Railway agent loop | Blocked on M3; needs Railway access |
 | M7 | Receipts → earned grants | Blocked on TRUSTSHELL M2 (§12 Q1/Q2) |
@@ -231,11 +272,15 @@ the earned authority exists to prevent.
 - **M7** needs the two open TrustShell §12 decisions: receipt storage, and
   signing key custody.
 
-### Not derivable — do not let anyone backfill it by guess
+### The one decision that unblocks the most
 
-The mapping from the 34 orphan agent uuids to agent names **is not in this
-database**. Zero nodes carry `agent_name` in metadata; only 10 carry a role.
-Populating `owner_agent_name` by inference would fabricate provenance for
-memories that would then be recalled as though their owner were known. The
-column stays null until a real mapping is found — probably in repid-engine,
-which wrote these rows and which this session cannot reach.
+**Embed the 175 unembedded production-agent nodes.** That is the whole gap
+between "memory feature exists" and "memory feature returns something" for eight
+of twelve agents. It is ~175 embedding calls for the production fleet (or ~431
+for the entire corpus including test agents, which is not worth it).
+
+The choice that must be made once and never casually changed is **which
+embedding model** — the existing 213 vectors were written by whatever
+`src/services/graph-rag/embedding-service.ts` used, and mixing models within one
+index silently degrades every similarity score without erroring. Match the
+existing model or re-embed everything; do not mix.

@@ -383,3 +383,54 @@ narrow and reusable: **when two plausible definitions of a metric differ by
 more than rounding, one field name for them is a bug.** Anyone re-deriving the
 number the other way has to be able to see why they disagree, or the receipt is
 not checkable — which is the whole product.
+
+### A9 — I declared identity broken after checking four of five registries
+
+Building the agent-memory recall path, I reported as a headline finding that
+**"all 34 distinct `agent_memory_nodes.agent_id` values resolve to no row in
+`agents`, `trinity_agents`, `agent_kya_registry` or `conductor_state`"** —
+memory has no owner, recall cannot be scoped, everything else waits on this. I
+ranked it defect #1 of four, wrote a migration adding an `owner_agent_name`
+column to fix it, published a live view encoding it (`v_memory_recall_readiness`,
+changelog #117), put it in `SESSION_SUMMARY.md` as the highest-value unblock,
+and put it in the PR body as the single thing most worth Sean's time.
+
+It was wrong. The nodes are owned by **`repid_agents`** — a fifth registry I
+never queried. **34 of 34 owner ids and 429 of 429 nodes resolve** against it,
+cleanly, and always did. There was nothing to repair.
+
+What made the error, precisely: I enumerated candidate registries **from my own
+reading of the schema** — I grepped `information_schema` for tables that looked
+like agent registries, found four, and treated "not in any of these four" as
+"orphaned." I never asked the only source that actually knows: **the code that
+writes the column.** One grep of the writer (`repid-engine
+scripts/seed-squad-memories.ts`) names `repid_agents` in its second statement.
+
+The tell I walked past: 34 orphans out of 34 is not a data-integrity failure
+pattern. Real orphaning is partial — some rows migrate, some don't. A clean
+100% miss almost always means you are holding the wrong key, not that every
+key is broken. I read 34/34 as "totally broken" when it should have read
+"totally wrong lookup."
+
+Two related claims in the same work were **understated rather than wrong**, and
+the fix was to strengthen the evidence, not retract:
+
+- *"Never recalled"* rested on `access_count = 0`, a counter I had not shown
+  anything increments — and in fact grep found it only in type definitions and
+  SELECT lists, which nearly made me retract a true claim. `graph_rag_touch_node`
+  does increment it and `retrieval-service.ts:91` does call it. The claim now
+  rests on `access_count = 0` **and** `accessed_at = created_at` on all 429 rows
+  — two columns written by different code paths.
+- *"There is no read path"* was false. `GET /api/v1/agents/:id/recall` is built,
+  deployed and public. It has simply never returned a row.
+
+**The rule.** For any claim of the form "X references nothing," the authority is
+the code that writes X, not an enumeration of tables that look like they might
+be the target. Enumerating candidates yourself and finding none is evidence
+about your enumeration, not about the data. Grep the writer first.
+
+This is the same shape as A8 one milestone later: a precise, confident number
+derived from a model I built myself and never checked against the system that
+produces the data. A8 was caught by reading the output. A9 was caught only
+because the user asked me to go grep the writer — which is to say, it was not
+caught by me at all.

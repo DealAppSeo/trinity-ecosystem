@@ -12,7 +12,6 @@
 --   drop index if exists public.idx_amn_content_trgm;
 --   drop index if exists public.idx_tlp_embedding_hnsw;
 --   alter table public.agent_memory_nodes
---     drop column if exists owner_agent_name,
 --     drop column if exists reused_good,
 --     drop column if exists reused_bad,
 --     drop column if exists last_outcome_at;
@@ -26,62 +25,48 @@
 -- created additively in changelog #117):
 --
 --   corpus                    rows  retrievable  ever_read  dup   orphan_owners
---   agent_memory_nodes         429          213          0  124              34
+--   agent_memory_nodes         429          213          0  124               0
 --   agent_learning_events      429            0          0   99               0
 --   trinity_learned_patterns   215            0          0  163               0
 --   trinity_skills              14            0          0    0               0
 --
--- Read that middle column. Nothing in Trinity's memory has ever been recalled.
+-- Read that middle column. No memory node has ever been successfully recalled.
 -- The corpus is not the problem — three months of writes produced substantive
--- content. There is simply no read path, and three things block building one:
+-- content.
 --
---   1. IDENTITY. All 34 distinct `agent_memory_nodes.agent_id` values resolve
---      to no row in `agents`, `trinity_agents`, `agent_kya_registry` or
---      `conductor_state`. Memory cannot be scoped to an agent because the
---      ownership key points nowhere. This blocks everything else, which is why
---      it is fixed first below.
+-- CORRECTED 2026-08-13 05:1xZ. An earlier draft of this header claimed identity
+-- was broken: that all 34 distinct `agent_memory_nodes.agent_id` values resolved
+-- to no agent registry, and it added an `owner_agent_name` column to fix it.
+-- That was WRONG. It checked `agents`, `trinity_agents`, `agent_kya_registry`
+-- and `conductor_state` — but not `repid_agents`, which is the registry the
+-- writing code actually uses (repid-engine `scripts/seed-squad-memories.ts`,
+-- `src/services/graph-rag/*`). Against `repid_agents`, **34 of 34 owner ids and
+-- 429 of 429 nodes resolve.** Identity was never broken; the column that was
+-- going to fix it has been removed from this migration. See LESSONS A9.
 --
---   2. RETRIEVABILITY. Half of agent_memory_nodes carries an embedding; none of
---      trinity_learned_patterns does, despite having the column. A vector
---      search over this corpus today would silently miss 50% and 100%
---      respectively — and return a short list that reads like an honest miss.
+-- What is actually wrong, measured per agent via `v_agent_memory_readiness`:
 --
---   3. OUTCOME. Nothing records whether a recalled memory helped. Without that
+--   1. RETRIEVABILITY, and it is far worse than the 50% aggregate suggests.
+--      `graph_rag_match_nodes` filters on `embedding IS NOT NULL`. Of the 429
+--      nodes, 204 belong to `test-agent-v11` and carry 192 of the 213
+--      embeddings. The twelve production `trinity-*` agents hold 184 nodes with
+--      **9 embeddings between them** — and eight of the twelve (nexus, apm,
+--      hdm, orch, torch, w3c, gcm, mel) have **zero**. For those eight, recall
+--      returns empty by construction, forever, no matter what is asked.
+--
+--   2. OUTCOME. Nothing records whether a recalled memory helped. Without that
 --      link, reuse credit can only count retrievals, which rewards being
 --      retrieved rather than being right and is self-reinforcing. See
 --      `memory.reuse_credit_requires_outcome` in lib/trustshell/HarnessProfile.ts.
 --
--- This migration fixes 1 and 3 structurally and gives 2 its indexes. It does
--- NOT backfill embeddings — that costs money per row and is a separate,
--- explicitly costed job.
+-- This migration fixes 2 structurally and gives 1 its indexes. It does NOT
+-- backfill embeddings — that costs money per row and is a separate, explicitly
+-- costed job, and it is now the single highest-value one.
 
 begin;
 
 -- ---------------------------------------------------------------------------
--- 1. Identity: give memory a resolvable owner
--- ---------------------------------------------------------------------------
--- A text agent name rather than a second uuid FK, deliberately. The four
--- registries disagree on ids (34 orphans prove it) but agree on names —
--- `agent_heartbeat.agent_name`, `agents.name`, `trinity_agents.name` and
--- `agent_kya_registry.agent_name` all use the `trinity-*` convention. Naming is
--- the join key that actually holds across this schema. The existing agent_id
--- column is left untouched so nothing that writes it breaks.
-
-alter table public.agent_memory_nodes
-  add column if not exists owner_agent_name text;
-
-comment on column public.agent_memory_nodes.owner_agent_name is
-  'Resolvable owner. The pre-existing agent_id uuid is orphaned across all four '
-  'agent registries as of 2026-08-13 (34/34 unmatched); this column is the key '
-  'recall actually scopes on. Nullable: a null owner means fleet-wide memory, '
-  'not an error.';
-
-create index if not exists idx_amn_owner_agent_name
-  on public.agent_memory_nodes (owner_agent_name)
-  where owner_agent_name is not null;
-
--- ---------------------------------------------------------------------------
--- 2. Outcome counters
+-- 1. Outcome counters
 -- ---------------------------------------------------------------------------
 -- Two counters, not one. A single `usage_count` cannot distinguish a memory
 -- recalled twice and right both times from one recalled twice and wrong both
@@ -101,7 +86,7 @@ comment on column public.agent_memory_nodes.reused_bad is
   'misleading memory should be harder to retrieve than an unproven one.';
 
 -- ---------------------------------------------------------------------------
--- 3. Indexes for the two retrieval legs
+-- 2. Indexes for the two retrieval legs
 -- ---------------------------------------------------------------------------
 -- HNSW over cosine distance for the vector leg. Partial, because indexing the
 -- 216 null-embedding rows buys nothing.
@@ -126,7 +111,7 @@ create index if not exists idx_amn_content_trgm
   using gin (content gin_trgm_ops);
 
 -- ---------------------------------------------------------------------------
--- 4. Recall log — the receipt substrate
+-- 3. Recall log — the receipt substrate
 -- ---------------------------------------------------------------------------
 -- Every recall, including the ones that returned nothing. Empty recalls are the
 -- most informative rows here: they are how you find out an index is missing
@@ -160,7 +145,7 @@ create index if not exists idx_mrl_degraded
   on public.memory_recall_log (created_at desc) where degraded;
 
 -- ---------------------------------------------------------------------------
--- 5. Outcome link — what turns a recall into evidence
+-- 4. Outcome link — what turns a recall into evidence
 -- ---------------------------------------------------------------------------
 -- This is the table that makes memory *earn*. A recall on its own is not
 -- evidence of anything. A recall joined to a task that later verifiably
@@ -184,7 +169,7 @@ create index if not exists idx_mol_node_outcome
   on public.memory_outcome_link (node_id, outcome);
 
 -- ---------------------------------------------------------------------------
--- 6. RLS
+-- 5. RLS
 -- ---------------------------------------------------------------------------
 -- Both new tables carry agent behaviour and must never be anon-readable. This
 -- project already has two tables sitting at `USING (true)` for anon (LESSONS
@@ -209,11 +194,9 @@ commit;
 --     decision and a model choice that must then stay fixed, because mixing
 --     embedding models in one index silently degrades every similarity score.
 --
---   * Populating owner_agent_name for the 429 existing rows. The mapping from
---     the 34 orphan uuids to agent names is NOT derivable from this database —
---     it is not in metadata (0 rows carry agent_name; only 10 carry a role).
---     Writing a guess here would fabricate provenance for memories that would
---     then be recalled as though their owner were known. Left null.
+--   * Any identity repair. There is nothing to repair — `agent_memory_nodes.
+--     agent_id` is a clean FK into `repid_agents` and always was. The earlier
+--     `owner_agent_name` column has been removed from this migration entirely.
 --
 --   * Deduplication of the 124 duplicate node contents, 99 duplicate lessons
 --     and 163 duplicate pattern insights. Requires the batch-dedup pass in
