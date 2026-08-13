@@ -15,15 +15,54 @@ already been wrong once — see LESSONS A4.
 | Surface | Actually served by |
 |---|---|
 | `app.aitrinitysymphony.com` | **Railway** (`x-railway-edge` in response headers) |
+| `aitrinitysymphony.com` (apex) | **Vercel** — 200, redirects to `www` |
+| `www.aitrinitysymphony.com` | **Vercel** (`x-vercel-id`) |
 | `*.vercel.app` for this repo | Vercel project `ai-trinity-symphony-landing` (`prj_EtbAAh789ySdcT0AZc8cgZNui3lt`) |
 
 The same Next app runs in **both places with separate environment variables.** A
 200 from the custom domain says nothing about the Vercel deployment, and vice
 versa. Check `x-railway-edge` / `x-vercel-id` in the response headers to know which
-one answered you.
+one answered you. Body sizes differ between the two (23,588 vs 23,995 bytes on
+2026-08-13) — that is the separate-env split, not a bug.
+
+**The apex and `www` rows were missing from this table until 2026-08-13**, which
+cost real time: with only `app.*` listed, `app.*` looks like the whole product,
+and it is the one surface Vercel does **not** serve. Those two are Vercel, they
+are **publicly reachable**, and they are the only way to observe the Vercel
+deployment when the Vercel API is unavailable — which is exactly the situation
+that surfaced them.
 
 Vercel `ssoProtection` is `all_except_custom_domains`, so every `.vercel.app` URL
-302s to `vercel.com/sso-api`. You cannot fetch a preview URL from an agent session.
+302s to `vercel.com/sso-api`. You cannot fetch a preview URL from an agent
+session. The custom domains above are exempt, which is why they work.
+
+### Knowing WHICH COMMIT a surface is running
+
+`GET /api/version` → `{ commit, commit_short, platform, environment, region }`.
+Public, uncached, and it names which platform answered.
+
+A 200 from a domain proves the site is **up**, not that it is running the commit
+you just merged: a platform keeps the last SUCCESSFUL build serving when a new
+deploy fails, so a green pipeline and a healthy page are both compatible with
+week-old code. Compare `commit` against `origin/main` HEAD before believing a
+deploy landed. `www` was seen serving `x-vercel-cache: HIT`, so cache-busting
+matters here — this route sets `no-store` for that reason.
+
+repid-engine has the same thing at `GET /health` → `deployed_commit`.
+
+### Reaching these hosts from a sandboxed agent session
+
+`curl` from the container is proxy-denied for most external hosts, but **Supabase
+`pg_net` is not** — it egresses from Supabase infrastructure:
+
+```sql
+select net.http_get(url := 'https://www.aitrinitysymphony.com/api/version',
+                    timeout_milliseconds := 45000);
+-- then: select status_code, headers, content from net._http_response where id = <id>;
+```
+
+`net._http_response.headers` carries `x-vercel-id` / `x-railway-edge`, so this
+answers "which surface, which commit" in one round trip.
 
 ## Supabase
 
