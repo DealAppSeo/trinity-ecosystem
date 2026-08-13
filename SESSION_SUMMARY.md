@@ -1,4 +1,99 @@
+# SESSION SUMMARY — 2026-08-13 (claude-opus-5, cloud/scheduled)
+
+Surface = **cloud/scheduled** (Claude Code Remote).
+Access = GitHub **yes** (read+write via MCP), Supabase **yes** (MCP), Vercel **yes** (MCP),
+Railway **no** (proxy denies CONNECT). Cloudflare MCP **unauthenticated** — unavailable.
+
+Preflight: `v_agent_preflight` → **verdict=GO, global_pause=false**. No tasks claimed from
+the queue; all work below was directly user-requested.
+
+## Accomplished
+
+**`1af1f00` — the harness profile.** Six dimensions (loops, tools, memory, reliability,
+permissions, verification) as settings resolving through `vendor → org → user → agent`,
+with one authority — `earned` — that no layer may write. Spec in `docs/HARNESS-SPEC.md`,
+implementation in `lib/trustshell/HarnessProfile.ts`, **31 assertions** in
+`scripts/check-harness-profile.mjs`, wired into `npm run check`. **0 new `tsc` errors**
+(36 before, 36 after, none in the new files). REAL, not stub — but see the gap below.
+
+**Earlier tonight:** `3c7eea7` (mainnet preconditions), `da8208e` (NORTH-STAR blocker list
+made live + Done section). PR **#22** open, draft, mergeable clean, Vercel green.
+
+## Found live — three instances of the same defect
+
+1. **`repid_permissions` has always been empty.** Right shape, zero rows, so
+   `get_conductor_permissions()` has returned nothing for every conductor since creation.
+   [VERIFIED — row count + function definition read live]
+2. **Two reputation scales.** `conductor_state.reputation_score` is **0..1** (8 rows,
+   0.4–1.0, unknown defaults to 0.5). `agent_kya_registry.repid_score` and
+   `RepIDConfig.ts` are **0..10000**. `repid_permissions.min_repid` is consumed by the
+   former despite its name. Banding on the RepID scale would park every conductor in the
+   floor tier permanently while looking like a working ladder. [VERIFIED]
+3. **`v_fleet_truth` scores a responding port as a working agent.** Reports **12/12 live**;
+   all twelve on `probe` alone — heartbeats **~26 days** stale, 8 of 12 with no logged work
+   ever. `v_agent_preflight.agents_live_10m` reads the heartbeat table and says **0**. Both
+   are in the preflight contract; they disagree. [VERIFIED 2026-08-13 01:50Z]
+
+## REAL vs STUB
+
+| Piece | State |
+|---|---|
+| `HarnessProfile.ts` registry + resolver | **REAL** — 31 assertions, runs in `npm run check` |
+| `repid_permissions` ladder migration | **WRITTEN, NOT APPLIED** — Sean-gated, see below |
+| Session receipts feeding earned grants | **NOT BUILT** — every earned setting sits at its floor |
+| `repid_writes_require_receipt` enforcement | **NOT BUILT** — declared, nothing enforces it |
+| Compiling resolved `rule` settings into agent instructions | **NOT BUILT** |
+| Per-user profile storage / onboarding surface | **NOT BUILT** — no table, no UI |
+
+Honest summary: until receipts exist, the harness is a fully tested implementation of
+**least privilege for everybody**. Right failure mode, not yet a reputation system.
+
+## BLOCKED_FOR_SEAN
+
+1. **Apply `supabase/migrations/20260813020000_repid_permissions_ladder.sql`.** Exact
+   action: run that file against `qnnpjhlxljtqyigedwkb`. Not done because it is a live
+   authority expansion — it grants **Platinum to APM, HDM, MEL, VERITAS** on scores of
+   exactly 1.0 with **zero receipts** behind them, which is the specific thing
+   `HARNESS-SPEC.md` forbids. Nothing in this repo calls `get_conductor_permissions()`,
+   but an external Railway caller cannot be ruled out from a sandboxed session, so blast
+   radius is **UNVERIFIED**. Rollback SQL is in the file header.
+2. **`repid_config` is readable by `anon`, and holds `enterprise_api_key`.** Policy
+   `"Enable read for anon"` is `SELECT … USING (true)` for `{anon, authenticated,
+   service_role}`; the row `enterprise_api_key = 495150b8-…` is described as "Enterprise
+   bypass key for rate limits". Publishable keys map to `anon` and ship in the browser
+   bundle, so **anyone who views source can read it**. Unlike the settled legacy JWT, this
+   one is live and reachable. Exact action: decide between rotating the key, moving it out
+   of `repid_config`, or replacing the blanket policy with a column/row-filtered view.
+   Not done here — key rotation and RLS changes on a live read path are both fenced.
+3. **Sean-gate bookkeeping is split.** `v_agent_preflight.open_sean_gates` counts
+   `autonomous_tasks`, which `NORTH-STAR.md` marks "historical — do not add to". So the
+   canonical way to file a gate contradicts the canonical planning surface. Logged here
+   instead of adding to a deprecated table. Exact action: point `open_sean_gates` at
+   `trinity_tasks`, or un-deprecate `autonomous_tasks` for this one purpose.
+
+## Next 3 commands
+
+```bash
+# 1. Confirm the fleet-truth finding for yourself before trusting any liveness number.
+#    Expect: every row liveness_signal='probe', minutes_since_ping ~37,000+.
+#    psql: select agent_name, is_live, liveness_signal, minutes_since_ping,
+#                 minutes_since_work from v_fleet_truth order by agent_name;
+
+# 2. Re-run the harness assertions after any edit to the registry.
+npm run check:harness
+
+# 3. Start the load-bearing gap: the transcript parser (TRUSTSHELL-V1.md M1).
+#    Until it exists, every `earned` setting resolves to its floor by design.
+```
+
+---
+
 # SESSION SUMMARY — 2026-08-11 (claude-opus-5, cloud/scheduled)
+
+> **Stale below this line.** The header that follows says `verdict=HOLD,
+> global_pause=true` and `0/12 live`. The pause was cleared 2026-08-13 and the fleet
+> numbers are contested — see the current section above. Kept for its merged-PR and
+> credential history, which is still accurate.
 
 Surface = **cloud/scheduled** (Claude Code Remote).
 Access = GitHub **yes** (read+write via MCP), Supabase **yes**, Vercel **yes** (MCP),
