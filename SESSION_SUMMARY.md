@@ -1,4 +1,229 @@
+# SESSION SUMMARY — 2026-08-13 (claude-opus-5, cloud/scheduled)
+
+Surface = **cloud/scheduled** (Claude Code Remote).
+Access = GitHub **yes** (read+write via MCP), Supabase **yes** (MCP), Vercel **yes** (MCP),
+Railway **no** (proxy denies CONNECT). Cloudflare MCP **unauthenticated** — unavailable.
+
+Preflight: `v_agent_preflight` → **verdict=GO, global_pause=false**. No tasks claimed from
+the queue; all work below was directly user-requested.
+
+## Accomplished
+
+**`1af1f00` — the harness profile.** Six dimensions (loops, tools, memory, reliability,
+permissions, verification) as settings resolving through `vendor → org → user → agent`,
+with one authority — `earned` — that no layer may write. Spec in `docs/HARNESS-SPEC.md`,
+implementation in `lib/trustshell/HarnessProfile.ts`, **31 assertions** in
+`scripts/check-harness-profile.mjs`, wired into `npm run check`. **0 new `tsc` errors**
+(36 before, 36 after, none in the new files). REAL, not stub — but see the gap below.
+
+**`249af42` — TrustShell M1, the transcript parser.** The load-bearing gap named in
+`HARNESS-SPEC.md` §6: a receipt starts with reading what an agent actually did.
+`lib/trustshell/TranscriptParser.ts` is a pure function — transcript string in, census
+out, no file handle and no hash, because §7.2 requires the observer be read-only on
+`~/.claude` and because a live session is appended to *while it is read* (parsing a path
+twice gives two answers). **42 assertions** in `scripts/check-transcript-parser.mjs`
+against two synthetic fixtures, wired into `npm run check`. CLI:
+`node scripts/trustshell-parse.mjs <session.jsonl>`. **0 new `tsc` errors** (36 → 36).
+
+M1's acceptance criterion — *"reproduces the §3 table on any saved session; 0 phantom
+results"* — holds on the live session: 6,946 lines, **0 phantom, 0 malformed, 0
+unrecognised record types**. [VERIFIED 2026-08-13 03:09Z — run against
+`~/.claude/projects/-home-user-trinity-ecosystem/8c56e4c1….jsonl`]
+
+**Earlier tonight:** `3c7eea7` (mainnet preconditions), `da8208e` (NORTH-STAR blocker list
+made live + Done section). PR **#22** open, draft, Vercel **Ready at `249af42`**.
+
+**Agent memory — research, measurement, and the recall path.** Deep dive on
+`TencentCloud/TencentDB-Agent-Memory` (MIT) and mapping it onto the RepID harness.
+Write-up in `docs/AGENT-MEMORY-SPEC.md`, primitives in `lib/trustshell/MemoryRecall.ts`,
+**44 assertions** in `scripts/check-memory-recall.mjs`, wired into `npm run check` as
+`check:memory`. **0 new `tsc` errors** (36 → 36; one I introduced — a Map-iterator spread
+that the repo target rejects — was caught by the diff and fixed).
+
+The finding that reordered the work: **Trinity has no recall problem it can measure,
+because it has never recalled anything.** [VERIFIED 2026-08-13 04:30Z via SQL]
+`access_count > 0` matches **0 of 429** rows in `agent_memory_nodes`;
+`trinity_skills.last_used_at` is null on all 14. Three months of writes, zero reads.
+**CORRECTED 05:20Z — see `LESSONS` A9.** I first reported that all 34
+`agent_memory_nodes.agent_id` values resolved to no agent registry and ranked "identity
+is broken" as defect #1. **That was wrong.** I checked four registries and missed
+`repid_agents`, the one the writing code uses. **34 of 34 owner ids and 429 of 429 nodes
+resolve** against it. Nothing to repair; view corrected (changelog #118), `owner_agent_name`
+dropped from the migration. Two neighbouring claims were understated, not wrong, and now
+rest on stronger evidence: "never recalled" holds on `access_count=0` **and**
+`accessed_at = created_at` on all 429 rows (two columns, different writers); and a recall
+path **does** exist and is deployed — `GET /api/v1/agents/:id/recall`, public, no auth —
+it has simply never returned a row.
+
+The real blocker, and it is sharper than the wrong one: `graph_rag_match_nodes` filters on
+`embedding IS NOT NULL`. Of 429 nodes, **204 belong to `test-agent-v11`** carrying **192 of
+the 213 embeddings**. The twelve production agents hold 184 nodes with **9 embeddings
+between them**, and **eight of the twelve have zero** — nexus, apm, hdm, orch, torch, w3c,
+gcm, mel. For those eight recall returns empty **by construction**, forever. Per-agent
+breakdown is live in `v_agent_memory_readiness`. Remaining defects: nothing links a memory
+to an outcome; no dedup ever ran (215 patterns hold **52** distinct insights).
+Also: 13 of 22 memory tables are empty, including the whole warm/cold/glacier tier, and
+`trinity_learned_patterns` exists **twice** (`public` has `embedding`, `private` has
+`times_reused`) — two complementary halves of one table split across schemas.
+
+`v_memory_recall_readiness` created live (additive, reversible, **changelog #117**) so
+this stays visible instead of needing a bespoke query each session. It reports
+**FAILED on all four corpora** today.
+
+Seven memory settings added to the harness, three of them `earned`. The cut: recalling
+your *own* memory is baseline (floor is 5 items, not 0 — an agent denied it is amnesiac,
+which protects nobody); recalling *peers'* memory is the privilege, because that is where
+one agent's wrong conclusion becomes twelve agents'. Two upstream ideas deliberately
+inverted, both documented at their call sites: their extraction gate is **permissive when
+unconfigured** (ours denies), and their `usage_count` is a **popularity counter** that
+rewards being retrieved rather than being right (ours nets good against bad outcomes, so
+a harmful memory ranks *below* an unproven one — asserted).
+
+## What M1 found — two spec corrections and one defect of mine
+
+1. **Spend in `TRUSTSHELL-V1.md` §4.2 was overcounted 2.36×.** It claimed 2,111,919
+   output tokens; that was a **per-record** sum. Claude Code repeats a turn's `usage`
+   verbatim on every record of that turn. True figure **1,389,855** across 1,507
+   `requestId` groups. [VERIFIED — 1,507 groups over 3,147 records, every group
+   internally identical, zero differing.] Parser now reports both, named differently,
+   with the ratio.
+2. **`tool_result` blocks outnumber `tool_use` blocks.** §3's table implies
+   `results = uses − orphans`. A retried or rejected-then-approved call is delivered
+   **twice** under one `tool_use_id`: 1,562 uses − 2 orphans + 11 duplicates = 1,571
+   blocks. One call, two deliveries, one action. [VERIFIED]
+3. **LESSONS A8 — I shipped the house defect into the tool built to catch it.** The
+   parser's first run reported "87 records on the active path, 5,421 off it" — 98% of a
+   real session called abandoned, as a bare integer. The transcript is a **forest**
+   (10 roots, 7 of them compaction/resume seams, 85 branch points, 95 leaves), not one
+   tree, so a single leaf walk reaches 1,484 of 5,547 records by construction. Worse:
+   nothing in the format records which sibling won at a branch, so liveness is
+   **undecidable from this input** and I emitted a precise number for it anyway. Fixed
+   by **deleting the field**, not improving the guess. All 42 assertions passed while it
+   was wrong — I had written them against my own model. Reading the output caught it.
+
+## Found live — three instances of the same defect
+
+1. **`repid_permissions` has always been empty.** Right shape, zero rows, so
+   `get_conductor_permissions()` has returned nothing for every conductor since creation.
+   [VERIFIED — row count + function definition read live]
+2. **Two reputation scales.** `conductor_state.reputation_score` is **0..1** (8 rows,
+   0.4–1.0, unknown defaults to 0.5). `agent_kya_registry.repid_score` and
+   `RepIDConfig.ts` are **0..10000**. `repid_permissions.min_repid` is consumed by the
+   former despite its name. Banding on the RepID scale would park every conductor in the
+   floor tier permanently while looking like a working ladder. [VERIFIED]
+3. **`v_fleet_truth` scores a responding port as a working agent.** Reports **12/12 live**;
+   all twelve on `probe` alone — heartbeats **~26 days** stale, 8 of 12 with no logged work
+   ever. `v_agent_preflight.agents_live_10m` reads the heartbeat table and says **0**. Both
+   are in the preflight contract; they disagree. [VERIFIED 2026-08-13 01:50Z]
+
+## REAL vs STUB
+
+| Piece | State |
+|---|---|
+| `HarnessProfile.ts` registry + resolver | **REAL** — 31 assertions, runs in `npm run check` |
+| `repid_permissions` ladder migration | **WRITTEN, NOT APPLIED** — Sean-gated, see below |
+| TrustShell M1 transcript parser | **REAL** — 42 assertions, runs in `npm run check`; verified against a live session |
+| `MemoryRecall.ts` primitives (RRF, tiers, budget, utility, dedup shape) | **REAL** — 44 assertions, runs in `npm run check` |
+| Memory dimension in the harness (7 settings, 3 earned) | **REAL** — resolves and refuses; asserted |
+| `v_memory_recall_readiness` | **REAL, LIVE** — changelog #117, reports FAILED on all four corpora |
+| Memory recall actually running in an agent loop | **NOT BUILT** — no executor; the plan compiles, nothing executes it. Needs Railway |
+| `memory_recall_log` / `memory_outcome_link` / identity repair | **WRITTEN, NOT APPLIED** — `20260813050000_memory_recall_path.sql`, Sean-gated |
+| Embedding backfill (216 nodes, 215 patterns) | **NOT DONE** — costs per row and permanently fixes a model choice |
+| `owner_agent_name` backfill | **NOT DERIVABLE** — the uuid→name mapping is not in this database; guessing it would fabricate provenance |
+| Session receipts (TrustShell M2–M4) | **NOT BUILT** — M1 reads the transcript; nothing emits, signs or verifies a receipt yet, so every earned setting still sits at its floor |
+| `repid_writes_require_receipt` enforcement | **NOT BUILT** — declared, nothing enforces it |
+| Compiling resolved `rule` settings into agent instructions | **NOT BUILT** |
+| Per-user profile storage / onboarding surface | **NOT BUILT** — no table, no UI |
+
+Honest summary: until receipts exist, the harness is a fully tested implementation of
+**least privilege for everybody**. Right failure mode, not yet a reputation system.
+
+## BLOCKED_FOR_SEAN
+
+1. **Apply `supabase/migrations/20260813020000_repid_permissions_ladder.sql`.** Exact
+   action: run that file against `qnnpjhlxljtqyigedwkb`. Not done because it is a live
+   authority expansion — it grants **Platinum to APM, HDM, MEL, VERITAS** on scores of
+   exactly 1.0 with **zero receipts** behind them, which is the specific thing
+   `HARNESS-SPEC.md` forbids. Nothing in this repo calls `get_conductor_permissions()`,
+   but an external Railway caller cannot be ruled out from a sandboxed session, so blast
+   radius is **UNVERIFIED**. Rollback SQL is in the file header.
+2. **`repid_config` is readable by `anon`, and holds `enterprise_api_key`.** Policy
+   `"Enable read for anon"` is `SELECT … USING (true)` for `{anon, authenticated,
+   service_role}`; the row `enterprise_api_key = 495150b8-…` is described as "Enterprise
+   bypass key for rate limits". Publishable keys map to `anon` and ship in the browser
+   bundle, so **anyone who views source can read it**. Unlike the settled legacy JWT, this
+   one is live and reachable. Exact action: decide between rotating the key, moving it out
+   of `repid_config`, or replacing the blanket policy with a column/row-filtered view.
+   Not done here — key rotation and RLS changes on a live read path are both fenced.
+3. **Sean-gate bookkeeping is split.** `v_agent_preflight.open_sean_gates` counts
+   `autonomous_tasks`, which `NORTH-STAR.md` marks "historical — do not add to". So the
+   canonical way to file a gate contradicts the canonical planning surface. Logged here
+   instead of adding to a deprecated table. Exact action: point `open_sean_gates` at
+   `trinity_tasks`, or un-deprecate `autonomous_tasks` for this one purpose.
+4. ~~Apply `supabase/migrations/20260813050000_memory_recall_path.sql`~~ — **DONE
+   2026-08-13, Sean-authorised. Changelog #120.** Verified against the catalog, not the
+   tool's success flag: 3 columns, 2 tables, 6 indexes, RLS on both new tables with
+   **0 policies**, 429 nodes intact. Rollback SQL still valid in the file header.
+   What it added: `reused_good` / `reused_bad` / `last_outcome_at` on
+   `agent_memory_nodes`; HNSW cosine indexes on both embedding columns; a GIN trigram
+   index on `content`; and `memory_recall_log` + `memory_outcome_link`. **Do not add a
+   permissive policy to those two tables to "make something work"** — RLS-enabled-with-
+   zero-policies is the intended posture, and a permissive policy is exactly how the two
+   `USING (true)` tables in LESSONS S1 happened.
+5. ~~Where do the 34 orphan agent uuids come from?~~ **RESOLVED 05:20Z — the premise was
+   my error.** They were never orphaned; they are a clean FK into `repid_agents`. See
+   `LESSONS` A9. No action needed.
+6. ~~Embed the 175 unembedded production-agent nodes~~ — **DONE.** 213 → 388 embedded,
+   0 remaining, zero failures. All twelve production agents have retrievable memory.
+   Drain cron unscheduled. Changelog #119 / #121. Original entry:
+   It is the entire gap between "the memory feature exists" and "the memory feature
+   returns something" for eight of the twelve agents. Exact action: name the embedding
+   model and approve ~175 embedding calls. The model choice is effectively permanent —
+   the existing 213 vectors came from whatever `src/services/graph-rag/embedding-service.ts`
+   uses, and mixing models within one index silently degrades every similarity score
+   without erroring. Match it or re-embed everything; do not mix.
+7. **Merge repid-engine PR #425** — recall was pointed at three hardcoded uuids that own
+   zero rows and do not exist in `repid_agents`, so injection was a no-op on every HAL
+   turn. The backfill in item 6 was necessary but NOT sufficient; `access_count` stays 0
+   until #425 ships. After merge, the honest test is: score one event with a prompt for an
+   agent that has embedded memory, then confirm `access_count` on its nodes goes non-zero.
+8. **Railway access for this session** — an env var on the environment, or a remote MCP
+   connector. Note `trinity-egress` (env_01NdsRSYouC9gZx2BapbftQM) was created 00:36Z,
+   *after* this session started ~00:07Z, which is the likeliest reason the allowlist never
+   reached this container. A NEW session in that environment is the untested case.
+
+## Next 3 commands
+
+```bash
+# 1. Confirm the fleet-truth finding for yourself before trusting any liveness number.
+#    Expect: every row liveness_signal='probe', minutes_since_ping ~37,000+.
+#    psql: select agent_name, is_live, liveness_signal, minutes_since_ping,
+#                 minutes_since_work from v_fleet_truth order by agent_name;
+
+# 2. Re-run the harness assertions after any edit to the registry.
+npm run check:harness
+
+# 3. M1 is done. Next is M2 — emit the §5 receipt from the parsed transcript, with an
+#    audit_hash stable across re-runs of the same pinned bytes. Start by reading what
+#    M1 already produces, then decide TRUSTSHELL-V1.md §12 Q1 (receipt storage) and
+#    Q2 (signing key custody) — both are open and both block M3.
+node scripts/trustshell-parse.mjs --latest --json | head -60
+```
+
+**Watch item for M2.** The parser has been run against **one** session on one format
+revision. §11's first named risk is transcript format churn. `KNOWN_RECORD_TYPES` is
+documented as an observed census rather than a claim about the format; unknown types are
+reported, and `--strict` makes them fatal. A second real session on a different Claude
+Code version is the cheapest next piece of evidence, and nobody has run one.
+
+---
+
 # SESSION SUMMARY — 2026-08-11 (claude-opus-5, cloud/scheduled)
+
+> **Stale below this line.** The header that follows says `verdict=HOLD,
+> global_pause=true` and `0/12 live`. The pause was cleared 2026-08-13 and the fleet
+> numbers are contested — see the current section above. Kept for its merged-PR and
+> credential history, which is still accurate.
 
 Surface = **cloud/scheduled** (Claude Code Remote).
 Access = GitHub **yes** (read+write via MCP), Supabase **yes**, Vercel **yes** (MCP),

@@ -318,3 +318,119 @@ closes. A closed question that is not written down is an open question.
   it reports SETTLED rather than NOT MEASURED forever from a blocked surface
   (D1). Open — needs a small evidence file the script can read, not just a
   probe.
+
+---
+
+## 2026-08-13 — session 01KzQZ, part 3 (claude-opus-5, cloud) — building M1
+
+### A8 — I shipped the house defect into the tool built to catch it
+
+The TrustShell M1 parser's first working run reported **"87 records on the
+active path, 5,421 off it."** Ninety-eight percent of a real session called
+abandoned. The number was wrong, and worse, it was *confident* — a plain
+integer in a census table, with nothing marking it as inferred.
+
+The bug: I modelled the transcript as one tree and reconstructed "what the
+session actually did" by walking `parentUuid` back from the final leaf. The
+transcript is a **forest** — 10 chain roots, 7 of them records whose parent is
+not in the file at all (compaction boundaries and session resumes), 85 branch
+points, 95 leaves. A single root-to-leaf walk reaches at most 1,484 of 5,547
+addressable records **by construction**. Everything else got labelled
+abandoned because the walk could not reach it.
+
+Two failures stacked, and the second is the one worth keeping:
+
+1. I assumed a data shape instead of measuring it. Cheap, ordinary, caught in
+   minutes.
+2. **I answered a question that has no answer in the data.** Nothing in the
+   transcript records which sibling won at a branch point. "Which records are
+   live" is not merely unmeasured, it is *undecidable from this input* — and I
+   emitted a precise-looking number for it anyway. That is A1–A7's shape exactly
+   (a system reporting something it has not earned), reproduced inside the
+   product whose stated purpose is catching it. §11 of `TRUSTSHELL-V1.md` even
+   names this risk — "the harness confabulates" — which I had read that hour.
+
+The fix was not a better heuristic. It was **deleting the field.** The census
+now reports what the graph demonstrably is (roots, dangling parents, leaves,
+branch points, longest chain) and reports no liveness verdict. Two assertions
+in `check-transcript-parser.mjs` now fail if `activePathRecords`,
+`abandonedRecords`, or `onActivePath` ever come back.
+
+What caught it: **the number was implausible on its face.** Not a test — the
+42 assertions all passed, because I had written them against my own wrong
+model, on a fixture I had built to match it. A green suite over a wrong premise
+is the four failures in `TRUSTSHELL-V1.md` §1 in miniature. What actually
+caught it was running the thing against real data and *reading the output*
+instead of the exit code.
+
+**The generalisation, and the reason this is A8 rather than a footnote:** when
+a field cannot be derived from the input, the correct output is not a best
+guess, a heuristic, or a caveat in prose beneath a confident number. It is **no
+field.** A missing field makes the next reader ask. A wrong field makes them
+build on it.
+
+### WHAT WENT RIGHT — the 2.36× overcount
+
+The same run caught a real error in the spec, which is the outcome M6 predicts.
+`TRUSTSHELL-V1.md` §4.2 claimed 2,111,919 output tokens for this session. That
+was a **per-record** sum. Claude Code repeats one turn's `usage` verbatim on
+every record of that turn, so the true figure is 1,389,855 across 1,507
+`requestId` groups — the naive sum inflates by 2.36×. [VERIFIED — 1,507 groups
+over 3,147 records; every group internally identical, zero groups differing.]
+
+The parser now reports both, named differently, with the ratio. The lesson is
+narrow and reusable: **when two plausible definitions of a metric differ by
+more than rounding, one field name for them is a bug.** Anyone re-deriving the
+number the other way has to be able to see why they disagree, or the receipt is
+not checkable — which is the whole product.
+
+### A9 — I declared identity broken after checking four of five registries
+
+Building the agent-memory recall path, I reported as a headline finding that
+**"all 34 distinct `agent_memory_nodes.agent_id` values resolve to no row in
+`agents`, `trinity_agents`, `agent_kya_registry` or `conductor_state`"** —
+memory has no owner, recall cannot be scoped, everything else waits on this. I
+ranked it defect #1 of four, wrote a migration adding an `owner_agent_name`
+column to fix it, published a live view encoding it (`v_memory_recall_readiness`,
+changelog #117), put it in `SESSION_SUMMARY.md` as the highest-value unblock,
+and put it in the PR body as the single thing most worth Sean's time.
+
+It was wrong. The nodes are owned by **`repid_agents`** — a fifth registry I
+never queried. **34 of 34 owner ids and 429 of 429 nodes resolve** against it,
+cleanly, and always did. There was nothing to repair.
+
+What made the error, precisely: I enumerated candidate registries **from my own
+reading of the schema** — I grepped `information_schema` for tables that looked
+like agent registries, found four, and treated "not in any of these four" as
+"orphaned." I never asked the only source that actually knows: **the code that
+writes the column.** One grep of the writer (`repid-engine
+scripts/seed-squad-memories.ts`) names `repid_agents` in its second statement.
+
+The tell I walked past: 34 orphans out of 34 is not a data-integrity failure
+pattern. Real orphaning is partial — some rows migrate, some don't. A clean
+100% miss almost always means you are holding the wrong key, not that every
+key is broken. I read 34/34 as "totally broken" when it should have read
+"totally wrong lookup."
+
+Two related claims in the same work were **understated rather than wrong**, and
+the fix was to strengthen the evidence, not retract:
+
+- *"Never recalled"* rested on `access_count = 0`, a counter I had not shown
+  anything increments — and in fact grep found it only in type definitions and
+  SELECT lists, which nearly made me retract a true claim. `graph_rag_touch_node`
+  does increment it and `retrieval-service.ts:91` does call it. The claim now
+  rests on `access_count = 0` **and** `accessed_at = created_at` on all 429 rows
+  — two columns written by different code paths.
+- *"There is no read path"* was false. `GET /api/v1/agents/:id/recall` is built,
+  deployed and public. It has simply never returned a row.
+
+**The rule.** For any claim of the form "X references nothing," the authority is
+the code that writes X, not an enumeration of tables that look like they might
+be the target. Enumerating candidates yourself and finding none is evidence
+about your enumeration, not about the data. Grep the writer first.
+
+This is the same shape as A8 one milestone later: a precise, confident number
+derived from a model I built myself and never checked against the system that
+produces the data. A8 was caught by reading the output. A9 was caught only
+because the user asked me to go grep the writer — which is to say, it was not
+caught by me at all.

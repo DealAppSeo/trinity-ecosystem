@@ -1,7 +1,9 @@
 # TrustShell v1 — specification
 
-**Status:** draft for review. Nothing here is built yet.
-**Date:** 2026-08-12
+**Status:** spec, with M1 built. §10 is the ledger — M1 (transcript parser) is
+done and proven; M2–M6 are not started. §3 and §4.2 carry corrections the M1
+build forced on the spec that specified it.
+**Date:** 2026-08-12, revised 2026-08-13
 
 TrustShell turns an AI agent's assertions into receipts you can verify without
 trusting the agent or the vendor.
@@ -74,6 +76,26 @@ Measured on the session that produced this document — 4,705 records, 13 MB:
 | orphan `tool_use` (no result) | 2 | matched the two user interruptions |
 | `tool_result` with no `tool_use` | **0** | referential integrity holds |
 
+**Corrected 2026-08-13, by the M1 parser this table specified.** The hand count
+above was taken mid-session and two of its properties do not survive contact
+with the parser:
+
+- **`tool_result` blocks outnumber `tool_use` blocks**, not the reverse. The
+  table implies `results = uses − orphans`; in fact a rejected-then-approved or
+  retried call has its result delivered **twice** under one `tool_use_id`. On
+  the same session re-measured: 1,562 uses, 2 orphans, 11 duplicate deliveries,
+  1,571 result blocks — `1562 − 2 + 11 = 1571`. One call, two deliveries, still
+  one action. A parser that assumes the shorthand double-counts the action.
+- **The transcript is a forest, not a log.** 85 branch points, 10 chain roots —
+  7 of them records whose `parentUuid` is not in the file at all, left by
+  context compaction and session resume. Nothing in the format records which
+  sibling won at a branch, so **which records are live is not decidable** from
+  the transcript. The parser measures the graph and declines to guess; see the
+  note on `TranscriptGraph`.
+
+`0 phantom results` (a `tool_result` whose `tool_use` is absent) does hold, and
+is asserted, not assumed.
+
 Also present per record: `toolUseID`, `parentUuid`, `uuid`, `timestamp`,
 `sessionId`, `gitBranch`, `cwd`, `permissionMode`, `attributionMcpServer`,
 `attributionMcpTool`, `hookCount`, `hookErrors`, and per-turn
@@ -124,9 +146,27 @@ catches an agent that says it edited a file when nothing changed on disk.
 
 ### 4.2 Spend — what did it cost, and was it authorised?
 
-`message.usage` is recorded per turn. Summed over the session that produced this
-document: **2,111,919 output tokens**, 569,596,196 cache-read, 34,862,730
-cache-write, across 2,175 assistant turns on `claude-opus-5`.
+`message.usage` is recorded per turn.
+
+**Corrected 2026-08-13.** An earlier draft of this section reported *2,111,919
+output tokens across 2,175 assistant turns* for this session. That figure was a
+**per-record sum, and it overcounts by roughly 2.36×.**
+
+Claude Code writes one record per content block of an assistant turn and repeats
+that turn's `usage` object **verbatim on every one of them** — a turn that
+thinks, speaks, and calls a tool contributes three records carrying identical
+token counts. [VERIFIED — 1,507 distinct `requestId` groups across 3,147
+assistant records; every group's usage identical across its records, zero
+groups differing.] Records are not turns, and `requestId` is what separates
+them.
+
+Same session, re-measured by the parser: **1,389,855 output tokens across 1,507
+turns**, where the per-record sum would say 3,277,108 across 3,147 records.
+
+The parser reports the deduplicated figure and keeps the naive one beside it in
+`spend.naive`, with the ratio. Two numbers that differ by 2.36× must never be
+reachable by the same field name — a receipt that says "output tokens" without
+saying which is a receipt nobody can re-derive.
 
 v1 reports cost per session, per model, and per tool. It does **not** enforce a
 budget.
@@ -298,7 +338,7 @@ mechanical, not clever, and it is the whole first-run experience.
 
 | # | Deliverable | Done when |
 | :-- | :-- | :-- |
-| M1 | Transcript parser | Reproduces the §3 table on any saved session; 0 phantom results |
+| M1 | Transcript parser | **DONE 2026-08-13.** `lib/trustshell/TranscriptParser.ts`, 42 assertions in `scripts/check-transcript-parser.mjs`, CLI `scripts/trustshell-parse.mjs`. Reproduces §3 on the live session; **0 phantom results**; 0 malformed lines; 0 unrecognised record types; 0 new `tsc` errors. Corrections it forced are folded into §3 and §4.2 above. |
 | M2 | Actions + spend receipt | Receipt emitted, `audit_hash` stable across re-runs of the same transcript |
 | M3 | `proof-verifier` accepts it | Third party verifies offline; tampering with any field fails |
 | M4 | T0 + T1 claim checking | Catches ≥1 real `LESSONS.md` entry; false-positive rate measured and published |
