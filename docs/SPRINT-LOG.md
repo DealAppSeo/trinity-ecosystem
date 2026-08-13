@@ -362,6 +362,84 @@ where each expert sees far fewer than 250 observations — the regime where low
 `confidenceK` should be most dangerous and where this sweep says least.
 
 
+### 10. Sprint E — the hang-under-trust scenario, and two scenarios that lied
+
+Backlog item 3 was Postgres persistence. **Skipped deliberately**: this session
+has no Supabase, so `agent_repid`'s real schema cannot be inspected, and writing
+SQL against a table I cannot see is the exact "success it has not earned"
+pattern this repo exists to avoid. Took the next authoritative item instead —
+the hang-under-trust scenario — which is fully verifiable here and closes a NOT
+CHECKED I logged myself in Sprint C.
+
+**186 assertions unchanged, tsc 25, portability 11 files, and the simulator's
+published headline is byte-identical** — this work lives in
+`scripts/harness-experiment.mjs` (`npm run experiment`) and touches no module.
+
+**THE SCENARIO LIED TWICE BEFORE IT TOLD THE TRUTH.**
+
+*Attempt one*: `veteran`, quality 0.93, hangs from 60% onward. It printed a
+clean table showing the timeout barely mattered. The table was meaningless —
+diagnosis showed veteran took **4 calls all run and 0 before it went bad**. It
+was `stalled` wearing a different name: a cold expert that hangs, which is the
+easy case the scenario was written to escape. Had I reported that table it would
+have read as "the timeout does not help under trust", a false negative dressed
+as a finding.
+
+*Attempt two*: made veteran the best expert in the pool on every axis. It took
+**1 call** before going bad. That failure exposed something worth more than the
+scenario: **with default parameters a cold expert takes almost no early traffic
+at all** — `rookie` also took 0 calls in the first 60% of a run. Exploration is
+nominally 12% but the incumbent absorbs it. No newcomer can build trust inside a
+run, which is the cold-start problem still present in a milder form, and it
+corroborates the A/B sweep independently (confidenceK 50→20 moves rookie from
+105 calls to 752).
+
+*Attempt three*: warm-start the ledger with 400 good observations. A veteran does
+not earn its reputation inside the window you observe it in — it arrives holding
+one. Valid at last: **1010 calls before going bad, confidence 0.97 on 1636
+observations.**
+
+**The scenario now carries its own validity guard** — ≥200 pre-hang calls and
+≥0.80 confidence, or it refuses to print an ablation at all. A scenario that
+cannot prove it instantiated its own premise must not be allowed to report
+numbers, because a confident table from a broken scenario is worse than no table.
+
+**MEASURED — 10 seeds, timeout off vs on:**
+
+| metric | OFF | ON | delta |
+|---|---|---|---|
+| calls to veteran once bad | 446 | **6** | −98.7% |
+| hangs encountered | 220 | 3 | −98.5% |
+| wall clock lost to hangs | 2,195 s | 4.8 s | −99.8% |
+| p99 latency | 10,000 ms | 713 ms | −92.9% |
+| Kendall tau | 0.436 | **0.579** | +32.8% |
+| unrecovered failures | 2 | 0 | −94% |
+| correctness rate | 92.4% | 91.8% | **−0.61pp** |
+
+**REGRESSION, STATED PLAINLY: correctness does not improve and nominally falls
+0.61pp.** That is inside the 2.6pp seed spread so it is not a real regression
+either — but the honest claim is that **the timeout buys nothing in correctness
+here**, and I am not claiming otherwise. Without it a hang still costs the task
+nothing: the outer run deadline abandons the attempt and the retry usually
+succeeds. Correctness is preserved at ruinous cost, which is why correctness is
+the wrong metric for this module.
+
+**The tau row is the real finding.** Without the timeout the reputation ledger is
+**silently poisoned** — the veteran keeps a high earned score forever while
+delivering nothing, because a hang produces no outcome to learn from. Ranking
+quality collapses 0.579 → 0.436. A hang is not merely wasted latency; it is a
+lie the ledger cannot detect, and the ledger is what the entire harness rests on.
+That is a stronger argument for the module than anything in Sprint C, and unlike
+Sprint C it is measured rather than argued.
+
+**NOT CHECKED.** Still no live-LLM validation; the veteran's behaviour is a model.
+The warm start is a modelling choice — 400 good observations — and a different
+figure would move how fast the ledger reacts. Only one hang rate (50%) and one
+onset (75%) were tried. And the correctness result may be an artefact of a
+generous retry budget: with 3 attempts a hang is nearly free, so a fleet with no
+retries would likely show the timeout buying correctness too. Untested.
+
+
 ---
 
 ### Standing NOT CHECKED

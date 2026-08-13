@@ -4,7 +4,7 @@
 layer that other trust systems can adopt. RepID as a package rather than a
 Trinity feature.
 
-Nine modules, no imports outside the directory, no Node built-ins, no
+Eleven modules, no imports outside the directory, no Node built-ins, no
 `process.env`. `npm run check:harness-portable` fails the build if that stops
 being true.
 
@@ -142,9 +142,51 @@ So the case for the module is not the aggregate numbers. It is that a hang is
 invisible to every other layer — the breaker only learns from `recordFailure`,
 the governor only samples on completion, the ledger only learns from outcomes —
 and none of them fires on a call that simply never returns. The timeout
-manufactures the one signal they all need. Its value is bounded below by
-correctness (it does no harm) and is unbounded above in a world where a
-*trusted* expert starts hanging, which this simulation does not model.
+manufactures the one signal they all need.
+
+### Hang under trust — where the timeout actually pays
+
+The default pool cannot show this, because `stalled` is demoted within a few
+calls. The case the module exists for is an expert that has **earned** its
+standing and then goes bad. `npm run experiment` section (d) models it: a
+`veteran` of true quality 0.97, warm-started with 400 good observations so it
+arrives as an incumbent, which then hangs on half its calls from 75% onward.
+Ten seeds, timeout off versus on:
+
+| metric | timeout OFF | timeout ON | delta |
+|---|---|---|---|
+| calls to veteran once bad | 446 | **6** | −98.7% |
+| hangs encountered | 220 | 3 | −98.5% |
+| wall clock lost to hangs | 2,195 s | 4.8 s | −99.8% |
+| p99 latency | 10,000 ms | 713 ms | −92.9% |
+| Kendall tau | 0.436 | **0.579** | +32.8% |
+| unrecovered failures | 2 | 0 | −94% |
+| correctness rate | 92.4% | 91.8% | **−0.61pp** |
+
+**Correctness does not improve, and nominally falls.** The −0.61pp is inside the
+2.6pp seed spread, so it is not a real regression either — but the honest
+statement is that **the timeout buys nothing in correctness here**. Without it a
+hang still costs the task nothing: the attempt is abandoned by the outer run
+deadline and the retry usually succeeds. Correctness is preserved at ruinous
+cost, which is precisely why correctness is the wrong metric for this module.
+
+What it does buy is everything else, and the tau row is the one that matters
+most. **Without the timeout the reputation ledger is silently poisoned**: the
+veteran keeps a high earned score forever while delivering nothing, because a
+hang produces no outcome to learn from. Ranking quality collapses from 0.579 to
+0.436. A hang is not only wasted latency, it is a lie the ledger cannot detect —
+and the ledger is the thing the whole harness rests on.
+
+**The scenario carries a validity guard, because the first two attempts at it
+silently failed.** It asserts the veteran took ≥200 calls and reached ≥0.80
+confidence *before* going bad, and refuses to print an ablation otherwise. Attempt
+one gave it quality 0.93 and `hangsAt` 0.6; it took 4 calls all run and 0 before
+going bad — a cold staller under a different name, which still produced a
+confident, meaningless table. Attempt two made it the best expert in the pool and
+it still took 1 call, which exposed something worth knowing on its own: **with
+default parameters a cold expert takes almost no early traffic at all** (`rookie`
+also took 0 calls in the first 60% of a run). No newcomer can build trust inside
+the run, so the incumbent had to be warm-started.
 
 ### Context-bloat control, measured on its own model
 
@@ -277,6 +319,7 @@ npm run check:harness-consensus    # 46 assertions
 npm run check:harness-timeout      # 29 assertions
 npm run check:harness-transform    # 31 assertions
 npm run sim:harness                # E2E numbers
+npm run experiment                 # parameter sweep + hang-under-trust scenario
 npm run sim:harness -- --seed 7 --tasks 5000 --json
 npm run sim:harness -- --no-timeout   # ablate the timeout policy
 ```
@@ -318,12 +361,17 @@ only as good as that model.
 ## Not yet built
 
 - **Sub-task routing granularity.** Routing is per task; the brief calls for
-  sub-step and tool-call granularity. Now the highest-value remaining item.
-- **A hang-under-trust scenario for the simulator.** `stalled` is demoted so
-  fast that the timeout has almost nothing to catch, which is why the ablation
-  above is within noise. The case the module is really for — a *high-earning*
-  expert that starts hanging, where reputation keeps sending it work — is not
-  modelled. Until it is, the module's upside is argued rather than measured.
+  sub-step and tool-call granularity. Highest-value remaining item by impact,
+  but it reshapes the task model and `router.ts` rather than adding to them —
+  **judged architecturally significant on 2026-08-13 and left for Sean**, not
+  skipped.
+- **Cold experts take almost no early traffic at default parameters.** Measured
+  while building the hang-under-trust scenario: across the first 60% of a run,
+  both `rookie` and a newly added expert took **0 calls**. Exploration is
+  nominally 12% but the entrenched incumbent absorbs it. The A/B sweep points
+  the same way — `confidenceK` 50→20 moves `rookie` from 105 calls to 752. This
+  is the cold-start problem still present in a milder form, and it is why no
+  newcomer can build trust inside a run.
 - **Cancellation.** `TimeoutPolicy` reports expiry; it cannot cancel the
   underlying call, because it holds no handle on the transport. The caller must
   abandon the work itself, and nothing currently checks that it does.

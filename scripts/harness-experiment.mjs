@@ -71,6 +71,33 @@ const EXPERTS_NOGEM = EXPERTS_BASE.map((e) =>
   e.id === 'rookie' ? { ...e, trueQuality: 0.5 } : e
 );
 
+// HANG UNDER TRUST — the scenario timeout.ts actually exists for, and the one
+// the main simulation cannot show.
+//
+// `stalled` in the default pool is demoted within a handful of calls, so the
+// timeout has almost nothing left to catch and its ablation sits inside seed
+// noise. That is the EASY case. The hard case is an expert that has genuinely
+// EARNED its reputation over hundreds of observations and then starts hanging.
+//
+// It is hard precisely because of the shrinkage that fixed the original tau
+// 0.429 defect: an earned score is weighted n/(n+k), so an expert with many
+// observations moves slowly BY DESIGN. That is correct behaviour — it is what
+// stops a lucky 15-observation streak outranking a 757-observation record — and
+// it is exactly what keeps traffic flowing to a veteran that has just gone bad.
+// The mechanism that fixed one failure is what makes this one bite.
+const EXPERTS_VETERAN = [
+  ...EXPERTS_BASE.filter((e) => e.id !== 'stalled'),
+  // Decisively the best expert in the pool on every axis, and it does not go bad
+  // until 75% through. Both are required, and the FIRST ATTEMPT AT THIS SCENARIO
+  // GOT BOTH WRONG: quality 0.93 (merely comparable to alpha) and hangsAt 0.6
+  // gave it 4 calls all run and 0 before it went bad. It was `stalled` wearing a
+  // different name — a cold expert that hangs — and the ablation it produced was
+  // measuring nothing. `assertTrusted` below now refuses to report unless the
+  // scenario actually instantiated the case.
+  { id: 'veteran', caps: ['hal'], trueQuality: 0.97, baseLatency: 90, errorRate: 0.01,
+    claimedScore: 7500, capacity: 400, hangsAt: 0.75, hangRate: 0.5 },
+];
+
 function effectiveQuality(e) {
   const degradeFrom = e.degradesAt ?? 1;
   const failFrom = e.failsAt ?? 1;
@@ -137,7 +164,8 @@ const DEFAULTS = {
 
 /** Faithful copy of runHarness() from harness-simulate.mjs, parameterised. */
 function runHarness(seed, over = {}) {
-  const P = { ...DEFAULTS, ...over };
+  const { noTimeout = false, warmStart = null, ...rest } = over;
+  const P = { ...DEFAULTS, ...rest };
   const world = makeWorld(seed);
   const clock = new ManualClock(0);
 
@@ -147,6 +175,9 @@ function runHarness(seed, over = {}) {
   let correct = 0;
   let failed = 0;
   let hangsHit = 0;
+  let hangStallMs = 0;
+  let postHangCalls = 0;
+  let preHangCalls = 0;
 
   const limiter = new LeakyBucketLimiter(clock, { tokensPerMinute: 600 });
   for (const e of EXPERTS) limiter.configure(e.id, { tokensPerMinute: e.capacity });
@@ -175,6 +206,18 @@ function runHarness(seed, over = {}) {
     prior: P.prior, alpha: P.ledgerAlpha,
     confidenceK: P.confidenceK, coldStartConfidence: P.coldStartConfidence,
   });
+  // A veteran does not earn its reputation during the window you observe it in —
+  // it arrives holding one. Seeding the ledger models an incumbent with a track
+  // record, which is the only way to instantiate "hang under trust": with default
+  // parameters a cold expert takes almost no early traffic (measured: `rookie`
+  // and `veteran` both took 0 calls in the first 60% of a run), so no newcomer
+  // can build trust inside the run and then lose it.
+  if (warmStart) {
+    for (const [id, n] of Object.entries(warmStart)) {
+      for (let i = 0; i < n; i += 1) ledger.record(id, true);
+    }
+  }
+
   const updateEarned = (id, good) => ledger.record(id, good);
 
   const profiles = () =>
@@ -218,6 +261,22 @@ function runHarness(seed, over = {}) {
       const r = world.call(expert, progress);
 
       perExpert.set(id, perExpert.get(id) + 1);
+      if (expert.hangsAt !== undefined) {
+        if (progress >= expert.hangsAt) postHangCalls += 1;
+        else preHangCalls += 1;
+      }
+
+      if (r.hang && noTimeout) {
+        // No idle deadline. The hang is bounded only by the run deadline, and
+        // because nothing ever completes there is NO failure to record — the
+        // breaker, the governor and the ledger all learn nothing at all.
+        hangsHit += 1;
+        hangStallMs += RUN_TIMEOUT_MS;
+        latencies.push(RUN_TIMEOUT_MS);
+        clock.advance(RUN_TIMEOUT_MS);
+        capacity.release(id);
+        continue;
+      }
 
       if (r.hang) {
         hangsHit += 1;
@@ -225,6 +284,7 @@ function runHarness(seed, over = {}) {
         const expired = timeouts.sweep();
         capacity.release(id);
         for (const e of expired) {
+          hangStallMs += e.elapsedMs;
           latencies.push(e.elapsedMs);
           capacity.observe(e.attempt.expert, e.elapsedMs, false);
           breakers.recordFailure(e.attempt.expert);
@@ -279,6 +339,17 @@ function runHarness(seed, over = {}) {
     gini: gini(counts),
     tau,
     hangsHit,
+    hangStallMs,
+    postHangCalls,
+    preHangCalls,
+    hangerConfidence: (() => {
+      const h = EXPERTS.find((e) => e.hangsAt !== undefined);
+      return h ? ledger.view(h.id).confidence : 0;
+    })(),
+    hangerObs: (() => {
+      const h = EXPERTS.find((e) => e.hangsAt !== undefined);
+      return h ? ledger.observations(h.id) : 0;
+    })(),
     rookieCalls: perExpert.get('rookie'),
     perExpert: Object.fromEntries(perExpert),
   };
@@ -324,6 +395,12 @@ function evaluate(over, seeds) {
     gini: mean(runs.map((r) => r.gini)),
     tau: mean(runs.map((r) => r.tau)),
     failed: mean(runs.map((r) => r.failed)),
+    hangsHit: mean(runs.map((r) => r.hangsHit)),
+    hangStallMs: mean(runs.map((r) => r.hangStallMs)),
+    postHangCalls: mean(runs.map((r) => r.postHangCalls)),
+    preHangCalls: mean(runs.map((r) => r.preHangCalls)),
+    hangerConfidence: mean(runs.map((r) => r.hangerConfidence)),
+    hangerObs: mean(runs.map((r) => r.hangerObs)),
     rookieCalls: mean(runs.map((r) => r.rookieCalls)),
     worst: Math.min(...runs.map((r) => r.correctnessRate)),
   };
@@ -480,4 +557,77 @@ withPool(EXPERTS_NOGEM, () => {
       `${name.padEnd(20)} ${(r.correctness * 100).toFixed(1).padStart(7)}% ${((d >= 0 ? '+' : '') + d.toFixed(2)).padStart(8)} ${String(Math.round(r.p99)).padStart(6)} ${r.tau.toFixed(3).padStart(6)} ${r.gini.toFixed(3).padStart(6)} ${r.rookieCalls.toFixed(0).padStart(7)}`
     );
   }
+});
+
+// ── (d) HANG UNDER TRUST ─────────────────────────────────────────────────────
+//
+// The scenario timeout.ts exists for. `veteran` earns genuinely for 60% of the
+// run — high quality, low latency, hundreds of observations — and then starts
+// hanging on 45% of its calls without ever erroring.
+//
+// The ablation here is the honest A/B for the module: identical world, identical
+// seeds, timeout policy on versus off. In the default pool this comparison sat
+// inside seed noise because `stalled` was demoted before the timeout mattered.
+
+console.log(`\n\n(d) HANG UNDER TRUST — a veteran with earned reputation starts hanging`);
+console.log('='.repeat(78));
+
+withPool(EXPERTS_VETERAN, () => {
+  const ALL = TRAIN.concat(HOLDOUT);
+  const WARM = { veteran: 400 };
+  const off = evaluate({ noTimeout: true, warmStart: WARM }, ALL);
+  const on = evaluate({ warmStart: WARM }, ALL);
+
+  const row2 = (label, a, b, fmt = (x) => String(Math.round(x)), invert = true) => {
+    const delta = a === 0 ? (b === 0 ? '0' : 'n/a') : `${(((b - a) / Math.abs(a)) * 100).toFixed(1)}%`;
+    const better = a === 0 ? '' : invert ? (b < a ? '✓' : '✗') : b > a ? '✓' : '✗';
+    return `${label.padEnd(30)} ${fmt(a).padStart(12)} ${fmt(b).padStart(12)}   ${delta.padStart(8)} ${better}`;
+  };
+
+  // SCENARIO VALIDITY GUARD. This section claims to measure a hang under
+  // *trust*. If the veteran never accumulated trust before going bad, it is
+  // just another cold staller and the ablation below measures nothing. The
+  // first version of this scenario failed exactly that way — 4 calls all run,
+  // 0 before it went bad — and printed a confident, meaningless table. Prove
+  // the case was instantiated before reporting on it.
+  const trusted = off.preHangCalls >= 200 && off.hangerConfidence >= 0.8;
+  console.log(
+    `\n  Scenario validity: veteran took ${off.preHangCalls.toFixed(0)} calls BEFORE going bad, ` +
+      `ending confidence ${off.hangerConfidence.toFixed(2)} on ${off.hangerObs.toFixed(0)} observations.`
+  );
+  console.log(
+    `  Needs >=200 pre-hang calls and >=0.80 confidence to count as "under trust" => ${trusted ? 'VALID' : 'INVALID'}`
+  );
+  if (!trusted) {
+    console.log(
+      `\n  SCENARIO INVALID — the veteran never earned trust, so this is a cold staller,\n` +
+        `  not a hang under trust. No ablation reported: it would measure nothing.`
+    );
+    return;
+  }
+
+  console.log(
+    `\n  10 seeds, ${TASKS} tasks. veteran: quality 0.97, warm-started with 400 good\n` +
+      `  observations (an incumbent with a track record), hangs 50% of calls from 75% onward.\n`
+  );
+  console.log(`${''.padEnd(30)} ${'timeout OFF'.padStart(12)} ${'timeout ON'.padStart(12)}      delta`);
+  console.log('-'.repeat(78));
+  console.log(row2('correctness rate', off.correctness, on.correctness, (x) => `${(x * 100).toFixed(1)}%`, false));
+  console.log(row2('unrecovered failures', off.failed, on.failed));
+  console.log(row2('calls to veteran once bad', off.postHangCalls, on.postHangCalls));
+  console.log(row2('hangs encountered', off.hangsHit, on.hangsHit));
+  console.log(row2('wall clock lost to hangs (s)', off.hangStallMs / 1000, on.hangStallMs / 1000, (x) => x.toFixed(1)));
+  console.log(row2('p99 latency (ms)', off.p99, on.p99));
+  console.log(row2('Kendall tau', off.tau, on.tau, (x) => x.toFixed(3), false));
+  console.log(row2('load Gini', off.gini, on.gini, (x) => x.toFixed(3)));
+
+  const dpp = (on.correctness - off.correctness) * 100;
+  console.log(
+    `\n  Correctness delta ${dpp >= 0 ? '+' : ''}${dpp.toFixed(2)}pp. Seed noise on this pool is measured below;` +
+      `\n  anything inside it is not an effect, however good the story sounds.`
+  );
+  const spreadV = ALL.map((s) => runHarness(s, { noTimeout: true, warmStart: WARM }).correctnessRate);
+  const loV = Math.min(...spreadV) * 100;
+  const hiV = Math.max(...spreadV) * 100;
+  console.log(`  timeout-OFF control across the same 10 seeds: ${loV.toFixed(1)}% – ${hiV.toFixed(1)}% (spread ${(hiV - loV).toFixed(1)}pp).`);
 });
