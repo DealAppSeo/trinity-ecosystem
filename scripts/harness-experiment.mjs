@@ -38,6 +38,7 @@ const { TrustRouter, SeededRng } = await load('router');
 const { CircuitBreakerRegistry } = await load('circuit-breaker');
 const { ReputationLedger } = await load('reputation');
 const { TimeoutPolicy } = await load('timeout');
+const { QuorumEvaluator } = await load('quorum');
 
 const RUN_TIMEOUT_MS = 10_000;
 const IDLE_TIMEOUT_MS = 1_500;
@@ -164,7 +165,7 @@ const DEFAULTS = {
 
 /** Faithful copy of runHarness() from harness-simulate.mjs, parameterised. */
 function runHarness(seed, over = {}) {
-  const { noTimeout = false, warmStart = null, ...rest } = over;
+  const { noTimeout = false, warmStart = null, panelSize = 0, ...rest } = over;
   const P = { ...DEFAULTS, ...rest };
   const world = makeWorld(seed);
   const clock = new ManualClock(0);
@@ -178,6 +179,8 @@ function runHarness(seed, over = {}) {
   let hangStallMs = 0;
   let postHangCalls = 0;
   let preHangCalls = 0;
+  let qCommit = 0, qReject = 0, qIndet = 0;
+  let pluralityCorrect = 0;
 
   const limiter = new LeakyBucketLimiter(clock, { tokensPerMinute: 600 });
   for (const e of EXPERTS) limiter.configure(e.id, { tokensPerMinute: e.capacity });
@@ -189,6 +192,23 @@ function runHarness(seed, over = {}) {
   const breakers = new CircuitBreakerRegistry(clock, {
     thresholdFailures: 3, resetTimeoutMs: 30_000, successesToClose: 2,
   });
+  // MoA panel. panelSize 0 keeps the existing top-1 path byte-for-byte, which is
+  // what lets the validity guard above still reproduce the simulator.
+  //
+  // faultTolerance 0 disables the n >= 3f+1 structural check, because that check
+  // is about Byzantine validators in a consensus round, not about how many
+  // proposers we chose to ask. Leaving it on would return INDETERMINATE for every
+  // panel smaller than 4 and silently score the whole arm as wrong.
+  // supermajority is left at the PBFT default of 2/3. The module REFUSES 0.5 —
+  // "supermajority must be in (0.5, 1)" — and that guard is right, so the panel
+  // bends to it rather than the reverse. The consequence is deliberate and
+  // conservative: a panel that merely splits does not commit, and an
+  // INDETERMINATE round is scored as NOT correct.
+  const panel = new QuorumEvaluator(clock, {
+    minValidators: Math.max(1, panelSize),
+    faultTolerance: 0,
+  });
+
   const timeouts = new TimeoutPolicy(clock, {
     runTimeoutMs: RUN_TIMEOUT_MS, idleTimeoutMs: IDLE_TIMEOUT_MS,
   });
@@ -235,6 +255,72 @@ function runHarness(seed, over = {}) {
     const task = { id: `t${i}`, requires: ['hal'], estimatedTokens: 1 };
     const tried = [];
     let done = false;
+
+    if (panelSize > 0) {
+      const d = router.route(task, profiles(), { isCircuitOpen: (id) => breakers.isOpen(id) });
+      const members = [d.selected, ...d.alternates].filter(Boolean).slice(0, panelSize);
+      if (members.length === 0) {
+        failed += 1;
+        continue;
+      }
+      const votes = [];
+      let slowest = 0;
+      for (const id of members) {
+        const expert = EXPERTS.find((e) => e.id === id);
+        limiter.tryConsume(id, 1);
+        capacity.acquire(id);
+        const r = world.call(expert, progress);
+        capacity.release(id);
+        perExpert.set(id, perExpert.get(id) + 1);
+
+        if (r.hang) {
+          hangsHit += 1;
+          hangStallMs += IDLE_TIMEOUT_MS;
+          slowest = Math.max(slowest, IDLE_TIMEOUT_MS);
+          capacity.observe(id, IDLE_TIMEOUT_MS, false);
+          breakers.recordFailure(id);
+          updateEarned(id, false);
+          continue;
+        }
+        slowest = Math.max(slowest, r.latencyMs);
+        capacity.observe(id, r.latencyMs, r.ok);
+        if (r.ok) {
+          breakers.recordSuccess(id);
+          updateEarned(id, r.correct);
+          // CONSERVATIVE MODELLING. A correct answer is an 'approve', a wrong one
+          // a 'reject', so wrong answers are counted as a single agreeing bloc.
+          // In reality there are many ways to be wrong and one way to be right,
+          // so incorrect answers scatter and fail to form a plurality. Treating
+          // them as a bloc UNDERSTATES the panel's benefit — chosen deliberately,
+          // because the opposite assumption would manufacture the result.
+          votes.push({ validator: id, verdict: r.correct ? 'approve' : 'reject',
+                       earnedScore: ledger.earnedScore(id) });
+        } else {
+          breakers.recordFailure(id);
+          updateEarned(id, false);
+        }
+      }
+
+      // A panel pays the SLOWEST member, not the sum: the calls are concurrent.
+      latencies.push(slowest || 200);
+
+      if (votes.length === 0) {
+        failed += 1;
+        continue;
+      }
+      const verdictResult = panel.evaluate(votes);
+      // SECOND SCORING LENS ON THE SAME VOTES — no new module, no re-run.
+      // A real MoA aggregator returns the plurality answer rather than
+      // abstaining, so this asks what the identical panel would have scored
+      // under plurality semantics. It is a diagnostic, not a proposed default.
+      if (verdictResult.approveWeight > verdictResult.rejectWeight) pluralityCorrect += 1;
+      if (verdictResult.outcome === 'COMMIT') qCommit += 1;
+      else if (verdictResult.outcome === 'REJECT') qReject += 1;
+      else qIndet += 1;
+      completed += 1;
+      if (verdictResult.outcome === 'COMMIT') correct += 1;
+      continue;
+    }
 
     for (let attempt = 0; attempt < 3 && !done; attempt += 1) {
       const decision = router.route(task, profiles(), {
@@ -340,6 +426,10 @@ function runHarness(seed, over = {}) {
     tau,
     hangsHit,
     hangStallMs,
+    callsPerTask: [...perExpert.values()].reduce((a, b) => a + b, 0) / TASKS,
+    qCommit, qReject, qIndet,
+    pluralityRate: pluralityCorrect / TASKS,
+    panelAnyCorrect: 0,
     postHangCalls,
     preHangCalls,
     hangerConfidence: (() => {
@@ -405,6 +495,11 @@ function evaluate(over, seeds) {
     tau: mean(runs.map((r) => r.tau)),
     failed: mean(runs.map((r) => r.failed)),
     hangsHit: mean(runs.map((r) => r.hangsHit)),
+    callsPerTask: mean(runs.map((r) => r.callsPerTask)),
+    qCommit: mean(runs.map((r) => r.qCommit)),
+    qReject: mean(runs.map((r) => r.qReject)),
+    qIndet: mean(runs.map((r) => r.qIndet)),
+    pluralityRate: mean(runs.map((r) => r.pluralityRate)),
     hangStallMs: mean(runs.map((r) => r.hangStallMs)),
     postHangCalls: mean(runs.map((r) => r.postHangCalls)),
     preHangCalls: mean(runs.map((r) => r.preHangCalls)),
@@ -640,3 +735,50 @@ withPool(EXPERTS_VETERAN, () => {
   const hiV = Math.max(...spreadV) * 100;
   console.log(`  timeout-OFF control across the same 10 seeds: ${loV.toFixed(1)}% – ${hiV.toFixed(1)}% (spread ${(hiV - loV).toFixed(1)}pp).`);
 });
+
+// ── (e) MoA PANEL — does aggregating beat top-1? ─────────────────────────────
+//
+// QuorumEvaluator was imported by harness-simulate.mjs and never used: we built
+// PBFT aggregation with 46 assertions behind it and never aggregated. This is
+// that wiring, measured. Votes are weighted by EARNED reputation, which is the
+// one thing the MoA literature does not do — it aggregates uniformly or by a
+// learned gate, with no notion of a proposer that lies.
+
+console.log(`\n\n(e) MoA PANEL — weighted aggregation vs top-1 routing`);
+console.log('='.repeat(78));
+const ALL10 = TRAIN.concat(HOLDOUT);
+const base = evaluate({}, ALL10);
+console.log(
+  `${'arm'.padEnd(22)} ${'correct'.padStart(8)} ${'Δpp'.padStart(8)} ${'calls/task'.padStart(11)} ${'p99'.padStart(6)} ${'tau'.padStart(6)}`
+);
+console.log(
+  `${'top-1 (control)'.padEnd(22)} ${(base.correctness * 100).toFixed(1).padStart(7)}% ${'0.00'.padStart(8)} ${base.callsPerTask.toFixed(2).padStart(11)} ${String(Math.round(base.p99)).padStart(6)} ${base.tau.toFixed(3).padStart(6)}`
+);
+for (const k of [2, 3, 4]) {
+  const r = evaluate({ panelSize: k }, ALL10);
+  const d = (r.correctness - base.correctness) * 100;
+  console.log(
+    `${('panel of ' + k).padEnd(22)} ${(r.correctness * 100).toFixed(1).padStart(7)}% ${((d >= 0 ? '+' : '') + d.toFixed(2)).padStart(8)} ${r.callsPerTask.toFixed(2).padStart(11)} ${String(Math.round(r.p99)).padStart(6)} ${r.tau.toFixed(3).padStart(6)}`
+  );
+}
+
+// DIAGNOSIS, not a guess. If the loss is dominated by INDETERMINATE rounds then
+// what was measured is a fail-closed unanimity gate, not aggregation.
+console.log(`\n  Same votes, scored two ways — supermajority gate vs plurality aggregator:`);
+console.log(`  ${'panel'.padEnd(10)} ${'gate'.padStart(8)} ${'plurality'.padStart(10)} ${'Δpp vs top-1'.padStart(13)}`);
+for (const k of [2, 3, 4]) {
+  const r = evaluate({ panelSize: k }, ALL10);
+  const dp = (r.pluralityRate - base.correctness) * 100;
+  console.log(
+    `  ${String(k).padEnd(10)} ${(r.correctness * 100).toFixed(1).padStart(7)}% ${(r.pluralityRate * 100).toFixed(1).padStart(9)}% ${((dp >= 0 ? '+' : '') + dp.toFixed(2)).padStart(13)}`
+  );
+}
+
+console.log(`\n  Quorum outcome mix per run (of ${TASKS} tasks):`);
+console.log(`  ${'panel'.padEnd(10)} ${'COMMIT'.padStart(8)} ${'REJECT'.padStart(8)} ${'INDETERMINATE'.padStart(14)}`);
+for (const k of [2, 3, 4]) {
+  const r = evaluate({ panelSize: k }, ALL10);
+  console.log(
+    `  ${String(k).padEnd(10)} ${r.qCommit.toFixed(0).padStart(8)} ${r.qReject.toFixed(0).padStart(8)} ${r.qIndet.toFixed(0).padStart(14)}`
+  );
+}

@@ -246,6 +246,53 @@ message hundreds of times and read 173,800 for a run containing 935 messages —
 a number that looks impressive and means nothing. Third instance today of the
 same wrong-metric shape, this time in the reporting rather than the code.
 
+### The MoA panel — a negative result, and what it redirected to
+
+`QuorumEvaluator` shipped with 46 assertions and was imported by the simulator
+without ever being called. Wiring it up (`npm run experiment`, section e) routes
+to a panel of K and aggregates instead of taking top-1. Ten seeds:
+
+| panel | via quorum gate | Δ vs top-1 | calls/task | p99 |
+|---|---|---|---|---|
+| top-1 | 91.8% | — | 1.02 | 193 ms |
+| 2 | 77.9% | −13.83pp | 2.00 | 213 ms |
+| 3 | 84.5% | −7.31pp | 3.00 | 632 ms |
+| 4 | 80.3% | −11.49pp | 3.98 | 959 ms |
+
+**A clear loss — and the diagnosis matters more than the number.** Per 2000
+tasks the panel produced only ~16 REJECT rounds but **~424 INDETERMINATE**. It
+almost never agrees on a wrong answer; it fails to reach the 2/3 supermajority,
+and a gate that abstains was scored as wrong.
+
+So this measured a fail-closed unanimity gate, not aggregation. Scoring the
+**identical votes** under plurality semantics — what an MoA aggregator actually
+does — inverts the result:
+
+| panel | gate | plurality | Δ vs top-1 |
+|---|---|---|---|
+| 2 | 77.9% | **95.4%** | +3.62pp |
+| 3 | 84.5% | **96.8%** | +5.00pp |
+| 4 | 80.3% | **98.3%** | +6.52pp |
+
+**The entire difference between "aggregation is a disaster" and "aggregation is
+worth +6.5pp" is which lens is applied to one set of votes.** Fifth instance of
+the same lesson today, and the most expensive one had it gone unexamined: the
+first table alone would have justified deleting `quorum.ts`.
+
+The panel model is deliberately conservative — a wrong answer votes `reject`, so
+wrong answers count as one agreeing bloc. In reality there are many ways to be
+wrong and one way to be right, so incorrect answers scatter and the correct one
+wins pluralities more easily than modelled. The +3.6 to +6.5pp is therefore a
+floor, not a ceiling.
+
+**The cost is real and is not netted out of the gain:** calls/task 1.02 → 2.00 /
+3.00 / 3.98, p99 193 → 213 / 632 / 959 ms. MoA buys correctness with calls and
+tail latency, exactly as the literature says.
+
+`quorum.ts` is not wrong — it is a BFT commit gate and correct as one. It is
+simply not an aggregator, and its guard refusing `supermajority: 0.5` ("must be
+in (0.5, 1)") is right; the panel bent to the guard rather than the reverse.
+
 ## Three build–measure–learn cycles, and what each taught
 
 The tau figure took three iterations. Each one is a defect the simulation found

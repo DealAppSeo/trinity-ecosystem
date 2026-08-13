@@ -159,12 +159,22 @@ to ERC-8004*), and **theauth** / **identity-spiffe** for agent↔agent delegatio
 Nothing below depends on the unverified rows. They are listed so that a future
 reader does not mistake them for checked facts.
 
-**The most important observation: `router.ts` + `quorum.ts` already *is* RouteMoA
-in structure.** RouteMoA = a lightweight scorer for prior screening + a
-mixture-of-judges for posterior refinement. `TrustRouter` is the scorer;
-`QuorumEvaluator` is the judge panel. **We built both halves and never connected
-them** (§1.4). The gap between what we have and a published SOTA architecture is
-one wiring change, not a rewrite.
+**~~The most important observation: `router.ts` + `quorum.ts` already *is*
+RouteMoA in structure.~~ CORRECTED 2026-08-13, by measurement.** That claim was
+made earlier the same day and is wrong. `TrustRouter` is indeed the prior
+screener, but `QuorumEvaluator` is **not** an MoA aggregator — it is a
+fail-closed BFT commit gate, and the two answer different questions:
+
+- *Quorum:* "do enough trusted validators agree that we should COMMIT?"
+- *Aggregator:* "given K proposals, which answer do we RETURN?"
+
+Wiring the panel through the quorum was measured and lost badly — up to −13.8pp
+against top-1. Diagnosis: only 16 rounds per 2000 were REJECT, while **424 were
+INDETERMINATE**. The panel almost never agrees on a wrong answer; it just fails
+to reach a supermajority, and a gate that abstains scores as wrong. Scoring the
+*identical votes* under plurality semantics instead gives +3.6 to +6.5pp. The
+missing piece is a small aggregator module, not a wiring change. Full numbers in
+`TRUST-HARNESS.md`.
 
 Our genuine differentiator against all of the MoA family: **they route on
 self-declared or learned scores; we route on earned reputation with an evidence
@@ -194,15 +204,23 @@ every number the harness has produced**, and specifically validates or refutes
 *Gate:* if real-data replay contradicts the simulator, the simulator's world
 model is wrong and gets fixed before anything else proceeds.
 
-**0.2 Wire `QuorumEvaluator` into the router — the MoA change.**
-Route to top-K instead of top-1 for high-stakes tasks, aggregate with the
-existing quorum, and A/B it with `harness-experiment.mjs`. This is the single
-cheapest path to MoA-class output quality because both halves already exist and
-are tested. Expect a cost/latency regression — measure it, and use RouteMoA's
-framing (screen cheaply, escalate only when the prior is uncertain) to bound it.
+**0.2 ~~Wire `QuorumEvaluator` into the router~~ — DONE, and it produced a
+negative plus a redirect.** Measured 2026-08-13: routing to a panel and
+aggregating through the quorum loses up to 13.8pp, because the quorum is a
+fail-closed gate (424 INDETERMINATE per 2000 vs 16 REJECT). The same votes under
+plurality semantics gain +3.6 to +6.5pp at panel sizes 2/3/4.
 
-*Gate:* must beat top-1 on held-out seeds **and** in the no-gem counterfactual,
-per the standard already established.
+**0.2b (NEW, now the top item): build a weighted-plurality aggregator.** A small
+dependency-free module beside `quorum.ts`, returning the plurality answer with an
+explicit abstain policy rather than failing closed. Votes weighted by earned
+reputation — the thing MoA does not do, since it aggregates uniformly or by a
+learned gate and has no notion of a proposer that lies.
+
+*Cost is real and must be reported with any gain:* calls/task 1.02 → 2.00/3.00/3.98
+and p99 193 → 213/632/959 ms. Use RouteMoA's framing to bound it — screen cheaply,
+escalate to a panel only when the prior is uncertain.
+
+*Gate:* must beat top-1 on held-out seeds **and** in the no-gem counterfactual.
 
 ### Phase 1 — One canonical identifier (Sean-gated, migrations written not applied)
 

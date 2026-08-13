@@ -591,6 +591,77 @@ exercised by a live failure. `FleetSource` and `CheckpointStore` still have no
 Postgres implementation.
 
 
+### 12. Sprint G — the MoA panel: a negative result that inverted on re-scoring
+
+Wired `QuorumEvaluator` into routing as an opt-in panel mode in
+`harness-experiment.mjs` (`npm run experiment`, section e). It had been imported
+by `harness-simulate.mjs:42` and **never called** — 46 assertions of PBFT
+aggregation, loaded and unused. Default paths untouched, so the validity guard
+still reproduces the simulator exactly and every published number stands.
+
+**208 assertions unchanged, tsc 25, no module edited.**
+
+**FAILED — the panel lost badly.** Ten seeds, versus top-1 at 91.8%:
+
+| panel | via quorum gate | Δpp | calls/task | p99 |
+|---|---|---|---|---|
+| 2 | 77.9% | **−13.83** | 2.00 | 213 ms |
+| 3 | 84.5% | −7.31 | 3.00 | 632 ms |
+| 4 | 80.3% | −11.49 | 3.98 | 959 ms |
+
+**Then the diagnosis, which mattered far more than the number.** Per 2000 tasks
+the panel produced ~16 REJECT rounds and **~424 INDETERMINATE**. It almost never
+agrees on a wrong answer — it just fails to clear the 2/3 supermajority, and a
+gate that abstains was being scored as wrong. What I had measured was a
+fail-closed unanimity gate, not aggregation.
+
+Re-scoring the **identical votes** under plurality semantics — what an MoA
+aggregator actually does — inverts the result completely:
+
+| panel | gate | plurality | Δ vs top-1 |
+|---|---|---|---|
+| 2 | 77.9% | **95.4%** | +3.62 |
+| 3 | 84.5% | **96.8%** | +5.00 |
+| 4 | 80.3% | **98.3%** | +6.52 |
+
+**The entire difference between "aggregation is a disaster" and "aggregation is
+worth +6.5pp" is which lens is applied to one set of votes.** Fifth instance of
+this pattern today and the most expensive had it gone unexamined: the first
+table alone would have justified deleting `quorum.ts` as useless.
+
+**A claim I made this morning was wrong and is corrected.** The roadmap
+(`09a4795`, ~6 hours ago) asserted "`router.ts` + `quorum.ts` already *is*
+RouteMoA in structure … the gap is one wiring change, not a rewrite." It is not.
+`QuorumEvaluator` is a fail-closed BFT commit gate; an aggregator answers a
+different question. *Quorum:* should we COMMIT? *Aggregator:* which answer do we
+RETURN? The wiring change was made and measured, and it refuted the claim.
+
+`quorum.ts` is not defective — it is correct as a commit gate, and its guard
+rejecting `supermajority: 0.5` ("must be in (0.5, 1)") is right. The panel bent
+to the guard rather than the reverse.
+
+**COST, not netted out of the gain:** calls/task 1.02 → 2.00/3.00/3.98 and p99
+193 → 213/632/959 ms. MoA buys correctness with calls and tail latency, exactly
+as the literature says. Any future default must bound this — screen cheaply,
+escalate to a panel only when the prior is uncertain.
+
+**NOT CHECKED.** The panel model is deliberately conservative: a wrong answer
+votes `reject`, so wrong answers count as one agreeing bloc, when in reality
+there are many ways to be wrong and one way to be right. Incorrect answers
+scatter, so a real aggregator should do BETTER than +3.6 to +6.5pp — that range
+is a floor, not a ceiling, and it is untested. No aggregator module exists yet;
+the plurality column is a second scoring lens on recorded votes, not a shipped
+code path. And this is still the simulator: none of it is validated against the
+152,001 real labelled outcomes now known to be reachable.
+
+**Next item, and it is now clearly justified rather than assumed:** a small
+dependency-free weighted-plurality aggregator beside `quorum.ts`, returning the
+plurality answer with an explicit abstain policy instead of failing closed, with
+votes weighted by earned reputation — the thing MoA does not do, since it
+aggregates uniformly or by a learned gate and has no notion of a proposer that
+lies.
+
+
 ---
 
 ### Standing NOT CHECKED
