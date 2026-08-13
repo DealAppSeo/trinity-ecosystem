@@ -289,6 +289,79 @@ default estimator is crude by design; a caller with a real tokenizer should
 inject one. And the compression model is synthetic — message sizes come from a
 seeded RNG, not from real traffic.
 
+### 9. Parameter A/B sweep — and one result that did not survive scrutiny
+
+Built `scripts/harness-experiment.mjs`. Sweeps harness parameters across TRAIN
+seeds, re-measures the winners on HOLDOUT seeds that took no part in the choice,
+and then re-runs them in a counterfactual world. It opens with a validity guard:
+the experiment arm is a copy of `runHarness()`, so it first asserts it reproduces
+the published 89.0% / p99 794 / tau 0.643 and aborts if it has drifted.
+
+**Seed noise is 3.4pp across ten seeds, so anything under ~1.7pp is nothing.**
+
+**Round 1 — three arms beat control on train AND holdout:**
+
+| arm | train Δpp | holdout Δpp |
+|---|---|---|
+| confidenceK 20 | +3.59 | +3.09 |
+| explorationRate 0.40 | +2.31 | +2.55 |
+| explorationRate 0.25 | +1.92 | +1.89 |
+
+Replicating on held-out seeds rules out seed-fitting. It does **not** rule out
+scenario-fitting, and that is what the next round was for.
+
+**Round 2(c) — the decisive test.** Every round-1 winner works by reacting to an
+unknown expert sooner, and this world contains `rookie`: true quality 0.95,
+claims 0, planted precisely to reward that. Rewarding exploration in a world
+built to reward exploration is close to circular. Re-ran with the gem removed —
+same unknown expert, mediocre quality 0.50:
+
+| arm | Δpp with gem | Δpp NO gem | tau (no gem) |
+|---|---|---|---|
+| explorationRate 0.25 | +1.89 | **+0.02** | 0.557 |
+| explorationRate 0.40 | +2.55 | **+0.22** | 0.679 |
+| confidenceK 20 | +3.09 | **+1.86** | 0.800 |
+| cK20 + expl 0.40 | +3.73 | +1.30 | 0.729 |
+
+**The exploration result evaporates.** Both arms fall to inside noise once the
+planted gem is gone. Raising `explorationRate` is not an improvement; it is a
+property of the scenario, and shipping it as a default would have been tuning to
+a world I wrote. It replicated across ten seeds and was still wrong — *holdout
+seeds catch noise-fitting, not scenario-fitting, and only a counterfactual world
+catches the second.*
+
+**`confidenceK` survives**, and the mechanism is different from what round 1
+suggested: in the no-gem world `confidenceK 20` gives rookie FEWER calls than
+control (21 vs 46). It is not exploring more — it is reacting to evidence faster,
+including correctly demoting a mediocre unknown. That generalises to any fleet
+with degrading or failing experts, which is every fleet.
+
+**Correctness and ranking quality diverge, and picking on correctness alone
+picks wrong.** In the no-gem world: cK10 +2.33pp with tau 0.714; cK15 +2.10pp
+with tau 0.743; cK20 +1.86pp with tau **0.800**. Lower K buys correctness by
+shrinking less — which is the road back to the original tau 0.429 defect, where
+118 observations outranked 757. The optimum on the headline metric is the worst
+on the ranking metric. Fourth instance today of the measurement being the trap.
+
+**`trustFloor` is inert at its default.** Identical results at 0, 2000, 3500,
+5000; a slight change at 6500; and at 8000 correctness collapses to 74.5%. The
+knob is wired, but earned scores never approach the default 2000, so it does
+nothing until it suddenly does a great deal. Worth knowing before anyone tunes it.
+
+**RECOMMENDED, NOT APPLIED: `confidenceK` 50 => 20.** In the honest world that is
++1.86pp correctness, tau 0.693 => 0.800, p99 811 => 202. Three metrics improve
+together and it survives both holdout and the counterfactual. It is left as a
+recommendation because it changes a shipped default for every consumer of the
+ledger on **simulator evidence alone**, and the standing NOT CHECKED is that
+nothing here has been validated against live traffic. What would justify making
+it: one replay against real `agent_repid` outcomes.
+
+**NOT CHECKED.** Only one counterfactual world was tried (gem removed). Not
+tested: a fleet with no degrading expert, a much larger fleet, or task volumes
+where each expert sees far fewer than 250 observations — the regime where low
+`confidenceK` should be most dangerous and where this sweep says least.
+
+
 ---
 
 ### Standing NOT CHECKED
