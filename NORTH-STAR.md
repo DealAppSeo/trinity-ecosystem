@@ -109,6 +109,32 @@ surface states whether what it shows was measured, not measured, or failed.*
 A dash is a lie when it means "we didn't look." Three states, never two —
 LIVE / NOT CHECKED / FAILED — on every panel that renders a number.
 
+## Before mainnet — preconditions that are cheap now and expensive later
+
+None of these matter on devnet/testnet. All of them must be true before value
+moves on a real chain. Written down here because each one currently looks like
+a non-issue, which is exactly how it gets shipped past.
+
+- **Replace the Solana signing keypair.** `AGENT_SOPHIA_PRIVKEY` and
+  `AGENT_SOPHIA_SECRET_BYTES` are the *same* keypair — one
+  `Keypair.generate()` in `scripts/create-solana-wallet.js` — and the base58
+  form is in git history. `SolanaExecutor` still signs with it. On devnet that
+  is harmless: the funds are worthless, there is no signature-based auth
+  anywhere in the app, and the on-chain compliance memos it writes are never
+  read back. Any one of those three changing makes it live. Fix is five
+  minutes: regenerate, set `AGENT_SOPHIA_SECRET_BYTES`, delete
+  `AGENT_SOPHIA_PRIVKEY`.
+- **Stop baking secrets into container images.** `repid-engine`'s Dockerfile
+  passes `BASE_SEPOLIA_PRIVATE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` as build
+  `ARG`/`ENV` (Railway build log flags `SecretsUsedInArgOrEnv`, lines 11-12), so
+  a funded wallet key persists in the image layers. Unlike the settled Supabase
+  key, this one has **no disabled-key defence behind it**. Read them at runtime
+  only.
+- **Re-check the memo threat once anything reads memos.** The moment a verifier
+  reads compliance memos back from chain — or a counterparty does — a leaked
+  signing key can forge RepID and `bft: 1` claims into the audit trail the
+  product sells. Write-only memos are why this is currently theoretical.
+
 ## Blocked on a human
 
 These do not move without Sean, and everything downstream waits on them.
