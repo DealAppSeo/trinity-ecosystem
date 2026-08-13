@@ -7,6 +7,7 @@ import {
   SolanaExecutor, FireblocksPreAuth,
   ZKPAttestationService, RepIDCalculator
 } from '@/lib/trustshell';
+import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
 
 export async function POST(req: NextRequest) {
   const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();
@@ -82,25 +83,42 @@ export async function POST(req: NextRequest) {
     const paymentId = crypto.randomUUID();
     const ruleHash  = await sha256(`${agentName}:${amountUSDC}:${recipientAddress}:${purpose}`);
 
+    const maxWithdrawal = kyaResult.repidScore > 7500 ? 100000 : 50000;
+
+    // The panel needs the actual decision context, not just an amount — the
+    // recipient, the stated purpose and the agent's standing are what a
+    // reviewer weighs. In observe mode this returns immediately without
+    // consulting anything; in enforce mode it runs the three providers inline.
+    const authorizationContext = {
+      paymentId,
+      agentName,
+      amountUSDC,
+      maxWithdrawal,
+      recipientAddress,
+      purpose: purpose ?? '',
+      repidScore: kyaResult.repidScore,
+      repidTier: kyaResult.repidTier,
+      humanCustody: kyaResult.humanCustodyBound,
+    };
+
     const bftProof = await bft.authorize(
-      paymentId, agentName, amountUSDC,
-      kyaResult.repidScore > 7500 ? 100000 : 50000,
-      purpose
+      paymentId, agentName, amountUSDC, maxWithdrawal, purpose, authorizationContext
     );
 
     if (!bftProof.passed) {
       return NextResponse.json({
         approved: false,
         stage:  'bft_consensus',
-        reason: `BFT consensus failed: ${(bftProof.consensusWeight * 100).toFixed(1)}% < ${(bftProof.threshold * 100)}% required`,
+        reason: bftProof.evaluated
+          ? `BFT consensus failed: ${((bftProof.consensusWeight ?? 0) * 100).toFixed(1)}% < ${bftProof.threshold * 100}% required`
+          : `BFT consensus NOT CHECKED: ${bftProof.notEvaluatedReason}`,
         bftProof,
       }, { status: 403 });
     }
 
     // Step 3: Solana Execution
-    const { txHash, explorerUrl } = await solana.execute(
+    const execution = await solana.execute(
       amountUSDC, recipientAddress,
-      process.env.AGENT_SOPHIA_PRIVKEY || '',
       {
         receiptId:         paymentId,
         agentName,
@@ -116,8 +134,19 @@ export async function POST(req: NextRequest) {
     // Step 4: Generate Compliance Receipt
     const receipt = await receipts.generate({
       kyaResult, bftProof, amountUSDC, recipientAddress,
-      solanaTxHash: txHash, solanaExplorerUrl: explorerUrl, ruleHash,
+      solanaTxHash:      execution.txHash,
+      solanaExplorerUrl: execution.explorerUrl,
+      ruleHash,
+      simulated:         execution.simulated,
+      confirmed:         execution.confirmed,
     });
+
+    // Step 4b: queue the consensus evaluation. Only meaningful in observe mode
+    // — in enforce mode the verdict is already on the proof above. Queued after
+    // the receipt so bft_passed has somewhere to be written back to.
+    if (!bftProof.evaluated) {
+      await bft.enqueue(receipt.receiptId, authorizationContext);
+    }
 
     // Step 5: Fireblocks Pre-Auth (demonstrates architecture)
     const fbPreAuth = await fireblocks.generatePreAuth(receipt);
@@ -125,12 +154,40 @@ export async function POST(req: NextRequest) {
     // Step 6: Update RepID (reward successful compliance)
     await kya.updateRepID(agentName, 10, `Successful compliant payment: ${amountUSDC} USDC`);
 
+    // Say what actually happened. "executed" for a run that touched no chain,
+    // or "consensus-authorized" for a check that never ran, is the failure this
+    // repo keeps logging.
+    const settlement = execution.simulated
+      ? 'SIMULATED — no transaction was broadcast'
+      : execution.confirmed
+        ? 'confirmed on Solana devnet'
+        : 'submitted to Solana devnet, not yet confirmed';
+
     return NextResponse.json({
       approved:     true,
       receipt,
       fireblocksPreAuth: fbPreAuth,
-      explorerUrl,
-      message: `KYA-verified payment of ${amountUSDC} USDC executed by ${agentName} (RepID: ${kyaResult.repidScore})`,
+      explorerUrl:  execution.explorerUrl,
+      settlement: {
+        status:    execution.simulated ? 'simulated' : execution.confirmed ? 'confirmed' : 'submitted',
+        simulated: execution.simulated,
+        confirmed: execution.confirmed,
+        error:     execution.error,
+      },
+      bft: {
+        evaluated: bftProof.evaluated,
+        status:    bftProof.evaluated ? (bftProof.passed ? 'passed' : 'failed') : 'NOT CHECKED',
+        reason:    bftProof.notEvaluatedReason,
+        mode:      bftEnforcementMode(),
+        // In observe mode the verdict arrives later; say where to look for it
+        // rather than leaving NOT CHECKED looking permanent.
+        pending:   !bftProof.evaluated,
+        resolvesVia: !bftProof.evaluated ? 'POST /api/trustrails/bft/process' : undefined,
+      },
+      message:
+        `KYA-verified payment of ${amountUSDC} USDC by ${agentName} ` +
+        `(RepID: ${kyaResult.repidScore}) — ${settlement}` +
+        (bftProof.evaluated ? '' : '. BFT consensus NOT CHECKED.'),
     });
 
   } catch (error: any) {

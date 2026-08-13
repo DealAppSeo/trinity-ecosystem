@@ -7,6 +7,7 @@ import { AgentRepIDGrid }   from '@/components/trustrails/AgentRepIDGrid';
 import { LiveReceiptFeed }  from '@/components/trustrails/LiveReceiptFeed';
 import { RiskSlider }       from '@/components/trustrails/RiskSlider';
 import { InstitutionalControls } from '@/components/trustrails/InstitutionalControls';
+import { OperationsPanel } from '@/components/trustrails/OperationsPanel';
 
 export default function Dashboard() {
   return (
@@ -27,7 +28,13 @@ export default function Dashboard() {
             The SSL Trust Layer for Autonomous Agent Finance
           </p>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Institutional controls require a session — without a way to reach
+              sign-in the panel just reports an error with no way forward. */}
+          <a href="/login"
+            style={{ background: '#1e293b', color: '#cbd5e1', border: '1px solid #334155', borderRadius: 8, padding: '8px 16px', fontSize: 13, textDecoration: 'none' }}>
+            Sign in
+          </a>
           <a href="/api/trustrails/demo/villain" target="_blank"
             style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #991b1b', borderRadius: 8, padding: '8px 16px', fontSize: 13, textDecoration: 'none', cursor: 'pointer' }}>
             ⛔ Run Guardrail Demo
@@ -42,6 +49,10 @@ export default function Dashboard() {
       {/* System Trust Score — THE SSL PADLOCK */}
       <SystemTrustScore />
 
+
+      {/* Operational history — 171k+ recorded events that the dashboard
+          previously ignored while showing two 12-row tables. */}
+      <OperationsPanel />
 
       {/* Complete Enterprise Control Matrix */}
       <div style={{ marginBottom: 32 }}>

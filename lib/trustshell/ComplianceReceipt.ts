@@ -12,9 +12,13 @@ export class ComplianceReceiptGenerator {
     bftProof:        BFTConsensusProof;
     amountUSDC:      number;
     recipientAddress: string;
-    solanaTxHash:    string;
-    solanaExplorerUrl: string;
+    solanaTxHash:    string | null;
+    solanaExplorerUrl: string | null;
     ruleHash:        string;
+    /** True when no transaction was broadcast. */
+    simulated?:      boolean;
+    /** True only when the network confirmed the transaction. */
+    confirmed?:      boolean;
   }): Promise<ComplianceReceipt> {
 
     const receiptId = crypto.randomUUID();
@@ -27,9 +31,11 @@ export class ComplianceReceiptGenerator {
       params.kyaResult.repidScore.toString(),
       params.amountUSDC.toString(),
       params.recipientAddress,
-      params.bftProof.passed.toString(),
-      params.bftProof.consensusWeight.toFixed(4),
-      params.solanaTxHash,
+      // An unevaluated proof must not hash as though it passed, or two
+      // materially different receipts produce the same audit hash.
+      params.bftProof.evaluated ? params.bftProof.passed.toString() : 'not_evaluated',
+      params.bftProof.consensusWeight?.toFixed(4) ?? 'null',
+      params.solanaTxHash ?? 'no_tx',
       params.ruleHash,
     ].join(':');
 
@@ -57,8 +63,20 @@ export class ComplianceReceiptGenerator {
       createdAt:          new Date().toISOString(),
     };
 
+    // Three states, never two. `bft_passed` is nullable precisely so an
+    // unevaluated check can be recorded as unknown instead of as a pass.
+    const bftPassed = params.bftProof.evaluated ? params.bftProof.passed : null;
+
+    // A simulated run touched no chain; a submitted one is not yet confirmed.
+    // Only genuine confirmation may set on_chain_verified.
+    const txStatus = params.simulated
+      ? 'simulated'
+      : params.confirmed
+        ? 'confirmed'
+        : 'submitted';
+
     // Persist to Supabase
-    await this.supabase.from('kya_compliance_receipts').insert({
+    const { error: insertError } = await this.supabase.from('kya_compliance_receipts').insert({
       receipt_id:           receipt.receiptId,
       agent_name:           receipt.agentName,
       agent_repid_score:    receipt.agentRepidScore,
@@ -68,7 +86,7 @@ export class ComplianceReceiptGenerator {
       kya_verified:         receipt.kyaVerified,
       zkp_proof_cid:        receipt.zkpProofCID,
       human_custody_bound:  receipt.humanCustodyBound,
-      bft_passed:           receipt.bftProof.passed,
+      bft_passed:           bftPassed,
       bft_votes_for:        receipt.bftProof.votesFor,
       bft_votes_against:    receipt.bftProof.votesAgainst,
       bft_consensus_weight: receipt.bftProof.consensusWeight,
@@ -82,7 +100,19 @@ export class ComplianceReceiptGenerator {
       solana_explorer_url:  receipt.solanaExplorerUrl,
       fireblocks_preauth_id: receipt.fireblocksPreAuthId,
       audit_hash:           receipt.auditHash,
+      on_chain_verified:    params.confirmed === true && params.simulated !== true,
+      tx_verification_status: txStatus,
     });
+
+    // The insert result was previously discarded, so a failed write still
+    // returned a receipt object to the caller and the API answered 200 with a
+    // receipt that does not exist. A receipt that was not stored is not a
+    // receipt.
+    if (insertError) {
+      throw new Error(
+        `Compliance receipt ${receipt.receiptId} was NOT persisted: ${insertError.message}`
+      );
+    }
 
     return receipt;
   }

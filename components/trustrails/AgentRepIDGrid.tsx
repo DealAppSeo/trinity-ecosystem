@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
+import { apiFetch, ApiError } from '@/lib/api-fetch';
 
 const TIER_COLORS: Record<string, string> = {
   Platinum: '#e2e8f0',
@@ -15,15 +16,26 @@ const TIER_COLORS: Record<string, string> = {
 
 export function AgentRepIDGrid() {
   const [agents, setAgents] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
+    // Reads go through the API route, which holds the service key and returns
+    // only the six columns this grid renders. The browser client is kept for
+    // the realtime subscription below — it carries the signed-in user's token,
+    // so it subscribes as `authenticated` rather than `anon`.
     const load = async () => {
-      const { data } = await supabase
-        .from('agent_kya_registry')
-        .select('*')
-        .order('repid_score', { ascending: false });
-      setAgents(data || []);
+      try {
+        const d = await apiFetch<{ agents: any[] }>('/api/trustrails/agents');
+        setAgents(d.agents || []);
+        setError(null);
+      } catch (e) {
+        setError(
+          e instanceof ApiError && e.isUnauthenticated
+            ? 'Sign in to view the agent registry.'
+            : e instanceof Error ? e.message : String(e)
+        );
+      }
     };
     load();
 
@@ -35,6 +47,15 @@ export function AgentRepIDGrid() {
       .subscribe();
     return () => { supabase.removeChannel(sub); };
   }, []);
+
+  if (error) {
+    return (
+      <div style={{ background: '#0f172a', borderRadius: 12, padding: 20 }}>
+        <p style={{ color: '#fca5a5', fontSize: 13, margin: '0 0 8px' }}>{error}</p>
+        <a href="/login" style={{ color: '#86efac', fontSize: 13, textDecoration: 'none' }}>Go to sign in →</a>
+      </div>
+    );
+  }
 
   return (
     <div>

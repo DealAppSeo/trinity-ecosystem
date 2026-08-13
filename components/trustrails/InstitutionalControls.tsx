@@ -5,6 +5,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch, apiPost, ApiError } from '@/lib/api-fetch';
 
 // Regulatory profiles with descriptions
 const REGULATORY_PROFILES = [
@@ -92,47 +93,110 @@ const CONTROL_GROUPS = [
   },
 ];
 
+// Three controls in CONTROL_GROUPS have no column in institution_config:
+// llm_version_pinning, air_gap_fallback_enabled and compartmentalized. Saving
+// them returned a PostgREST error, but the old save() ignored the response and
+// showed "Saved ✓" regardless. They are rendered disabled until the columns
+// exist rather than silently failing.
+const CONTROLS_WITHOUT_STORAGE = new Set([
+  'llm_version_pinning',
+  'air_gap_fallback_enabled',
+  'compartmentalized',
+]);
+
 export function InstitutionalControls({ institutionId = 'default' }: { institutionId?: string }) {
   const [config, setConfig]       = useState<any>(null);
   const [activeGroup, setGroup]   = useState('ceo');
   const [saving, setSaving]       = useState(false);
   const [saved, setSaved]         = useState(false);
   const [frozen, setFrozen]       = useState(false);
+  const [role, setRole]           = useState<'viewer' | 'operator' | 'owner' | null>(null);
+  const [error, setError]         = useState<string | null>(null);
+  // Only fields the user actually touched are sent. Posting the whole config
+  // back would include server-managed columns (id, institution_id, updated_by,
+  // frozen_at) which the API rejects outright — and it would also clobber any
+  // concurrent change to a field this user never looked at.
+  const [dirty, setDirty]         = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetch(`/api/trustrails/settings?institution=${institutionId}`)
-      .then(r => r.json())
+    let cancelled = false;
+    setError(null);
+    setConfig(null);
+    apiFetch<{ config: any; role: 'viewer' | 'operator' | 'owner' }>(
+      `/api/trustrails/settings?institution=${encodeURIComponent(institutionId)}`
+    )
       .then(d => {
+        if (cancelled) return;
         setConfig(d.config || {});
         setFrozen(d.config?.frozen || false);
+        setRole(d.role);
+        setDirty(new Set());
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        // Say which failure this is. An empty panel is indistinguishable from
+        // "this institution has no policy configured".
+        setError(
+          e instanceof ApiError && e.isUnauthenticated
+            ? 'Sign in to view institutional controls.'
+            : e instanceof Error
+              ? e.message
+              : String(e)
+        );
       });
+    return () => { cancelled = true; };
   }, [institutionId]);
 
+  const markDirty = (key: string) => setDirty(prev => new Set(prev).add(key));
+
   const save = async () => {
+    if (dirty.size === 0) return;
     setSaving(true);
-    await fetch('/api/trustrails/settings', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ institutionId, config }),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    setError(null);
+    try {
+      const patch: Record<string, unknown> = {};
+      // Array.from rather than iterating the Set directly — this tsconfig
+      // targets below es2015, so `for…of` over a Set needs downlevelIteration.
+      for (const key of Array.from(dirty)) patch[key] = config[key];
+      await apiPost('/api/trustrails/settings', { institutionId, config: patch });
+      setDirty(new Set());
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const freeze = async () => {
     if (!confirm('Freeze ALL agent activity? This requires dual-sig to reverse.')) return;
-    const newConfig = { ...config, frozen: true, frozen_by: 'admin', frozen_at: new Date().toISOString() };
-    await fetch('/api/trustrails/settings', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ institutionId, config: newConfig }),
-    });
-    setConfig(newConfig);
-    setFrozen(true);
+    setError(null);
+    try {
+      // Send only the flag. `frozen_at` and `frozen_by` are stamped server-side
+      // from the authenticated actor so the record cannot be forged.
+      await apiPost('/api/trustrails/settings', { institutionId, config: { frozen: true } });
+      setConfig({ ...config, frozen: true });
+      setFrozen(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   };
 
+  if (error && !config) {
+    return (
+      <div style={{ background: '#0f172a', borderRadius: 16, padding: 24 }}>
+        <p style={{ color: '#fca5a5', fontSize: 13.5, margin: 0 }}>{error}</p>
+        <a href="/login" style={{ color: '#86efac', fontSize: 13, textDecoration: 'none' }}>
+          Go to sign in →
+        </a>
+      </div>
+    );
+  }
+
   if (!config) return <div style={{ color: '#64748b', padding: 24 }}>Loading controls...</div>;
+
+  const canEdit = role === 'operator' || role === 'owner';
 
   const currentGroup = CONTROL_GROUPS.find(g => g.id === activeGroup)!;
 
@@ -190,7 +254,7 @@ export function InstitutionalControls({ institutionId = 'default' }: { instituti
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {REGULATORY_PROFILES.map(profile => (
             <button key={profile.id}
-              onClick={() => setConfig((c: any) => ({ ...c, regulatory_profile: profile.id }))}
+              onClick={() => { markDirty('regulatory_profile'); setConfig((c: any) => ({ ...c, regulatory_profile: profile.id })); }}
               title={profile.desc}
               style={{
                 background: config.regulatory_profile === profile.id ? '#1d4ed8' : '#1e293b',
@@ -233,13 +297,29 @@ export function InstitutionalControls({ institutionId = 'default' }: { instituti
         {currentGroup.controls.map(control => (
           <div key={control.key} style={{
             background: '#1e293b', borderRadius: 10, padding: 16,
+            opacity: CONTROLS_WITHOUT_STORAGE.has(control.key) ? 0.55 : 1,
           }}>
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{control.label}</div>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>
+              {control.label}
+              {CONTROLS_WITHOUT_STORAGE.has(control.key) && (
+                <span style={{
+                  marginLeft: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.3,
+                  color: '#f59e0b', border: '1px solid #f59e0b55', background: '#f59e0b14',
+                  borderRadius: 999, padding: '2px 8px', whiteSpace: 'nowrap',
+                }}>NOT STORED</span>
+              )}
+            </div>
+            {CONTROLS_WITHOUT_STORAGE.has(control.key) && (
+              <div style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 8, lineHeight: 1.5 }}>
+                No column exists for this setting yet, so it cannot be saved. Shown for
+                roadmap visibility rather than hidden.
+              </div>
+            )}
 
             {control.type === 'toggle' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div
-                  onClick={() => setConfig((c: any) => ({ ...c, [control.key]: !c[control.key] }))}
+                  onClick={() => { markDirty(control.key); setConfig((c: any) => ({ ...c, [control.key]: !c[control.key] })); }}
                   style={{
                     width: 48, height: 26, borderRadius: 13,
                     background: config[control.key] ? '#22c55e' : '#334155',
@@ -263,7 +343,7 @@ export function InstitutionalControls({ institutionId = 'default' }: { instituti
                 <input
                   type="number"
                   value={config[control.key] || 0}
-                  onChange={e => setConfig((c: any) => ({ ...c, [control.key]: Number(e.target.value) }))}
+                  onChange={e => { markDirty(control.key); setConfig((c: any) => ({ ...c, [control.key]: Number(e.target.value) })); }}
                   style={{
                     background: '#0f172a', border: '1px solid #334155',
                     borderRadius: 6, padding: '6px 12px', color: '#f1f5f9',
@@ -280,7 +360,7 @@ export function InstitutionalControls({ institutionId = 'default' }: { instituti
                   min={(control as any).min || 0}
                   max={(control as any).max || 100}
                   value={config[control.key] || 0}
-                  onChange={e => setConfig((c: any) => ({ ...c, [control.key]: Number(e.target.value) }))}
+                  onChange={e => { markDirty(control.key); setConfig((c: any) => ({ ...c, [control.key]: Number(e.target.value) })); }}
                   style={{ flex: 1, accentColor: '#3b82f6' }}
                 />
                 <span style={{ color: '#f1f5f9', fontWeight: 700, minWidth: 40 }}>
@@ -292,7 +372,7 @@ export function InstitutionalControls({ institutionId = 'default' }: { instituti
             {control.type === 'select' && (
               <select
                 value={config[control.key] || ''}
-                onChange={e => setConfig((c: any) => ({ ...c, [control.key]: e.target.value }))}
+                onChange={e => { markDirty(control.key); setConfig((c: any) => ({ ...c, [control.key]: e.target.value })); }}
                 style={{
                   background: '#0f172a', border: '1px solid #334155',
                   borderRadius: 6, padding: '6px 12px', color: '#f1f5f9', fontSize: 13,

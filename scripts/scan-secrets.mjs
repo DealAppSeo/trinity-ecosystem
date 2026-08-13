@@ -132,6 +132,16 @@ function scanText(text, where, sink) {
 
 const findings = [];
 
+// Say which repo is being scanned, before scanning it.
+// `git ls-files` resolves against the SHELL's cwd, not this file's location, so
+// running `node ../other-repo/scripts/scan-secrets.mjs` from the wrong
+// directory silently audits the wrong repository and prints a clean result for
+// it. That happened. Echoing the resolved target makes the mistake visible in
+// the first line of output instead of never. See LESSONS D4.
+const repoRoot = git(['rev-parse', '--show-toplevel']).trim();
+const remote = git(['remote', 'get-url', 'origin'], { allowNoMatch: true }).trim() || '(no origin)';
+console.log(`scanning ${repoRoot}\n         ${remote}\n`);
+
 const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
 for (const file of tracked) {
   // -I skips binary; a lockfile carries integrity hashes that look like nothing

@@ -27,11 +27,18 @@ export interface BFTConsensusProof {
   paymentId:         string;
   votesFor:          string[];
   votesAgainst:      string[];
-  consensusWeight:   number;    // 0-1
-  threshold:         number;    // 0.618 golden ratio
+  consensusWeight:   number | null;  // null when not evaluated
+  threshold:         number;         // 0.618 golden ratio
   passed:            boolean;
   pythagoreanVeto:   boolean;
   votedAt:           string;
+
+  // Whether consensus was actually computed. `passed: true` with
+  // `evaluated: false` means "not blocked" — it does NOT mean "consensus
+  // reached". Anything persisting or displaying this proof must treat the two
+  // as different, or it reports a check that never ran as a check that passed.
+  evaluated:         boolean;
+  notEvaluatedReason?: string;
 }
 
 export interface KYAComplianceResult {
@@ -62,8 +69,8 @@ export interface ComplianceReceipt {
   withinTxLimit:      boolean;
   ruleHash:           string;
   insuranceCoverage:  number;
-  solanaExplorerUrl:  string;
-  solanaTxHash:       string;
+  solanaExplorerUrl:  string | null;   // null when nothing was broadcast
+  solanaTxHash:       string | null;   // null when nothing was broadcast
   fireblocksPreAuthId: string;
   auditHash:          string;
   createdAt:          string;
