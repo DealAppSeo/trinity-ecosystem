@@ -347,6 +347,7 @@ npm run check:harness-routing      # 45 assertions
 npm run check:harness-consensus    # 46 assertions
 npm run check:harness-timeout      # 29 assertions
 npm run check:harness-transform    # 31 assertions
+npm run check:harness-reputation   # 22 assertions
 npm run sim:harness                # E2E numbers
 npm run experiment                 # parameter sweep + hang-under-trust scenario
 npm run sim:harness -- --seed 7 --tasks 5000 --json
@@ -356,7 +357,8 @@ npm run sim:harness -- --no-timeout   # ablate the timeout policy
 ### Verified 2026-08-13
 
 - `harness-routing` 45/45, `harness-consensus` 46/46, `harness-timeout` 29/29,
-  `harness-transform` 31/31, `mcp-fleet` 35/35 — **186 assertions, 0 failures**.
+  `harness-transform` 31/31, `harness-reputation` 22/22, `mcp-fleet` 35/35 —
+  **208 assertions, 0 failures**.
 - `npx tsc --noEmit` — 25 errors, unchanged from baseline, none in new code.
 - `npx next build` — clean.
 - Portability check — 11 files, no external imports.
@@ -410,11 +412,24 @@ only as good as that model.
   unless a caller provides one. Nothing measures whether a summary preserves
   what the dropped turns contained, which is the part that would actually need
   an LLM and an eval.
-- **Persistence.** Everything is in-memory behind interfaces (`FleetSource`,
-  `CheckpointStore`). Postgres implementations are the obvious next step, and
-  `circuit-breaker.ts` already mirrors the `circuit_breakers` table's columns.
-- **Wiring to real RepID.** `agent_repid` already carries
-  `earned_score`/`perceived_score`/`earned_weight`/`perceived_weight`; the
-  ledger here should read and write those rather than holding its own map.
+- **Persistence — reputation done, the rest not.** `ReputationStore` is
+  implemented against `agent_repid` in
+  `lib/trustshell/persistence/supabase-reputation-store.ts`, and **blocked on
+  an unapplied migration** (below). `FleetSource` and `CheckpointStore` still
+  have no Postgres implementation; `circuit-breaker.ts` already mirrors the
+  `circuit_breakers` table's columns, so that one should be short.
+- **The reputation store cannot run yet.** `agent_repid` has no
+  observation-count column, and the ledger's confidence is `n / (n + k)`. A
+  restored ledger without `n` has confidence 0 and every earned score collapses
+  to the prior — a silent erasure of the fleet's entire track record by a load
+  that appears to succeed. The store refuses to load or save until the column
+  exists rather than defaulting `n` to 0.
+  `supabase/migrations/20260813210000_agent_repid_earned_observations.sql` is
+  **written and deliberately not applied** — additive, one nullable integer
+  plus a non-negative check, with rollback in the header. Applying it is Sean's
+  call.
+- **`perceived_score` is still not written by anything here**, on purpose. The
+  ledger holds only earned outcomes, so it has nothing to say about the
+  perceived column and must not overwrite whatever maintains it.
 - **x402 / ERC-8004 binding, and ZK bind/unbind to humans.** Not started. The
   ledger is the substrate they attach to.

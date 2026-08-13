@@ -515,6 +515,82 @@ untested — the hang-under-trust scenario still warm-starts its veteran, and th
 warm start was not retested against the new default.
 
 
+### 12. Sprint F — Postgres persistence for the ledger, and a table that cannot hold it
+
+Backlog item 3, attempted properly this time: Supabase was reachable, so
+`agent_repid` could be inspected rather than guessed at. Last firing I skipped
+this item precisely because writing SQL against an uninspectable table is the
+failure mode this repo exists to avoid — that judgement was right, and the
+inspection is why.
+
+**208 assertions (up from 186), 0 failures. tsc 25 unchanged. next build clean.
+Portability still 11 files** — the adapter lives outside the harness, which is
+the whole point.
+
+**VERIFIED BY QUERY, not assumed.** `agent_repid` PK is `agent_name`;
+`earned_score` is an integer whose live range across 87 rows is **0..10000, the
+same basis-point scale the harness uses** — no conversion, and worth checking,
+because a silent 10× scale mismatch would corrupt every ranking downstream. RLS
+is on: `service_role` ALL, `authenticated` SELECT only, so writes need the admin
+client.
+
+**THE FINDING: the table cannot hold a ledger.** There is no observation-count
+column. Confidence is `n / (n + k)`, so a ledger restored without `n` comes back
+with confidence 0 and **every earned score collapses to the prior** — a fleet
+with years of history reloading as though it had never run a task. The load
+succeeds, every row is present, and every ranking is quietly wrong.
+
+There is no honest workaround. `total_challenges_made` and `total_trades` count
+different things, and borrowing one would make confidence a function of
+unrelated activity — the earned/perceived defect reintroduced through the
+schema. Defaulting `n` to 0 *is* the erasure.
+
+So the store **refuses to load or save** until the column exists, throwing a
+named `MissingObservationsColumnError` that names the migration. Confirmed
+against the live database that the column is absent, so that refusal is the
+actual current behaviour rather than a hypothetical branch.
+
+**Migration written, NOT applied**, as the standing rule requires:
+`supabase/migrations/20260813210000_agent_repid_earned_observations.sql`.
+Additive only — one nullable integer plus a non-negative check constraint, no
+existing column touched, no policy change, rollback in the header. No backfill
+and no default, both deliberately: there is no honest source for a historical
+count, and a default of 0 would assert "measured zero times" for rows the ledger
+has simply never seen.
+
+**THE LEDGER HAD NO TESTS.** `reputation.ts` is the module the entire thesis
+rests on and it had **zero direct assertions** — five suites, 186 assertions,
+none touching it. It was exercised only through a simulation whose numbers it
+produces. Now 22, including the ones that pin the behaviours the design
+arguments depend on: an unobserved expert sits on the prior and says it asserts
+nothing; no evidence is not evidence of badness; a long record outranks a lucky
+streak; cold start keyed to confidence rather than a count.
+
+**The load-bearing test is the argument for the migration, executable.**
+`dropping observations erases the fleet`: a veteran on 800 observations earns
+>8500, and restoring it with `observations: 0` returns exactly 5000. A companion
+test asserts that this **raises no error at all** — which is the entire reason
+the store must refuse up front.
+
+**Two of my own tests were wrong, and one taught me something.** The
+track-record test appended 60 failures after 400 successes and expected a good
+score; it got 442. The observed score is an EWMA with `alpha` 0.06, so its
+effective window is ~17 outcomes — **it is not a lifetime average**, and a
+sustained recent collapse floors an expert regardless of history. That is
+intended (it is how `decayer` is caught) but I had been reasoning about it as an
+average. Fixed by interleaving, and the property now has its own test. The
+second was plain arithmetic: I expected the UCB bonus below 30 at n=502 when
+`(1 − 502/522) × 2500` is 96.
+
+**NOT CHECKED.** The store has never executed against Postgres — it cannot,
+until the migration is applied, and that is Sean's call. Its row mapping, upsert
+conflict handling and error classification are therefore unverified in the only
+way that counts. `MissingObservationsColumnError` is triggered by PostgREST code
+42703 or the column name appearing in the message; the code path is not
+exercised by a live failure. `FleetSource` and `CheckpointStore` still have no
+Postgres implementation.
+
+
 ---
 
 ### Standing NOT CHECKED

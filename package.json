@@ -26,6 +26,7 @@
     "check:harness-consensus": "node scripts/harness-consensus-test.mjs",
     "check:harness-timeout": "node scripts/harness-timeout-test.mjs",
     "check:harness-transform": "node scripts/harness-transform-test.mjs",
+    "check:harness-reputation": "node scripts/harness-reputation-test.mjs",
     "sim:harness": "node scripts/harness-simulate.mjs",
     "experiment": "node scripts/harness-experiment.mjs"
   },

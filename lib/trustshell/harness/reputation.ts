@@ -211,4 +211,75 @@ export class ReputationLedger {
   ids(): string[] {
     return [...this.counts.keys()];
   }
+
+  /**
+   * Complete state for one expert, sufficient to reconstruct it exactly.
+   *
+   * BOTH FIELDS ARE LOAD-BEARING. `observedScore` alone is not a ledger: the
+   * whole design rests on `confidence = n / (n + k)`, so an expert restored
+   * without its observation count has confidence 0, and `earnedScore` collapses
+   * to the prior no matter what it had earned. Persisting the score and
+   * dropping the count would silently erase every track record in the fleet
+   * while looking like a successful save.
+   */
+  snapshot(): ReputationRecord[] {
+    return this.ids().map((id) => ({
+      id,
+      // The raw EWMA, unrounded. `view()` rounds for display; rounding here
+      // would make save/load lossy in a way that compounds over restarts.
+      observedScore: this.observed.get(id) ?? this.cfg.prior,
+      observations: this.counts.get(id) ?? 0,
+    }));
+  }
+
+  /**
+   * Replace all state with `records`. Existing entries are discarded.
+   *
+   * Replace rather than merge, because merging two ledgers is not defined —
+   * you cannot add observation counts from two sources without knowing whether
+   * they observed the same events.
+   */
+  hydrate(records: readonly ReputationRecord[]): void {
+    this.observed.clear();
+    this.counts.clear();
+    for (const r of records) {
+      if (!Number.isFinite(r.observedScore)) {
+        throw new Error(`observedScore for '${r.id}' must be finite; got ${r.observedScore}`);
+      }
+      if (!Number.isInteger(r.observations) || r.observations < 0) {
+        throw new Error(
+          `observations for '${r.id}' must be a non-negative integer; got ${r.observations}`
+        );
+      }
+      this.observed.set(r.id, r.observedScore);
+      this.counts.set(r.id, r.observations);
+    }
+  }
+}
+
+/** One expert's persisted state. See `ReputationLedger.snapshot()`. */
+export interface ReputationRecord {
+  id: string;
+  /** Raw EWMA of outcomes, 0..10000. Unrounded. */
+  observedScore: number;
+  /** Number of outcomes behind it. Without this, confidence cannot be rebuilt. */
+  observations: number;
+}
+
+/**
+ * Somewhere a ledger can be persisted.
+ *
+ * Declared here so the harness stays portable — this file may not import a
+ * database client, so the interface lives inside and every implementation
+ * lives outside. `lib/trustshell/persistence/supabase-reputation-store.ts` is
+ * the Postgres one.
+ *
+ * `load()` returning an empty array means "no state stored", which is a valid
+ * cold start. An implementation that cannot tell empty from broken must throw
+ * rather than return `[]` — a silent empty load looks exactly like a fresh
+ * fleet and would wipe every earned score on the next save.
+ */
+export interface ReputationStore {
+  load(): Promise<ReputationRecord[]>;
+  save(records: readonly ReputationRecord[]): Promise<void>;
 }
