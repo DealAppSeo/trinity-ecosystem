@@ -173,17 +173,24 @@ Honest summary: until receipts exist, the harness is a fully tested implementati
 5. ~~Where do the 34 orphan agent uuids come from?~~ **RESOLVED 05:20Z — the premise was
    my error.** They were never orphaned; they are a clean FK into `repid_agents`. See
    `LESSONS` A9. No action needed.
-6. ~~Embed the 175 unembedded production-agent nodes~~ — **DONE / DRAINING.** All twelve
-   production agents are out of the INERT state (each has retrievable memory); a pg_cron
-   job is finishing the remainder at 8/min. Changelog #119. Original entry:
+6. ~~Embed the 175 unembedded production-agent nodes~~ — **DONE.** 213 → 388 embedded,
+   0 remaining, zero failures. All twelve production agents have retrievable memory.
+   Drain cron unscheduled. Changelog #119 / #121. Original entry:
    It is the entire gap between "the memory feature exists" and "the memory feature
    returns something" for eight of the twelve agents. Exact action: name the embedding
    model and approve ~175 embedding calls. The model choice is effectively permanent —
    the existing 213 vectors came from whatever `src/services/graph-rag/embedding-service.ts`
    uses, and mixing models within one index silently degrades every similarity score
    without erroring. Match it or re-embed everything; do not mix.
-7. **Railway access for this session** (see §Railway below) — the one credential gap that
-   blocks the agent-side work rather than the database side.
+7. **Merge repid-engine PR #425** — recall was pointed at three hardcoded uuids that own
+   zero rows and do not exist in `repid_agents`, so injection was a no-op on every HAL
+   turn. The backfill in item 6 was necessary but NOT sufficient; `access_count` stays 0
+   until #425 ships. After merge, the honest test is: score one event with a prompt for an
+   agent that has embedded memory, then confirm `access_count` on its nodes goes non-zero.
+8. **Railway access for this session** — an env var on the environment, or a remote MCP
+   connector. Note `trinity-egress` (env_01NdsRSYouC9gZx2BapbftQM) was created 00:36Z,
+   *after* this session started ~00:07Z, which is the likeliest reason the allowlist never
+   reached this container. A NEW session in that environment is the untested case.
 
 ## Next 3 commands
 

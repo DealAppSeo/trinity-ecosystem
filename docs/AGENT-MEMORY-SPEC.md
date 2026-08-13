@@ -256,7 +256,8 @@ the earned authority exists to prevent.
 | M1 | Recall primitives: RRF, tiers, budget, utility, dedup shape | **DONE** — 44 assertions |
 | M2 | Memory as earned harness dimension | **DONE** — 7 settings |
 | M3 | Outcome tables + retrieval indexes | **APPLIED** — changelog #120, verified |
-| M4 | Embedding backfill — the actual unblock | **DONE / DRAINING** — changelog #119 |
+| M4 | Embedding backfill — the actual unblock | **DONE** — 213→388, 0 remaining, #119/#121 |
+| M6a | Point recall at the calling agent | **PR OPEN** — repid-engine #425 |
 | M5 | Dedup pass over 124/99/163 duplicates | Blocked on M4 (needs an index) |
 | M6 | Wire recall into the Railway agent loop | Blocked on M3; needs Railway access |
 | M7 | Receipts → earned grants | Blocked on TRUSTSHELL M2 (§12 Q1/Q2) |
@@ -305,6 +306,29 @@ The rule this earns: *an embedding backfill must reproduce an existing vector
 before it is allowed to write a new one.* Not "use the same model name" — the
 same model name produced a 0.994 mismatch. The check has to be empirical, and
 it has to run where the writing runs.
+
+### And the reason the backfill alone would not have been enough
+
+With every production agent embedded, recall still returned nothing — because
+the caller was asking for the wrong agent.
+
+`repid-engine` `src/services/hal-signals.ts` injected memory on every HAL turn,
+but recalled from three hardcoded uuids: `550e8400-…-440000/1/2`, the
+`ALPHA/BETA/GAMMA_SQUAD_REP` placeholders from `scripts/seed-squad-memories.ts`.
+Those three ids own **zero** rows in `agent_memory_nodes` and do not exist in
+`repid_agents` at all. `graph_rag_match_nodes` returned `[]` every time,
+`enrichedPrompt` always equalled `prompt`, and nothing errored — an empty result
+set is not an error. Injection ran on schedule and was a no-op by construction.
+
+Fixed in repid-engine **PR #425**: the calling agent's id is threaded through
+(it was already in scope at `/:id/score-event`), absence of an id now means
+inject nothing *and say so* rather than fall back to a fixed id, and the three
+outcomes — skipped / 0 matches / failed — are logged distinguishably.
+
+**This is why `access_count` stays 0 until #425 ships.** The backfill was
+necessary and not sufficient; both halves were broken independently, and each
+one alone produced the identical symptom of a memory system that looked built
+and returned nothing.
 
 ### The one decision that unblocks the most
 
