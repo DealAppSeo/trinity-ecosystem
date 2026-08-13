@@ -40,6 +40,7 @@ const { ReputationLedger } = await load('reputation');
 const { TimeoutPolicy } = await load('timeout');
 const { QuorumEvaluator } = await load('quorum');
 const { PluralityAggregator } = await load('aggregate');
+const { EscalationPolicy } = await load('escalate');
 
 const RUN_TIMEOUT_MS = 10_000;
 const IDLE_TIMEOUT_MS = 1_500;
@@ -167,7 +168,7 @@ const DEFAULTS = {
 /** Faithful copy of runHarness() from harness-simulate.mjs, parameterised. */
 function runHarness(seed, over = {}) {
   const { noTimeout = false, warmStart = null, panelSize = 0,
-          aggregate = false, scatterWrong = false, ...rest } = over;
+          aggregate = false, scatterWrong = false, escalateCfg = null, ...rest } = over;
   const P = { ...DEFAULTS, ...rest };
   const world = makeWorld(seed);
   const clock = new ManualClock(0);
@@ -208,6 +209,10 @@ function runHarness(seed, over = {}) {
   // INDETERMINATE round is scored as NOT correct.
   // The real module, not the second scoring lens used to justify building it.
   const plurality = new PluralityAggregator(clock, { minProposals: 2 });
+  // RouteMoA: screen cheaply, escalate only when the prior is uncertain. The
+  // signals are all ledger state the router already computed, so screening
+  // costs nothing.
+  const escalator = escalateCfg ? new EscalationPolicy(clock, escalateCfg) : null;
 
   const panel = new QuorumEvaluator(clock, {
     minValidators: Math.max(1, panelSize),
@@ -263,6 +268,48 @@ function runHarness(seed, over = {}) {
 
     if (panelSize > 0) {
       const d = router.route(task, profiles(), { isCircuitOpen: (id) => breakers.isOpen(id) });
+
+      // Screen before spending. A clear leader is answered by top-1 at 1 call.
+      if (escalator && d.selected) {
+        const dec = escalator.decide({
+          topEarned: ledger.earnedScore(d.selected),
+          runnerUpEarned: d.alternates[0] ? ledger.earnedScore(d.alternates[0]) : undefined,
+          topConfidence: ledger.view(d.selected).confidence,
+        });
+        if (!dec.escalate) {
+          const id = d.selected;
+          const expert = EXPERTS.find((e) => e.id === id);
+          limiter.tryConsume(id, 1);
+          capacity.acquire(id);
+          const r = world.call(expert, progress);
+          capacity.release(id);
+          perExpert.set(id, perExpert.get(id) + 1);
+          if (r.hang) {
+            hangsHit += 1;
+            hangStallMs += IDLE_TIMEOUT_MS;
+            latencies.push(IDLE_TIMEOUT_MS);
+            capacity.observe(id, IDLE_TIMEOUT_MS, false);
+            breakers.recordFailure(id);
+            updateEarned(id, false);
+            failed += 1;
+            continue;
+          }
+          latencies.push(r.latencyMs);
+          capacity.observe(id, r.latencyMs, r.ok);
+          if (r.ok) {
+            breakers.recordSuccess(id);
+            updateEarned(id, r.correct);
+            completed += 1;
+            if (r.correct) correct += 1;
+          } else {
+            breakers.recordFailure(id);
+            updateEarned(id, false);
+            failed += 1;
+          }
+          continue;
+        }
+      }
+
       const members = [d.selected, ...d.alternates].filter(Boolean).slice(0, panelSize);
       if (members.length === 0) {
         failed += 1;
@@ -448,6 +495,8 @@ function runHarness(seed, over = {}) {
     tau,
     hangsHit,
     hangStallMs,
+    escalationRate: escalator ? escalator.stats().rate : 1,
+    escalationDenied: escalator ? escalator.stats().denied : 0,
     callsPerTask: [...perExpert.values()].reduce((a, b) => a + b, 0) / TASKS,
     qCommit, qReject, qIndet,
     pluralityRate: pluralityCorrect / TASKS,
@@ -518,6 +567,8 @@ function evaluate(over, seeds) {
     failed: mean(runs.map((r) => r.failed)),
     hangsHit: mean(runs.map((r) => r.hangsHit)),
     callsPerTask: mean(runs.map((r) => r.callsPerTask)),
+    escalationRate: mean(runs.map((r) => r.escalationRate)),
+    escalationDenied: mean(runs.map((r) => r.escalationDenied)),
     qCommit: mean(runs.map((r) => r.qCommit)),
     qReject: mean(runs.map((r) => r.qReject)),
     qIndet: mean(runs.map((r) => r.qIndet)),
@@ -846,3 +897,59 @@ withPool(EXPERTS_NOGEM, () => {
     );
   }
 });
+
+// ── (g) ESCALATION — is the panel gain worth its cost only sometimes? ────────
+//
+// Section (f) pays 3-4x on EVERY task. RouteMoA's answer is to screen cheaply
+// and escalate only when the prior is uncertain. If most of the gain survives
+// at a fraction of the calls, that is the shipping configuration.
+
+console.log(`\n\n(g) ESCALATION POLICY — panel of 3 only when uncertain`);
+console.log('='.repeat(78));
+console.log(
+  `${'arm'.padEnd(34)} ${'correct'.padStart(8)} ${'Δpp'.padStart(8)} ${'calls'.padStart(7)} ${'esc%'.padStart(6)} ${'p99'.padStart(6)}`
+);
+const alwaysPanel = evaluate({ panelSize: 3, aggregate: true, scatterWrong: true }, ALL10);
+console.log(
+  `${'top-1 (control)'.padEnd(34)} ${(base.correctness * 100).toFixed(1).padStart(7)}% ${'0.00'.padStart(8)} ${base.callsPerTask.toFixed(2).padStart(7)} ${'-'.padStart(6)} ${String(Math.round(base.p99)).padStart(6)}`
+);
+console.log(
+  `${'panel of 3, always'.padEnd(34)} ${(alwaysPanel.correctness * 100).toFixed(1).padStart(7)}% ${('+' + ((alwaysPanel.correctness - base.correctness) * 100).toFixed(2)).padStart(8)} ${alwaysPanel.callsPerTask.toFixed(2).padStart(7)} ${'100'.padStart(6)} ${String(Math.round(alwaysPanel.p99)).padStart(6)}`
+);
+for (const [label, cfg] of [
+  ['margin<1000', { marginFloor: 1000 }],
+  ['margin<2000', { marginFloor: 2000 }],
+  ['conf<0.5', { confidenceFloor: 0.5 }],
+  ['margin<2000 + conf<0.5', { marginFloor: 2000, confidenceFloor: 0.5 }],
+  ['margin<2000, cap 25%', { marginFloor: 2000, maxEscalationRate: 0.25 }],
+]) {
+  const r = evaluate({ panelSize: 3, aggregate: true, scatterWrong: true, escalateCfg: cfg }, ALL10);
+  const d = (r.correctness - base.correctness) * 100;
+  console.log(
+    `${('escalate ' + label).padEnd(34)} ${(r.correctness * 100).toFixed(1).padStart(7)}% ${((d >= 0 ? '+' : '') + d.toFixed(2)).padStart(8)} ${r.callsPerTask.toFixed(2).padStart(7)} ${(r.escalationRate * 100).toFixed(0).padStart(6)} ${String(Math.round(r.p99)).padStart(6)}`
+  );
+}
+
+console.log(`\n  NO-HIDDEN-GEM counterfactual, panel of 3:`);
+withPool(EXPERTS_NOGEM, () => {
+  const ctrl = evaluate({}, ALL10);
+  console.log(`  ${'top-1'.padEnd(30)} ${(ctrl.correctness * 100).toFixed(1).padStart(7)}%  calls ${ctrl.callsPerTask.toFixed(2)}`);
+  for (const [label, cfg] of [['always', null], ['margin<1000', { marginFloor: 1000 }]]) {
+    const r = evaluate({ panelSize: 3, aggregate: true, scatterWrong: true, escalateCfg: cfg }, ALL10);
+    const d = (r.correctness - ctrl.correctness) * 100;
+    console.log(
+      `  ${('panel ' + label).padEnd(30)} ${(r.correctness * 100).toFixed(1).padStart(7)}% ${((d >= 0 ? '+' : '') + d.toFixed(2)).padStart(8)}pp  calls ${r.callsPerTask.toFixed(2)}  esc ${(r.escalationRate * 100).toFixed(0)}%`
+    );
+  }
+});
+
+// Gain per extra call — the metric that actually decides whether screening pays.
+console.log(`\n  Efficiency (pp gained per extra call over top-1), default world:`);
+for (const [label, cfg] of [['always', null], ['margin<1000', { marginFloor: 1000 }],
+                            ['margin<2000', { marginFloor: 2000 }],
+                            ['margin<2000 cap 25%', { marginFloor: 2000, maxEscalationRate: 0.25 }]]) {
+  const r = evaluate({ panelSize: 3, aggregate: true, scatterWrong: true, escalateCfg: cfg }, ALL10);
+  const gain = (r.correctness - base.correctness) * 100;
+  const extra = r.callsPerTask - base.callsPerTask;
+  console.log(`  ${label.padEnd(22)} ${gain.toFixed(2).padStart(6)}pp / ${extra.toFixed(2)} calls = ${(gain / extra).toFixed(2)} pp per extra call`);
+}

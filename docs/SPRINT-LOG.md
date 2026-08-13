@@ -732,6 +732,70 @@ every task rather than only on uncertain ones. And none of it is validated
 against the 152,001 real labelled outcomes.
 
 
+### 14. Sprint I — `escalate.ts`, and a dial mistaken for an improvement
+
+Built `lib/trustshell/harness/escalate.ts` plus
+`scripts/harness-escalate-test.mjs`. **22 assertions, 258 across nine suites,
+tsc 25 unchanged, next build clean, portability 13 files.** Nothing changes a
+default; the validity guard still reproduces the simulator exactly.
+
+Panels cost 3–4× on every task. This screens first — thin margin over the
+runner-up, low absolute earned score, low confidence in the leader — using only
+ledger state the router already computed, so screening itself costs no calls.
+
+**MEASURED, panel of 3, ten seeds:** always-panel +6.69pp at 3.00 calls and p99
+632 ms; `margin<1000` +3.95pp at 2.15 calls, 57% escalation, **p99 258 ms**;
+`margin<2000` +6.12pp at 2.83 calls; `conf<0.5` +0.19pp at 3% escalation;
+`margin<2000` with a 25% cap +0.58pp.
+
+**THE HEADLINE IS NOT WHAT IT LOOKS LIKE.** Gain per extra call is 3.51 for
+`margin<1000` versus 3.38 for always-panel — a 4% difference, i.e. nothing.
+**Screening does not improve the exchange rate between calls and correctness.**
+What it buys is the tail: p99 632 → 258 ms, −59%, at 28% fewer calls and 41% of
+the gain forgone. That is a **dial, not an improvement**, and reporting it as
+"escalation is more efficient" would have been the overclaim this log exists to
+catch.
+
+**FAILED — the rate cap is worse than useless as implemented.** 1.21 pp per
+extra call against 3.38 for always-panel. This is the greedy-budget limitation
+written into the module docstring, now measured rather than predicted: the cap
+spends budget on the first uncertain tasks it meets, which early in a run are
+cold-start tasks where a panel of low-confidence experts helps least. By the
+time the ledger is informative the budget is spent. Do not ship
+`maxEscalationRate` below 1 until that is fixed with a windowed quantile.
+
+**`conf<0.5` is nearly dead at the current default** — it fires on 3% of tasks,
+because `confidenceK` 20 makes confidence rise fast. A floor tuned when
+`confidenceK` was 50 would be badly wrong now. Config floors are coupled to
+other config.
+
+**MUTATION TESTED — five mutations, four caught immediately**, and the fifth
+exposed a real coverage hole. Silent budget denial: 3 failures. Pre-increment
+cap (the classic rate-limiter off-by-one): 4. A 0 floor meaning ALWAYS instead
+of OFF: 3. Rate computed over escalations rather than decisions: 2.
+
+The miss: replacing `POSITIVE_INFINITY` with `topEarned` for a missing runner-up
+passed all 22 assertions. My test used `topEarned: 6000` against a `marginFloor`
+of 5000, so the substituted value still cleared the floor **by luck** and the
+test never distinguished the two. Lowered to 3000 against the same floor and the
+mutation now fails it. Second time mutation testing has found a hole that writing
+more tests from the same mental model would not have.
+
+**One test was self-contradictory and the module was right.** I asserted the
+first escalation succeeds under a 50% cap while the comment beside it said it
+would be denied. It is denied — on decision 1 the rate is 1/1 = 100%, which
+exceeds any cap below 1. That is a real property worth its own assertion: **a
+capped policy is always refused its first panel** and needs a warm-up of quiet
+decisions, so a low cap on a short run yields zero panels rather than "a few".
+
+Counterfactual gate passed: `margin<1000` gives +4.39pp in the no-gem world.
+
+**NOT CHECKED.** Still the simulator. The three floors were chosen by hand and
+swept coarsely — no holdout/counterfactual discipline was applied to the floor
+VALUES themselves, so they may be fitted to this world. Escalation is measured
+only at panel size 3. And none of it touches the 152,001 real labelled outcomes.
+
+
 ---
 
 ### Standing NOT CHECKED

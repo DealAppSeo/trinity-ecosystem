@@ -4,7 +4,7 @@
 layer that other trust systems can adopt. RepID as a package rather than a
 Trinity feature.
 
-Twelve modules, no imports outside the directory, no Node built-ins, no
+Thirteen modules, no imports outside the directory, no Node built-ins, no
 `process.env`. `npm run check:harness-portable` fails the build if that stops
 being true.
 
@@ -35,6 +35,7 @@ weight, tier, payout.
 | `timeout.ts` | Run/idle deadline split; catches an expert that hangs |
 | `transform.ts` | Middle-out context compression with a reported ratio |
 | `aggregate.ts` | Weighted-plurality MoA aggregation; earned weight, not head count |
+| `escalate.ts` | When a panel is worth paying for; budget cap that reports refusals |
 
 ## Measured results
 
@@ -344,6 +345,49 @@ Two details worth keeping:
   second key, equal-weight clusters fall back to `Map` insertion order and the
   same input yields different answers across runs.
 
+### `escalate.ts` — screening, and an honest look at what it buys
+
+`aggregate.ts` pays 3–4× on **every** task. RouteMoA's answer is to screen
+cheaply and escalate only when the prior is uncertain, using signals that are
+already computed — thin margin over the runner-up, low absolute earned score,
+low confidence in the leader. Screening costs no calls.
+
+Panel of 3, ten seeds:
+
+| arm | correct | Δpp | calls/task | escalated | p99 |
+|---|---|---|---|---|---|
+| top-1 | 91.8% | — | 1.02 | — | 193 ms |
+| panel always | 98.5% | +6.69 | 3.00 | 100% | 632 ms |
+| escalate margin<1000 | 95.7% | +3.95 | 2.15 | 57% | **258 ms** |
+| escalate margin<2000 | 97.9% | +6.12 | 2.83 | 92% | 360 ms |
+| escalate conf<0.5 | 92.0% | +0.19 | 1.06 | 3% | 185 ms |
+| escalate margin<2000, cap 25% | 92.4% | +0.58 | 1.50 | 25% | 211 ms |
+
+**Do not read this as "screening is more efficient".** Gain per extra call is
+3.51 for `margin<1000` against 3.38 for always-panel — a 4% difference, which is
+nothing. Screening does not buy a better exchange rate between calls and
+correctness.
+
+**What it does buy is the tail: p99 632 → 258 ms, −59%**, with 28% fewer calls
+and 41% of the gain forgone. On a workload where p99 is the binding constraint
+that is a good trade; on one where correctness is, always-panel is still right.
+The honest framing is that this is a **dial, not an improvement**.
+
+**The rate cap is worse than useless as implemented** — 1.21 pp per extra call
+against 3.38 for always-panel. This is the greedy-budget limitation documented
+in the module, now measured: the cap spends its budget on the first uncertain
+tasks it meets, which early in a run are cold-start tasks where a panel of
+low-confidence experts helps least. By the time the ledger is informative the
+budget is gone. **Do not ship `maxEscalationRate` below 1 without fixing that.**
+
+**`conf<0.5` barely fires — 3% of tasks.** At `confidenceK` 20 confidence rises
+fast, so almost nothing is below 0.5. The signal is not wrong; it is nearly
+dead at the current default, and a floor tuned for `confidenceK` 50 would be
+badly wrong here.
+
+Counterfactual gate passed: in the no-gem world `margin<1000` gives +4.39pp
+against top-1 (always-panel gives +7.84).
+
 ## Three build–measure–learn cycles, and what each taught
 
 The tau figure took three iterations. Each one is a defect the simulation found
@@ -446,6 +490,7 @@ npm run check:harness-consensus    # 46 assertions
 npm run check:harness-timeout      # 29 assertions
 npm run check:harness-transform    # 31 assertions
 npm run check:harness-aggregate    # 28 assertions
+npm run check:harness-escalate     # 22 assertions
 npm run check:harness-reputation   # 22 assertions
 npm run sim:harness                # E2E numbers
 npm run experiment                 # parameter sweep + hang-under-trust scenario
@@ -460,7 +505,7 @@ npm run sim:harness -- --no-timeout   # ablate the timeout policy
   **208 assertions, 0 failures**.
 - `npx tsc --noEmit` — 25 errors, unchanged from baseline, none in new code.
 - `npx next build` — clean.
-- Portability check — 12 files, no external imports.
+- Portability check — 13 files, no external imports.
 - Simulation across 5 seeds, results above.
 - `harness-timeout` mutation-tested: three mutations applied to `timeout.ts`
   and each was caught. Refreshing `startedAt` from a heartbeat (the mutation
