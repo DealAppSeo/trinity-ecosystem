@@ -27,11 +27,37 @@
 // `budgetDenied` is true whenever the policy WANTED a panel and could not
 // afford one, and the caller can count those.
 //
-// KNOWN LIMITATION, stated because it is not obvious. The cap is greedy: it
-// spends budget on the first uncertain tasks it meets, not the most uncertain
-// ones. Under a workload whose hard tasks arrive late, the budget is already
-// gone. Fixing that needs a quantile estimate of uncertainty over a window,
-// which is real work and is not done here.
+// THE CAP IS A SAFETY CEILING, NOT AN ALLOCATOR. Set `maxEscalationRate` to
+// bound worst-case spend and tune the FLOORS to decide what deserves a panel.
+// Using the cap to do the deciding is what fails.
+//
+// This was established by building the obvious fix and measuring it. The cap is
+// greedy — it spends on the first qualifying tasks, which early in a run are
+// cold-start tasks — so a windowed-quantile allocator was written to spend on
+// the MOST uncertain tasks instead. On a workload of 20 mild then 5 severe
+// tasks at a 20% cap:
+//
+//   floor 1000, greedy      severe caught 1/5, budget burned on 4 mild
+//   floor 1000, quantile    severe caught 1/5, budget burned on 4 mild
+//   floor  500, greedy      severe caught 5/5, budget burned on 0 mild
+//
+// **The quantile allocator produced exactly zero improvement, and a tighter
+// floor fixed the problem completely at the same cap.** It was removed rather
+// than shipped, because machinery that does not do what its name claims is the
+// defect this codebase exists to catch.
+//
+// The reason is not a bug and is not patchable: an online quantile is estimated
+// from tasks already seen, so it cannot reserve budget for a severity it has
+// never observed. When mild tasks arrive first they define the distribution,
+// clear their own threshold, and take the budget. Reserving for the unseen
+// needs lookahead or a prior on the severity distribution, and neither is
+// available here. A first attempt selecting on the quantile ALONE also overshot
+// a 20% cap to 68%, because a tied mass of equally uncertain tasks all clear a
+// threshold equal to their own value.
+//
+// `uncertainty` is still reported on every decision. It earned its place — it
+// is the measurement that diagnosed all of the above — and it lets a caller see
+// how far short a task fell rather than only whether a boolean tripped.
 
 import type { Bps, Clock } from '@/lib/trustshell/harness/types';
 
@@ -62,6 +88,9 @@ export interface EscalationConfig {
   /**
    * Maximum share of decisions that may escalate, 0..1. 1 allows every
    * escalation the signals ask for; 0 disables panels entirely.
+   *
+   * A hard ceiling, always. It bounds spend; it does not choose what to spend
+   * on. See the header for why that distinction is load-bearing.
    */
   maxEscalationRate?: number;
 }
@@ -77,6 +106,12 @@ export interface EscalationDecision {
    * from `escalate: false, reason: null`, which means nothing asked for one.
    */
   budgetDenied: boolean;
+  /**
+   * How far short of its floor the worst-off signal fell, 0..1. 0 means no
+   * signal fired. This is what quantile mode ranks tasks by, and it is exposed
+   * so a caller can see WHY one task outranked another.
+   */
+  uncertainty: number;
   /** Why, in plain language. */
   basis: string;
   decidedAt: number;
@@ -109,6 +144,7 @@ export class EscalationPolicy {
     low_confidence: 0,
   };
 
+
   constructor(
     private readonly clock: Clock,
     config: EscalationConfig = {}
@@ -123,6 +159,34 @@ export class EscalationPolicy {
     if (this.cfg.earnedFloor < 0) throw new Error('earnedFloor must be >= 0');
     if (this.cfg.marginFloor < 0) throw new Error('marginFloor must be >= 0');
   }
+
+  /**
+   * How far short of its floor the worst-off armed signal fell, 0..1.
+   *
+   * Each signal is normalised by its OWN floor, so a margin floor in basis
+   * points and a confidence floor in 0..1 become comparable. The maximum is
+   * taken rather than the sum or mean: a task that is desperately short on one
+   * axis is uncertain, and averaging that against two comfortable axes would
+   * hide it. A disarmed floor (0) contributes nothing.
+   */
+  private uncertaintyOf(signals: EscalationSignals, margin: number): number {
+    let worst = 0;
+    if (this.cfg.marginFloor > 0 && Number.isFinite(margin)) {
+      worst = Math.max(worst, (this.cfg.marginFloor - margin) / this.cfg.marginFloor);
+    }
+    if (this.cfg.earnedFloor > 0) {
+      worst = Math.max(worst, (this.cfg.earnedFloor - signals.topEarned) / this.cfg.earnedFloor);
+    }
+    if (this.cfg.confidenceFloor > 0) {
+      worst = Math.max(
+        worst,
+        (this.cfg.confidenceFloor - signals.topConfidence) / this.cfg.confidenceFloor
+      );
+    }
+    return Math.max(0, Math.min(1, worst));
+  }
+
+
 
   /**
    * Decide whether this task is worth a panel.
@@ -154,32 +218,46 @@ export class EscalationPolicy {
       detail = `leader's confidence is ${signals.topConfidence.toFixed(2)}, under the ${this.cfg.confidenceFloor} floor`;
     }
 
+    const uncertainty = this.uncertaintyOf(signals, margin);
+
     if (reason === null) {
       return {
         escalate: false,
         reason: null,
         rateSoFar: this.escalations / this.decisions,
         budgetDenied: false,
+        uncertainty,
         basis: 'No uncertainty signal fired; top-1 is a clear pick.',
         decidedAt,
       };
     }
 
-    // Budget check. `escalations + 1` because this decision would be the one
-    // spending it — testing the pre-increment rate lets the cap be exceeded by
-    // exactly one, which is the classic off-by-one in a rate limiter.
-    const wouldBeRate = (this.escalations + 1) / this.decisions;
-    if (wouldBeRate > this.cfg.maxEscalationRate) {
+    let denyBasis: string | null = null;
+
+    {
+      // `escalations + 1` because this decision would be the one spending it —
+      // testing the pre-increment rate lets the cap be exceeded by exactly one,
+      // the classic off-by-one in a rate limiter.
+      const wouldBeRate = (this.escalations + 1) / this.decisions;
+      if (wouldBeRate > this.cfg.maxEscalationRate) {
+        denyBasis =
+          `Wanted a panel (${detail}) but the escalation budget is spent: ` +
+          `${(wouldBeRate * 100).toFixed(1)}% would exceed the ${(this.cfg.maxEscalationRate * 100).toFixed(1)}% cap. ` +
+          'Answered by top-1 instead — this is a cost decision, not a quality one. ' +
+          'If this fires often, tighten the FLOORS rather than raising the cap: ' +
+          'the cap bounds spend, it does not choose what to spend on.';
+      }
+    }
+
+    if (denyBasis !== null) {
       this.denied += 1;
       return {
         escalate: false,
         reason,
         rateSoFar: this.escalations / this.decisions,
         budgetDenied: true,
-        basis:
-          `Wanted a panel (${detail}) but the escalation budget is spent: ` +
-          `${(wouldBeRate * 100).toFixed(1)}% would exceed the ${(this.cfg.maxEscalationRate * 100).toFixed(1)}% cap. ` +
-          'Answered by top-1 instead — this is a cost decision, not a quality one.',
+        uncertainty,
+        basis: denyBasis,
         decidedAt,
       };
     }
@@ -191,6 +269,7 @@ export class EscalationPolicy {
       reason,
       rateSoFar: this.escalations / this.decisions,
       budgetDenied: false,
+      uncertainty,
       basis: `Escalating to a panel: ${detail}.`,
       decidedAt,
     };

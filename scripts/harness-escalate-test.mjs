@@ -250,4 +250,64 @@ check('a mixed workload escalates only its uncertain share', () => {
   close(s.rate, 0.2, 0.001, 'a 20% escalation rate, not 100%');
 });
 
+// ── quantile budget mode ─────────────────────────────────────────────────────
+
+check('uncertainty is 0 when no signal fires and rises as floors are missed', () => {
+  const { pol } = mk({ marginFloor: 2000 });
+  eq(pol.decide(clear).uncertainty, 0, 'a clear leader is not uncertain at all');
+  const half = pol.decide({ topEarned: 5000, runnerUpEarned: 4000, topConfidence: 0.9 });
+  close(half.uncertainty, 0.5, 0.001, 'a 1000 margin against a 2000 floor is half short');
+  const full = pol.decide({ topEarned: 5000, runnerUpEarned: 5000, topConfidence: 0.9 });
+  close(full.uncertainty, 1, 0.001, 'a dead-even margin is maximally short');
+});
+
+check('uncertainty is clamped to [0, 1] even on an inverted margin', () => {
+  // Found by mutation testing: removing the upper clamp passed every
+  // assertion, because nothing exercised a shortfall above 1. A runner-up
+  // scoring ABOVE the leader gives a negative margin, so (floor - margin)/floor
+  // exceeds 1 and an unclamped score would leave the 0..1 contract the field
+  // documents — and would silently outrank a genuinely maximal 1.0.
+  const { pol } = mk({ marginFloor: 1000 });
+  const r = pol.decide({ topEarned: 5000, runnerUpEarned: 9000, topConfidence: 0.9 });
+  eq(r.uncertainty, 1, 'clamped to 1, not 5');
+  const lo = pol.decide(clear);
+  eq(lo.uncertainty, 0, 'and never below 0');
+});
+
+check('uncertainty takes the worst signal, not the average', () => {
+  // Averaging would let two comfortable axes hide one desperate axis.
+  const { pol } = mk({ marginFloor: 2000, earnedFloor: 8000, confidenceFloor: 0.9 });
+  const r = pol.decide({ topEarned: 7999, runnerUpEarned: 0, topConfidence: 0.89 });
+  truthy(r.uncertainty < 0.02, `both misses are tiny, so uncertainty is tiny: ${r.uncertainty}`);
+  const r2 = pol.decide({ topEarned: 0, runnerUpEarned: 0, topConfidence: 0.89 });
+  close(r2.uncertainty, 1, 0.001, 'one desperate axis dominates');
+});
+
+check('A TIGHTER FLOOR BEATS A SMARTER ALLOCATOR', () => {
+  // The measured finding that removed the quantile allocator. Twenty mild tasks
+  // then five severe ones, 20% cap throughout.
+  //
+  // At a loose floor the mild tasks qualify, take the budget on arrival, and
+  // only 1 of 5 severe tasks gets a panel. At a floor tight enough that mild
+  // tasks never fire, all 5 severe tasks are caught within the SAME cap. The
+  // cap bounds spend; the floor decides what deserves it.
+  const mild = { topEarned: 5000, runnerUpEarned: 4400, topConfidence: 0.9 };
+  const severe = { topEarned: 5000, runnerUpEarned: 5000, topConfidence: 0.9 };
+  const runAt = (marginFloor) => {
+    const pol = new EscalationPolicy(new ManualClock(0), { marginFloor, maxEscalationRate: 0.2 });
+    let sev = 0;
+    let mildBurned = 0;
+    for (let i = 0; i < 20; i += 1) if (pol.decide(mild).escalate) mildBurned += 1;
+    for (let i = 0; i < 5; i += 1) if (pol.decide(severe).escalate) sev += 1;
+    return { sev, mildBurned, rate: pol.stats().rate };
+  };
+  const loose = runAt(1000);
+  const tight = runAt(500);
+  eq(loose.sev, 1, 'a loose floor catches 1 of 5 severe tasks');
+  eq(loose.mildBurned, 4, 'having burned the budget on 4 mild ones');
+  eq(tight.sev, 5, 'a tighter floor catches all 5');
+  eq(tight.mildBurned, 0, 'burning none');
+  close(tight.rate, loose.rate, 0.001, 'at an identical escalation rate — same cost, better spend');
+});
+
 report();

@@ -796,6 +796,68 @@ VALUES themselves, so they may be fitted to this world. Escalation is measured
 only at panel size 3. And none of it touches the 152,001 real labelled outcomes.
 
 
+### 15. Sprint J — the greedy budget fix that did not work
+
+Asked to fix the greedy budget cap. Built the documented fix — a windowed
+quantile allocator that spends on the MOST uncertain tasks rather than the
+earliest — measured it, and **removed it**. It produced exactly zero
+improvement.
+
+**261 assertions, 0 failures; escalate suite 22 → 26. tsc 25 unchanged.**
+
+**MEASURED.** Twenty mild tasks then five severe ones, 20% cap:
+
+| config | severe caught | mild burned | rate |
+|---|---|---|---|
+| floor 1000, greedy | 1/5 | 4 | 0.20 |
+| floor 1000, quantile | **1/5** | **4** | 0.20 |
+| floor 500, greedy | **5/5** | **0** | 0.20 |
+
+**The quantile allocator changed nothing. A tighter floor fixed it completely at
+the same cap.** So the finding is that `maxEscalationRate` is a safety ceiling,
+not an allocator: bound spend with the cap, decide what deserves a panel with
+the floors.
+
+**Why it cannot be patched.** An online quantile is estimated from tasks already
+seen, so it cannot reserve budget for a severity it has never observed. Mild
+tasks arriving first define the distribution, clear their own threshold, and take
+the budget. Reserving for the unseen needs lookahead or a prior, and neither is
+available. That is a property of online allocation, not a bug in the code.
+
+**An intermediate version was also wrong, and measurement caught it.** Selecting
+on the quantile ALONE overshot the 20% cap to **68%** — a tied mass of equally
+uncertain tasks all clear a threshold equal to their own value, so `>= threshold`
+admits the whole tie at once. Adding the cap back as a second gate fixed the
+overshoot and left the allocator useless, which is what led to testing the floor
+instead.
+
+**A probe of my own was degenerate and nearly produced a false positive.** An
+"interleaved arrival" scenario showed greedy catching 5/5 severe tasks and looked
+like evidence that arrival order was the whole story. It was an artefact: the 20%
+cap exactly matched the 20% severe frequency, so greedy's periodic escalation
+aligned with the severe tasks by coincidence. Caught before it was written down.
+
+**REMOVED rather than shipped.** Machinery that does not do what its name claims
+is the defect this codebase exists to catch — the same judgement as the fleet
+endpoint over an empty table. The `uncertainty` score was KEPT: it is what
+diagnosed all of the above, and it lets a caller see how far short a task fell
+rather than only whether a boolean tripped.
+
+**MUTATION TESTED — and it found a second coverage hole.** Averaging the signals
+instead of taking the worst: caught. Removing the `[0,1]` clamp: **passed all 25
+assertions**, because nothing exercised a shortfall above 1. A runner-up scoring
+above the leader gives a negative margin and an unclamped score of 5.0, breaking
+the documented contract and outranking a genuinely maximal 1.0. A 26th assertion
+now covers it. Third time mutation testing has found a gap that writing more
+tests from the same mental model would not have.
+
+**NOT CHECKED.** The floor VALUES that make this work (500 vs 1000) were derived
+from one synthetic two-tier workload. Real uncertainty distributions are not
+two-tier, and no holdout or counterfactual discipline was applied to the floor
+values themselves. The claim "tighten the floor" is directionally supported and
+its magnitude is not.
+
+
 ---
 
 ### Standing NOT CHECKED

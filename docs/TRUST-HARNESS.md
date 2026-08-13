@@ -373,12 +373,35 @@ and 41% of the gain forgone. On a workload where p99 is the binding constraint
 that is a good trade; on one where correctness is, always-panel is still right.
 The honest framing is that this is a **dial, not an improvement**.
 
-**The rate cap is worse than useless as implemented** — 1.21 pp per extra call
-against 3.38 for always-panel. This is the greedy-budget limitation documented
-in the module, now measured: the cap spends its budget on the first uncertain
-tasks it meets, which early in a run are cold-start tasks where a panel of
-low-confidence experts helps least. By the time the ledger is informative the
-budget is gone. **Do not ship `maxEscalationRate` below 1 without fixing that.**
+**The rate cap is worse than useless as an allocator** — 1.21 pp per extra call
+against 3.38 for always-panel. It spends its budget on the first qualifying
+tasks, which early in a run are cold-start tasks where a panel of low-confidence
+experts helps least.
+
+**The obvious fix was built, measured, and removed.** A windowed-quantile
+allocator was written to spend on the *most* uncertain tasks rather than the
+earliest. On 20 mild then 5 severe tasks at a 20% cap:
+
+| config | severe caught | mild burned | rate |
+|---|---|---|---|
+| floor 1000, greedy | 1/5 | 4 | 0.20 |
+| floor 1000, **quantile** | **1/5** | **4** | 0.20 |
+| floor 500, greedy | **5/5** | **0** | 0.20 |
+
+**The quantile allocator produced exactly zero improvement, and a tighter floor
+fixed the problem completely at the same cap.** It was removed rather than
+shipped. The reason is not patchable: an online quantile is estimated from tasks
+already seen, so it cannot reserve budget for a severity it has never observed —
+mild tasks arriving first define the distribution, clear their own threshold, and
+take the budget. A first attempt that selected on the quantile *alone* also
+overshot the 20% cap to **68%**, because a tied mass of equally uncertain tasks
+all clear a threshold equal to their own value.
+
+**So: `maxEscalationRate` is a safety ceiling, not an allocator.** Bound
+worst-case spend with the cap; decide what deserves a panel with the floors. The
+`uncertainty` score survives as an observable — it is what diagnosed all of the
+above, and it lets a caller see how far short a task fell rather than only
+whether a boolean tripped.
 
 **`conf<0.5` barely fires — 3% of tasks.** At `confidenceK` 20 confidence rises
 fast, so almost nothing is below 0.5. The signal is not wrong; it is nearly
