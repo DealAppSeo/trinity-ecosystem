@@ -662,6 +662,76 @@ aggregates uniformly or by a learned gate and has no notion of a proposer that
 lies.
 
 
+### 13. Sprint H — `aggregate.ts`, the module the negative result asked for
+
+Sprint G measured that the missing piece was an aggregator rather than a wiring
+change. Built it: `lib/trustshell/harness/aggregate.ts` plus
+`scripts/harness-aggregate-test.mjs`. **28 assertions, 236 across eight suites,
+tsc 25 unchanged, next build clean, portability 12 files.**
+
+Proposals are clustered by an answer `key` the caller supplies, clusters are
+weighted by **earned** reputation, and the heaviest cluster is returned. What
+this adds to the published MoA work: MoA aggregates uniformly or by a learned
+gate, neither of which has any notion of a proposer that lies. Here a confident
+proposer with no track record cannot buy influence over the answer.
+
+**MEASURED, ten seeds, `wrong=scatter`:**
+
+| arm | default world | no-gem world | calls/task | p99 |
+|---|---|---|---|---|
+| top-1 | 91.8% | 89.2% | 1.02 | 193 ms |
+| panel of 2 | 91.1% (**−0.65**) | 88.3% (**−0.93**) | 2.00 | 213 ms |
+| panel of 3 | 98.5% (**+6.69**) | 97.1% (**+7.84**) | 3.00 | 632 ms |
+| panel of 4 | 99.6% (**+7.79**) | 98.9% (**+9.73**) | 3.98 | 959 ms |
+
+**Passes the counterfactual gate and is stronger inside it** — with no planted
+gem, top-1 is weaker and aggregation matters more. The exact opposite of the
+`explorationRate` artefact, which evaporated under the same test.
+
+**REGRESSION, stated plainly: panel of 2 loses in both worlds**, and the cause is
+this module's own guard. `minProposals` is 2, so when one of a pair hangs the
+survivor is a lone proposal and the aggregator abstains — correctly, because one
+proposal has 100% support by construction. A pair has no redundancy. Do not run
+panels of 2.
+
+**The estimate that justified the build was optimistic, in the safe direction.**
+Sprint G's diagnostic lens predicted +3.62pp for panel-2; the shipped module
+delivers −0.65pp, because the lens counted a lone survivor as a correct answer
+and the module refuses to. Better that an estimate proves too generous than too
+mean — but it is a reminder that a scoring lens applied to recorded data is not
+the same thing as the code that will run.
+
+**A defect the tests found in the module.** `dominatedBySingleExpert` is meant to
+say "one proposer outweighed everyone, so the panel bought nothing over top-1".
+The first implementation compared the winning *cluster* against the rest, so a
+two-expert bloc at 3000+3000 beating a lone 5000 reported `true` — the inverse of
+the truth, since that is precisely the case where combining won it. The name and
+the computation disagreed. One of the two initial test failures was my test being
+wrong; this one was the module being wrong.
+
+**MUTATION TESTED — six mutations, all caught.** Weighting removed so head count
+decides: 10 failures. Tie-break ordering reduced to weight-only: 1. `minMargin`
+guard removed: 2. Equivocators kept: 2. Abstain weight left in the denominator:
+2. `dominatedBySingleExpert` hardcoded false: 1.
+
+**Answer-model sensitivity is bracketed, not assumed.** `wrong=bloc` counts every
+wrong answer as the same answer; `wrong=scatter` gives each its own. Panel of 3
+reads 96.6% bloc, 98.5% scatter. Reality is scatter, so bloc is the floor and
+both are printed.
+
+**COST, not netted out of the gain:** 3–4× the calls, p99 193 → 632/959 ms. The
+unbuilt answer is RouteMoA's — screen cheaply, escalate to a panel only when the
+prior is uncertain. Nothing here changes a default; panels are opt-in and the
+validity guard still reproduces the simulator exactly.
+
+**NOT CHECKED.** Still the simulator. The `key` equivalence that decides whether
+two answers are "the same" is supplied by the caller and modelled here as a
+boolean right/wrong — real semantic clustering of LLM answers is the hard part
+and is untested. No escalation policy exists, so the cost is currently paid on
+every task rather than only on uncertain ones. And none of it is validated
+against the 152,001 real labelled outcomes.
+
+
 ---
 
 ### Standing NOT CHECKED

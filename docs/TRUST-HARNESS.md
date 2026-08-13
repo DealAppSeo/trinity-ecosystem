@@ -4,7 +4,7 @@
 layer that other trust systems can adopt. RepID as a package rather than a
 Trinity feature.
 
-Eleven modules, no imports outside the directory, no Node built-ins, no
+Twelve modules, no imports outside the directory, no Node built-ins, no
 `process.env`. `npm run check:harness-portable` fails the build if that stops
 being true.
 
@@ -34,6 +34,7 @@ weight, tier, payout.
 | `replay.ts` | Self-healing state replay |
 | `timeout.ts` | Run/idle deadline split; catches an expert that hangs |
 | `transform.ts` | Middle-out context compression with a reported ratio |
+| `aggregate.ts` | Weighted-plurality MoA aggregation; earned weight, not head count |
 
 ## Measured results
 
@@ -293,6 +294,56 @@ tail latency, exactly as the literature says.
 simply not an aggregator, and its guard refusing `supermajority: 0.5` ("must be
 in (0.5, 1)") is right; the panel bent to the guard rather than the reverse.
 
+### `aggregate.ts` — the module the negative result asked for
+
+The panel experiment above said the missing piece was an aggregator, not a
+wiring change. This is it: proposals clustered by answer, clusters weighted by
+**earned** reputation, heaviest cluster returned. Ten seeds, `wrong=scatter`
+(each wrong answer distinct, which is what actually happens):
+
+| arm | default world | no-gem world | calls/task | p99 |
+|---|---|---|---|---|
+| top-1 | 91.8% | 89.2% | 1.02 | 193 ms |
+| panel of 2 | 91.1% (**−0.65**) | 88.3% (**−0.93**) | 2.00 | 213 ms |
+| panel of 3 | 98.5% (**+6.69**) | 97.1% (**+7.84**) | 3.00 | 632 ms |
+| panel of 4 | 99.6% (**+7.79**) | 98.9% (**+9.73**) | 3.98 | 959 ms |
+
+**It passes the counterfactual gate, and is stronger there** — with no planted
+gem to find, top-1 is weaker and aggregation matters more. That is the opposite
+of the `explorationRate` artefact, which evaporated under the same test.
+
+**Panel of 2 loses in both worlds, and the cause is this module's own guard.**
+`minProposals` defaults to 2, so when one member of a pair hangs or errors the
+survivor is a lone proposal and the aggregator abstains — correctly, since one
+proposal has 100% support by construction and says nothing. A pair has no
+redundancy: any single failure drops it below quorum. **Do not run panels of 2.**
+
+The diagnostic lens in the previous section predicted +3.62pp for panel-2 and
+was wrong, because it counted a lone survivor as a correct answer. The shipped
+module is more conservative than the estimate that justified building it, and
+that is the right direction for an estimate to be wrong in.
+
+**Answer-model sensitivity is bracketed rather than assumed.** `wrong=bloc`
+treats every wrong answer as the same wrong answer; `wrong=scatter` gives each
+its own. Panel of 3 reads 96.6% under bloc and 98.5% under scatter. Reality is
+scatter — there are many ways to be wrong and one way to be right — so bloc is
+the floor.
+
+**The cost is not netted out:** 3–4× the calls and p99 193 → 632/959 ms. This is
+the RouteMoA problem exactly, and the unbuilt answer to it is to screen cheaply
+and escalate to a panel only when the prior is uncertain.
+
+Two details worth keeping:
+
+- **`dominatedBySingleExpert`** reports when one proposer outweighs all others
+  combined — the panel cost K calls and returned what top-1 would have. It first
+  measured the winning *cluster* against the rest, which made a two-expert bloc
+  beating a lone heavyweight report `true`: the exact inverse of the truth. The
+  name and the computation disagreed and a test caught it.
+- **Ordering is total** — weight descending, then key ascending. Without the
+  second key, equal-weight clusters fall back to `Map` insertion order and the
+  same input yields different answers across runs.
+
 ## Three build–measure–learn cycles, and what each taught
 
 The tau figure took three iterations. Each one is a defect the simulation found
@@ -394,6 +445,7 @@ npm run check:harness-routing      # 45 assertions
 npm run check:harness-consensus    # 46 assertions
 npm run check:harness-timeout      # 29 assertions
 npm run check:harness-transform    # 31 assertions
+npm run check:harness-aggregate    # 28 assertions
 npm run check:harness-reputation   # 22 assertions
 npm run sim:harness                # E2E numbers
 npm run experiment                 # parameter sweep + hang-under-trust scenario
@@ -408,7 +460,7 @@ npm run sim:harness -- --no-timeout   # ablate the timeout policy
   **208 assertions, 0 failures**.
 - `npx tsc --noEmit` — 25 errors, unchanged from baseline, none in new code.
 - `npx next build` — clean.
-- Portability check — 11 files, no external imports.
+- Portability check — 12 files, no external imports.
 - Simulation across 5 seeds, results above.
 - `harness-timeout` mutation-tested: three mutations applied to `timeout.ts`
   and each was caught. Refreshing `startedAt` from a heartbeat (the mutation

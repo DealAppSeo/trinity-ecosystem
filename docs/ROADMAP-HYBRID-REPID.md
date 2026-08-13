@@ -210,7 +210,7 @@ aggregating through the quorum loses up to 13.8pp, because the quorum is a
 fail-closed gate (424 INDETERMINATE per 2000 vs 16 REJECT). The same votes under
 plurality semantics gain +3.6 to +6.5pp at panel sizes 2/3/4.
 
-**0.2b (NEW, now the top item): build a weighted-plurality aggregator.** A small
+**0.2b — DONE 2026-08-13, `aggregate.ts`. Build a weighted-plurality aggregator.** A small
 dependency-free module beside `quorum.ts`, returning the plurality answer with an
 explicit abstain policy rather than failing closed. Votes weighted by earned
 reputation — the thing MoA does not do, since it aggregates uniformly or by a

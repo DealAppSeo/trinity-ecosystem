@@ -39,6 +39,7 @@ const { CircuitBreakerRegistry } = await load('circuit-breaker');
 const { ReputationLedger } = await load('reputation');
 const { TimeoutPolicy } = await load('timeout');
 const { QuorumEvaluator } = await load('quorum');
+const { PluralityAggregator } = await load('aggregate');
 
 const RUN_TIMEOUT_MS = 10_000;
 const IDLE_TIMEOUT_MS = 1_500;
@@ -165,7 +166,8 @@ const DEFAULTS = {
 
 /** Faithful copy of runHarness() from harness-simulate.mjs, parameterised. */
 function runHarness(seed, over = {}) {
-  const { noTimeout = false, warmStart = null, panelSize = 0, ...rest } = over;
+  const { noTimeout = false, warmStart = null, panelSize = 0,
+          aggregate = false, scatterWrong = false, ...rest } = over;
   const P = { ...DEFAULTS, ...rest };
   const world = makeWorld(seed);
   const clock = new ManualClock(0);
@@ -204,6 +206,9 @@ function runHarness(seed, over = {}) {
   // bends to it rather than the reverse. The consequence is deliberate and
   // conservative: a panel that merely splits does not commit, and an
   // INDETERMINATE round is scored as NOT correct.
+  // The real module, not the second scoring lens used to justify building it.
+  const plurality = new PluralityAggregator(clock, { minProposals: 2 });
+
   const panel = new QuorumEvaluator(clock, {
     minValidators: Math.max(1, panelSize),
     faultTolerance: 0,
@@ -293,8 +298,15 @@ function runHarness(seed, over = {}) {
           // so incorrect answers scatter and fail to form a plurality. Treating
           // them as a bloc UNDERSTATES the panel's benefit — chosen deliberately,
           // because the opposite assumption would manufacture the result.
+          // scatterWrong models reality: there are many ways to be wrong and
+          // one way to be right, so incorrect answers do NOT agree with each
+          // other. The bloc model (scatterWrong false) is the conservative
+          // bound that was used to justify building this module; both are
+          // measured so the truth is bracketed rather than asserted.
+          const key = r.correct ? 'right' : scatterWrong ? `wrong:${id}` : 'wrong';
           votes.push({ validator: id, verdict: r.correct ? 'approve' : 'reject',
-                       earnedScore: ledger.earnedScore(id) });
+                       earnedScore: ledger.earnedScore(id),
+                       key, answer: key, expert: id });
         } else {
           breakers.recordFailure(id);
           updateEarned(id, false);
@@ -308,6 +320,16 @@ function runHarness(seed, over = {}) {
         failed += 1;
         continue;
       }
+      if (aggregate) {
+        const a = plurality.aggregate(
+          votes.map((v) => ({ expert: v.expert, key: v.key, answer: v.answer,
+                              earnedScore: v.earnedScore }))
+        );
+        completed += 1;
+        if (a.outcome === 'DECIDED' && a.key === 'right') correct += 1;
+        continue;
+      }
+
       const verdictResult = panel.evaluate(votes);
       // SECOND SCORING LENS ON THE SAME VOTES — no new module, no re-run.
       // A real MoA aggregator returns the plurality answer rather than
@@ -782,3 +804,45 @@ for (const k of [2, 3, 4]) {
     `  ${String(k).padEnd(10)} ${r.qCommit.toFixed(0).padStart(8)} ${r.qReject.toFixed(0).padStart(8)} ${r.qIndet.toFixed(0).padStart(14)}`
   );
 }
+
+// ── (f) THE REAL AGGREGATOR ──────────────────────────────────────────────────
+//
+// Section (e) scored recorded votes under plurality semantics as a diagnostic.
+// This runs the shipped PluralityAggregator instead, and brackets the answer
+// model: `bloc` counts every wrong answer as the same wrong answer (the
+// conservative bound used to justify the build), `scatter` gives each wrong
+// answer its own key, which is what actually happens.
+
+console.log(`\n\n(f) PluralityAggregator — the shipped module, not a scoring lens`);
+console.log('='.repeat(78));
+console.log(
+  `${'arm'.padEnd(28)} ${'correct'.padStart(8)} ${'Δpp'.padStart(8)} ${'calls/task'.padStart(11)} ${'p99'.padStart(6)}`
+);
+console.log(
+  `${'top-1 (control)'.padEnd(28)} ${(base.correctness * 100).toFixed(1).padStart(7)}% ${'0.00'.padStart(8)} ${base.callsPerTask.toFixed(2).padStart(11)} ${String(Math.round(base.p99)).padStart(6)}`
+);
+for (const k of [2, 3, 4]) {
+  for (const [label, scatter] of [['bloc', false], ['scatter', true]]) {
+    const r = evaluate({ panelSize: k, aggregate: true, scatterWrong: scatter }, ALL10);
+    const d = (r.correctness - base.correctness) * 100;
+    console.log(
+      `${(`panel ${k}, wrong=${label}`).padEnd(28)} ${(r.correctness * 100).toFixed(1).padStart(7)}% ${((d >= 0 ? '+' : '') + d.toFixed(2)).padStart(8)} ${r.callsPerTask.toFixed(2).padStart(11)} ${String(Math.round(r.p99)).padStart(6)}`
+    );
+  }
+}
+
+// The same gate every other change has had to pass: does it survive the world
+// with the planted excellent expert removed? A panel gain that only exists
+// because there is a gem to find would be the explorationRate artefact again.
+console.log(`\n  NO-HIDDEN-GEM counterfactual (rookie 0.95 -> 0.50), wrong=scatter:`);
+withPool(EXPERTS_NOGEM, () => {
+  const ctrl = evaluate({}, ALL10);
+  console.log(`  ${'top-1 (control)'.padEnd(24)} ${(ctrl.correctness * 100).toFixed(1).padStart(7)}%`);
+  for (const k of [2, 3, 4]) {
+    const r = evaluate({ panelSize: k, aggregate: true, scatterWrong: true }, ALL10);
+    const d = (r.correctness - ctrl.correctness) * 100;
+    console.log(
+      `  ${('panel of ' + k).padEnd(24)} ${(r.correctness * 100).toFixed(1).padStart(7)}% ${((d >= 0 ? '+' : '') + d.toFixed(2)).padStart(8)}pp`
+    );
+  }
+});
