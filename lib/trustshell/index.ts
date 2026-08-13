@@ -9,4 +9,24 @@ export { SolanaExecutor }       from './SolanaExecutor';
 export { FireblocksPreAuth }    from './FireblocksPreAuth';
 export { RepIDCalculator }      from './RepIDConfig';
 export { ZKPAttestationService } from './ZKPAttestation';
+export {
+  HARNESS_SETTINGS,
+  LAYER_ORDER,
+  getSettingSpec,
+  resolveHarnessProfile,
+  personalisationReport,
+} from './HarnessProfile';
+export type {
+  Authority,
+  Layer,
+  Dimension,
+  SafeDirection,
+  CompilesTo,
+  SettingSpec,
+  EarnedGrant,
+  ResolveInput,
+  ResolvedSetting,
+  ResolvedProfile,
+  Rejection,
+} from './HarnessProfile';
 export type * from './types';
