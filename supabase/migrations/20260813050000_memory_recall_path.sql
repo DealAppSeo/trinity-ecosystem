@@ -1,7 +1,12 @@
 -- 20260813050000_memory_recall_path.sql
 --
--- STATUS: WRITTEN, NOT APPLIED. Sean-gated (preflight contract §6 — this alters
--- base tables, which is beyond the additive-view allowance).
+-- STATUS: APPLIED 2026-08-13 on Sean's explicit authorisation. Changelog #120.
+--
+-- Post-apply verification (not the tool's success flag — the actual catalog):
+--   3 new columns · 2 new tables · 6 new indexes · RLS enabled on 2 tables ·
+--   0 policies on those tables (deny-all to anon) · 429 nodes intact.
+--
+-- The rollback below is still valid and still complete.
 --
 -- ---------------------------------------------------------------------------
 -- ROLLBACK (complete, in reverse order):

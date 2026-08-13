@@ -255,7 +255,7 @@ the earned authority exists to prevent.
 | M0 | Measure the corpus; `v_memory_recall_readiness` | **DONE** — changelog #117, corrected #118 |
 | M1 | Recall primitives: RRF, tiers, budget, utility, dedup shape | **DONE** — 44 assertions |
 | M2 | Memory as earned harness dimension | **DONE** — 7 settings |
-| M3 | Outcome tables + retrieval indexes | **WRITTEN, NOT APPLIED** — Sean-gated |
+| M3 | Outcome tables + retrieval indexes | **APPLIED** — changelog #120, verified |
 | M4 | Embedding backfill — the actual unblock | **DONE / DRAINING** — changelog #119 |
 | M5 | Dedup pass over 124/99/163 duplicates | Blocked on M4 (needs an index) |
 | M6 | Wire recall into the Railway agent loop | Blocked on M3; needs Railway access |

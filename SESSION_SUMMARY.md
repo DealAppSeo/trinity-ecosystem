@@ -160,18 +160,22 @@ Honest summary: until receipts exist, the harness is a fully tested implementati
    canonical way to file a gate contradicts the canonical planning surface. Logged here
    instead of adding to a deprecated table. Exact action: point `open_sean_gates` at
    `trinity_tasks`, or un-deprecate `autonomous_tasks` for this one purpose.
-4. **Apply `supabase/migrations/20260813050000_memory_recall_path.sql`.** Exact action:
-   run that file against `qnnpjhlxljtqyigedwkb`. It adds `owner_agent_name`, two outcome
-   counters and `last_outcome_at` to `agent_memory_nodes`; creates HNSW + trigram indexes;
-   creates `memory_recall_log` and `memory_outcome_link` with RLS enabled and **zero
-   policies** (deny-all to `anon`, service_role unaffected). Not applied here because it
-   alters base tables, which is beyond the additive-view allowance. Complete rollback SQL
-   is in the file header; no column is dropped and no row deleted, so rollback restores
-   the exact prior shape.
+4. ~~Apply `supabase/migrations/20260813050000_memory_recall_path.sql`~~ — **DONE
+   2026-08-13, Sean-authorised. Changelog #120.** Verified against the catalog, not the
+   tool's success flag: 3 columns, 2 tables, 6 indexes, RLS on both new tables with
+   **0 policies**, 429 nodes intact. Rollback SQL still valid in the file header.
+   What it added: `reused_good` / `reused_bad` / `last_outcome_at` on
+   `agent_memory_nodes`; HNSW cosine indexes on both embedding columns; a GIN trigram
+   index on `content`; and `memory_recall_log` + `memory_outcome_link`. **Do not add a
+   permissive policy to those two tables to "make something work"** — RLS-enabled-with-
+   zero-policies is the intended posture, and a permissive policy is exactly how the two
+   `USING (true)` tables in LESSONS S1 happened.
 5. ~~Where do the 34 orphan agent uuids come from?~~ **RESOLVED 05:20Z — the premise was
    my error.** They were never orphaned; they are a clean FK into `repid_agents`. See
    `LESSONS` A9. No action needed.
-6. **Embed the 175 unembedded production-agent nodes. THIS IS THE HIGHEST-VALUE UNBLOCK.**
+6. ~~Embed the 175 unembedded production-agent nodes~~ — **DONE / DRAINING.** All twelve
+   production agents are out of the INERT state (each has retrievable memory); a pg_cron
+   job is finishing the remainder at 8/min. Changelog #119. Original entry:
    It is the entire gap between "the memory feature exists" and "the memory feature
    returns something" for eight of the twelve agents. Exact action: name the embedding
    model and approve ~175 embedding calls. The model choice is effectively permanent —
