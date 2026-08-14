@@ -2060,3 +2060,100 @@ the shape first, which in both cases was one cheap query.
 - `hallucination_caught` as the wrongness label remains inferred (Sprint R).
 
 341 assertions unchanged, `tsc` 25, published world untouched.
+
+---
+
+## Sprint V — pricing per-domain reputation before building it, and a third correction
+
+Sprint U found agent quality to be domain-dependent and flagged per-domain
+reputation as architecturally significant. Sprint L's rule says **measure the
+prize before building.** Measured — with a clean method this time: a plain
+group-by over the 60,000-event slice, `n >= 150` per cell, no windowing, no tail
+selection.
+
+### Correction to Sprint U: 32e0e809 is NOT the best cron performer
+
+Sprint U reported that `32e0e809` — 22.9% globally, near-worst — scored **66.7%
+on cron, the best of any agent**, and drew a conclusion from it. The full-slice
+per-domain rates say the opposite: it ranks **11th of 11 on cait (0.416)** and
+**10th of 11 on EVERGREEN (0.396)**.
+
+The error is in Sprint U's method, not the data. It took each agent's **last 150
+cron events**. `32e0e809` has ~467 cron events, so its tail-150 reaches back
+across a third of its history; agents with ~4,500 cron events have a tail-150
+covering 3% of a much shorter, more recent window. **The tail-150 windows span
+different time periods per agent, so the scores were never comparable.**
+"Constant task mix" fixed one confound and left an unaligned-time confound in
+place.
+
+That is three consecutive sprints where an ad-hoc slice produced a number that
+did not survive the next check. **The common cause is not any one bug: it is
+computing on a convenience sample and reporting it as a property of the fleet.**
+This sprint's group-by has no window, no ordering and no tail, which is why it
+is the first of the four that has nothing left to retract.
+
+### The fleet is two disjoint pools, not one
+
+`peer_verify` is ~30,600 events at ~21% success, worked by exactly three agents
+— `32e0e809`, `57a2f83a`, `942860a6` — and **no other agent touches it**. Those
+three are also barely present anywhere else.
+
+So the three agents with terrible global scores are not bad agents. They work a
+domain where **everyone** scores 21%, and they are never in competition with the
+other nine. A global earned score ranks across two pools the router never
+actually chooses between, which makes the comparison meaningless in both
+directions.
+
+### The prize, priced
+
+Rank by domain (1 = best) among the nine overlapping agents:
+
+| agent | cait | EVERGREEN | review | system |
+|---|---|---|---|---|
+| 84f2d7de | 6 | **1** | **9** | 7 |
+| 065ad782 | 4 | 7 | **1** | 8 |
+| 848da285 | 7 | 6 | 2 | **1** |
+| 9c0dc740 | **1** | 5 | 3 | 5 |
+
+**Ranks genuinely scramble** — `84f2d7de` is first on EVERGREEN and last on
+review. Domain-dependence is real.
+
+But the prize is not proportional to the drama:
+
+| domain | best-by-domain | global pick scores | gain |
+|---|---|---|---|
+| cait | 9c0dc740 48.9% | d82b2ae5 47.2% | +1.70pp |
+| EVERGREEN | 84f2d7de 51.5% | d82b2ae5 51.3% | +0.20pp |
+| review | 065ad782 51.4% | d82b2ae5 46.1% | +5.30pp |
+| system | 848da285 42.4% | d82b2ae5 38.1% | +4.30pp |
+
+**Volume-weighted: +1.64pp.** The two high-volume domains have the smallest
+gains (+1.70, +0.20); the large gains sit in low-volume domains. So the
+headline-grabbing +5.30pp on `review` is worth very little in aggregate.
+
+### Recommendation: do not build it yet
+
+**+1.64pp** against a change that reshapes `ReputationLedger`'s key from agent to
+(agent, domain), touches persistence, the router, and the store's unapplied
+migration. For comparison, escalated aggregation measured **+4.70pp** in the
+simulator for an additive module that changed nothing existing.
+
+The cheap version captures most of it: the `peer_verify` pool is disjoint, so
+simply **not ranking those three agents against the other nine** removes the
+largest distortion without any per-domain machinery. That is a filter, not an
+architecture change.
+
+Still Sean's call, and still not started.
+
+### Evidence and caveats
+
+- Read-only. No write, no migration, nothing Sean-gated.
+- One 60,000-event slice; cells with `n >= 150`. Domains below that threshold
+  (`general`, `heal`, `verification`) are excluded and unmeasured.
+- `general` shows two agents at **1.000** over 165–174 events. Not investigated;
+  a domain where everything succeeds is more likely a labelling artefact than a
+  real one, and it is excluded from the volume-weighted figure by the same
+  threshold that excludes the rest.
+- `hallucination_caught` as the wrongness label remains inferred (Sprint R).
+
+341 assertions unchanged, `tsc` 25, published world untouched.
