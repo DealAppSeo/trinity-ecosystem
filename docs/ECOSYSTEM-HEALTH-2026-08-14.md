@@ -23,7 +23,7 @@ Railway no (proxy-denied), Base Sepolia RPC **yes indirectly** via Supabase
 | Harness layer | **3** / 10 | `HarnessProfile.ts` is excellent and has zero runtime callers. The nine-module portable harness the brain records as built **is not in the repo** |
 | Safety & autonomy (HAL) | **2** / 10 | HAL is not in this repo; local integration is two table names in a row-count script. BFT defaults to observe mode and never runs inline |
 | Infrastructure | **4** / 10 | Dual Railway+Vercel works, `/api/version` works, Vercel green. **No CI workflows exist in this repo at all** |
-| Measurement & observability | **3** / 10 | Rich brain views and a real changelog — sitting on a canonical liveness view that overstates the working fleet by 6× |
+| Measurement & observability | **5** / 10 | *Raised from 3.* The canonical liveness view is fixed and now agrees with the strict view. CI exists. Still no instrumentation of routing, cost or HAL rates in this repo |
 | Fleet & orchestration | **2** / 10 | 2 of 12 agents doing work; heartbeat writer dead 27 days; 23,113 orphaned claims |
 
 **Composite: ~2.5 / 10.** The honest summary is that this is a system with
@@ -81,10 +81,39 @@ Measured this session:
 | Newest heartbeat, any agent | 2026-07-17 — **~27 days stale** |
 | Agents with work in last 7d | torch, veritas, shofet, api-gateway |
 
-`v_fleet_liveness_strict` already exists and is correct. Nothing points at it —
-the contract still points at the masked view, so every agent that follows the
-preflight protocol is told 12/12. This is the CLAUDE.md recurring defect sitting
-inside the instrument meant to detect it.
+`v_fleet_liveness_strict` already exists and is correct. Nothing pointed at it —
+the contract pointed at the masked view, so every agent following the preflight
+protocol was told 12/12. This was the CLAUDE.md recurring defect sitting inside
+the instrument meant to detect it.
+
+**FIXED — task #70 closed, `trinity_changelog` #134.** `is_live` now requires
+fresh heartbeat *or* fresh work; a `/health` probe alone no longer counts.
+Reachability moved to a new `is_reachable` column so "the port answers" stays
+visible without being mistaken for "the agent works", and `liveness_signal`
+gained `probe_only` — container up, agent idle — the state the old definition
+hid.
+
+| Signal | Before | After |
+|---|---:|---:|
+| `is_live` | **12 / 12** | **3 / 12** (torch, shofet, veritas — all via `work`) |
+| `is_reachable` | *not distinguished* | 12 / 12 |
+| `liveness_signal = probe_only` | *invisible* | **9 / 12** |
+| `liveness_signal = heartbeat` | — | **0 / 12** (writer dead ~27 days) |
+
+Canonical `v_fleet_truth` (3) now **equals** `v_fleet_liveness_strict` (3); they
+disagreed 12 vs 2. The dependent `v_fleet_liveness_audit` was updated in the same
+change, because its `probe_only_live` was defined against the old semantics and
+would otherwise have read as "no problem" rather than "problem fixed".
+
+Two notes worth keeping. The rollback SQL in #134 was **tested** under a
+temporary name — it recreates the original 13-column shape and reproduces the old
+12/12 reading, so it is a real rollback rather than an assumed one. And the
+preflight skill needed no edit: its instruction ("fleet facts come from
+`v_fleet_truth`") was always correct — the view it pointed at was not.
+
+Known trade-off: an agent that works without writing to `trinity_agent_logs` now
+reads `is_live = false`. That is a false negative, which is the right direction to
+err for a trust system, and it stays visible through `is_reachable`.
 
 ### 2.3 A completed sprint exists only in the database
 
@@ -315,6 +344,8 @@ automatically the moment attribution is fixed, with no further change here.
 | Latency measured per agent (256-933ms) | **VERIFIED** | computed from `llm_call_log` over the observation view |
 | `llm_call_log.agent_id` on 209/486,280 | **VERIFIED** | direct count |
 | `llm_call_id` dangling (15/147,617) | **VERIFIED** | tested both candidate keys, identical date windows |
+| v_fleet_truth 12/12 -> 3/12, matches strict | **VERIFIED** | counted both views after the change |
+| #134 rollback SQL actually works | **VERIFIED** | created under a temp name, reproduced the old 12/12, dropped |
 | BFT scoring path against real data | **NOT CHECKED** | zero evaluated rows exist; exercised by unit tests only |
 | Sprint 2 route invoked end-to-end | **NOT CHECKED** | no running server + keys in this container; the effect was computed from the view the route reads, not an HTTP call |
 | zkp-postcard crate compiles | **NOT CHECKED** | no Rust toolchain run this session |

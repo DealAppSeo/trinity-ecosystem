@@ -85,10 +85,11 @@ hardcoded RepID inputs in `app/api/trustrails/pay/route.ts`, the ANFIS stub.
    a commit cannot remove it. Generate a fresh signer and `transferFrom` 3747/3748/3750.
    Until then treat those three identities as compromised and do not cite them as
    provenance. Also unrecorded: a **USABLE Solana secret key at `history:e5b0d884`**.
-2. **`autonomous_tasks` #70 — `v_fleet_truth` masks the fleet.** [VERIFIED] it reports
-   **12/12 live** where `v_fleet_liveness_strict` reports **2/12**, because `is_live`
-   resolves to a `GET /health` probe. Newest heartbeat is ~27 days stale. The correct
-   view already exists; the preflight contract still points at the masked one.
+2. ~~**#70 — `v_fleet_truth` masks the fleet.**~~ **FIXED** on Sean's instruction
+   (`trinity_changelog` #134). `is_live` now requires fresh heartbeat or work;
+   reachability moved to `is_reachable`; `liveness_signal` gained `probe_only`.
+   [VERIFIED] 12/12 → **3/12** live, 12/12 reachable, 9/12 probe-only, 0/12
+   heartbeat. Canonical now equals `v_fleet_liveness_strict`. Rollback tested.
 3. **Durability.** `trinity_changelog` #130 records nine harness modules, 126 assertions
    and a 2000-task simulation. `git log --all` for that path is **empty** — the container
    was reclaimed before a push. The brain can record a build that has no artifact.
