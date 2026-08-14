@@ -1871,3 +1871,93 @@ invites a "fix" that would break the mechanism.
 2. **Ordered replay** by `created_at`, to exercise the EWMA's recency behaviour
    rather than approximating it.
 3. **Co-failure remains uncomputable** (Sprint R): no task key exists.
+
+---
+
+## Sprint T — the ordered replay, which corrects Sprint S
+
+Sprint S validated shrinkage on real data and attached a caveat: *"the EWMA is
+order-dependent and aggregate counts have lost their order… this validates
+SHRINKAGE, not recency. An ordered replay is still owed."* Paid. **The caveat
+was load-bearing — the ordered result materially revises Sprint S's conclusion.**
+
+### Method, with no approximation this time
+
+`alpha = 0.06` means `0.94^150 ≈ 1e-4`, so an agent's EWMA is fully determined by
+its last ~150 outcomes and the seeded prior has washed out. So the last 150
+events per agent were pulled **in `created_at` order** as a bitstring and fed
+through the real `ReputationLedger` in sequence. Nothing was interleaved,
+averaged, or re-implemented. Read-only throughout.
+
+### The fleet improved recently, and the lifetime rate hides it
+
+| agent | n | lifetime | last-20 | EWMA earned | drift |
+|---|---|---|---|---|---|
+| 848da285 | 3,042 | 47.2% | **100%** | 8896 | +4175 |
+| 84f2d7de | 3,176 | 50.3% | **100%** | 8740 | +3712 |
+| f3ef0bf8 | 3,401 | 43.8% | 95% | 7971 | +3596 |
+| d82b2ae5 | 2,947 | 48.1% | 75% | 7257 | +2449 |
+| **32e0e809** | **14,715** | **22.9%** | **75%** | **6388** | **+4101** |
+| … | | | | | |
+| 942860a6 | 2,731 | 21.2% | 40% | 4209 | +2089 |
+| 57a2f83a | 14,490 | 21.9% | 20% | 2493 | +308 |
+
+**11 of 12 agents score materially higher on recent evidence than on their
+lifetime rate. Mean drift +2419 bps.**
+
+The sharpest case is `32e0e809`: 14,715 observations at a **22.9%** lifetime
+rate — second-worst in the fleet — but **75%** over its last 20 and an EWMA
+earned score of **6388**, mid-pack. A lifetime average would keep routing away
+from an agent that is currently performing fine. This is precisely the failure
+the EWMA was chosen to prevent, observed on production data for the first time.
+
+### The correction to Sprint S
+
+Sprint S reported that **100%** of pairwise margins among well-evidenced agents
+fall under the shipped `marginFloor: 2000`, and concluded the escalation policy
+"would degenerate into always-panel."
+
+Under the correct ordered replay:
+
+| | Sprint S (order destroyed) | Sprint T (ordered) |
+|---|---|---|
+| earned spread | 2,887 bps | **6,403 bps** |
+| median pairwise margin | 242 bps | **1,818 bps** |
+| share under `marginFloor: 2000` | **100%** | **56%** |
+
+**Sprint S overstated it.** Interleaving outcomes to match a lifetime rate
+compresses every agent toward the prior, which manufactures artificially thin
+margins. With real ordering the fleet is genuinely spread out — 6,403 bps
+top-to-bottom.
+
+56% is still high, and `marginFloor: 2000` would still escalate on more than
+half of all pairs, so the direction of Sprint S's concern stands. **Its
+magnitude does not, and the headline claim was wrong.** Recorded as a
+correction, not quietly amended.
+
+`marginFloor` is still not changed. The evidence has moved from "certainly
+degenerate" to "probably too permissive", and one recent sample is not grounds
+for retuning a default.
+
+### What this says about the method
+
+The order-destroying approximation was flagged as a limitation at the time it
+was used, and the limitation is exactly what produced the wrong number. That is
+the process working — but it is also the third time in this session a result had
+to be walked back after a caveat I had written myself turned out to matter. The
+lesson is not "write better caveats". It is that **a caveat is a debt, and a
+published number carrying one should be treated as provisional until it is
+paid.** Sprint S's table should not have been stated as flatly as it was.
+
+### Evidence and caveats
+
+- Read-only. No write, no migration, nothing Sean-gated.
+- Tail of 150 events per agent, drawn from the most recent 60,000 by `id`.
+- **The improvement may be systemic rather than per-agent.** Nearly every agent
+  ends on a run of successes *simultaneously*, which looks more like a fix
+  landing or a change in task mix than twelve agents independently improving.
+  Not investigated. If it is a task-mix change, the drift measures the workload,
+  not the agents — the same confound class as Sprint L's `--hardness` work.
+- `hallucination_caught` as the wrongness label remains inferred (Sprint R).
+
+341 assertions unchanged, `tsc` 25, published world untouched.
