@@ -1781,3 +1781,93 @@ with the measurements inlined so the reasoning cannot be lost.
   caught someone else's hallucination". Its 99% agreement with `vetoed`, which
   carries the penalty, points at the former — **inferred, not confirmed.**
 - The replay's ledger path still has not been run end to end against live data.
+
+---
+
+## Sprint S — the ledger on real data, and a config that would degenerate
+
+Q1 was answerable and is now answered, read-only, from the most recent 60,000
+events by `id`. Per-agent counts came from SQL; the scoring was done by the real
+`ReputationLedger` at harness defaults, not re-implemented.
+
+### The shrinkage works, and real data shows why it had to exist
+
+Ranked by **raw success rate**, the top of the fleet is:
+
+| rank | agent | rate | n |
+|---|---|---|---|
+| 1 | e1efdd14 | 100.0% | **2** |
+| 2 | 8f37d12e | 100.0% | **2** |
+| 3–13 | nine more | 100.0% | **1** |
+
+**Eleven agents are joint-first on a single observation each**, while the agent
+with 14,715 observations sits at 22.9%. A naive rate ranking hands the fleet to
+twelve one-shot claims.
+
+Through the ledger, those eleven collapse to **5014** — the 5000 prior, with
+confidence **0.05**. The 3,176-observation agent at 50.3% earns 5154 at
+confidence **0.99**. This is the empirical-Bayes shrinkage doing on real data
+exactly what it was built for in Sprint B, and it is the first time any of it
+has been checked against something other than the simulator.
+
+### The finding that changes a shipped default
+
+The real evidence distribution looks nothing like the simulator's. Well-evidenced
+agents (n > 2,700) earn:
+
+```
+5028, 4809, 4785, 4785, 4723, 4711, 4656, 4389, 4379, 2291, 2189, 2141
+```
+
+**Nine of the twelve sit within 649 bps of one another** — median pairwise
+margin **242 bps**. They are all 43–50% success rates, which is to say they are
+statistically indistinguishable from the neutral 5000 prior.
+
+Sprints L–P ran escalation at **`marginFloor: 2000`**. Against this fleet,
+**100% of pairwise margins in that cluster fall under the floor.** The policy
+would fire on essentially every task and degenerate into "always panel" —
+destroying the entire point of screening, which is to pay for a panel only when
+the leader is genuinely uncertain. In the simulator it escalated on 88% of tasks
+and that already looked high; on real data it would be ~100%.
+
+**The right floor for this fleet is on the order of 200–300 bps, not 2000.** Not
+changed here: the default was tuned against the simulator, and re-tuning it
+against one read-only sample of recent traffic would repeat the same error in
+the other direction. It is flagged as a config that does not survive contact
+with the real evidence distribution.
+
+This is the concrete payoff of getting off the simulator. The simulator's pool
+spanned true quality 0.35–0.95 and produced wide, well-separated margins. The
+real fleet is nine agents effectively tied. No amount of further simulator work
+would have surfaced that.
+
+### Why the ledger's top pick is not a defect
+
+The ledger ranks `c2aab664` first — 60% over **n=15**, confidence 0.43 — above
+the 3,176-observation agent. That looks wrong and is not. The big-`n` agents sit
+at 50.28%, i.e. **5028 against a 5000 prior**: they have almost no signal to
+shrink toward. An agent at 60% over 15 observations genuinely is the better bet
+on this evidence, and the router's UCB would rank it higher still, which is
+correct for exploration. Worth stating because it is the kind of output that
+invites a "fix" that would break the mechanism.
+
+### Evidence and caveats
+
+- Read-only throughout. No write, no migration, nothing Sean-gated.
+- **The EWMA is order-dependent and aggregate counts have lost their order.**
+  Outcomes were interleaved deterministically to match each agent's rate. For a
+  stationary agent an EWMA converges to the rate, so this approximates the
+  ordered replay; **for an agent whose quality drifted it does not.** This
+  validates SHRINKAGE, not recency. An ordered replay is still owed.
+- Most recent 60,000 events by `id`, not all 152,001.
+- `hallucination_caught` as the wrongness label — inferred, per Sprint R.
+
+341 assertions unchanged, `tsc` 25, published world untouched.
+
+### What is now genuinely open
+
+1. **`marginFloor` 2000 does not survive real data.** Needs re-tuning against an
+   ordered, representative sample — not against this one.
+2. **Ordered replay** by `created_at`, to exercise the EWMA's recency behaviour
+   rather than approximating it.
+3. **Co-failure remains uncomputable** (Sprint R): no task key exists.
