@@ -1,3 +1,81 @@
+# SESSION SUMMARY — 2026-08-14 (claude-opus-5, cloud/scheduled)
+
+Surface = **cloud/scheduled** (Claude Code Remote, ephemeral container).
+Access = GitHub **yes** (MCP), Supabase **yes** (MCP), Railway **no** (proxy denies
+CONNECT), Base Sepolia RPC **yes, indirectly** via Supabase `pg_net`.
+
+Preflight: `v_agent_preflight` → **verdict=GO, global_pause=false**. No tasks claimed;
+all work was directly user-requested (Phase 0 evaluation + first sprint).
+
+Branch `claude/zkrepid-agentic-os-jfbi18`, **PR #25** (draft, open).
+Full report: **`docs/ECOSYSTEM-HEALTH-2026-08-14.md`**. Brain: `trinity_changelog` #131.
+
+## Accomplished
+
+**Phase 0 — Ecosystem Health Report.** Ten subsystems scored against executed evidence,
+composite **~2.5/10**. Everything not checkable from this session is marked NOT CHECKED
+rather than inferred.
+
+**`d77cc87` — a committed EVM private key the scanner could not see.** `npm run
+check:secrets` printed *"No credential-shaped strings found"* over a literal key in
+`scripts/register-agents-erc8004.js`. The scanner was built for the Supabase JWT incident
+and had no pattern for a `0x` 32-byte hex key — the one shape this project deploys with.
+[VERIFIED on-chain via `pg_net`] leaked address `0xdf6b8215d193b11b4903d223729c3cf7a6de271d`,
+~0.059 testnet ETH, nonce 111, and `ownerOf` agent IDs **3747, 3748, 3750**. Registry
+`owner()` is a different account, so the registry contract itself is safe. Detection now
+reuses the Solana ambiguity rule and treats `env || '0x…'` fallbacks as assignments.
+
+**`bbe0647` + `430251a` — `tsc --noEmit` 25 → 0, and CI exists now.** Deleted
+`src/graphs/motor-squad-graph.ts` (17 errors, self-labelled mock, imports a package that
+was never in `package.json`, imported by nothing). Restored `tsconfig` `target: es2022`
+— the lost fix from changelog #130; note it appears to do nothing until
+`tsconfig.tsbuildinfo` is deleted, exactly as CLAUDE.md warns.
+
+**Two real bugs were hiding behind those type errors** in `register-agents-agent0.ts`:
+`.agentId` was read off a `TransactionHandle`, which does not have it, so `undefined` was
+POSTed to production as `agent_id_onchain` (the id only exists after `waitMined()`); and a
+demo branch returned `Math.floor(Math.random() * 10000)` as an agent id, which was written
+to the production vault and rendered as a `did:pkh:` identity in a public agent card.
+
+Also: `MemoryRecall` is now exported from `lib/trustshell/index.ts` (421 lines and 44
+assertions that nothing could import), and the check scripts resolve the pinned local
+compiler instead of `npx tsc`.
+
+## REAL vs STUB
+
+REAL and landed: EVM key detection, tsc 25→0, CI workflow, MemoryRecall export, two
+agent-id bugs fixed. **Unchanged and still stubbed** (documented, not touched): the
+Plonky3 `format!` fake proof, `ZKPAttestation`'s SHA-256 labelled `groth16`, the four
+hardcoded RepID inputs in `app/api/trustrails/pay/route.ts`, the ANFIS stub.
+
+## BLOCKED_FOR_SEAN
+
+1. **`autonomous_tasks` #73 — rotate the Base Sepolia deployer key.** In git history;
+   a commit cannot remove it. Generate a fresh signer and `transferFrom` 3747/3748/3750.
+   Until then treat those three identities as compromised and do not cite them as
+   provenance. Also unrecorded: a **USABLE Solana secret key at `history:e5b0d884`**.
+2. **`autonomous_tasks` #70 — `v_fleet_truth` masks the fleet.** [VERIFIED] it reports
+   **12/12 live** where `v_fleet_liveness_strict` reports **2/12**, because `is_live`
+   resolves to a `GET /health` probe. Newest heartbeat is ~27 days stale. The correct
+   view already exists; the preflight contract still points at the masked one.
+3. **Durability.** `trinity_changelog` #130 records nine harness modules, 126 assertions
+   and a 2000-task simulation. `git log --all` for that path is **empty** — the container
+   was reclaimed before a push. The brain can record a build that has no artifact.
+
+## Next 3 commands
+
+```sh
+git fetch origin && git checkout claude/zkrepid-agentic-os-jfbi18 && npm ci
+npm run check && node scripts/scan-secrets.mjs --history
+psql -c "select agent_name, is_live_strict, probe_masking from v_fleet_liveness_strict;"
+```
+
+Next sprint (2): wire `HarnessProfile` + `MemoryRecall` into the live request path, and
+replace the four hardcoded RepID inputs with measured outcomes via a declared-contract →
+verify → credit loop. Success metric: a RepID that provably changes when behaviour does.
+
+---
+
 # SESSION SUMMARY — 2026-08-13 (claude-opus-5, cloud/scheduled)
 
 Surface = **cloud/scheduled** (Claude Code Remote).
