@@ -1674,3 +1674,110 @@ empty result sets that read as "no data" instead of "misconfigured".
 - Whether a task key exists at all. `--dry-run` answers this in one command and
   costs nothing; that is the single most informative thing anyone with
   credentials can do next.
+
+---
+
+## Sprint R — the database answered, and it corrected me twice
+
+The Supabase MCP tools were available after all. Every query below is
+**read-only** — SELECTs against `information_schema` and `repid_score_events`.
+No migration, no write, nothing Sean-gated touched.
+
+### Correction 1: the table has 37 columns, not 2
+
+Sprint Q concluded "no task-grouping column is recorded anywhere in this repo."
+That was true **of the docs** and I stated it as if it were true of the table.
+The table has 37 columns including `llm_call_id`, `prompt_text`, `contract_id`,
+`idempotency_key`, `counterparty_agent_id`, `task_domain`, `hal_score`, and
+`hallucination_caught`. My candidate list did not contain a single one of the
+plausible ones.
+
+**The docs being thin is not evidence about the schema.** Six sprints of
+"NOT CHECKED: needs the DB" would have been answered by one read-only query, and
+I did not try it because a prompt three hours earlier said the tools were absent.
+
+### Correction 2: `flagged` is not a failure
+
+The replay script I committed one commit earlier maps `flagged` as BAD, with a
+printed caveat saying CONFIRM THIS BEFORE PUBLISHING. Confirmed, and it was
+wrong. Grouping 40,000 rows by outcome and averaging the system's **own**
+reputation delta:
+
+| decision_outcome | rows | hallucination_caught | avg repid delta | |
+|---|---|---|---|---|
+| `vetoed` | 27,351 | 27,060 | **−0.56** | penalty |
+| `flagged` | 7,966 | 0 | **0.00** | **neutral — held for review** |
+| `clean` | 4,648 | 0 | **+0.30** | reward |
+
+`flagged` carries no penalty at all. Scoring it as a failure would have
+mislabelled **21,976 rows** across the full table and depressed every earned
+score. Fixed. Also noted: `approved` and `correct` each carry delta **−9.00** —
+positive-sounding names on penalties. The enum's labels are not trustworthy;
+`delta` and `hallucination_caught` are. `hallucination_caught` is non-null on
+every row sampled and agrees with `vetoed` 27,060/27,351, so it is now the
+preferred label.
+
+### Q2: still unanswerable, now for a much better reason
+
+Two columns looked like task keys. Both fail:
+
+- **`llm_call_id`** — 19,880 non-null and **19,880 distinct** in a 20,000-row
+  sample. Exactly 1:1 with events. It identifies a *call*, not a task shared
+  between agents.
+- **`prompt_text`** — 19,941 non-null, 11,538 distinct. It repeats, which looks
+  promising until you see *what* repeats. Of 22,711 distinct prompts, **78 have
+  2+ agents and those 78 hold 17,348 events** — ~222 runs each. They are
+  **recurring cron jobs**: 8 `EVERGREEN` prompts over 7,731 events (966 runs
+  apiece), 2 `system` prompts over 2,001 events, one of which says "Every 60
+  minutes".
+
+Grouping by `prompt_text` pairs agents that answered **at different times about
+different underlying data**. Computed anyway, it gives **lift 1.283** over 1,612
+co-observations and 62 pairs. **That number is an artefact of the join and must
+not be published as the fleet's error correlation.** It is recorded here
+specifically so nobody recomputes it and believes it.
+
+The replay script's own header warned against exactly this substitution before
+any of it was run, and I still nearly took the number at face value. Writing the
+guard down is not the same as being immune to the mistake.
+
+**So: co-failure correlation is NOT computable from `repid_score_events`.**
+Nothing in the table expresses "two agents evaluated one task instance." Sprint
+Q's conclusion survives; its stated reason does not.
+
+### What this means for Sprints L–P
+
+Unchanged, and still conditional. The panel's value swings from +4.70pp to
+−0.85pp depending on where the fleet sits on the correlation axis, and **that
+position is still unmeasured** — not because the data is unavailable, but
+because the schema does not record which events share a task.
+
+That is now a concrete, cheap ask rather than a vague dependency: **either a
+task/decision key on `repid_score_events`, or a join table linking events to
+task instances.** Without one, the adaptive gate built in Sprint O has to learn
+correlation online from its own panels, which is what it was designed to do —
+so nothing is blocked, but nothing can be predicted in advance either.
+
+### Also learned, not acted on
+
+Agents on these recurring prompts are wrong **47–70%** of the time
+(`hallucination_caught`). These are self-monitoring cron tasks and adversarial
+by design, so this is not a fleet quality benchmark and must not be quoted as
+one. It does say the simulator's 0.05–0.15 error rates are nowhere near this
+slice of real traffic.
+
+### Evidence
+
+341 assertions unchanged, `tsc` 25, published world untouched. The replay
+script's outcome map and task-key candidate list are corrected from measurement,
+with the measurements inlined so the reasoning cannot be lost.
+
+### NOT CHECKED
+
+- All figures come from the most recent 20,000–40,000 events by `id`, not the
+  full 152,001. Full-table `count(distinct …)` timed out; the sample is recent
+  traffic and is not claimed to be representative of history.
+- Whether `hallucination_caught` means "this agent hallucinated" or "this agent
+  caught someone else's hallucination". Its 99% agreement with `vetoed`, which
+  carries the penalty, points at the former — **inferred, not confirmed.**
+- The replay's ledger path still has not been run end to end against live data.

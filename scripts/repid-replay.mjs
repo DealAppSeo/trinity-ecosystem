@@ -79,18 +79,60 @@ const { AgreementTracker } = await load('agreement');
 // not outcomes are listed as IGNORED rather than silently falling through, so
 // the set is auditable and a new value shows up as unmapped instead of being
 // absorbed into whichever bucket the code happened to default to.
-const GOOD = new Set(['approved', 'clean', 'correct', 'success']);
-const BAD = new Set(['vetoed', 'flagged', 'rejected']);
-const IGNORED = new Set(['pending', 'submitted', 'restore', 'test', 'profit']);
+// CORRECTED 2026-08-14 BY MEASUREMENT, not by reading. The first version of
+// this map read `flagged` as a FAILURE. A read-only query over 40,000 rows says
+// otherwise — grouping by decision_outcome and averaging the system's own
+// reputation delta:
+//
+//   vetoed   27,351 rows   hallucination_caught 27,060   delta -0.56  penalty
+//   flagged   7,966 rows   hallucination_caught      0   delta  0.00  NEUTRAL
+//   clean     4,648 rows   hallucination_caught      0   delta +0.30  reward
+//
+// `flagged` carries no reputation penalty at all: it means held-for-review, not
+// wrong. Scoring it as a failure would have mislabelled 21,976 rows across the
+// full table and depressed every earned score. This is exactly the CONFIRM
+// THIS BEFORE PUBLISHING caveat the first version printed, now confirmed and
+// acted on.
+//
+// Note also `approved` and `correct` each carry delta -9.00 on their single
+// rows — positive-sounding names attached to penalties. The enum's labels are
+// not trustworthy; the delta and `hallucination_caught` are.
+const GOOD = new Set(['clean', 'success', 'approved', 'correct']);
+const BAD = new Set(['vetoed', 'rejected']);
+const IGNORED = new Set(['flagged', 'pending', 'submitted', 'restore', 'test', 'profit']);
+
+// PREFER THIS OVER THE ENUM. `hallucination_caught` is a non-null boolean on
+// every row sampled and agrees with `vetoed` on 27,060 of 27,351. One column,
+// no case duplicates, no unmapped values.
+const PREFERRED_LABEL = 'hallucination_caught';
 
 /** Candidate columns, in preference order. Discovered, never assumed. */
 const OUTCOME_CANDIDATES = ['decision_outcome', 'outcome', 'result', 'status'];
+// MEASURED, not guessed. The real column list was read on 2026-08-14; the
+// table has 37 columns, not the 2 the docs recorded. Two looked like task keys
+// and BOTH FAIL on inspection:
+//
+//   llm_call_id   19,880 non-null / 19,880 distinct in a 20k sample. Exactly
+//                 1:1 with events, so it identifies a CALL, not a task shared
+//                 between agents. Useless for co-failure.
+//   prompt_text   19,941 non-null / 11,538 distinct — it repeats, which looks
+//                 promising until you see WHAT repeats. The 78 prompts with 2+
+//                 agents are RECURRING CRON JOBS: 8 EVERGREEN prompts over
+//                 7,731 events (966 runs each), 2 `system` prompts over 2,001
+//                 events, one of which literally says "Every 60 minutes".
+//
+// Grouping by prompt_text therefore pairs agents that answered AT DIFFERENT
+// TIMES ABOUT DIFFERENT UNDERLYING DATA. Doing it anyway yields lift 1.283 over
+// 1,612 co-observations, and that number is an ARTEFACT OF THE JOIN, not a
+// correlation. It is recorded here so nobody recomputes it and believes it.
+//
+// So prompt_text is deliberately NOT in this list. Co-failure needs two agents
+// on ONE task instance; nothing in this table expresses that.
 const TASK_CANDIDATES = [
   'task_id',
   'decision_id',
   'evaluation_id',
   'request_id',
-  'session_id',
   'correlation_id',
   'batch_id',
   'context_id',
