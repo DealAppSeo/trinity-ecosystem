@@ -1,0 +1,79 @@
+# Gates the prior-work index and the harness suites.
+#
+# WHY THIS IS SEPARATE FROM PR #25's `check.yml`. That PR adds a broader
+# workflow running `npm run check`, and the two overlap on purpose — once both
+# land, `npm run check` covers `check:prior-work` too, because it is wired into
+# that chain. A distinct file was chosen over editing theirs so the branches do
+# not conflict, and a distinct job name means a failure here says *which* gate
+# broke without opening the log.
+#
+# WHY NOT JUST `npm run check`. On this branch it exits 1, and would have landed
+# red on day one. Its final step is `npx tsc --noEmit`, and there are 25
+# PRE-EXISTING type errors — all in `src/graphs/motor-squad-graph.ts`, a file
+# that imports a package which is not in package.json and never has been. PR #25
+# deletes it. Gating on a red command would make this workflow permanently red
+# and therefore ignored, which is the failure mode the repo's own tooling
+# argues against.
+#
+# So tsc is gated on the REGRESSION instead of on zero: the repo's documented
+# convention is "compare against 25". That catches new errors on the first push
+# that introduces one, while staying green against a backlog this branch did
+# not create and must not silently adopt.
+
+name: prior-work
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  prior-work:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # First, and alone, because it is the cheapest gate and the one most
+      # likely to catch a stale document. A retracted figure reappearing, or a
+      # doc nobody indexed, fails here in under a second rather than after the
+      # suites have run.
+      - name: prior-work index (retracted claims, doc reachability)
+        run: npm run check:prior-work
+
+      - name: harness portability
+        run: npm run check:harness-portable
+
+      - name: harness suites
+        run: |
+          npm run check:harness-routing
+          npm run check:harness-consensus
+          npm run check:harness-aggregate
+          npm run check:harness-escalate
+          npm run check:harness-timeout
+          npm run check:harness-transform
+          npm run check:harness-reputation
+          npm run check:harness-agreement
+          npm run check:mcp-fleet
+
+      # Threshold, not zero. See the header: 25 is the documented baseline and
+      # every one of them predates this branch. `|| true` on the count keeps the
+      # pipeline from dying on grep's exit-1-when-no-match, which would report
+      # zero errors as a failure.
+      - name: tsc must not exceed the 25-error baseline
+        run: |
+          COUNT=$(npx tsc --noEmit 2>&1 | grep -cE "error TS" || true)
+          echo "tsc --noEmit: $COUNT errors (baseline 25)"
+          if [ "$COUNT" -gt 25 ]; then
+            echo "::error::tsc regressed: $COUNT errors, baseline is 25"
+            exit 1
+          fi
+          if [ "$COUNT" -lt 25 ]; then
+            echo "::notice::tsc improved to $COUNT. Lower the baseline in this workflow so it cannot silently drift back."
+          fi

@@ -49,7 +49,7 @@ jobs:
       # otherwise pull a newer compiler and fail TS5112 on this tsconfig.
       - run: npm ci
 
-      - name: check (secrets, auth policy, 201 assertions, tsc --noEmit)
+      - name: check (secrets, auth policy, 381 assertions, tsc --noEmit)
         run: npm run check
 
       - name: next build
