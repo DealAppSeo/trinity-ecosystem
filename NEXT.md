@@ -41,11 +41,17 @@ and close.
 
 ## Tier 2 — Priority 2 (zkRepID core)
 
-**4. Bind `EarnedMetrics` output into a `ControlProof` predicate.**
-`EarnedMetrics.ts` already computes measured scores (trinity-orch 2960,
-trinity-tom 2038). The `PredicateStatement` shape accepts it as-is:
-`{ predicate: 'gte', publicInputs: { bound: 3000 }, privateWitness: { value: <score> } }`.
-Honest today (`witnessHidden: false`), zero-knowledge when #75 clears.
+**4. Bind `EarnedMetrics` into a predicate — DONE** (`repid-predicate.ts`).
+Evidence quality (`fullyMeasured`, `measuredSignals`, `weakestConfidence`)
+travels in `publicInputs` so a verifier can distinguish a well-evidenced pass
+from a thin one; the score stays in `privateWitness`. A non-positive threshold
+is refused, because an unevidenced agent scores exactly 0 and would clear it.
+
+**4b. Nullifier ↔ commitment contract — DONE, blocked on parameters**
+(`nullifier.ts`). The statement/witness shape and `CIRCUIT_CONTRACT` are
+written; the Poseidon2 scheme deliberately throws until the other lane supplies
+field, width, rounds, constants, matrices, absorption order and test vectors.
+See `docs/POSEIDON2-PARAMETER-REQUEST.md`. **This is the top open item.**
 
 **5. Selective-disclosure claim vocabulary.**
 `disclosure.ts` accepts arbitrary keys. A fixed vocabulary
@@ -90,13 +96,17 @@ signed grant is worse than no caveat, because it reads as a control.
    `Plonky3ProofProvider`, `services/zkp-postcard`'s `cargo check`, and the only
    change on this branch with no executed evidence behind it.
 
-3. **Decide the `ControlProof` → `VaultPermission` wiring** (LESSONS A11).
+3. **Poseidon2 parameters from the repid-engine lane** — hand over
+   `docs/POSEIDON2-PARAMETER-REQUEST.md`. Blocks the real binding scheme; the
+   contract and tests are already written against it.
+
+4. **Decide the `ControlProof` → `VaultPermission` wiring** (LESSONS A11).
    Recommended: shadow mode — verify the proof, log agreement/disagreement
    against the existing `human_custody_verified` boolean, change no behaviour.
    That measures the migration before committing to it; if the two ever
    disagree you learn it from a log rather than from a locked-out agent.
 
-4. **PR #25** is open and green; #24 is merged.
+5. **PR #25** is open; #24 is merged.
 
 ---
 
@@ -104,7 +114,7 @@ signed grant is worse than no caveat, because it reads as a control.
 
 ```bash
 npm run check                    # expect exit 0, 448 assertions
-node scripts/check-identity.mjs  # expect 79, VERIFIED
+node scripts/check-identity.mjs  # expect 104, VERIFIED
 npm run test:e2e                 # expect 26 VERIFIED, 0 FAILED, core 10/10
 git log --oneline -8             # orient on the identity commits
 ```

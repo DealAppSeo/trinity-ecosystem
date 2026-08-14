@@ -1,6 +1,6 @@
 # STATUS — zkRepID TrustShell identity layer
 
-**Updated:** 2026-08-14 · **Branch:** `claude/zkrepid-agentic-os-jfbi18` · **Gate:** `npm run check` exit 0, 448 assertions · `check:identity` 79 · E2E 26 VERIFIED / 0 FAILED, core 10/10
+**Updated:** 2026-08-14 · **Branch:** `claude/zkrepid-agentic-os-jfbi18` · **Gate:** `npm run check` exit 0 · `check:identity` **104** · E2E 26 VERIFIED / 0 FAILED, core 10/10
 
 ---
 
@@ -53,6 +53,8 @@ and it is isolated behind one interface.
 | `control-proof.ts` | the central artifact — dual-auth authorization |
 | `nonce-store.ts` | atomic spent-nonce store — `consume`, deliberately no `has()` |
 | `delegation.ts` | sub-agent chains — capability, audience **and time** attenuate per link |
+| `repid-predicate.ts` | measured RepID → predicate; evidence quality is public, score is not |
+| `nullifier.ts` | the circuit contract — statement/witness, and a placeholder that refuses |
 
 ---
 
@@ -225,6 +227,59 @@ is the correct call; checked, not assumed.
 Dry run is the default. The script verifies by re-reading `ownerOf` after each
 transfer rather than trusting receipts, and exits non-zero if any identity did
 not arrive.
+
+---
+
+## Poseidon2 — decided, and deliberately not implemented here
+
+**Decision 2026-08-14: Poseidon2 is the canonical hash for every circuit-bound
+commitment and nullifier across both lanes.** SHA-256 inside an arithmetic
+circuit costs orders of magnitude more constraints than a ZK-friendly sponge,
+and the stated endpoint of this whole roadmap is a Plonky3 circuit over these
+commitments — so the hash that is cheap to verify outside a circuit is the wrong
+one to have baked in.
+
+**This lane does not implement it.** `PendingPoseidon2Scheme` contains no
+arithmetic at all; it throws. A parameter set chosen independently produces
+values that look like field elements, pass their own round-trip tests, and agree
+with no other implementation — and nothing downstream notices until two systems
+compare a root in production, by which point both have persisted data under
+incompatible hashes. `docs/POSEIDON2-PARAMETER-REQUEST.md` lists exactly what is
+needed, with test vectors as the acceptance criterion.
+
+### The contract this lane owns
+
+```
+public:  commitment, nullifier, domain, scope, tagCommit, tagNullifier
+private: secret
+         commitment == H(tagCommit    ‖ secret)
+         nullifier  == H(tagNullifier ‖ secret ‖ domain ‖ scope)
+```
+
+`CIRCUIT_CONTRACT` exports this as data, plus four ways a circuit can produce a
+valid proof and still be wrong: two independent secrets satisfying each relation
+separately; `domain`/`scope` as witness rather than public (a prover then picks
+them after seeing the challenge and unlinkability is forgeable); unconstrained
+tags letting a commitment replay as a nullifier; and an absorption order that is
+conventional rather than constrained.
+
+### Two levels of assurance, never conflated
+
+`verifyBindingByRecomputation` is real evidence that one secret produced both
+values — but the verifier had to be handed the secret, so it returns
+`provenWithoutSecret: false`. The circuit is what removes the secret from the
+verifier. That bit is the difference between honest-prover binding and an
+identity proof, and the type will not let a caller blur it.
+
+### Both authorization models are kept
+
+| | `ControlProof` | nullifier ↔ commitment |
+|---|---|---|
+| answers | who authorized what, legibly | that the presenter privately controls the identity |
+| revocable | yes — expiry, attenuation | no |
+| unlinkable | **no** — the signature names the signer | **yes**, per `(domain, scope)` |
+
+Neither subsumes the other, and that is the design rather than indecision.
 
 ---
 
