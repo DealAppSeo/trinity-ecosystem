@@ -599,3 +599,40 @@ psql -c "select task_domain, count(distinct agent_id) agents, count(*) n
          from repid_score_events where task_domain is not null
          group by 1 having count(*) >= 30 order by n desc;"
 ```
+
+---
+
+## 2026-08-14 — identity layer (cloud session, branch `claude/zkrepid-agentic-os-jfbi18`)
+
+**Preflight:** surface=cloud/scheduled; GitHub=yes, Supabase=yes (MCP), Railway=no.
+`v_agent_preflight` verdict=GO, global_pause=false. `v_fleet_truth` 3 live / 12.
+
+**Accomplished.** `781efbc` — `lib/trustshell/identity/` (6 modules, zero new
+deps, WebCrypto only): `did:key` Ed25519, salted-Merkle selective disclosure,
+capability attenuation, `IProofProvider` seam, dual-auth `ControlProof`.
+`check:identity` = 57 assertions wired into `npm run check` (now **438**, exit 0,
+`tsc --noEmit` clean). Verified by 9 mutations, each compile-checked.
+Earlier in session: `5fb3151` merged main after PR #24 (union of both check
+suites); `0e06808` fixed a next-server process leak in the E2E harness.
+
+**REAL vs STUB.** REAL: human→agent authorization verifiable offline; selective
+disclosure with undisclosed claims cryptographically hidden; audience binding;
+capability attenuation; expiry. STUB/NOT PROVEN: zero-knowledge predicates
+(`repid >= t` without revealing repid) — blocked on #75; ERC-8004 DID↔agentId
+binding is `claimed`, never `proven` (different curves); replay defence reports
+`NOT_CHECKED` until a nonce store exists.
+
+**BLOCKED_FOR_SEAN.**
+1. Add `static.crates.io` to the proxy allow-list (task #75) — unblocks
+   `Plonky3ProofProvider` and `cargo check` on `services/zkp-postcard`, the only
+   change on this branch with no executed evidence behind it.
+2. Rotate the Base Sepolia deployer key (task #73) — owns ERC-8004 ids
+   3747/3748/3750, in git history.
+3. Review/merge PR #25.
+
+**Next 3 commands.** See `NEXT.md`.
+```
+npm run check                    # expect exit 0, 438 assertions
+node scripts/check-identity.mjs  # expect 57, VERIFIED
+git log --oneline -8
+```
