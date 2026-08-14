@@ -30,6 +30,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
+import { localTsc } from './local-tsc.mjs';
 
 const SOURCES = ['lib/trustshell/MemoryRecall.ts', 'lib/trustshell/HarnessProfile.ts'];
 
@@ -38,8 +39,8 @@ let recall;
 let harness;
 try {
   execFileSync(
-    'npx',
-    ['tsc', ...SOURCES, '--outDir', outDir, '--module', 'commonjs', '--target', 'es2019'],
+    localTsc(),
+    [...SOURCES, '--outDir', outDir, '--module', 'commonjs', '--target', 'es2019'],
     { stdio: 'pipe' }
   );
   recall = await import(pathToFileURL(join(outDir, 'MemoryRecall.js')).href);

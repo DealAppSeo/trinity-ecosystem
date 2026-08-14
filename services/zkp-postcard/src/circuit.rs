@@ -122,10 +122,33 @@ pub fn prove_range_check(value: u32) -> Result<Vec<u8>, String> {
     verify(&config, &air, &proof, &vec![])
         .map_err(|e| format!("Verify failed: {:?}", e))?;
 
-    // Return a proof indicator (full serialization requires serde on Proof<SC>)
-    let proof_bytes = format!(
-        "plonky3_stark_babybear_rangecheck_value_{}_verified_ok",
-        value
-    );
-    Ok(proof_bytes.into_bytes())
+    // The AIR, the prove() above and the verify() above are all real. What was
+    // missing is serialization: Proof<SC> has no serde impl wired here, so the
+    // proof object cannot leave this process.
+    //
+    // This used to paper over that by returning
+    //   format!("plonky3_stark_babybear_rangecheck_value_{}_verified_ok", value)
+    // as the proof bytes. Three things were wrong with it, in increasing order
+    // of seriousness:
+    //   1. main.rs reports proof_bytes.len() as `proof_size_bytes`, so the
+    //      advertised proof size was the length of an English sentence.
+    //   2. Nothing outside this process could verify anything, because no proof
+    //      artifact ever left it — while the caller was told one had.
+    //   3. `value` is `repid - threshold - 1`, the PRIVATE input. Printing it
+    //      into the returned "proof" does not merely fail to be zero-knowledge,
+    //      it publishes the secret the circuit exists to hide.
+    //
+    // Returning Err is the honest outcome and it is not a regression: main.rs
+    // already handles this branch and falls back to a commitment it labels
+    // `sha256_commitment_poc`, which is what the service is actually doing. The
+    // range check still runs and still has to verify before we get here, so a
+    // broken AIR is still caught.
+    //
+    // To make this Ok again, serialize `proof` (serde on Proof<SC>, or a
+    // hand-rolled encoding) and return the real bytes.
+    Err(
+        "proof generated and verified in-process, but Proof<SC> serialization is \
+         not implemented, so no verifiable artifact can be returned"
+            .to_string(),
+    )
 }

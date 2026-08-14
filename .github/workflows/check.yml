@@ -1,0 +1,82 @@
+# The repo had no CI of any kind, so `npm run check` — the secret scan, the auth
+# policy check, 128 assertions across three suites, and `tsc --noEmit` — only ran
+# when someone remembered to run it. A committed private key sat in the tree for
+# multiple commits partly because nothing ever ran the scanner on a push.
+#
+# This workflow is deliberately allowed to be green. As of the commit that adds
+# it, `npm run check` exits 0 with 0 type errors. A gate that cannot pass is a
+# gate that gets ignored, so if this goes red the correct response is to fix the
+# cause, not to relax the gate.
+
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # scan-secrets.mjs --history walks every commit reachable from any ref.
+          # A shallow clone would make it report a clean history it never read.
+          fetch-depth: 0
+
+      # 24.x to match the Vercel project (`nodeVersion: "24.x"`, verified
+      # 2026-08-14). This was '20', which is not a version this app can run on:
+      # @supabase/realtime-js requires a native WebSocket and throws
+      # "Node.js detected but native WebSocket not found" from inside
+      # `createClient()` on Node 20. Every Supabase call in the app goes through
+      # getSupabaseAdmin() -> createClient, so CI was validating an engine where
+      # the first database call of any request would throw.
+      #
+      # Nothing caught it because no check had ever CONSTRUCTED a client — the
+      # suite was pure functions, and `next build` deliberately does not build
+      # clients (that fix is why the build stopped failing). The E2E suite is the
+      # first thing here to run a real client, and it failed on Node 20 within
+      # 36 seconds. npm ci had been printing EBADENGINE for seven packages
+      # requiring >=22 on every run, and it was read as noise.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # `npm ci` installs the pinned typescript. The check scripts resolve
+      # node_modules/.bin/tsc and refuse to fall back to `npx tsc`, which would
+      # otherwise pull a newer compiler and fail TS5112 on this tsconfig.
+      - run: npm ci
+
+      - name: check (secrets, auth policy, 381 assertions, tsc --noEmit)
+        run: npm run check
+
+      - name: next build
+        run: npx next build
+        env:
+          # The build must not need real credentials: a module-scope Supabase
+          # client is what broke every deployment from 2026-06-05 to 2026-08-11,
+          # and building with no keys present is what catches a regression.
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      # Boots the production server built above and drives the real payment path
+      # over HTTP against an in-memory PostgREST. Reuses that build (--no-build).
+      #
+      # NOT --strict, deliberately. Three steps are legitimately NOT CHECKED on a
+      # GitHub runner — Solana devnet, the live Supabase schema, and the BFT panel
+      # (needs live LLM providers). --strict would make them fatal, and the only
+      # way to a green run would be to delete the honest admission that they were
+      # not tested. The ledger still fails the job on any FAILED step, and on a run
+      # that verified no core step at all.
+      - name: e2e (payment path, real server, stubbed database)
+        run: npm run test:e2e -- --no-build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      # History hits cannot be removed by a commit, so this never fails the run —
+      # it reports credentials that need rotating. Failing here would make the
+      # job permanently red and therefore ignored.
+      - name: report credentials in git history
+        if: always()
+        run: node scripts/scan-secrets.mjs --history || true

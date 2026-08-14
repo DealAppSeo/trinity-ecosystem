@@ -1,3 +1,230 @@
+# SESSION SUMMARY — 2026-08-14 (claude-opus-5, cloud/scheduled)
+
+Surface = **cloud/scheduled** (Claude Code Remote, ephemeral container).
+Access = GitHub **yes** (MCP), Supabase **yes** (MCP), Railway **no** (proxy denies
+CONNECT), Base Sepolia RPC **yes, indirectly** via Supabase `pg_net`.
+
+Preflight: `v_agent_preflight` → **verdict=GO, global_pause=false**. No tasks claimed;
+all work was directly user-requested (Phase 0 evaluation + first sprint).
+
+Branch `claude/zkrepid-agentic-os-jfbi18`, **PR #25** (draft, open).
+Full report: **`docs/ECOSYSTEM-HEALTH-2026-08-14.md`**. Brain: `trinity_changelog` #131.
+
+## Sprint 2 — RepID is measured (landed, `d4bb85d`)
+
+The live payment path fed RepID four literals, so every agent scored an identical
+**3971** and the score could not move with behaviour. It is now computed from
+recorded outcomes with 30-day decay and empirical-Bayes shrinkage toward **zero**
+(not the population mean — shrinking toward a fleet average is the
+reputation-laundering vector). Three states, never two: measured / insufficient /
+unmeasured, each carrying its reason, and an unmeasured metric scores zero rather
+than being defaulted.
+
+[VERIFIED] measured effect: trinity-orch **2960**, trinity-shofet 2726,
+trinity-gcm 2441, trinity-tom **2038** (2 observations — the thin-record penalty
+working). Lower than 3971 because 3971 was never earned.
+
+Two silent bugs the data forced out: `x402_settlements.status` and
+`.is_simulated` **disagree** (403 `settled` vs 289 simulated — scoring on status
+would count ~287 simulated payments as earned), and the payment path and
+reputation ledger are **disjoint namespaces** (`TORCH` vs `trinity-torch`, 0 of
+12 join directly).
+
+**Two of four inputs are structurally unmeasurable and now say so:** `bftAccuracy`
+— heaviest weight at 0.40 — has zero rows in both BFT tables, and no table
+records latency per agent. Until those are captured, 50% of RepID's weight can
+only resolve to zero. That is the next highest-leverage gap in this subsystem,
+and it is a data-capture problem rather than a scoring one.
+
+Gate: `npm run check` exit 0, **157 assertions** (up from 128), `tsc` 0 errors,
+`next build` clean. Brain: `trinity_changelog` #132 with rollback SQL.
+
+---
+
+## Accomplished
+
+**Phase 0 — Ecosystem Health Report.** Ten subsystems scored against executed evidence,
+composite **~2.5/10**. Everything not checkable from this session is marked NOT CHECKED
+rather than inferred.
+
+**`d77cc87` — a committed EVM private key the scanner could not see.** `npm run
+check:secrets` printed *"No credential-shaped strings found"* over a literal key in
+`scripts/register-agents-erc8004.js`. The scanner was built for the Supabase JWT incident
+and had no pattern for a `0x` 32-byte hex key — the one shape this project deploys with.
+[VERIFIED on-chain via `pg_net`] leaked address `0xdf6b8215d193b11b4903d223729c3cf7a6de271d`,
+~0.059 testnet ETH, nonce 111, and `ownerOf` agent IDs **3747, 3748, 3750**. Registry
+`owner()` is a different account, so the registry contract itself is safe. Detection now
+reuses the Solana ambiguity rule and treats `env || '0x…'` fallbacks as assignments.
+
+**`bbe0647` + `430251a` — `tsc --noEmit` 25 → 0, and CI exists now.** Deleted
+`src/graphs/motor-squad-graph.ts` (17 errors, self-labelled mock, imports a package that
+was never in `package.json`, imported by nothing). Restored `tsconfig` `target: es2022`
+— the lost fix from changelog #130; note it appears to do nothing until
+`tsconfig.tsbuildinfo` is deleted, exactly as CLAUDE.md warns.
+
+**Two real bugs were hiding behind those type errors** in `register-agents-agent0.ts`:
+`.agentId` was read off a `TransactionHandle`, which does not have it, so `undefined` was
+POSTed to production as `agent_id_onchain` (the id only exists after `waitMined()`); and a
+demo branch returned `Math.floor(Math.random() * 10000)` as an agent id, which was written
+to the production vault and rendered as a `did:pkh:` identity in a public agent card.
+
+Also: `MemoryRecall` is now exported from `lib/trustshell/index.ts` (421 lines and 44
+assertions that nothing could import), and the check scripts resolve the pinned local
+compiler instead of `npx tsc`.
+
+## Sprint 3 — the proving stack stops claiming a proof
+
+`ZKPAttestation` returned `proofSystem: 'groth16'` and a `verificationKey` over a
+SHA-256 of a timestamp dressed as an IPFS CID, and that value was published
+on-chain in a Solana memo under key `zkp`. Four signals were hardcoded `true`
+(including a sanctions check that exists nowhere), so a **failing** agent was
+attested as passing.
+
+Now: `proven:false`, `proofSystem:'none'`, a reopenable `commit-sha256:`
+commitment with its salt returned, signals **derived** from inputs, and unchecked
+claims **absent** from `publicSignals` rather than set to `false` — `false` would
+assert the agent *is* sanctioned. Memo key `zkp` → `cmt`. 14 assertions.
+
+`services/zkp-postcard/src/circuit.rs` returned
+`format!("plonky3_..._value_{}_verified_ok", value)` as proof bytes, where
+`value` is `repid − threshold − 1` — **the private input the circuit exists to
+hide**. It now returns `Err`, routing `main.rs` onto its own truthful
+`sha256_commitment_poc` fallback. **NOT COMPILED** — see below.
+
+Gate: `npm run check` exit 0, **172 assertions**, `tsc` 0 errors, `next build`
+clean. Brain: `trinity_changelog` #136.
+
+**Still false in that service, untouched and recorded:** `verify_proof` is a
+`HashMap` lookup echoing a boolean stored at write time; `get_agent_repid` is a
+hardcoded 4-entry table disagreeing with live RepID. Both need the Rust build.
+
+## Environment blocker worth fixing once
+
+**CORRECTED 2026-08-14.** This previously read *"No Claude session can build
+Rust in this ecosystem."* That was an overclaim: I measured one environment and
+generalised to all of them. The XAI lane subsequently built the Plonky3 stack
+and produced a real STARK (10,673 proof bytes, `prove_local.rs`), which refutes
+it. Same shape as A1 and A4 — a conclusion wider than the evidence under it.
+
+**What is actually true, and was actually measured:** *this sandboxed cloud
+container* cannot build Rust. The agent proxy allow-list has `index.crates.io`
+but not `static.crates.io`, so cargo resolves the sparse index then 403s on
+every `.crate` download, with no local cache. Re-verified this session:
+`cargo check --offline` fails on an undownloadable dependency, `cargo fetch`
+hangs until killed.
+
+Task **#75** is therefore a fix for *agent sessions*, not a global blocker on
+the proving stack — a developer machine builds it fine. That distinction
+matters for prioritisation: #75 unblocks verification-in-CI and agent work, it
+does not gate whether the circuit can exist at all.
+
+## REAL vs STUB
+
+> **Corrected 2026-08-14.** This section was written after Sprint 1 and then went
+> stale inside its own file: it listed the Plonky3 `format!` proof, the `groth16`
+> label and the four hardcoded RepID inputs as untouched, all three of which
+> Sprints 2 and 3 *above* had already fixed. Verified against the source, not
+> against this file — `app/api/trustrails/pay/route.ts:58` reads
+> `...toScoringInputs(earned.metrics)`. Same defect the rest of the session is
+> about: a document asserting a state it had not re-checked.
+
+REAL and landed: EVM key detection, tsc 25→0, CI workflow, MemoryRecall export, two
+agent-id bugs fixed, RepID computed from recorded outcomes, `ZKPAttestation`
+reporting `proven:false`, the Plonky3 `format!` proof replaced by an `Err`, and the
+E2E suite below.
+
+**Still stubbed, documented and not touched:** the ANFIS stub; `verify_proof` (a
+`HashMap` lookup echoing a boolean stored at write time) and `get_agent_repid` (a
+hardcoded 4-entry table) in `services/zkp-postcard`, both of which need the Rust
+build that task #75 unblocks.
+
+## Sprint 4 — the ecosystem can run an E2E test
+
+There was **no test runner in this repo at all** — no jest, no vitest, no
+playwright, zero `*.test.*` files. `npm run check` was seven hand-rolled assertion
+scripts over pure functions, so nothing had ever executed a route handler.
+
+`npm run test:e2e` now boots the production server (`next start`) and drives the
+real payment path over HTTP. Real handler, real `lib/trustshell`, real supabase-js,
+real query strings; only the database is replaced, by an in-memory PostgREST
+(`scripts/e2e/postgrest-stub.mjs`) — necessary because the sandbox proxy denies the
+Supabase host. The seam is at the **wire**, not at `getSupabaseAdmin()`: mocking the
+client would have replaced the layer most likely to be wrong, since a hand-written
+mock accepts any chain you write, including one PostgREST would reject.
+
+[VERIFIED] **19 VERIFIED, 3 NOT CHECKED, 0 FAILED**, core 8/8, exit 0.
+
+Two design decisions carry the weight:
+
+1. **Three outcomes.** `scripts/e2e/ledger.mjs` records VERIFIED / NOT CHECKED /
+   FAILED and fails the run when *zero core steps were verified*, so a suite that
+   skipped everything cannot exit 0. That is repid-engine #414 — where every route
+   returning 401 produced **6/6 passed, exit 0** — encoded as a guard. A step may
+   also only resolve once, so a skip cannot later be upgraded to a pass.
+2. **An unseeded table 404s rather than returning `[]`.** An empty array is
+   indistinguishable from "no matching rows", so a route reading the wrong table
+   would pass silently.
+
+**The suite was verified by breaking the code, not by reading it.** Reintroducing
+the four literals into `pay/route.ts` produced **3 FAILED, core 6/8, exit 1**, with
+the response reverting to 3971. The mutation was then reverted and the run is green
+again. An E2E suite that has never been shown to fail is an untested assertion.
+
+It also tests itself: `scripts/check-e2e-harness.mjs` (29 assertions, in
+`npm run check`) reproduces the #414 all-skipped run and asserts it exits 1, and
+drives the PostgREST stub through a **real supabase-js client** — a stub validated
+against my own idea of the wire format would only have confirmed my idea of the
+wire format.
+
+One gap this found in its own first draft: both dual-signature assertions were
+passing while blocked at `kya_validation`, because TORCH's per-tx limit denied a
+60000 payment before the signature gate ran. A `WHALE` fixture with a 200000 limit
+now reaches the gate, and it is asserted in all three directions — unsigned held at
+202, CFO+CFO rejected, **CFO+CTO accepted**. A gate that only ever closes is
+indistinguishable from a broken one.
+
+Not covered, and reported as NOT CHECKED rather than skipped: Solana broadcast (no
+signing key, devnet unreachable), the live Supabase schema (so column drift would
+not be caught), and the BFT panel (needs `BFT_ENFORCEMENT_MODE=enforce` and live
+providers). CI runs the suite **without** `--strict` for exactly that reason — under
+`--strict` the only route to green would be deleting those admissions.
+
+## BLOCKED_FOR_SEAN
+
+0. **Open tasks now: #73 (rotate key, Sean), #74 (llm_call_log attribution, CC),
+   #75 (cargo verify + proxy allow-list, CC).** #70 is CLOSED.
+
+1. **`autonomous_tasks` #73 — rotate the Base Sepolia deployer key.** In git history;
+   a commit cannot remove it. Generate a fresh signer and `transferFrom` 3747/3748/3750.
+   Until then treat those three identities as compromised and do not cite them as
+   provenance. Also unrecorded: a **USABLE Solana secret key at `history:e5b0d884`**.
+2. ~~**#70 — `v_fleet_truth` masks the fleet.**~~ **FIXED** on Sean's instruction
+   (`trinity_changelog` #134). `is_live` now requires fresh heartbeat or work;
+   reachability moved to `is_reachable`; `liveness_signal` gained `probe_only`.
+   [VERIFIED] 12/12 → **3/12** live, 12/12 reachable, 9/12 probe-only, 0/12
+   heartbeat. Canonical now equals `v_fleet_liveness_strict`. Rollback tested.
+3. ~~**Durability — the brain can record a build with no artifact.**~~ **RETRACTED
+   2026-08-14.** The fourteen harness modules from `trinity_changelog` #130 exist on
+   PR #24's branch (`claude/e2e-mvp-packaging-plttzn`), with the portability checker.
+   The original check ran `git log --all` in a container that had fetched only
+   `origin/main`, so it could not have seen them and its silence was misread as
+   absence. Nothing was lost. Fetch all remotes before concluding a path never
+   existed.
+
+## Next 3 commands
+
+```sh
+git fetch origin && git checkout claude/zkrepid-agentic-os-jfbi18 && npm ci
+npm run check && node scripts/scan-secrets.mjs --history
+psql -c "select agent_name, is_live_strict, probe_masking from v_fleet_liveness_strict;"
+```
+
+Next sprint (2): wire `HarnessProfile` + `MemoryRecall` into the live request path, and
+replace the four hardcoded RepID inputs with measured outcomes via a declared-contract →
+verify → credit loop. Success metric: a RepID that provably changes when behaviour does.
+
+---
+
 # SESSION SUMMARY — 2026-08-13 (claude-opus-5, cloud/scheduled)
 
 Surface = **cloud/scheduled** (Claude Code Remote).
@@ -383,4 +610,88 @@ cd /workspace/repid-engine && E2E_STRICT=1 npm run test:e2e
 psql -c "select task_domain, count(distinct agent_id) agents, count(*) n
          from repid_score_events where task_domain is not null
          group by 1 having count(*) >= 30 order by n desc;"
+```
+
+---
+
+## 2026-08-14 — identity layer (cloud session, branch `claude/zkrepid-agentic-os-jfbi18`)
+
+**Preflight:** surface=cloud/scheduled; GitHub=yes, Supabase=yes (MCP), Railway=no.
+`v_agent_preflight` verdict=GO, global_pause=false. `v_fleet_truth` 3 live / 12.
+
+**Accomplished.** `781efbc` — `lib/trustshell/identity/` (6 modules, zero new
+deps, WebCrypto only): `did:key` Ed25519, salted-Merkle selective disclosure,
+capability attenuation, `IProofProvider` seam, dual-auth `ControlProof`.
+`check:identity` = 57 assertions wired into `npm run check` (now **438**, exit 0,
+`tsc --noEmit` clean). Verified by 9 mutations, each compile-checked.
+Earlier in session: `5fb3151` merged main after PR #24 (union of both check
+suites); `0e06808` fixed a next-server process leak in the E2E harness.
+
+**REAL vs STUB.** REAL: human→agent authorization verifiable offline; selective
+disclosure with undisclosed claims cryptographically hidden; audience binding;
+capability attenuation; expiry. STUB/NOT PROVEN: zero-knowledge predicates
+(`repid >= t` without revealing repid) — blocked on #75; ERC-8004 DID↔agentId
+binding is `claimed`, never `proven` (different curves); replay defence reports
+`NOT_CHECKED` until a nonce store exists.
+
+**BLOCKED_FOR_SEAN.**
+1. Add `static.crates.io` to the proxy allow-list (task #75) — unblocks
+   `Plonky3ProofProvider` and `cargo check` on `services/zkp-postcard`, the only
+   change on this branch with no executed evidence behind it.
+2. Rotate the Base Sepolia deployer key (task #73) — owns ERC-8004 ids
+   3747/3748/3750, in git history.
+3. Review/merge PR #25.
+
+**Next 3 commands.** See `NEXT.md`.
+```
+npm run check                    # expect exit 0, 438 assertions
+node scripts/check-identity.mjs  # expect 57, VERIFIED
+git log --oneline -8
+```
+
+### 2026-08-14 continued — cycles 2-5
+
+**Accomplished.** `44e9cd3` atomic nonce store (one `consume`, deliberately no
+`has()`; claimed only after signature checks so an invalid proof cannot burn a
+valid nonce) + fixed four raw NUL bytes that were sitting in the wire format.
+`c8396cf` E2E over real HTTP via an additive verify route — forgery, wrong
+audience, replay, escalation and disclosure tampering all rejected server-side.
+`1fc6378` rotation runbook + delegation chains. `843b5e4` RepID predicates.
+`a9a7a38` `alg` on every Disclosure. `31c4038` nullifier/commitment contract.
+
+**Numbers.** `check:identity` 57 → **104**. E2E **26 VERIFIED / 4 NOT CHECKED /
+0 FAILED, core 10/10**. Full gate exit 0 throughout.
+
+**REAL vs STUB.** REAL: dual-auth control proofs verified over HTTP, selective
+disclosure with the hash named on the wire, capability + time attenuation across
+delegation chains, atomic replay defence within an instance, RepID predicates
+carrying evidence quality publicly. STUB/BLOCKED: Poseidon2 (parameters
+requested, placeholder **throws** rather than guessing), cross-instance replay
+(migration written, unapplied), ERC-8004 DID↔agentId (claimed, never proven).
+
+**Three defects found in my own tests**, all by mutation testing rather than
+review: a lifted-counter-signature test that only tested nonce uniqueness; three
+delegation tests that edited grants after signing and so never reached the rule
+they named; and a toy fixture that embedded the secret in its own output, which
+would have made a leak assertion pass vacuously.
+
+**One overclaim retracted.** "No Claude session can build Rust in this
+ecosystem" — measured one environment, generalised to all. The other lane built
+it. Corrected to name this container.
+
+**BLOCKED_FOR_SEAN.**
+1. Rotate the leaked deployer (#73) — runbook `scripts/rotate-erc8004-deployer.mjs`,
+   dry-run default. Verified **not yet exploited** on-chain 2026-08-14.
+2. `static.crates.io` on the proxy allow-list (#75) — unblocks agent-side and CI
+   verification of circuits. Not a global blocker; a dev machine builds today.
+3. Poseidon2 parameters from the repid-engine lane —
+   `docs/POSEIDON2-PARAMETER-REQUEST.md`.
+4. `ControlProof` → `VaultPermission` wiring (LESSONS A11). Recommend shadow
+   mode: verify, log agreement/disagreement, change nothing.
+
+**Next 3 commands.**
+```
+npm run check                    # exit 0
+node scripts/check-identity.mjs  # expect 104, VERIFIED
+npm run test:e2e                 # expect 26 VERIFIED, 0 FAILED, core 10/10
 ```

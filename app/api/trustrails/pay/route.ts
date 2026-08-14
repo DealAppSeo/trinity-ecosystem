@@ -8,6 +8,8 @@ import {
   ZKPAttestationService, RepIDCalculator
 } from '@/lib/trustshell';
 import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
+import { EarnedMetricsRepository } from '@/lib/trustshell/EarnedMetricsRepo';
+import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
 
 export async function POST(req: NextRequest) {
   const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();
@@ -19,6 +21,7 @@ export async function POST(req: NextRequest) {
   const fireblocks = new FireblocksPreAuth();
   const zkp        = new ZKPAttestationService();
   const calc       = new RepIDCalculator();
+  const earnedMetrics = new EarnedMetricsRepository();
 
   try {
     // Step 1: KYA Validation
@@ -34,28 +37,45 @@ export async function POST(req: NextRequest) {
     }
 
     // Addendum 2: Real-time Institutional RepID Calculation
+    //
+    // These four inputs were literals — bftAccuracy 94, veritasCatchRate 97,
+    // x402SuccessRate 100, latencyMs 180 — on the live payment path. The
+    // calculator's maths and weights were real and it did not matter: constant
+    // inputs produce a constant score, so RepID could not move with behaviour.
+    //
+    // They are now measured from recorded outcomes, decayed and shrunk (see
+    // lib/trustshell/EarnedMetrics.ts). Two of the four come back `unmeasured`
+    // because the underlying data does not exist — no table records BFT results
+    // or per-agent latency — and unmeasured scores zero rather than being
+    // assumed. Real scores are therefore markedly lower than the fabricated ones
+    // they replace. That is the correction, not a regression: the old number was
+    // never earned. `evidence` in the response says exactly what was measured.
     const institution = req.nextUrl.searchParams.get('institution') || 'default';
+    const earned = await earnedMetrics.load(agentName);
     const repidResult = await calc.calculate(
       agentName,
       {
-        bftAccuracy:      94,
-        veritasCatchRate: 97,
-        x402SuccessRate:  100,
-        latencyMs:        180,
-        humanCustody:     kyaResult.humanCustodyBound,
+        ...toScoringInputs(earned.metrics),
+        humanCustody: kyaResult.humanCustodyBound,
       },
       institution
     );
 
-    // Addendum 2: ZKP Attestation (Honest Stub)
-    const zkpAttestation = await zkp.generateKYAAttestation(
+    // Addendum 2: KYA commitment. NOT a zero-knowledge proof — it never was.
+    // The object used to carry proofSystem 'groth16' over a SHA-256 of a
+    // timestamp; it now reports proven=false and binds the decision to a
+    // reproducible commitment instead.
+    const zkpAttestation = await zkp.generateKYAAttestation({
       agentName,
-      repidResult.repidScore,
-      repidResult.threshold
-    );
+      repidScore: repidResult.repidScore,
+      threshold: repidResult.threshold,
+      humanCustodyBound: kyaResult.humanCustodyBound,
+    });
 
     kyaResult.repidScore = repidResult.repidScore;
-    kyaResult.zkpProofCID = zkpAttestation.proofCID;
+    // Carries the commitment, not a proof. The field name is inherited from the
+    // receipt schema and the zkp_proof_cid column; the value now says what it is.
+    kyaResult.zkpProofCID = zkpAttestation.commitment;
 
     // Addendum 3: Dual-Signature Gate (SBT Role Diversity)
     const SINGLE_SIG_THRESHOLD = 50000;
@@ -173,6 +193,30 @@ export async function POST(req: NextRequest) {
         simulated: execution.simulated,
         confirmed: execution.confirmed,
         error:     execution.error,
+      },
+      // What the RepID in this receipt was actually computed from. A score is
+      // only as good as its evidence, so the evidence ships with it rather than
+      // living in a log the caller never sees.
+      // proven=false, always, until a prover runs. Surfaced rather than logged
+      // so a caller cannot mistake a commitment for a proof.
+      attestation: {
+        proven:        zkpAttestation.proven,
+        proofSystem:   zkpAttestation.proofSystem,
+        commitment:    zkpAttestation.commitment,
+        publicSignals: zkpAttestation.publicSignals,
+        notAttested:   zkpAttestation.notAttested,
+      },
+      repid: {
+        score: repidResult.repidScore,
+        tier:  repidResult.repidTier,
+        resolvedAgent: earned.resolvedAgent,
+        fullyMeasured: earned.evidence.fullyMeasured,
+        measured:      earned.evidence.measured,
+        insufficient:  earned.evidence.insufficient,
+        unmeasured:    earned.evidence.unmeasured,
+        weakestConfidence: earned.evidence.weakestConfidence,
+        observationsTruncated: earned.truncated,
+        detail: earned.evidence.detail,
       },
       bft: {
         evaluated: bftProof.evaluated,
