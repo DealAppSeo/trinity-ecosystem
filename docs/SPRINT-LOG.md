@@ -1961,3 +1961,102 @@ paid.** Sprint S's table should not have been stated as flatly as it was.
 - `hallucination_caught` as the wrongness label remains inferred (Sprint R).
 
 341 assertions unchanged, `tsc` 25, published world untouched.
+
+---
+
+## Sprint U — resolving a chain of two wrong answers
+
+Sprint T flagged a confound and did not resolve it: *"nearly every agent ends on
+a run of successes simultaneously, which looks more like a fix landing or a
+task-mix change… If it is task mix, the drift measures the workload, not the
+agents."* Investigated. **It is task mix, and it invalidates Sprint T's
+headline.**
+
+### The contamination
+
+The 60,000-event slice, selected by `id desc`, spans 2026-06-15 to 2026-08-13.
+Split at Aug 5:
+
+| | events | success rate | cron share |
+|---|---|---|---|
+| since Aug 5 | **57** | **0.930** | **0.000** |
+| before Aug 5 | 59,943 | 0.338 | 0.379 |
+
+**`id` order and `created_at` order are not aligned.** The recent tail is 57
+events of an entirely different character — no cron jobs, 93% success — sitting
+on top of 59,943 older events at 33.8% dominated by recurring cron traffic.
+
+With `alpha = 0.06` the EWMA's effective window is ~17 outcomes, so those 57
+events **dominate every agent's final score**. Sprint T's "+2419 bps mean drift,
+11 of 12 agents improved" measures a workload change, not agent improvement. The
+trailing runs of 1s were the artefact, exactly as suspected and not checked.
+
+### Three answers to one question
+
+The margin question has now been answered three times:
+
+| sprint | method | share of pairs under `marginFloor: 2000` |
+|---|---|---|
+| S | order destroyed (interleaved to match lifetime rate) | **100%** ✗ |
+| T | ordered, all domains — tail contaminated by the 57 | **56%** ✗ |
+| **U** | **ordered AND constant task mix (cron-only)** | **91%** |
+
+Sprint S was directionally right for the wrong reason. Sprint T's correction was
+itself wrong. **Both published numbers were unsound, and neither should have
+been stated as flatly as it was.**
+
+### The sound measurement
+
+Restricting to `EVERGREEN` + `cait` (recurring cron, a homogeneous mix), last
+150 events per agent in `created_at` order, through the real ledger:
+
+```
+spread 2704 bps    median pairwise margin 870 bps
+under marginFloor  500: 29%      1000: 56%      2000: 91%
+```
+
+**`marginFloor: 2000` escalates on 91% of pairs.** Sprint S's concern was
+correct and its number was not: the policy is far too permissive for this fleet,
+though "91%" is not "100%" and the fix is a floor near **500 bps**, which would
+escalate on 29%.
+
+Still not changed. This is one domain slice of one sample, and the whole point
+of the last three sprints is that this fleet's numbers move a lot depending on
+how you cut them.
+
+### A finding worth more than the margin number
+
+`32e0e809` has a **22.9% lifetime success rate over 14,715 events** — near-worst
+in the fleet. On cron work only, where it has 500 events, it scores **66.7%,
+the best of any agent**, earning 7327.
+
+Its poor global reputation comes entirely from non-cron work. **Agent quality
+here is domain-dependent, and the ledger is global.** A single earned score per
+agent averages across task types the agent is differently good at, and will
+route cron work away from the fleet's best cron performer.
+
+Per-domain reputation is not built and is not a small change — `ReputationLedger`
+keys on agent id alone. Flagging it, not starting it: it is the same class of
+architectural decision as sub-task routing granularity, which was deferred to
+Sean on 2026-08-13.
+
+### The pattern, stated plainly
+
+Three sprints, three numbers, two retractions. Each error came from a
+transformation that seemed harmless: interleaving to recover an order, then
+trusting `id` as a proxy for time. **Both were assumptions about data shape made
+without checking the data.** The corrective is not more caveats — it is checking
+the shape first, which in both cases was one cheap query.
+
+### Evidence and caveats
+
+- Read-only throughout. No write, no migration, nothing Sean-gated.
+- Cron-only means this measures the fleet on **recurring self-monitoring tasks**,
+  which are adversarial by design and not the production mix. It is the right
+  slice for comparing agents to each other, and the wrong one for predicting
+  production behaviour.
+- 11 agents; `32e0e809` and `57a2f83a` have only ~500 cron events each against
+  ~14,500 total, so their cron scores rest on far less evidence than the others'.
+- `hallucination_caught` as the wrongness label remains inferred (Sprint R).
+
+341 assertions unchanged, `tsc` 25, published world untouched.
