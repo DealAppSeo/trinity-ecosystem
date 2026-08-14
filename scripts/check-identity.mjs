@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation;
 try {
   execFileSync(
     localTsc(),
@@ -38,6 +38,7 @@ try {
       'lib/trustshell/identity/control-proof.ts',
       'lib/trustshell/identity/capability.ts',
       'lib/trustshell/identity/nonce-store.ts',
+      'lib/trustshell/identity/delegation.ts',
       '--outDir', outDir,
       '--module', 'commonjs',
       '--target', 'es2022',
@@ -58,6 +59,7 @@ try {
   controlProof = await import(pathToFileURL(join(base, 'control-proof.js')).href);
   capability = await import(pathToFileURL(join(base, 'capability.js')).href);
   nonceStore = await import(pathToFileURL(join(base, 'nonce-store.js')).href);
+  delegation = await import(pathToFileURL(join(base, 'delegation.js')).href);
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -800,6 +802,203 @@ await check('no raw control bytes in identity source (wire format must be readab
       );
     }
   }
+});
+
+// --- delegation chains (sub-agents under constraints) -----------------------
+
+const mkChain = async (parentCaps, childCaps, opts = {}) => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD,
+    capabilities: parentCaps, ttlSeconds: opts.parentTtl ?? 3600,
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: childCaps, ttlSeconds: opts.childTtl ?? 600,
+  });
+  return { human, supervisor, worker, root, link };
+};
+
+// Sign an arbitrary (possibly malicious) delegation grant with REAL keys.
+//
+// Editing a grant after `delegate()` returns breaks the signature, so such a
+// test fails at the signature check and never reaches the rule it claims to
+// exercise. Three mutations survived because of exactly that. To test
+// attenuation, audience and possession independently, the malicious link must
+// be genuinely well-signed — only its CONTENT is hostile.
+const forgeLink = async (parent, delegator, delegateIdent, grant) => {
+  const delegatorSignature = await identity.signAs(delegator, delegation.delegationPayload(grant));
+  const delegateSignature = await identity.signAs(
+    delegateIdent,
+    `${delegation.DELEGATION_DOMAIN.countersign}|${delegation.delegationPayload(grant)}|${delegatorSignature}`
+  );
+  return { parent, grant, delegatorSignature, delegateSignature };
+};
+
+await check('a narrowed delegation chain verifies end to end', async () => {
+  const { link } = await mkChain(['pay:*', 'read:memory'], ['pay:usdc']);
+  const v = await delegation.verifyDelegationChain(link, {
+    audience: AUD, seenNonces: new Set(), requiredCapabilities: ['pay:usdc'],
+  });
+  assert.equal(v.valid, true, JSON.stringify(v.links, null, 2));
+  assert.equal(v.depth, 1);
+  assert.deepEqual(v.grantedCapabilities, ['pay:usdc']);
+});
+
+await check('DELEGATION CANNOT WIDEN AUTHORITY (refused at construction)', async () => {
+  await assert.rejects(
+    mkChain(['pay:usdc'], ['pay:*']),
+    /refusing to widen authority/,
+    'a supervisor minted a child broader than itself'
+  );
+});
+
+await check('ATTENUATION IS ENFORCED AT VERIFY, not just at construction', async () => {
+  // A well-signed link that widens. `delegate()` would refuse to build this, but
+  // the verifier must not depend on the delegator having used delegate() at all.
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 3600,
+  });
+  const rogue = await forgeLink(root, supervisor, worker, {
+    delegatorDid: supervisor.did, delegateDid: worker.did, delegateName: 'WORKER',
+    capabilities: ['pay:*'],                       // <-- wider than the parent
+    audience: AUD, nonce: 'n-widen-0000000000000000',
+    notBefore: root.grant.notBefore, expiresAt: root.grant.expiresAt,
+  });
+  const v = await delegation.verifyDelegationChain(rogue, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'a well-signed widening verified');
+  assert.ok(v.links.some((l) => /widens authority/.test(l.detail)), JSON.stringify(v.links));
+  assert.deepEqual(v.grantedCapabilities, []);
+});
+
+
+await check('TIME ATTENUATES: a child is clamped to its parent expiry', async () => {
+  const { root, link } = await mkChain(['pay:*'], ['pay:usdc'], { parentTtl: 60, childTtl: 86400 });
+  assert.ok(new Date(link.grant.expiresAt) <= new Date(root.grant.expiresAt),
+    `child outlives parent: ${link.grant.expiresAt} > ${root.grant.expiresAt}`);
+});
+
+await check('a child forged to OUTLIVE its parent FAILS', async () => {
+  const { root, link } = await mkChain(['pay:*'], ['pay:usdc'], { parentTtl: 60 });
+  link.grant.expiresAt = new Date(new Date(root.grant.expiresAt).getTime() + 86_400_000).toISOString();
+  const v = await delegation.verifyDelegationChain(link, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'a sub-agent outliving its parent verified');
+  assert.ok(v.links.some((l) => /outlives its parent/.test(l.detail)), JSON.stringify(v.links));
+});
+
+await check('SUBJECT CONTINUITY: a stranger cannot append a link', async () => {
+  const { root, worker } = await mkChain(['pay:*'], ['pay:usdc']);
+  const stranger = await identity.createAgentIdentity('STRANGER');
+  const helper = await identity.createAgentIdentity('HELPER');
+  // The stranger signs a perfectly valid link the root never authorized.
+  const rogue = await delegation.delegate({
+    parent: { ...root, grant: { ...root.grant, agentDid: stranger.did } },
+    delegator: stranger, delegate: helper, capabilities: ['pay:usdc'], ttlSeconds: 300,
+  }).catch(() => null);
+  assert.ok(rogue, 'setup failed');
+  rogue.parent = root; // splice the real root back underneath
+  const v = await delegation.verifyDelegationChain(rogue, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'a link signed by a stranger verified against the real root');
+  assert.ok(v.links.some((l) => /not the principal the parent authorized/.test(l.detail)),
+    JSON.stringify(v.links));
+});
+
+await check('POSSESSION IS PROVEN: naming a delegate whose key nobody holds FAILS', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const victim = await identity.createAgentIdentity('VICTIM');
+  const attacker = await identity.createAgentIdentity('ATTACKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD, capabilities: ['pay:*'], ttlSeconds: 3600,
+  });
+  // Grant names VICTIM as the delegate; ATTACKER supplies the counter-signature.
+  const grant = {
+    delegatorDid: supervisor.did, delegateDid: victim.did, delegateName: 'VICTIM',
+    capabilities: ['pay:usdc'], audience: AUD, nonce: 'n-possess-00000000000',
+    notBefore: root.grant.notBefore, expiresAt: root.grant.expiresAt,
+  };
+  const rogue = await forgeLink(root, supervisor, attacker, grant);
+  const v = await delegation.verifyDelegationChain(rogue, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'a delegate that never counter-signed was accepted');
+  assert.ok(v.links.some((l) => /possession unproven/.test(l.detail)), JSON.stringify(v.links));
+});
+
+
+await check('a well-signed link cannot RETARGET the audience', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD, capabilities: ['pay:*'], ttlSeconds: 3600,
+  });
+  const rogue = await forgeLink(root, supervisor, worker, {
+    delegatorDid: supervisor.did, delegateDid: worker.did, delegateName: 'WORKER',
+    capabilities: ['pay:usdc'],
+    audience: 'trinity:vault',                     // <-- retargeted
+    nonce: 'n-retarget-000000000000', notBefore: root.grant.notBefore,
+    expiresAt: root.grant.expiresAt,
+  });
+  const v = await delegation.verifyDelegationChain(rogue, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'a delegation retargeted the audience');
+  assert.ok(v.links.some((l) => /retargets audience/.test(l.detail)), JSON.stringify(v.links));
+});
+
+
+await check('an invalid ROOT invalidates the whole chain', async () => {
+  const { link } = await mkChain(['pay:*'], ['pay:usdc']);
+  link.parent.humanSignature = await identity.signAs(
+    await identity.createHumanSSID(), controlProof.grantPayload(link.parent.grant)
+  );
+  const v = await delegation.verifyDelegationChain(link, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'a chain survived a forged root');
+  assert.equal(v.links[0].outcome, 'FAILED');
+});
+
+await check('the requirement is checked against the LEAF, not the root', async () => {
+  // The root holds pay:* — if the requirement were checked there, a narrowed
+  // leaf would pass for capabilities it does not have.
+  const { link } = await mkChain(['pay:*', 'read:memory'], ['read:memory']);
+  const v = await delegation.verifyDelegationChain(link, {
+    audience: AUD, seenNonces: new Set(), requiredCapabilities: ['pay:usdc'],
+  });
+  assert.equal(v.valid, false, 'the leaf passed on its root\'s broader authority');
+  assert.ok(v.links.some((l) => /leaf lacks required/.test(l.detail)), JSON.stringify(v.links));
+});
+
+await check('chains deeper than MAX_DELEGATION_DEPTH are refused', async () => {
+  const { root, supervisor } = await mkChain(['pay:*'], ['pay:*']);
+  let parent = root;
+  let delegator = supervisor;
+  for (let i = 0; i < delegation.MAX_DELEGATION_DEPTH + 1; i++) {
+    const next = await identity.createAgentIdentity(`W${i}`);
+    parent = await delegation.delegate({
+      parent, delegator, delegate: next, capabilities: ['pay:*'], ttlSeconds: 300,
+    });
+    delegator = next;
+  }
+  const v = await delegation.verifyDelegationChain(parent, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'an over-deep chain verified');
+  assert.ok(v.links.some((l) => /MAX_DELEGATION_DEPTH/.test(l.detail)), JSON.stringify(v.links));
+});
+
+await check('a two-link chain narrows monotonically', async () => {
+  const { link, worker } = await mkChain(['pay:*', 'read:memory'], ['pay:usdc', 'read:memory']);
+  const helper = await identity.createAgentIdentity('HELPER');
+  const second = await delegation.delegate({
+    parent: link, delegator: worker, delegate: helper,
+    capabilities: ['read:memory'], ttlSeconds: 120,
+  });
+  const v = await delegation.verifyDelegationChain(second, {
+    audience: AUD, seenNonces: new Set(), requiredCapabilities: ['read:memory'],
+  });
+  assert.equal(v.valid, true, JSON.stringify(v.links, null, 2));
+  assert.equal(v.depth, 2);
+  assert.deepEqual(v.grantedCapabilities, ['read:memory']);
 });
 
 rmSync(outDir, { recursive: true, force: true });
