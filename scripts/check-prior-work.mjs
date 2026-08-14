@@ -172,6 +172,7 @@ for (const heading of ['## CLOSED', '## OPEN', '## RETRACTED', '## The protocol'
 
 // ── report ───────────────────────────────────────────────────────────────────
 if (failures.length > 0) {
+  console.error(`\ncheck-prior-work: 0 passed, ${failures.length} failed`);
   console.error(`\ncheck:prior-work — ${failures.length} FAILED\n`);
   failures.forEach((f) => console.error(`  ✗ ${f}\n`));
   console.error(
@@ -181,6 +182,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
+console.log(`check-prior-work: ${scanned + docs.length} passed, 0 failed`);
 console.log(
   `check:prior-work — VERIFIED. ${scanned} files scanned for ${RETRACTED.length} retracted claims; ` +
     `all ${docs.length} docs reachable from the index.`

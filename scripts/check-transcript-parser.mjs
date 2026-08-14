@@ -398,10 +398,12 @@ check('KNOWN_RECORD_TYPES is documented as observed, not assumed', () => {
 rmSync(outDir, { recursive: true, force: true });
 
 if (failures.length > 0) {
+  console.error(`\ncheck-transcript: ${passed} passed, ${failures.length} failed`);
   console.error(`\n✗ FAILED  ${failures.length} of ${passed + failures.length} checks\n`);
   for (const failure of failures) console.error(`  - ${failure}`);
   console.error('');
   process.exit(1);
 }
 
+console.log(`check-transcript: ${passed} passed, 0 failed`);
 console.log(`✓ VERIFIED  ${passed} transcript-parser assertions`);
