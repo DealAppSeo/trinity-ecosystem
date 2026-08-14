@@ -1113,6 +1113,81 @@ await check('a repid predicate rides inside a real control proof', async () => {
   assert.match(v.checks.predicate.detail, /witnessHidden=false/);
 });
 
+// --- hash agility / interop tagging -----------------------------------------
+
+await check('a disclosure names the hash that produced its root', async () => {
+  const cred = await disclosure.buildCredential(CLAIMS);
+  const d = await disclosure.toDisclosure(cred, ['country']);
+  assert.equal(cred.alg, 'sha256-us-v1');
+  assert.equal(d.alg, 'sha256-us-v1');
+});
+
+await check('AN UNSUPPORTED ALG IS A NAMED REFUSAL, not a hash mismatch', async () => {
+  // The distinction matters: "I do not implement poseidon2" and "this proof is
+  // forged" must not look the same to an operator. A parallel implementation
+  // using a different hash should be diagnosable in one line.
+  const cred = await disclosure.buildCredential(CLAIMS);
+  const d = await disclosure.toDisclosure(cred, ['country']);
+  d.alg = 'poseidon2-v1';
+  const res = await disclosure.verifyDisclosure(d);
+  assert.equal(res.valid, false);
+  assert.match(res.reason, /unsupported hash 'poseidon2-v1'/);
+  assert.match(res.reason, /this verifier supports/);
+});
+
+await check('the alg tag cannot be swapped to smuggle a root past verification', async () => {
+  const cred = await disclosure.buildCredential(CLAIMS);
+  const d = await disclosure.toDisclosure(cred, ['country']);
+  d.alg = 'poseidon2-v1';
+  const res = await disclosure.verifyDisclosure(d);
+  assert.equal(res.valid, false);
+  assert.deepEqual(res.claims, {});
+});
+
+await check('re-hashing a credential under a different alg is refused at source', async () => {
+  const cred = await disclosure.buildCredential(CLAIMS);
+  const fakePoseidon = {
+    alg: 'poseidon2-v1',
+    leaf: async (parts) => 'f' + parts.length,
+    node: async (l, r) => 'f' + l + r,
+  };
+  await assert.rejects(
+    disclosure.toDisclosure(cred, ['country'], fakePoseidon),
+    /root the issuer never signed/
+  );
+});
+
+await check('a custom hasher round-trips through build/disclose/verify', async () => {
+  // Proves the seam is real — the tree logic does not assume SHA-256. Uses a
+  // deliberately trivial hasher; it is testing the plumbing, not the crypto.
+  let calls = 0;
+  const toy = {
+    alg: 'poseidon2-v1',
+    leaf: async (parts) => { calls++; return 'L(' + parts.join('~') + ')'; },
+    node: async (l, r) => { calls++; return 'N(' + l + '|' + r + ')'; },
+  };
+  const cred = await disclosure.buildCredential(CLAIMS, toy);
+  assert.equal(cred.alg, 'poseidon2-v1');
+  assert.ok(calls > 0, 'the custom hasher was never called');
+  const d = await disclosure.toDisclosure(cred, ['country', 'tier'], toy);
+  const res = await disclosure.verifyDisclosure(d, [toy]);
+  assert.equal(res.valid, true, res.reason);
+  assert.deepEqual(res.claims, { country: 'US', tier: 'Silver' });
+});
+
+await check('the default verifier still rejects a toy-hasher disclosure', async () => {
+  const toy = {
+    alg: 'poseidon2-v1',
+    leaf: async (parts) => 'L(' + parts.join('~') + ')',
+    node: async (l, r) => 'N(' + l + '|' + r + ')',
+  };
+  const cred = await disclosure.buildCredential(CLAIMS, toy);
+  const d = await disclosure.toDisclosure(cred, ['country'], toy);
+  const res = await disclosure.verifyDisclosure(d); // default: sha256 only
+  assert.equal(res.valid, false, 'a verifier accepted an algorithm it does not implement');
+  assert.match(res.reason, /unsupported hash/);
+});
+
 rmSync(outDir, { recursive: true, force: true });
 
 if (failed === 0) {

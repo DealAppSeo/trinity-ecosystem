@@ -29,6 +29,39 @@
 const LEAF_PREFIX = 0x00;
 const NODE_PREFIX = 0x01;
 
+/**
+ * The hash a credential was built with, carried ON THE WIRE.
+ *
+ * Added after a parallel implementation of this same layer chose Poseidon2
+ * while this one uses SHA-256. Without an algorithm tag the two produce
+ * different roots from identical claims and neither can say why — the
+ * disclosure simply "does not verify", which reads as tampering. An explicit
+ * tag turns a silent mismatch into a named one.
+ *
+ * Poseidon2 is likely the right long-run choice here: the stated endpoint is a
+ * Plonky3 circuit over these commitments, and SHA-256 inside an arithmetic
+ * circuit costs orders of magnitude more constraints than a ZK-friendly sponge.
+ * That migration needs the other implementation's exact parameters and test
+ * vectors, so it is deliberately not guessed at here. The seam is what this
+ * commit buys; the swap is a separate, evidenced change.
+ */
+export type MerkleAlg = 'sha256-us-v1' | 'poseidon2-v1';
+
+export const DEFAULT_ALG: MerkleAlg = 'sha256-us-v1';
+
+/**
+ * Pluggable so the hash can change without reshaping the tree logic.
+ *
+ * Deliberately NOT a byte-oriented `(bytes) => bytes`: Poseidon2 consumes field
+ * elements, not octets, so a byte interface would force an encoding decision
+ * into the wrong layer and quietly fix the format to a hash family.
+ */
+export interface MerkleHasher {
+  readonly alg: MerkleAlg;
+  leaf(parts: string[]): Promise<string>;
+  node(left: string, right: string): Promise<string>;
+}
+
 export interface Claim {
   key: string;
   value: string | number | boolean;
@@ -40,6 +73,7 @@ interface SaltedClaim extends Claim {
 
 /** What the holder keeps. Contains every salt, so it is secret material. */
 export interface DisclosableCredential {
+  alg: MerkleAlg;
   root: string;
   claims: SaltedClaim[];
 }
@@ -55,6 +89,8 @@ export interface DisclosedClaim {
 
 /** What the holder sends. Undisclosed claims appear only as a count. */
 export interface Disclosure {
+  /** Which hash produced `root`. A verifier MUST check this before hashing. */
+  alg: MerkleAlg;
   root: string;
   disclosed: DisclosedClaim[];
   /**
@@ -65,7 +101,10 @@ export interface Disclosure {
   totalClaims: number;
 }
 
-export async function buildCredential(claims: Claim[]): Promise<DisclosableCredential> {
+export async function buildCredential(
+  claims: Claim[],
+  hasher: MerkleHasher = sha256Hasher
+): Promise<DisclosableCredential> {
   if (claims.length === 0) {
     throw new Error('a credential needs at least one claim');
   }
@@ -79,16 +118,24 @@ export async function buildCredential(claims: Claim[]): Promise<DisclosableCrede
     seen.add(c.key);
   }
   const salted: SaltedClaim[] = claims.map((c) => ({ ...c, salt: randomSalt() }));
-  const leaves = await Promise.all(salted.map(leafHash));
-  return { root: await merkleRoot(leaves), claims: salted };
+  const leaves = await Promise.all(salted.map((c) => leafHash(c, hasher)));
+  return { alg: hasher.alg, root: await merkleRoot(leaves, hasher), claims: salted };
 }
 
 /** Produce a disclosure revealing only `keys`. */
 export async function toDisclosure(
   credential: DisclosableCredential,
-  keys: string[]
+  keys: string[],
+  hasher: MerkleHasher = sha256Hasher
 ): Promise<Disclosure> {
-  const leaves = await Promise.all(credential.claims.map(leafHash));
+  if (credential.alg !== hasher.alg) {
+    throw new Error(
+      `credential was built with '${credential.alg}' but disclosure was asked for ` +
+        `'${hasher.alg}'. Re-hashing under a different algorithm would produce a ` +
+        `root the issuer never signed.`
+    );
+  }
+  const leaves = await Promise.all(credential.claims.map((c) => leafHash(c, hasher)));
   const disclosed: DisclosedClaim[] = [];
 
   for (const key of keys) {
@@ -104,13 +151,13 @@ export async function toDisclosure(
       key: claim.key,
       value: claim.value,
       salt: claim.salt,
-      path: await merklePath(leaves, index),
+      path: await merklePath(leaves, index, hasher),
     });
   }
 
   // Note what is NOT here: the salts of undisclosed claims. Including them would
   // hand the verifier every leaf preimage and undo the whole mechanism.
-  return { root: credential.root, disclosed, totalClaims: credential.claims.length };
+  return { alg: credential.alg, root: credential.root, disclosed, totalClaims: credential.claims.length };
 }
 
 /**
@@ -121,9 +168,25 @@ export async function toDisclosure(
  * values it gets back are the ones that actually verified.
  */
 export async function verifyDisclosure(
-  disclosure: Disclosure
+  disclosure: Disclosure,
+  hashers: MerkleHasher[] = [sha256Hasher]
 ): Promise<{ valid: boolean; claims: Record<string, string | number | boolean>; reason?: string }> {
   const claims: Record<string, string | number | boolean> = {};
+
+  // Resolve the algorithm BEFORE hashing anything. An unknown alg must be a
+  // named refusal, not a hash mismatch — otherwise an implementation this
+  // verifier simply does not support is indistinguishable from a forgery.
+  const hasher = hashers.find((h) => h.alg === disclosure.alg);
+  if (!hasher) {
+    return {
+      valid: false,
+      claims: {},
+      reason:
+        `unsupported hash '${disclosure.alg}'; this verifier supports ` +
+        `[${hashers.map((h) => h.alg).join(', ')}]. Refusing rather than ` +
+        `re-hashing under an algorithm the issuer did not use.`,
+    };
+  }
 
   if (disclosure.disclosed.length > disclosure.totalClaims) {
     return {
@@ -140,9 +203,11 @@ export async function verifyDisclosure(
     }
     seen.add(d.key);
 
-    let hash = await leafHash(d);
+    let hash = await leafHash(d, hasher);
     for (const step of d.path) {
-      hash = step.left ? await nodeHash(step.hash, hash) : await nodeHash(hash, step.hash);
+      hash = step.left
+        ? await hasher.node(step.hash, hash)
+        : await hasher.node(hash, step.hash);
     }
     if (hash !== disclosure.root) {
       return {
@@ -177,34 +242,44 @@ export async function verifyDisclosure(
  */
 const FIELD_SEP = '\u001f';
 
-async function leafHash(c: SaltedClaim | DisclosedClaim): Promise<string> {
+/** The default: SHA-256 with RFC 6962 prefixes and a U+001F field separator. */
+export const sha256Hasher: MerkleHasher = {
+  alg: 'sha256-us-v1',
+  async leaf(parts: string[]): Promise<string> {
+    return sha256Prefixed(LEAF_PREFIX, new TextEncoder().encode(parts.join(FIELD_SEP)));
+  },
+  async node(left: string, right: string): Promise<string> {
+    return sha256Prefixed(NODE_PREFIX, new TextEncoder().encode(`${left}${right}`));
+  },
+};
+
+async function leafHash(
+  c: SaltedClaim | DisclosedClaim,
+  hasher: MerkleHasher
+): Promise<string> {
   // Type-tagged so 1 and "1" cannot collide into the same leaf.
-  const encoded = [c.key, typeof c.value, String(c.value), c.salt].join(FIELD_SEP);
-  return sha256Prefixed(LEAF_PREFIX, new TextEncoder().encode(encoded));
+  return hasher.leaf([c.key, typeof c.value, String(c.value), c.salt]);
 }
 
-async function nodeHash(left: string, right: string): Promise<string> {
-  return sha256Prefixed(NODE_PREFIX, new TextEncoder().encode(`${left}${right}`));
-}
-
-async function merkleRoot(leaves: string[]): Promise<string> {
+async function merkleRoot(leaves: string[], hasher: MerkleHasher): Promise<string> {
   let level = leaves;
-  while (level.length > 1) level = await nextLevel(level);
+  while (level.length > 1) level = await nextLevel(level, hasher);
   return level[0];
 }
 
-async function nextLevel(level: string[]): Promise<string[]> {
+async function nextLevel(level: string[], hasher: MerkleHasher): Promise<string[]> {
   const next: string[] = [];
   for (let i = 0; i < level.length; i += 2) {
     // Odd node carried up unchanged, not duplicated.
-    next.push(i + 1 < level.length ? await nodeHash(level[i], level[i + 1]) : level[i]);
+    next.push(i + 1 < level.length ? await hasher.node(level[i], level[i + 1]) : level[i]);
   }
   return next;
 }
 
 async function merklePath(
   leaves: string[],
-  index: number
+  index: number,
+  hasher: MerkleHasher
 ): Promise<Array<{ hash: string; left: boolean }>> {
   const path: Array<{ hash: string; left: boolean }> = [];
   let level = leaves;
@@ -216,7 +291,7 @@ async function merklePath(
       path.push({ hash: level[siblingIdx], left: isRight });
     }
     // else: this node was carried up alone, so there is no sibling to record.
-    level = await nextLevel(level);
+    level = await nextLevel(level, hasher);
     idx = Math.floor(idx / 2);
   }
   return path;
