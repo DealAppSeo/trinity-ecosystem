@@ -50,6 +50,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Key rotation, and why legacy keys stay disabled | `docs/KEY-ROTATION.md` | — |
 | End-to-end audit, 2026-08-12 | `docs/E2E-AUDIT.md` | — |
 | Ten-subsystem health scores against executed evidence, 2026-08-14 | `docs/ECOSYSTEM-HEALTH-2026-08-14.md` | re-scoring the subsystems yourself |
+| All six products from DNS to repo — what is live, what is parked, what is unreproducible, 2026-08-14 | `docs/FULL-STACK-E2E-ASSESSMENT-2026-08-14.md` | re-probing the domains yourself |
 | Poseidon2 parameters, the circuit contract, and why we do not implement it | `docs/POSEIDON2-PARAMETER-REQUEST.md` | choosing a parameter set independently |
 | The paste-ready Poseidon2 request to send the other lane | `docs/POSEIDON2-HANDOVER-MESSAGE.md` | rewriting the ask from scratch |
 
@@ -81,6 +82,9 @@ unless the underlying world changed.
 | Sub-task routing granularity | **Sean** | Architecturally significant; reshapes the task model and `router.ts`. |
 | `marginFloor` retune | open | Current 2000 escalates on ~91% of real pairs (cron-only). Not changed — every cut of that data moved the number. |
 | Rotate the leaked EVM key | **Sean** | Owns 3 live ERC-8004 identities, in git history. A commit cannot fix it. See PR #25. |
+| **Anon write grants on 15 RLS-disabled tables** | **Sean** | Includes `agent_preflight_control` — the `global_pause` switch. Anon read VERIFIED live over PostgREST with the browser-shipped publishable key; write verified at the privilege level. `LESSONS` S1 says "two tables"; it is **137 readable / 4 writable / 15 RLS-off**. See `FULL-STACK-E2E-ASSESSMENT-2026-08-14.md` §2. |
+| `scan-secrets.mjs` ignores unknown flags | open | `--root` is silently dropped, so it scans the cwd repo and reports confidently about a tree it never opened. Same §3. |
+| hyperdag.org serves bytes in no commit | open | Live content came from a Vercel Instant Rollback to a pre-git-connection deploy; newest prod deploy is ERROR and built from `repid-engine`. Same §1. |
 
 ---
 
