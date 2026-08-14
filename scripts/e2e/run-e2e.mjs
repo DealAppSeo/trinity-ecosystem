@@ -20,11 +20,13 @@
 // is genuinely unreachable here, and forcing it green would be the lie.
 
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync, readdirSync } from 'node:fs';
+import { join as pathJoin } from 'node:path';
 import assert from 'node:assert/strict';
 import { createPostgrestStub } from './postgrest-stub.mjs';
 import { VerificationLedger } from './ledger.mjs';
 import { buildSeed, AGENTS } from './seed.mjs';
+import { loadIdentity } from './identity-client.mjs';
 
 const argv = new Set(process.argv.slice(2));
 const strict = argv.has('--strict') || process.env.E2E_STRICT === '1';
@@ -32,6 +34,8 @@ const skipBuild = argv.has('--no-build');
 
 const CORE_STEPS = [
   'server_boot',
+  'control_proof_verifies_over_http',
+  'forged_control_proof_rejected_over_http',
   'pay_approved_with_measured_repid',
   'repid_differs_between_agents',
   'unmeasured_scores_zero_not_default',
@@ -49,6 +53,49 @@ function run(cmd, args, opts = {}) {
     child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} exited ${code}`))));
     child.on('error', reject);
   });
+}
+
+/**
+ * Refuse to run --no-build against a build older than the source.
+ *
+ * This bit: seven identity steps failed with `<!DOCTYPE` because `.next`
+ * predated the route they exercise, and the suite reported it as seven broken
+ * assertions rather than "you are testing yesterday's build". The false-failure
+ * direction is the lucky one — a stale build can equally hide a regression, or
+ * keep passing a route that has since been deleted, which is a green run over
+ * code that no longer exists.
+ *
+ * Fails rather than warns. A warning in a scrollback of build output is how
+ * this got missed the first time.
+ */
+function assertBuildIsFresh() {
+  const buildId = '.next/BUILD_ID';
+  if (!existsSync(buildId)) {
+    throw new Error('--no-build was passed but .next/BUILD_ID does not exist; run a build first');
+  }
+  const builtAt = statSync(buildId).mtimeMs;
+
+  let newest = { path: null, at: 0 };
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      const full = pathJoin(dir, entry.name);
+      if (entry.isDirectory()) { walk(full); continue; }
+      if (!/\.(ts|tsx|js|jsx|mjs|json)$/.test(entry.name)) continue;
+      const at = statSync(full).mtimeMs;
+      if (at > newest.at) newest = { path: full, at };
+    }
+  };
+  for (const dir of ['app', 'lib']) if (existsSync(dir)) walk(dir);
+
+  if (newest.at > builtAt) {
+    throw new Error(
+      `--no-build was passed but ${newest.path} is newer than .next/BUILD_ID ` +
+      `(${new Date(newest.at).toISOString()} > ${new Date(builtAt).toISOString()}).\n` +
+      'The run would exercise a stale build: routes added since the build 404, and ' +
+      'routes deleted since the build still answer. Re-run without --no-build.'
+    );
+  }
 }
 
 async function waitForServer(base, { timeoutMs = 90_000 } = {}) {
@@ -101,6 +148,8 @@ try {
   if (!skipBuild || !existsSync('.next')) {
     console.log('\nnext build …');
     await run('npx', ['next', 'build'], { env: { ...process.env } });
+  } else {
+    assertBuildIsFresh();
   }
 
   // ---- server --------------------------------------------------------------
@@ -379,6 +428,115 @@ try {
     return 'every table the routes touched was seeded';
   });
 
+  // ---- dual-auth control proof, over real HTTP ----------------------------
+  // The proofs below are minted by the SAME code a real holder would run, then
+  // posted to the running server. Nothing about the identity path is stubbed.
+  {
+    const AUD = 'trinity:control-proof-verify';
+    const identity = await loadIdentity();
+    try {
+      const { did: _did, identity: idm, disclosure: disc, 'control-proof': cp } = identity.mods;
+      const postVerify = async (body) => {
+        const res = await fetch(`${base}/api/trustshell/control-proof/verify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+          cache: 'no-store',
+        });
+        return { status: res.status, json: await res.json() };
+      };
+
+      const human = await idm.createHumanSSID();
+      const agent = await idm.createAgentIdentity('TORCH');
+
+      await ledger.check('control_proof_verifies_over_http', async () => {
+        const proof = await cp.issueControlProof({
+          human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+        });
+        const { status, json } = await postVerify({ proof, requiredCapabilities: ['pay:usdc'] });
+        assert.equal(status, 200);
+        assert.equal(json.valid, true, JSON.stringify(json.checks));
+        assert.equal(json.checks.humanAuthorization.outcome, 'VERIFIED');
+        assert.equal(json.checks.agentPossession.outcome, 'VERIFIED');
+        return `human ${human.did.slice(0, 20)}… authorized agent, verified by the running server`;
+      });
+
+      await ledger.check('forged_control_proof_rejected_over_http', async () => {
+        const impostor = await idm.createHumanSSID();
+        const proof = await cp.issueControlProof({
+          human: impostor, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+        });
+        proof.grant.humanDid = human.did; // claim the real human authorized it
+        const { status, json } = await postVerify({ proof });
+        assert.equal(status, 200);
+        assert.equal(json.valid, false, 'the server accepted a forged authorization');
+        assert.equal(json.checks.humanAuthorization.outcome, 'FAILED');
+        assert.deepEqual(json.grantedCapabilities, []);
+        return 'impostor-signed grant rejected, no capabilities granted';
+      });
+
+      await ledger.check('wrong_audience_rejected_over_http', async () => {
+        const proof = await cp.issueControlProof({
+          human, agent, audience: 'trinity:vault', capabilities: ['pay:usdc'], ttlSeconds: 300,
+        });
+        const { json } = await postVerify({ proof });
+        assert.equal(json.valid, false, 'a proof minted for another audience verified');
+        assert.equal(json.checks.audience.outcome, 'FAILED');
+        return 'proof bound to trinity:vault refused by trinity:control-proof-verify';
+      });
+
+      await ledger.check('replayed_control_proof_rejected_over_http', async () => {
+        const proof = await cp.issueControlProof({
+          human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+        });
+        const first = await postVerify({ proof });
+        assert.equal(first.json.valid, true, JSON.stringify(first.json.checks));
+        const second = await postVerify({ proof });
+        assert.equal(second.json.valid, false, 'the same proof verified twice');
+        assert.equal(second.json.checks.replay.outcome, 'FAILED');
+        return 'second presentation of the same nonce refused by the server';
+      });
+
+      await ledger.check('capability_escalation_rejected_over_http', async () => {
+        const proof = await cp.issueControlProof({
+          human, agent, audience: AUD, capabilities: ['read:memory'], ttlSeconds: 300,
+        });
+        const { json } = await postVerify({ proof, requiredCapabilities: ['pay:usdc'] });
+        assert.equal(json.valid, false, 'an agent acted outside its granted capabilities');
+        assert.equal(json.checks.capabilities.outcome, 'FAILED');
+        return 'grant of read:memory refused for a pay:usdc requirement';
+      });
+
+      await ledger.check('selective_disclosure_survives_the_wire', async () => {
+        const cred = await disc.buildCredential([
+          { key: 'legalName', value: 'E2E Fixture Person' },
+          { key: 'country', value: 'US' },
+          { key: 'tier', value: 'Silver' },
+        ]);
+        const d = await disc.toDisclosure(cred, ['country']);
+        const proof = await cp.issueControlProof({
+          human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300, disclosure: d,
+        });
+        const { json } = await postVerify({ proof });
+        assert.equal(json.valid, true, JSON.stringify(json.checks));
+        assert.equal(json.checks.disclosure.outcome, 'VERIFIED');
+        assert.deepEqual(json.disclosedClaims, { country: 'US' });
+        const blob = JSON.stringify(json);
+        assert.ok(!blob.includes('E2E Fixture Person'), 'a withheld claim came back from the server');
+        assert.ok(!blob.includes('Silver'), 'a withheld claim came back from the server');
+        return '1 of 3 claims disclosed and verified server-side; 2 withheld and absent from the response';
+      });
+
+      await ledger.check('malformed_proof_is_a_400_not_a_forgery', async () => {
+        const { status } = await postVerify({ proof: { grant: {} } });
+        assert.equal(status, 400, 'a malformed request was processed as a verification');
+        return 'shape errors answer 400, so they cannot be misread as a failed signature';
+      });
+    } finally {
+      identity.dispose();
+    }
+  }
+
   // ---- what this run did NOT check ----------------------------------------
   ledger.notChecked('solana_broadcast',
     'AGENT_SOPHIA_SECRET_BYTES unset and Solana devnet is not reachable from a sandboxed ' +
@@ -386,6 +544,10 @@ try {
   ledger.notChecked('live_supabase_schema',
     'the sandbox proxy denies qnnpjhlxljtqyigedwkb.supabase.co, so these assertions ran ' +
     'against scripts/e2e/postgrest-stub.mjs. Column drift in the real schema would not be caught here');
+  ledger.notChecked('control_proof_replay_across_instances',
+    'the verify route holds spent nonces in process memory, so replay was proven caught within ' +
+    'ONE instance only. Cross-instance defence needs migration 20260814090000_control_proof_nonces.sql, ' +
+    'which is deliberately unapplied pending Sean');
   ledger.notChecked('bft_consensus_verdict',
     'observe mode is the default; the panel itself runs only under BFT_ENFORCEMENT_MODE=enforce ' +
     'with live LLM providers');

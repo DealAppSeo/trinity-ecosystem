@@ -1,6 +1,6 @@
 # STATUS — zkRepID TrustShell identity layer
 
-**Updated:** 2026-08-14 · **Branch:** `claude/zkrepid-agentic-os-jfbi18` · **Gate:** `npm run check` exit 0, 438 assertions
+**Updated:** 2026-08-14 · **Branch:** `claude/zkrepid-agentic-os-jfbi18` · **Gate:** `npm run check` exit 0, 448 assertions · E2E 26 VERIFIED / 0 FAILED, core 10/10
 
 ---
 
@@ -48,6 +48,7 @@ and it is isolated behind one interface.
 | `capability.ts` | attenuation algebra — narrowing only, fails closed |
 | `proof-provider.ts` | `IProofProvider` seam + `WebCryptoProofProvider` |
 | `control-proof.ts` | the central artifact — dual-auth authorization |
+| `nonce-store.ts` | atomic spent-nonce store — `consume`, deliberately no `has()` |
 
 ---
 
@@ -99,7 +100,8 @@ timestamp `groth16` and published it on-chain.
 | Grant unexpired, audience-bound, in scope | **VERIFIED** |
 | Disclosed claims belong to the signed credential | **VERIFIED** — Merkle path |
 | Undisclosed claims stay hidden | **VERIFIED** — per-claim salts |
-| Replay defence | **VERIFIED when the caller supplies nonce state**, else reported `NOT_CHECKED` |
+| Replay defence, within one instance | **VERIFIED over HTTP** — second presentation of the same proof is refused |
+| Replay defence, across instances | **NOT CHECKED** — needs migration `20260814090000_control_proof_nonces.sql` (unapplied, Sean-gated) |
 | `repid >= threshold` **without revealing repid** | **NOT PROVEN** — needs Plonky3 (#75) |
 | Agent DID ↔ ERC-8004 `agentId` | **CLAIMED, never proven** — different curves; see below |
 
@@ -113,8 +115,20 @@ became an unverifiable boolean in the first place.
 
 ## Verification
 
-`npm run check` → **exit 0, 438 assertions**, `tsc --noEmit` 0 errors.
-`check:identity` → **57 assertions**, stable across 5 consecutive runs.
+`npm run check` → **exit 0, 448 assertions**, `tsc --noEmit` 0 errors.
+`check:identity` → **67 assertions**, stable across 5 consecutive runs.
+`npm run test:e2e` → **26 VERIFIED, 4 NOT CHECKED, 0 FAILED, core 10/10**.
+
+The identity path is exercised over real HTTP against a real handler, not only
+in unit assertions: proofs are minted by the same modules a real holder runs and
+posted to `POST /api/trustshell/control-proof/verify`. Forgery, wrong audience,
+replay, capability escalation and disclosure tampering are all rejected
+**server-side**, and a withheld claim never appears in the response.
+
+Two of those E2E steps are core, chosen so the gate must be shown to both open
+and close: `control_proof_verifies_over_http` and
+`forged_control_proof_rejected_over_http`. A gate that only ever closes is
+indistinguishable from a broken one.
 
 **Mutation testing — the suite was verified by breaking the code, not by reading
 it.** 9 mutations, each checked for compile success (a mutation that does not
