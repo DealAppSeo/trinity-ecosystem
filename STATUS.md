@@ -7,8 +7,11 @@
 ## The pivot, and the measurement behind it
 
 Priority 1 as originally briefed ended in "Plonky3 selective-disclosure linking
-proof". **Plonky3 cannot be compiled in this environment**, verified this session
-rather than assumed:
+proof". **Plonky3 cannot be compiled in _this sandboxed container_**, verified
+this session rather than assumed. (Scope matters: the XAI lane builds it fine on
+a developer machine and has produced a real STARK. An earlier version of this
+file said "no Claude session can build Rust in this ecosystem", which
+generalised one environment to all of them and was wrong.)
 
 ```
 cargo check --offline  →  error: failed to download `aho-corasick v1.1.4`

@@ -100,11 +100,23 @@ hardcoded 4-entry table disagreeing with live RepID. Both need the Rust build.
 
 ## Environment blocker worth fixing once
 
-**No Claude session can build Rust in this ecosystem.** The agent proxy allow-list
-has `index.crates.io` but not `static.crates.io`, so cargo resolves the sparse
-index then 403s on every `.crate` download, and there is no local cargo cache.
-This matters because the proving stack *is* the Rust part. Task **#75** covers
-the allow-list fix and the `cargo check` that verifies the change above.
+**CORRECTED 2026-08-14.** This previously read *"No Claude session can build
+Rust in this ecosystem."* That was an overclaim: I measured one environment and
+generalised to all of them. The XAI lane subsequently built the Plonky3 stack
+and produced a real STARK (10,673 proof bytes, `prove_local.rs`), which refutes
+it. Same shape as A1 and A4 — a conclusion wider than the evidence under it.
+
+**What is actually true, and was actually measured:** *this sandboxed cloud
+container* cannot build Rust. The agent proxy allow-list has `index.crates.io`
+but not `static.crates.io`, so cargo resolves the sparse index then 403s on
+every `.crate` download, with no local cache. Re-verified this session:
+`cargo check --offline` fails on an undownloadable dependency, `cargo fetch`
+hangs until killed.
+
+Task **#75** is therefore a fix for *agent sessions*, not a global blocker on
+the proving stack — a developer machine builds it fine. That distinction
+matters for prioritisation: #75 unblocks verification-in-CI and agent work, it
+does not gate whether the circuit can exist at all.
 
 ## REAL vs STUB
 
