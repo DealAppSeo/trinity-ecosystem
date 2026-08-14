@@ -9,6 +9,46 @@ Three outcomes, never two: a thing was VERIFIED, NOT CHECKED, or FAILED.
 
 ---
 
+# STATUS: THE OVERNIGHT SPRINT ROUTINE IS STOPPED
+
+**If you are the sprint routine: do not start a backlog item. Verify ground
+truth, confirm this block, end the turn.** The `STOPPED` marker further down
+(and Sprint W at the end) are the full record; this header exists because they
+were buried mid-file and a firing could miss them.
+
+Stopped 2026-08-14. Both documented stop conditions held, independently:
+
+- **Backlog exhausted.** (1) run/idle timeout split — built, Sprint C, plus
+  abandonment accounting in K. (2) context-bloat transform — built, Sprint D.
+  (3) Postgres reputation persistence — built, blocked only on an unapplied
+  migration. (4) sub-task routing granularity — **architecturally significant,
+  deferred to Sean**, which is itself a stop condition. (5) `hal_quorum_*`
+  migration — **declined deliberately**: grepped the repo, no writer targets
+  those tables here, so the schema would have been invented.
+- **Two consecutive firings with no measurable improvement** (Sprints J and K).
+
+Work continued past that point only under explicit user direction, producing
+Sprints L–W. Both axes are now closed:
+
+- **Simulator axis: closed.** Top-1 routing is at 97.9% of the omniscient bound
+  (2.00pp left); panel membership at 99.23% of its bound (0.75pp left); panel
+  size resolved at 3; whether-to-panel gated adaptively on measured uplift.
+- **Real-data axis: open, blocked on a schema change that is Sean's call.**
+  Co-failure correlation — the input deciding whether panels ever run — is **not
+  computable from `repid_score_events`**. Needs a real task key, or a join table
+  linking events to task instances.
+
+**Four numbers published here were later retracted.** They are listed with
+reasons in `docs/TRUST-HARNESS.md` § "What REAL data says". Read that section
+rather than reconstructing the chain from the entries below.
+
+Two notes for anyone reading the routine's own prompt: it asserts the session
+has no MCP tools and lists items 4 and 5 as open. **Both are stale** — MCP was
+available on 2026-08-14 and was used read-only, and items 4 and 5 are closed as
+above. The prompt says this file is authoritative over its list. It is.
+
+---
+
 ## 2026-08-13 — full day
 
 Five pieces of work. Every number below was produced by running something, not
