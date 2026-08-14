@@ -40,6 +40,10 @@ export async function loadIdentity() {
       [
         ...MODULES.map((m) => `lib/trustshell/identity/${m}`),
         '--outDir', outDir,
+      // Pin the root so output layout does not move when a module gains an
+      // import from outside identity/ — repid-predicate.ts imports
+      // ../EarnedMetrics, which silently relocated every .js file.
+      '--rootDir', 'lib',
         '--module', 'commonjs',
         '--target', 'es2022',
         '--lib', 'es2022,dom',
@@ -62,7 +66,7 @@ export async function loadIdentity() {
   const mods = {};
   for (const m of MODULES) {
     const name = m.replace(/\.ts$/, '');
-    mods[name] = await import(pathToFileURL(join(outDir, `${name}.js`)).href);
+    mods[name] = await import(pathToFileURL(join(outDir, 'trustshell', 'identity', `${name}.js`)).href);
   }
   return { mods, dispose: () => rmSync(outDir, { recursive: true, force: true }) };
 }

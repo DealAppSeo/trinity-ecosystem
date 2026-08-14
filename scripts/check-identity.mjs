@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate;
 try {
   execFileSync(
     localTsc(),
@@ -39,7 +39,12 @@ try {
       'lib/trustshell/identity/capability.ts',
       'lib/trustshell/identity/nonce-store.ts',
       'lib/trustshell/identity/delegation.ts',
+      'lib/trustshell/identity/repid-predicate.ts',
       '--outDir', outDir,
+      // Pin the root so output layout does not move when a module gains an
+      // import from outside identity/ — repid-predicate.ts imports
+      // ../EarnedMetrics, which silently relocated every .js file.
+      '--rootDir', 'lib',
       '--module', 'commonjs',
       '--target', 'es2022',
       '--lib', 'es2022,dom',
@@ -49,9 +54,7 @@ try {
     ],
     { stdio: 'pipe' }
   );
-  // tsc roots the output at the common parent of the inputs, which is the
-  // identity directory itself — so the .js files land directly in outDir.
-  const base = outDir;
+  const base = join(outDir, 'trustshell', 'identity');
   did = await import(pathToFileURL(join(base, 'did.js')).href);
   disclosure = await import(pathToFileURL(join(base, 'disclosure.js')).href);
   identity = await import(pathToFileURL(join(base, 'identity.js')).href);
@@ -60,6 +63,7 @@ try {
   capability = await import(pathToFileURL(join(base, 'capability.js')).href);
   nonceStore = await import(pathToFileURL(join(base, 'nonce-store.js')).href);
   delegation = await import(pathToFileURL(join(base, 'delegation.js')).href);
+  repidPredicate = await import(pathToFileURL(join(base, 'repid-predicate.js')).href);
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -999,6 +1003,114 @@ await check('a two-link chain narrows monotonically', async () => {
   assert.equal(v.valid, true, JSON.stringify(v.links, null, 2));
   assert.equal(v.depth, 2);
   assert.deepEqual(v.grantedCapabilities, ['read:memory']);
+});
+
+// --- RepID predicate (Priority 2: measured score -> disclosable claim) ------
+
+const EVIDENCE = (over) => ({
+  measured: ['bftAccuracy', 'veritasCatchRate', 'x402SuccessRate', 'latencyMs'],
+  insufficient: [], unmeasured: [], fullyMeasured: true, weakestConfidence: 0.8,
+  detail: {}, ...over,
+});
+
+await check('a measured score becomes a gte predicate over a private witness', () => {
+  const st = repidPredicate.repidPredicate({
+    score: 3723, threshold: 3000, evidence: EVIDENCE(), agentName: 'TORCH',
+  });
+  assert.equal(st.predicate, 'gte');
+  assert.equal(st.privateWitness.value, 3723);
+  assert.equal(st.publicInputs.bound, 3000);
+  assert.equal(st.publicInputs.agent, 'TORCH');
+});
+
+await check('EVIDENCE QUALITY IS PUBLIC, not collapsed into the boolean', () => {
+  const thin = repidPredicate.repidPredicate({
+    score: 3723, threshold: 3000,
+    evidence: EVIDENCE({
+      measured: ['x402SuccessRate'], unmeasured: ['bftAccuracy', 'veritasCatchRate'],
+      insufficient: ['latencyMs'], fullyMeasured: false, weakestConfidence: 0.02,
+    }),
+  });
+  const solid = repidPredicate.repidPredicate({ score: 3723, threshold: 3000, evidence: EVIDENCE() });
+  // Same score, same bound, same verdict — but distinguishable to a verifier.
+  assert.equal(thin.publicInputs.fullyMeasured, false);
+  assert.equal(solid.publicInputs.fullyMeasured, true);
+  assert.equal(thin.publicInputs.measuredSignals, 1);
+  assert.equal(thin.publicInputs.unmeasuredSignals, 2);
+  assert.equal(thin.publicInputs.insufficientSignals, 1);
+  assert.notEqual(thin.publicInputs.weakestConfidence, solid.publicInputs.weakestConfidence);
+});
+
+await check('THE SCORE STAYS OUT OF THE PUBLIC INPUTS', () => {
+  const st = repidPredicate.repidPredicate({ score: 3723, threshold: 3000, evidence: EVIDENCE() });
+  const pub = JSON.stringify(st.publicInputs);
+  assert.ok(!pub.includes('3723'), `the private witness leaked into publicInputs: ${pub}`);
+});
+
+await check('A NON-POSITIVE THRESHOLD IS REFUSED (0 >= 0 passes an unevidenced agent)', () => {
+  const ev = EVIDENCE({ measured: [], unmeasured: ['bftAccuracy','veritasCatchRate','x402SuccessRate','latencyMs'], fullyMeasured: false, weakestConfidence: 0 });
+  assert.throws(() => repidPredicate.repidPredicate({ score: 0, threshold: 0, evidence: ev }), /threshold must be > 0/);
+  assert.throws(() => repidPredicate.repidPredicate({ score: 0, threshold: -1, evidence: ev }), /threshold must be > 0/);
+});
+
+await check('an unevidenced agent scores 0 and FAILS a real threshold', async () => {
+  const provider = new proofProvider.WebCryptoProofProvider();
+  const st = repidPredicate.repidPredicate({
+    score: 0, threshold: 3000,
+    evidence: EVIDENCE({ measured: [], unmeasured: ['bftAccuracy','veritasCatchRate','x402SuccessRate','latencyMs'], fullyMeasured: false, weakestConfidence: 0 }),
+  });
+  const r = await provider.prove(st);
+  assert.equal(r.predicateHolds, false, 'an agent with no evidence cleared the bar');
+});
+
+await check('evidence policy rejects a thin pass and accepts a solid one', () => {
+  const policy = { requireFullyMeasured: true, minWeakestConfidence: 0.5, minMeasuredSignals: 4 };
+  const thin = repidPredicate.repidPredicate({
+    score: 3723, threshold: 3000,
+    evidence: EVIDENCE({ measured: ['x402SuccessRate'], unmeasured: ['bftAccuracy'], insufficient: ['latencyMs'], fullyMeasured: false, weakestConfidence: 0.02 }),
+  });
+  const solid = repidPredicate.repidPredicate({ score: 3723, threshold: 3000, evidence: EVIDENCE() });
+
+  const a = repidPredicate.evidenceMeetsPolicy(thin, policy);
+  assert.equal(a.ok, false);
+  assert.equal(a.reasons.length, 3, JSON.stringify(a.reasons));
+
+  const b = repidPredicate.evidenceMeetsPolicy(solid, policy);
+  assert.equal(b.ok, true, JSON.stringify(b.reasons));
+});
+
+await check('policy and predicate stay SEPARATE questions', async () => {
+  // A thin record can still clear the bound. Policy is what decides whether to
+  // act on it — merging the two would let a policy change alter what the
+  // commitment binds.
+  const provider = new proofProvider.WebCryptoProofProvider();
+  const thin = repidPredicate.repidPredicate({
+    score: 5000, threshold: 3000,
+    evidence: EVIDENCE({ measured: ['x402SuccessRate'], unmeasured: ['bftAccuracy'], fullyMeasured: false, weakestConfidence: 0.01 }),
+  });
+  const r = await provider.prove(thin);
+  assert.equal(r.predicateHolds, true, 'the score does clear the bound');
+  assert.equal(repidPredicate.evidenceMeetsPolicy(thin, { requireFullyMeasured: true }).ok, false,
+    'but the evidence should not satisfy a strict policy');
+});
+
+await check('a repid predicate rides inside a real control proof', async () => {
+  const { human, agent } = await mkPrincipals();
+  const provider = new proofProvider.WebCryptoProofProvider();
+  const statement = repidPredicate.repidPredicate({
+    score: 3723, threshold: 3000, evidence: EVIDENCE(), agentName: 'TORCH',
+  });
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+    predicate: { statement, provider },
+  });
+  const v = await controlProof.verifyControlProof(proof, {
+    audience: AUD, seenNonces: new Set(), predicateProvider: provider,
+  });
+  assert.equal(v.valid, true, JSON.stringify(v.checks, null, 2));
+  assert.equal(v.checks.predicate.outcome, 'VERIFIED');
+  // Still honest about privacy.
+  assert.match(v.checks.predicate.detail, /witnessHidden=false/);
 });
 
 rmSync(outDir, { recursive: true, force: true });
