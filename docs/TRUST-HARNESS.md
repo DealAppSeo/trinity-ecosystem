@@ -623,11 +623,18 @@ a caveat as provisional until the caveat is paid.
 
 ## Not yet built
 
-- **Sub-task routing granularity.** Routing is per task; the brief calls for
-  sub-step and tool-call granularity. Highest-value remaining item by impact,
-  but it reshapes the task model and `router.ts` rather than adding to them —
-  **judged architecturally significant on 2026-08-13 and left for Sean**, not
-  skipped.
+- **Sub-task routing granularity — PRICED 2026-08-14, and the cost claim above
+  was half wrong.** `npm run sim:subtask`. The impact is real and is the largest
+  remaining prize: **+3.11pp** at specialisation spread 0.10 and **+10.57pp** at
+  0.20 over 24 seeds, against the +1.64pp bar Sprint V declined for per-domain.
+  But it does **not** reshape `router.ts`: `route()` is a pure function of its
+  arguments, so it can be called per sub-step today, and `ReputationLedger` keys
+  on an opaque string, so `record('agent::step', ok)` is already legal. Only the
+  call-site keying changes; `supabase-reputation-store.ts` (primary key
+  `agent_name`) is the one thing that must change to persist per-step scores.
+  **Still not built**, because the prize depends on the fleet's actual
+  specialisation spread and that is unmeasurable while `repid_score_events` has
+  no task key. See Sprint Z4.
 - **Cold experts and early traffic — MEASURED 2026-08-14, and the answer was
   not the one expected.** At `confidenceK` 50 this was severe: across the first
   60% of a run both `rookie` and a newly added expert took **0 calls**. At 20,

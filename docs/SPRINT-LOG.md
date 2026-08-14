@@ -3108,3 +3108,106 @@ is the distinction the old framing missed by comparing at a fixed floor.
   the saturation ceiling of ~96.8% is a property of *this* world, not a constant.
 - `EscalationPolicy` still has no production caller; nothing here changes
   shipped behaviour.
+
+---
+
+## 2026-08-14 — Sprint Z4: sub-task routing, priced — and the cost claim corrected
+
+`TRUST-HARNESS.md` calls sub-task routing the **"highest-value remaining item by
+impact"** and defers it as architecturally significant. The impact claim had
+never been measured. `npm run sim:subtask`.
+
+### It is the first item this session with a genuinely large prize
+
+A task is S sub-steps, **all of which must succeed** — the conjunctive shape of a
+tool-call chain. That deliberately favours the proposal: a product of maxima can
+far exceed the maximum of products, so if the prize were small even here it
+would be small everywhere. 8 experts, 4 steps, 3000 tasks, 24 seeds.
+
+`spread` is each (expert, step) cell's deviation from that expert's base
+competence. 0 = no specialisation; 0.30 = skills essentially uncorrelated.
+
+| spread | omni per-task | omni per-STEP | CEILING | learned/task | learned/STEP | ACHIEVED |
+|---|---|---|---|---|---|---|
+| 0.00 | 72.63% | 72.63% | 0.00pp | 65.50% | 65.48% | −0.02pp (t −0.1) |
+| 0.05 | 73.28% | 74.46% | 1.17pp | 66.08% | 66.48% | +0.39pp (t 0.9) |
+| **0.10** | 74.08% | 78.35% | **4.26pp** | 67.22% | 70.33% | **+3.11pp** (t 3.4) |
+| 0.15 | 74.09% | 82.42% | 8.32pp | 67.58% | 73.98% | +6.39pp (t 5.4) |
+| 0.20 | 74.19% | 86.44% | 12.24pp | 67.03% | 77.60% | +10.57pp (t 6.9) |
+| 0.30 | 73.05% | 92.51% | 19.46pp | 66.15% | 82.64% | +16.49pp (t 6.6) |
+
+The learned arm recovers **73–85% of the ceiling** despite spreading the same
+traffic over 4× as many cells, so the dilution cost is real but not decisive.
+
+**This clears the bar, unlike everything else measured this session.** Sprint V
+priced per-domain reputation at **+1.64pp** on real data and declined it. Sub-task
+routing exceeds that from spread ≥ 0.10 onward, and by 6× at spread 0.20.
+
+### The cost claim was half wrong, and checking it changes the decision
+
+`TRUST-HARNESS.md` says this "reshapes the task model and `router.ts` rather than
+adding to them." Checked against the code:
+
+- **`router.ts` needs no change.** `TrustRouter` holds no per-task state —
+  `route()` is a pure function of its arguments — so calling it once per sub-step
+  works **today**.
+- **`ReputationLedger` needs no change.** It keys on an opaque `string`, so
+  `record('agent::step', ok)` is already legal. The granular arm above proves it
+  by driving the *real* ledger with composite keys.
+- **The call site keys trust per (agent, step) while keeping `id` per agent**, so
+  capacity, rate limits and breakers stay agent-scoped:
+
+  ```js
+  profiles = agents.map((a) => ({
+    id: a.id,                                              // capacity/limits: per AGENT
+    earnedScore:  led.upperConfidenceBound(`${a.id}::${step}`),
+    coldStart:    led.isColdStart(`${a.id}::${step}`),
+    observations: led.observations(`${a.id}::${step}`),     // per (agent, step)
+  }));
+  ```
+
+- **Persistence is the one real blocker.** `supabase-reputation-store.ts` has
+  primary key `agent_name`, a single text column, so per-step scores cannot be
+  stored. In-memory sub-task reputation works now; surviving a restart needs the
+  rekey Sprint V declined.
+
+**Sprint X made this more viable than it was.** Granular cells are thin by
+construction, and the old flat-0.5 cold-start rule discarded every observation in
+a thin cell. `observations` on the profile is what lets a cell with 6 outcomes
+rank on those 6 outcomes.
+
+### Why it is still not built
+
+The prize is a function of `spread`, and **the fleet's spread is unknown**.
+Locating it on the curve needs per-(agent, sub-step) success rates, which do not
+exist: `repid_score_events` has no task key — the same blocker that stops
+co-failure, now gating two things instead of one.
+
+Sprint V is the caution. Ranks scrambled hard across domains, yet the
+volume-weighted prize was +1.64pp because the high-volume domains had the
+smallest spreads. **"The prize is not proportional to the drama."** Sub-task
+specialisation could be equally dramatic and equally worthless if the volume sits
+on steps everyone handles identically. Building on the simulator's curve without
+locating the fleet on it would be assuming the shape of the data — the single
+cause of all four retractions in this repo.
+
+### Self-check, and it is a bias check
+
+At spread 0 per-step routing has nothing to find, so the arms must tie. If the
+granular arm wins there, the model favours its own proposal and every number
+above is inflated. Gated in CI. Mutation-tested: adding a silent +0.02 to the
+granular arm's success probability produces `granular is 6.30pp ahead` and
+exit 1.
+
+### NOT CHECKED
+
+- Simulator evidence. No `agent_repid` replay.
+- Exploration is a flat 10% forever, where the router explores only while
+  cold-starters exist. That depresses **both** learned arms equally — the paired
+  delta is sound — but the absolute learned levels understate what the real
+  router would achieve.
+- The conjunctive all-steps-must-succeed model is the most favourable shape for
+  the proposal. A task whose steps are independent or averaged would show less.
+- No sub-task decomposition exists in the task model, so nothing here says how
+  tasks would be split into steps in practice — only what it would be worth if
+  they were.

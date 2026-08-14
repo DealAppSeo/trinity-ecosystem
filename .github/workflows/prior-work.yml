@@ -100,6 +100,14 @@ jobs:
           npm run sim:adoption > /tmp/adoption.log
           tail -20 /tmp/adoption.log
 
+      # Same pattern again. Its invariant is a BIAS check: at zero specialisation
+      # per-step routing has nothing to find, so the two arms must tie. A model
+      # that favours the proposal there would inflate every number it reports.
+      - name: sub-task analysis (must not favour its own proposal)
+        run: |
+          npm run sim:subtask > /tmp/subtask.log
+          tail -22 /tmp/subtask.log
+
       # `|| true` on the count keeps the pipeline from dying on grep's
       # exit-1-when-no-match, which would report zero errors as a failure — the
       # one case that must read as success. On failure the errors are printed,
