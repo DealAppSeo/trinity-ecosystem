@@ -90,7 +90,10 @@ export class SolanaExecutor {
         ...(complianceData.bftWeight !== null
           ? { bfw: Number(complianceData.bftWeight.toFixed(3)) }
           : {}),
-        zkp: complianceData.zkpProofCID.slice(-8), // Last 8 chars of ZKP CID
+        // `cmt`, not `zkp`. This memo is published on-chain, and the value is a
+        // commitment fragment — no proof backs it. Labelling it zkp asserted a
+        // zero-knowledge proof to every reader of the chain.
+        cmt: complianceData.zkpProofCID.slice(-8),
         rh:  complianceData.ruleHash.slice(0, 8),  // First 8 chars of rule hash
         ins: complianceData.insuranceCoverage,     // Insurance coverage USD
         t:   Date.now(),                           // Unix timestamp

@@ -23,6 +23,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
+import { localTsc } from './local-tsc.mjs';
 
 const SOURCE = 'lib/institution-config-schema.ts';
 
@@ -30,8 +31,8 @@ const outDir = mkdtempSync(join(tmpdir(), 'trustrails-authcheck-'));
 let validateConfigPatch;
 try {
   execFileSync(
-    'npx',
-    ['tsc', SOURCE, '--outDir', outDir, '--module', 'commonjs', '--target', 'es2019'],
+    localTsc(),
+    [SOURCE, '--outDir', outDir, '--module', 'commonjs', '--target', 'es2019'],
     { stdio: 'pipe' }
   );
   const compiled = join(outDir, 'institution-config-schema.js');

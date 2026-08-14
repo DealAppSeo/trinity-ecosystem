@@ -1,5 +1,9 @@
 {
   "compilerOptions": {
+    // Without an explicit target, tsc downlevels to ES5. That is not only a type
+    // concern: ES5 output breaks `instanceof` on subclasses of Error (a bad tool
+    // input gets reported as an internal server error) and blocks direct Map and
+    // Set iteration. Node 18+ and every browser this app targets are ES2022.
     "target": "es2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,

@@ -434,3 +434,123 @@ derived from a model I built myself and never checked against the system that
 produces the data. A8 was caught by reading the output. A9 was caught only
 because the user asked me to go grep the writer — which is to say, it was not
 caught by me at all.
+
+---
+
+## 2026-08-14 — session 01Ke9Y (claude-opus-5, cloud) — building the E2E suite
+
+### A10 — the security gate went green over exactly the state I ran it in
+
+I added an E2E harness, ran `npm run check` (which begins with `check:secrets`),
+got **exit 0**, committed, pushed. CI failed on the first step:
+
+```
+USABLE  opaque:sb_secret  scripts/e2e/run-e2e.mjs
+```
+
+The harness set `SUPABASE_SECRET_KEY` to a realistic-looking placeholder. The
+scanner is right to flag a prefixed opaque key — it cannot know a literal is
+fake. That part is my bug, and the fix is trivial: the stub never validates the
+key, so it had no business looking like one.
+
+**The part worth writing down is why the local run said clean.** `scan-secrets.mjs`
+enumerated `git ls-files` and then read each file with `git show HEAD:<file>`. So
+it scanned neither of the two states that actually exist before a commit:
+
+1. **An untracked file** — not in `ls-files`, never scanned. Mine was untracked.
+2. **An uncommitted edit to a tracked file** — `git show HEAD:<file>` returns the
+   *committed* blob, so a key added and not yet committed scans clean.
+
+This is a pre-commit check that could not see the working tree. It reported
+success over a file it had never opened — the same shape as the skipped E2E step
+scored as a pass (#414), the build green over undefined references, and the
+credential check green with no credential. Three prior instances are already in
+this file, and I walked into the fourth while building a suite whose entire
+premise is that a gate must not go green without executing something.
+
+Fixed: scan the working tree (`ls-files` + `--others --exclude-standard`, read
+from disk, skip binary by NUL byte). Verified by reproducing both false-greens
+against the new version — an untracked file with a key, and an uncommitted edit
+to a tracked one — and confirming each is now reported.
+
+Then the fixed scanner flagged **its own comment**, because I had written the
+literal prefix into the prose explaining the fix. Also correct behaviour. The
+comment now says so, since the next person to document this will hit it too.
+
+**A permanent artifact, so nobody chases it.** That placeholder is now in git
+history at `afbb28c0`, and `scan-secrets --history` reports it forever as
+`USABLE opaque:sb_secret history:afbb28c0`. It is **not a credential** — it was
+never a valid key, the E2E stub never validated it, and there is nothing to
+rotate. It is a fake string that happens to match a real detection rule. Do not
+add it to an allowlist either: an allowlist that hides one prefixed opaque key
+hides the next real one. Leave it reported and leave this note pointing at it.
+
+**The rule.** A check that reads from `HEAD` is not a pre-commit check, it is a
+post-commit check running early. Before trusting any local gate, ask which bytes
+it actually opened — and if the answer is "the committed ones," it cannot tell
+you anything about the change you are about to make. The cheapest proof that a
+detector works is to hand it the thing it is supposed to catch.
+
+### What went right
+
+The E2E suite was verified by **breaking the code**: reintroducing the four RepID
+literals into `pay/route.ts` produced 3 FAILED, core 6/8, exit 1. An assertion
+suite that has never been observed to fail is an untested assertion. That step
+also caught a hollow test of my own — both dual-signature assertions were passing
+while blocked at `kya_validation`, so the gate under test never ran.
+
+---
+
+## A11 — a vault gate resting on a boolean nobody can check (2026-08-14)
+
+**[VERIFIED] via Supabase MCP this session.** Found while measuring whether
+wiring `ControlProof` into the payment path would be a migration or greenfield.
+It is greenfield, and the measurement is why.
+
+`agent_kya_registry` has a `custodian_zkp_proof` column. It is **NULL in all 12
+rows.** Meanwhile five agents — NEXUS, ORCH, SHOFET, SOPHIA, VERITAS — carry
+`human_custody_verified = true`. Nothing backs it: no proof, and
+`custodian_linked_at` is NULL on every one of them, so the link has no
+provenance either. The column built to hold the evidence has never held any.
+
+That boolean is not inert. Traced through the code:
+
+```
+agent_kya_registry.human_custody_verified
+  -> KYAValidator.ts:26   humanCustodyVerified: data.human_custody_verified
+  -> KYAValidator.ts:68   humanCustodyBound: profile.humanCustodyVerified
+  -> ComplianceReceipt.ts:53 -> kya_compliance_receipts.human_custody_bound
+  -> ZKPAttestation publicSignals
+  -> VaultPermission.ts:48   if (vault.requires_human_custody && !profile.humanCustodyVerified)
+```
+
+`institution_config.require_human_custody_vault` is **true** across all three
+rows, threshold 50,000 USDC. So a **vault access decision** is gated on a
+self-asserted flag. `require_human_custody_payment` is false, which bounds the
+blast radius — the payment path does not gate on it today — but the value still
+reaches compliance receipts and the attestation's public signals, which is how
+an internal assumption becomes an external claim.
+
+Two more things the same query surfaced:
+
+- **`custodian_tier = 'qualified_investor'` on 7 agents.** That is a regulatory
+  characterisation, asserted with no evidence recorded anywhere in the row.
+- **TORCH and W3C contradict themselves**: `custodian_link_active = true` with
+  `custodian_spending_authority = 250000`, but `human_custody_verified = false`.
+  Two fields describing one relationship disagree — the same shape as the
+  `x402_settlements.status` vs `.is_simulated` split in A9. Whichever field a
+  reader happens to consult decides the answer.
+
+**The rule.** A column named `*_verified` records that someone wrote `true`. It
+is evidence of an assertion, never of a verification, unless a companion column
+holds the artefact that can be re-checked — and then the check must actually run.
+Here the companion column exists and is empty, which is worse than not having
+it: its presence implies a verification step that no code performs.
+
+**Not fixed by flipping anything.** Setting those booleans to `false` would
+break vault access for five agents on the strength of a finding, and setting
+them `true` is what created the problem. The fix is a `ControlProof` in
+`custodian_zkp_proof` that `VaultPermission` re-checks, so the gate depends on
+something reopenable. That path is built (`lib/trustshell/identity/`) and not yet
+wired — deliberately, because changing a live authorization gate is a
+Sean-gated decision, not a sprint convenience.

@@ -29,6 +29,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
+import { localTsc } from './local-tsc.mjs';
 
 const SOURCE = 'lib/trustshell/TranscriptParser.ts';
 const CLEAN = 'lib/trustshell/fixtures/synthetic-clean.jsonl';
@@ -38,8 +39,8 @@ const outDir = mkdtempSync(join(tmpdir(), 'trustshell-transcript-'));
 let mod;
 try {
   execFileSync(
-    'npx',
-    ['tsc', SOURCE, '--outDir', outDir, '--module', 'commonjs', '--target', 'es2019'],
+    localTsc(),
+    [SOURCE, '--outDir', outDir, '--module', 'commonjs', '--target', 'es2019'],
     { stdio: 'pipe' }
   );
   mod = await import(pathToFileURL(join(outDir, 'TranscriptParser.js')).href);

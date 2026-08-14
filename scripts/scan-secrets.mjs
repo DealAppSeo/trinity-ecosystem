@@ -18,6 +18,8 @@
 // scan; this is that scan, kept.
 
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const HISTORY = process.argv.includes('--history');
 
@@ -38,6 +40,42 @@ const SECRET_ASSIGNMENT = /(PRIVKEY|PRIVATE_KEY|SECRET_BYTES|SECRET_KEY|KEYPAIR|
 
 const OPAQUE = /\b(sb_secret_[A-Za-z0-9_-]{8,}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,})\b/g;
 
+// An EVM private key is 32 bytes of hex. So is a transaction hash, a block
+// hash, a keccak digest, a merkle root and a storage commitment — and this repo
+// contains all of those. Length cannot separate them, so the Solana rule above
+// is reused: a match is only called a secret when an assignment to a key-shaped
+// name precedes it. Everything else is reported as ambiguous.
+//
+// Why this exists. This scanner was written for the Supabase JWT incident and
+// covered JWTs, Solana base58 and prefixed opaque keys. It did not cover the
+// one chain this project actually deploys to. A funded Base Sepolia key sat in
+// `scripts/register-agents-erc8004.js` across several commits and this scan
+// printed "No credential-shaped strings found" over it. That key owned three of
+// the four ERC-8004 agent identities, so anyone reading the repo could transfer
+// them or rewrite their on-chain metadata.
+const EVM_HEX32 = /(?<![0-9a-fA-Fx])0x[0-9a-fA-F]{64}(?![0-9a-fA-F])/g;
+// `=` and `:` cover a direct assignment. `||` and `??` cover the far more
+// common shipping shape — `process.env.DEPLOYER_PRIVATE_KEY || '0x…'` — where
+// the literal is a fallback. That form reads as a harmless default and is not:
+// it is the value used on every machine where the variable is unset.
+const EVM_ASSIGNMENT =
+  /(?:[A-Z0-9_]*(?:PRIV|SECRET|SIGNER|DEPLOYER|MNEMONIC|WALLET|ACCOUNT)[A-Z0-9_]*|[A-Z0-9_]*KEY)\s*(?:[=:]|\|\||\?\?)\s*[`'"]?$/i;
+
+// A key whose bytes are a short repeating unit (0xabcdabcd…) or all one value
+// (0x0000…) is a placeholder someone typed. It is reported anyway, and reported
+// as usable, because viem derives a real fundable address from it exactly like
+// any other key: the moment that address is sent testnet ETH the placeholder is
+// a live signer whose key is public. A default that is a valid key is a
+// credential, not a comment.
+function isPlaceholderHex(hex) {
+  const body = hex.slice(2).toLowerCase();
+  for (const unit of [1, 2, 4, 8, 16]) {
+    const head = body.slice(0, unit);
+    if (body === head.repeat(64 / unit)) return true;
+  }
+  return false;
+}
+
 // `git grep` takes POSIX ERE, which has no non-capturing groups and no
 // lookaround. Passing the JavaScript patterns above makes every invocation exit
 // 128 with "Invalid preceding regular expression" — and if that error is
@@ -51,6 +89,7 @@ const GIT_GREP_ERE = [
   'eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)?',
   '[A-HJ-NP-Za-km-z1-9]{87,88}',
   'sb_secret_[A-Za-z0-9_-]{8,}',
+  '0x[0-9a-fA-F]{64}',
 ].join('|');
 
 // git distinguishes "ran, found nothing" (exit 1) from "could not run" (exit
@@ -117,6 +156,24 @@ function scanText(text, where, sink) {
       fingerprint: `${key.slice(0, 6)}…`,
     });
   }
+  for (const match of text.matchAll(EVM_HEX32)) {
+    const key = match[0];
+    const preceding = text.slice(Math.max(0, match.index - 60), match.index);
+    const assigned = EVM_ASSIGNMENT.test(preceding);
+    const placeholder = isPlaceholderHex(key);
+    sink.push({
+      where,
+      kind: assigned ? (placeholder ? 'evm:secret-key-placeholder' : 'evm:secret-key') : 'evm:hex32',
+      complete: true,
+      usable: assigned,
+      detail: assigned
+        ? placeholder
+          ? 'repeating-pattern hex assigned to a key-named variable — still derives a real, fundable address'
+          : '32-byte hex assigned to a key-named variable'
+        : '32-byte hex, ambiguous — also the shape of a tx hash, block hash or merkle root',
+      fingerprint: `${key.slice(0, 8)}…`,
+    });
+  }
   for (const key of text.match(OPAQUE) ?? []) {
     const prefix = key.split('_').slice(0, 2).join('_');
     sink.push({
@@ -142,13 +199,45 @@ const repoRoot = git(['rev-parse', '--show-toplevel']).trim();
 const remote = git(['remote', 'get-url', 'origin'], { allowNoMatch: true }).trim() || '(no origin)';
 console.log(`scanning ${repoRoot}\n         ${remote}\n`);
 
-const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
-for (const file of tracked) {
-  // -I skips binary; a lockfile carries integrity hashes that look like nothing
-  // else but produce no useful signal here.
+// Scan the WORKING TREE, not HEAD, and include untracked files.
+//
+// This used to be `git ls-files` + `git show HEAD:<file>`, which reported clean
+// on two things it had never read:
+//
+//   1. A new file that had not been `git add`ed yet — invisible to `ls-files`.
+//   2. An uncommitted EDIT to a tracked file — `git show HEAD:<file>` returns the
+//      COMMITTED blob, so a key added and not yet committed scanned clean.
+//
+// Both matter because this is the check you run BEFORE committing. It reported
+// "No credential-shaped strings found" over an untracked file holding a prefixed
+// opaque key literal, and CI — which sees the committed file — failed on it. A
+// local gate that goes green on exactly the state a developer is in when they run
+// it is the house defect in miniature. Found 2026-08-14; see LESSONS.
+//
+// Note this scans the scanner too, so prose here must not contain a
+// credential-shaped token — the first version of this very comment tripped it.
+//
+// --exclude-standard honours .gitignore, so node_modules and .next stay out.
+const listed = [
+  ...git(['ls-files', '-z']).split('\0'),
+  ...git(['ls-files', '-z', '--others', '--exclude-standard']).split('\0'),
+].filter(Boolean);
+
+for (const file of [...new Set(listed)]) {
+  // A lockfile carries integrity hashes that look like nothing else but produce
+  // no useful signal here.
   if (file === 'package-lock.json' || file.endsWith('.pack')) continue;
-  const blob = git(['show', `HEAD:${file}`]);
-  if (blob) scanText(blob, file, findings);
+  let buf;
+  try {
+    buf = readFileSync(join(repoRoot, file));
+  } catch {
+    // Tracked but deleted from the working tree, or an unreadable symlink.
+    // Nothing on disk to scan; history mode still covers the committed copy.
+    continue;
+  }
+  // Skip binary the way `grep -I` does: a NUL byte in the first 8KB.
+  if (buf.subarray(0, 8192).includes(0)) continue;
+  scanText(buf.toString('utf8'), file, findings);
 }
 
 if (HISTORY) {
