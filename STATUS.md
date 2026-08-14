@@ -55,6 +55,8 @@ and it is isolated behind one interface.
 | `delegation.ts` | sub-agent chains — capability, audience **and time** attenuate per link |
 | `repid-predicate.ts` | measured RepID → predicate; evidence quality is public, score is not |
 | `nullifier.ts` | the circuit contract — statement/witness, and a placeholder that refuses |
+| `memory-authz.ts` | dual-auth memory access — read never implies write; fails closed |
+| `harness-bundle.ts` | the portable harness — parts signed together so they cannot be spliced |
 
 ---
 
@@ -305,6 +307,41 @@ identity proof, and the type will not let a caller blur it.
 | unlinkable | **no** — the signature names the signer | **yes**, per `(domain, scope)` |
 
 Neither subsumes the other, and that is the design rather than indecision.
+
+---
+
+## The portable harness (Priority 5)
+
+`harness-bundle.ts` is what an agent carries between hosts: identity, authority,
+reputation, disclosure, hash-pinned skills, and a memory *commitment*.
+
+No-lock-in is not satisfied by "our format is open". It is satisfied when a
+receiving host can verify everything the bundle asserts with no network, no
+registry, and no cooperation from the issuer. Every part is checkable from the
+bundle plus the receiver's own clock.
+
+**The property that matters most: parts cannot be spliced between bundles.**
+Each part is individually verifiable, which is exactly why the bundle needs its
+own signature over all of them together. Without it, anyone could take agent A's
+authority and agent B's reputation — both genuinely signed — and assemble a
+harness claiming a score that agent never earned. Every part verifying is not
+the same as the bundle being coherent, and that gap is where this kind of format
+usually fails.
+
+**A bundle is not a bearer token.** Verifying it establishes what the agent IS,
+not what it may do here: the embedded ControlProof is audience-bound, so
+presenting a bundle to a service it was not minted for verifies identity and
+grants nothing.
+
+Two things it deliberately does not claim:
+
+- **Skills are pinned, not attested.** The bundle carries content hashes and
+  says so — it cannot prove the host will *run* that content. The receiver must
+  compare each hash against what it loads.
+- **Memory travels as a commitment, never contents.** A portable bundle
+  carrying memory data is a data-exfiltration shape wearing a portability
+  costume. A malformed commitment is refused at pack time rather than accepted
+  as opaque bytes.
 
 ---
 

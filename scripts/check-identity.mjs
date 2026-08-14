@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat, memAuthz;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat, memAuthz, harness;
 try {
   execFileSync(
     localTsc(),
@@ -43,6 +43,7 @@ try {
       'lib/trustshell/identity/nullifier.ts',
       'lib/trustshell/identity/caveat.ts',
       'lib/trustshell/identity/memory-authz.ts',
+      'lib/trustshell/identity/harness-bundle.ts',
       '--outDir', outDir,
       // Pin the root so output layout does not move when a module gains an
       // import from outside identity/ — repid-predicate.ts imports
@@ -70,6 +71,7 @@ try {
   nullifier = await import(pathToFileURL(join(base, 'nullifier.js')).href);
   caveat = await import(pathToFileURL(join(base, 'caveat.js')).href);
   memAuthz = await import(pathToFileURL(join(base, 'memory-authz.js')).href);
+  harness = await import(pathToFileURL(join(base, 'harness-bundle.js')).href);
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -1630,6 +1632,190 @@ await check('a missing audience is NOT_CHECKED and still not permissive', async 
 await check('a namespace containing ":" is refused at construction', () => {
   assert.throws(() => memAuthz.memoryCapability('read', 'agent:TORCH'), /capability separator/);
   assert.throws(() => memAuthz.memoryCapability('read', '  '), /namespace is required/);
+});
+
+// --- portable harness bundle ------------------------------------------------
+
+const H = '0'.repeat(64);
+const mkBundle = async (over = {}) => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity(over.agentName ?? 'TORCH');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+  });
+  const bundle = await harness.packHarness({
+    agent, controllerDid: human.did, authority,
+    skills: [{ name: 'trade', contentHash: `sha256:${H}` }],
+    memory: { commitment: `commit-sha256:${H}`, itemCount: 42, takenAt: '2026-08-14T00:00:00Z' },
+    ...over.pack,
+  });
+  return { human, agent, authority, bundle };
+};
+
+await check('a packed harness verifies end to end', async () => {
+  const { bundle } = await mkBundle();
+  const v = await harness.verifyHarness(bundle, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, true, JSON.stringify(v.parts, null, 2));
+  assert.equal(v.parts.integrity.outcome, 'VERIFIED');
+  assert.equal(v.parts.authority.outcome, 'VERIFIED');
+  assert.deepEqual(v.grantedCapabilities, ['pay:usdc']);
+});
+
+await check('PARTS CANNOT BE SPLICED BETWEEN BUNDLES', async () => {
+  // The central property. Both bundles are genuine and every individual part is
+  // validly signed — but the combination was never asserted by anyone.
+  const a = await mkBundle();
+  const b = await mkBundle({ agentName: 'NEXUS' });
+  const frankenstein = { ...a.bundle, authority: b.bundle.authority };
+  const v = await harness.verifyHarness(frankenstein, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, "one agent's authority rode inside another's bundle");
+  assert.equal(v.parts.integrity.outcome, 'FAILED');
+  assert.match(v.parts.integrity.detail, /spliced/);
+  assert.deepEqual(v.grantedCapabilities, []);
+});
+
+await check('a bundle claiming an agent its authority does not authorize FAILS', async () => {
+  const a = await mkBundle();
+  const other = await identity.createAgentIdentity('IMPOSTOR');
+  // Re-sign so integrity passes; only the subject claim is wrong.
+  const unsigned = { ...a.bundle, agentDid: other.did };
+  delete unsigned.bundleSignature;
+  const spoofed = {
+    ...unsigned,
+    bundleSignature: await identity.signAs(other, harness.bundlePayload(unsigned)),
+  };
+  const v = await harness.verifyHarness(spoofed, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'a bundle claimed an agent its authority never named');
+  assert.equal(v.parts.authority.outcome, 'FAILED');
+  assert.match(v.parts.authority.detail, /but its authority authorizes/);
+});
+
+await check('A BUNDLE IS NOT A BEARER TOKEN — wrong audience grants nothing', async () => {
+  const { bundle } = await mkBundle();
+  const v = await harness.verifyHarness(bundle, {
+    audience: 'trinity:vault', seenNonces: new Set(),
+  });
+  assert.equal(v.valid, false, 'a bundle minted elsewhere granted authority here');
+  assert.equal(v.parts.integrity.outcome, 'VERIFIED', 'integrity should still hold');
+  assert.equal(v.parts.authority.outcome, 'FAILED');
+  assert.deepEqual(v.grantedCapabilities, []);
+});
+
+await check('editing any covered field breaks the bundle signature', async () => {
+  const { bundle } = await mkBundle();
+  const edits = [
+    ['agentName', (b) => { b.agentName = 'RENAMED'; }],
+    ['controllerDid', (b) => { b.controllerDid = 'did:key:z6MkOther'; }],
+    ['skills.contentHash', (b) => { b.skills = [{ name: 'trade', contentHash: `sha256:${'1'.repeat(64)}` }]; }],
+    ['memory.itemCount', (b) => { b.memory.itemCount = 99999; }],
+    ['packedAt', (b) => { b.packedAt = '2020-01-01T00:00:00Z'; }],
+  ];
+  for (const [field, mutate] of edits) {
+    const tampered = JSON.parse(JSON.stringify(bundle));
+    mutate(tampered);
+    const v = await harness.verifyHarness(tampered, { audience: AUD, seenNonces: new Set() });
+    assert.equal(v.parts.integrity.outcome, 'FAILED', `a covered field was editable: ${field}`);
+  }
+});
+
+await check('SKILLS MUST BE HASH-PINNED, names alone are refused', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+  });
+  await assert.rejects(
+    harness.packHarness({
+      agent, controllerDid: human.did, authority,
+      skills: [{ name: 'trade', contentHash: 'trust-me' }],
+    }),
+    /no usable content hash/
+  );
+});
+
+await check('MEMORY CONTENTS NEVER TRAVEL IN THE BUNDLE', async () => {
+  const { bundle } = await mkBundle();
+  const blob = JSON.stringify(bundle);
+  assert.ok(!blob.includes('"items"'), 'memory items appeared in the bundle');
+  assert.match(bundle.memory.commitment, /^commit-sha256:[0-9a-f]{64}$/);
+  // A malformed commitment is refused rather than accepted as opaque data.
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('T');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['x'], ttlSeconds: 300,
+  });
+  await assert.rejects(
+    harness.packHarness({
+      agent, controllerDid: human.did, authority,
+      memory: { commitment: 'here-is-all-my-memory', itemCount: 1, takenAt: 'now' },
+    }),
+    /must be a commitment/
+  );
+});
+
+await check('the skills verdict does NOT claim the host runs that content', async () => {
+  const { bundle } = await mkBundle();
+  const v = await harness.verifyHarness(bundle, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.parts.skills.outcome, 'VERIFIED');
+  assert.match(v.parts.skills.detail, /NOT an attestation/);
+});
+
+await check('a reputation claim rides along and reports its privacy honestly', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+  });
+  const provider = new proofProvider.WebCryptoProofProvider();
+  const statement = repidPredicate.repidPredicate({
+    score: 3723, threshold: 3000,
+    evidence: { measured: ['a','b','c','d'], insufficient: [], unmeasured: [],
+                fullyMeasured: true, weakestConfidence: 0.8, detail: {} },
+  });
+  const bundle = await harness.packHarness({
+    agent, controllerDid: human.did, authority,
+    reputation: { statement, result: await provider.prove(statement) },
+  });
+  const v = await harness.verifyHarness(bundle, {
+    audience: AUD, seenNonces: new Set(), predicateProvider: provider,
+  });
+  assert.equal(v.valid, true, JSON.stringify(v.parts, null, 2));
+  assert.equal(v.parts.reputation.outcome, 'VERIFIED');
+  assert.match(v.parts.reputation.detail, /witnessHidden=false/);
+  assert.ok(!JSON.stringify(v.parts).includes('3723'), 'the score leaked into the verdict');
+});
+
+await check('absent parts are NOT_CHECKED, never silently fine', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('BARE');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['x'], ttlSeconds: 300,
+  });
+  const bundle = await harness.packHarness({ agent, controllerDid: human.did, authority });
+  const v = await harness.verifyHarness(bundle, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, true);
+  for (const p of ['reputation', 'disclosure', 'skills', 'memory']) {
+    assert.equal(v.parts[p].outcome, 'NOT_CHECKED', `${p} should be NOT_CHECKED when absent`);
+  }
+});
+
+await check('a DELEGATED sub-agent can carry its own harness', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD, capabilities: ['pay:*'], ttlSeconds: 3600,
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: ['pay:usdc'], ttlSeconds: 300,
+  });
+  const bundle = await harness.packHarness({
+    agent: worker, controllerDid: human.did, authority: link,
+  });
+  const v = await harness.verifyHarness(bundle, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, true, JSON.stringify(v.parts, null, 2));
+  assert.deepEqual(v.grantedCapabilities, ['pay:usdc'], 'the worker should carry only what it was delegated');
 });
 
 rmSync(outDir, { recursive: true, force: true });
