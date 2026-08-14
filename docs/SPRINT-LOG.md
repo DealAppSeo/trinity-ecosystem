@@ -2525,3 +2525,66 @@ module was touched.
   which edits the same file's pattern list. Different regions, so a clean merge
   is likely but unobserved.
 - `.github/workflows/prior-work.yml` still has never run on GitHub.
+
+---
+
+## Sprint AA — failure-exit verified for the last five check scripts
+
+Sprint Z left five marked NOT CHECKED because the mutations used were arbitrary
+and therefore not evidence. Closed properly.
+
+### Method
+
+The question is narrow: **when an assertion in this script fails, does the
+process exit non-zero?** So the probe is a single genuine failing assertion,
+injected immediately before the script's success report — which is exactly where
+a real late failure would occur. No guessing at module semantics, and nothing
+that could fail for an unrelated reason.
+
+Then, critically, the *error class* was checked, not just the exit code. An
+exit 1 caused by a crashing probe would look identical to an exit 1 caused by a
+failing assertion, and only one of those proves anything.
+
+### Result
+
+| script | error class | exit | verdict |
+|---|---|---|---|
+| `check-auth-policy` | AssertionError | 1 | **VERIFIED** |
+| `check-harness-profile` | AssertionError | 1 | **VERIFIED** |
+| `check-memory-recall` | AssertionError | 1 | **VERIFIED** |
+| `check-transcript-parser` | AssertionError | 1 | **VERIFIED** |
+| `mcp-fleet-smoke` | — (own `check()`) | 1 | **VERIFIED** |
+
+The error-class check earned its place immediately. `mcp-fleet-smoke` first
+reported **ReferenceError**, not AssertionError: it does not import
+`node:assert` — it has its own `check(name, fn)` / `eq()` harness at line 96, so
+`assert` was undefined and my probe crashed. Exit 1, for the wrong reason.
+Marked INCONCLUSIVE rather than counted, then re-run through the script's own
+`check()`/`eq()`: `35 passed, 1 failed`, `FAIL  INJECTED probe`, exit 1, no
+crash. **VERIFIED.**
+
+That is the fifth invalid mutation caught in this session, and the first one
+caught *by an automated part of the probe* rather than by noticing afterwards.
+Checking the error class is cheap and should be standard.
+
+### All 17 check scripts now settled
+
+| property | status |
+|---|---|
+| exits non-zero on failure | **VERIFIED, 17/17** (`check-legacy-key` exits **2** for NOT CHECKED, by design) |
+| prints the greppable `N passed, M failed` token | 16/17; `check-legacy-key` prints a greppable `NOT CHECKED` marker instead |
+
+No script can now report success it has not earned, and no runner grepping the
+shared shape can invent a pass from a script that printed neither.
+
+### Evidence
+
+All five restored and re-verified clean afterwards; working tree clean at each
+step. No source module was modified — the probes touched only the check scripts,
+transiently.
+
+### NOT CHECKED
+
+- `.github/workflows/prior-work.yml` has still never executed on GitHub.
+- Whether the `scan-secrets.mjs` working-tree fix conflicts with PR #25, which
+  edits the same file's pattern list.
