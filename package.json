@@ -17,6 +17,7 @@
     "graph:ecosystem": "bash scripts/graph-ecosystem.sh",
     "mem:audit": "headroom audit-reads --path ~/.claude/projects",
     "setup:context": "bash scripts/setup-context-tools.sh",
+    "setup:browser": "bash scripts/setup-agent-browser.sh",
     "check:harness": "node scripts/check-harness-profile.mjs",
     "check:transcript": "node scripts/check-transcript-parser.mjs",
     "check:memory": "node scripts/check-memory-recall.mjs",
