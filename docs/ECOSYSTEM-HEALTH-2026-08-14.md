@@ -16,7 +16,7 @@ Railway no (proxy-denied), Base Sepolia RPC **yes indirectly** via Supabase
 | Subsystem | Score | One-line basis |
 |---|---:|---|
 | Identity & Linking | **2** / 10 | Real ERC-8004 registry with 4 agents actually on-chain; no human SSID at all, no execution path from the app, and 3 of 4 identities sit under a leaked key |
-| Reputation (zkRepID) | **3** / 10 | Real weighted formula with DB-loaded weights — fed four hardcoded constants at the only live call site |
+| Reputation (zkRepID) | **5** / 10 | *Raised from 3 by Sprint 2.* Now measured from recorded outcomes with decay and shrinkage, and it moves per agent. Still capped: two of four inputs have no data source at all |
 | Proving stack | **1** / 10 | A genuine Plonky3 AIR that discards its proof and returns a `format!` string containing the secret |
 | Memory | **4** / 10 | Best-developed area: real schema, real backfill with a fidelity gate, recall proven in prod. Zero encryption, no portable vault, dual-auth is unverified JSON |
 | Routing & intelligence | **1** / 10 | No request-time routing exists. ANFIS service returns `confidence: 0.99` from 38 lines. No GNN |
@@ -217,6 +217,48 @@ Then Sprint 1, which is a day of work and unblocks everything after it.
 
 ---
 
+## 6b. Sprint 2 result — RepID is measured (landed)
+
+**Success criterion was "a RepID that provably changes when behaviour changes."
+It does.** Computed from live data over a 120-day window:
+
+| | before | after |
+|---|---|---|
+| every agent | **3971**, always | — |
+| trinity-orch | 3971 | **2960** (integrity 0.586 over 6,961 obs) |
+| trinity-shofet | 3971 | **2726** (0.365 over 33,999) |
+| trinity-gcm | 3971 | **2441** (0.354 over 33,424) |
+| trinity-tom | 3971 | **2038** (0.148 over **2** obs — thin-record penalty) |
+
+Scores are lower because the old number was never earned. They now differ by
+agent, which was the point.
+
+**What the data forced, and would otherwise have been silent bugs:**
+
+1. `x402_settlements.status` and `.is_simulated` **disagree** — 403 rows read
+   `status='settled'` while 289 carry `is_simulated=true`. Scoring on `status`
+   would have counted ~287 **simulated** payments as earned successes.
+2. The payment path and the reputation ledger are **disjoint namespaces**:
+   `agent_kya_registry` holds `TORCH`, `repid_agents` holds `trinity-torch`, and
+   a direct join matches 0 of 12. All 12 resolve via the `trinity-` prefix.
+3. `repid_score_events` is **non-stationary** — veto rate 92% (May) → 73% (Jun)
+   → 68% (Jul) → 5% (Aug), with the shift starting ~07-27. Decay is what stops
+   the old regime being reported as current behaviour. Recent evidence is sparse.
+
+**Two of four inputs are structurally unmeasurable, and now say so** rather than
+being faked:
+
+- `bftAccuracy` — the **heaviest weight at 0.40** — has no signal anywhere:
+  `trinity_receipt_bft_results` and `bft_payment_evaluations` both hold **zero
+  rows**. That is an unbuilt subsystem, not a quiet agent.
+- per-agent latency does not exist: `hal_classifications` has 147k latency
+  samples but no `agent_id`; `repid_score_events` has no latency column.
+
+This is why Reputation scores 5 and not higher. **The next highest-leverage move
+in this subsystem is a data-capture problem, not a scoring one:** until BFT
+outcomes and per-agent latency are recorded, 50% of RepID's weight can only ever
+resolve to zero.
+
 ## 7. Verification record
 
 | Claim | Status | How |
@@ -230,6 +272,10 @@ Then Sprint 1, which is a day of work and unblocks everything after it.
 | Fleet 2/12 working vs 12/12 reported | **VERIFIED** | `v_fleet_truth` vs `v_fleet_liveness_strict` |
 | `lib/trustshell/harness/` never existed | **VERIFIED** | `git log --all -- <path>` empty |
 | Vercel build green on PR #25 | **VERIFIED** | deployment Ready |
+| RepID differs per agent post-Sprint 2 | **VERIFIED** | computed over the same view the route reads |
+| x402 status vs is_simulated disagree | **VERIFIED** | 403 `settled` vs 289 `is_simulated` |
+| BFT tables hold zero rows | **VERIFIED** | `pg_stat_user_tables` on both |
+| Sprint 2 route invoked end-to-end | **NOT CHECKED** | no running server + keys in this container; the effect was computed from the view the route reads, not an HTTP call |
 | zkp-postcard crate compiles | **NOT CHECKED** | no Rust toolchain run this session |
 | Whether repid-engine HAL is healthy | **NOT CHECKED** | different repo, Railway proxy-denied |
 | Simulation numbers in changelog #130 | **UNVERIFIABLE** | the artifact does not exist |

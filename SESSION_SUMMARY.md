@@ -10,6 +10,37 @@ all work was directly user-requested (Phase 0 evaluation + first sprint).
 Branch `claude/zkrepid-agentic-os-jfbi18`, **PR #25** (draft, open).
 Full report: **`docs/ECOSYSTEM-HEALTH-2026-08-14.md`**. Brain: `trinity_changelog` #131.
 
+## Sprint 2 — RepID is measured (landed, `d4bb85d`)
+
+The live payment path fed RepID four literals, so every agent scored an identical
+**3971** and the score could not move with behaviour. It is now computed from
+recorded outcomes with 30-day decay and empirical-Bayes shrinkage toward **zero**
+(not the population mean — shrinking toward a fleet average is the
+reputation-laundering vector). Three states, never two: measured / insufficient /
+unmeasured, each carrying its reason, and an unmeasured metric scores zero rather
+than being defaulted.
+
+[VERIFIED] measured effect: trinity-orch **2960**, trinity-shofet 2726,
+trinity-gcm 2441, trinity-tom **2038** (2 observations — the thin-record penalty
+working). Lower than 3971 because 3971 was never earned.
+
+Two silent bugs the data forced out: `x402_settlements.status` and
+`.is_simulated` **disagree** (403 `settled` vs 289 simulated — scoring on status
+would count ~287 simulated payments as earned), and the payment path and
+reputation ledger are **disjoint namespaces** (`TORCH` vs `trinity-torch`, 0 of
+12 join directly).
+
+**Two of four inputs are structurally unmeasurable and now say so:** `bftAccuracy`
+— heaviest weight at 0.40 — has zero rows in both BFT tables, and no table
+records latency per agent. Until those are captured, 50% of RepID's weight can
+only resolve to zero. That is the next highest-leverage gap in this subsystem,
+and it is a data-capture problem rather than a scoring one.
+
+Gate: `npm run check` exit 0, **157 assertions** (up from 128), `tsc` 0 errors,
+`next build` clean. Brain: `trinity_changelog` #132 with rollback SQL.
+
+---
+
 ## Accomplished
 
 **Phase 0 — Ecosystem Health Report.** Ten subsystems scored against executed evidence,
