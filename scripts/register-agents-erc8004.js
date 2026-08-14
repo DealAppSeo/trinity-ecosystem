@@ -5,6 +5,7 @@ const { createWalletClient, createPublicClient, http, decodeEventLog } = require
 const { privateKeyToAccount } = require('viem/accounts');
 const { baseSepolia } = require('viem/chains');
 const fs = require('fs');
+const { assertNotCompromised } = require('./lib/compromised-signer.cjs');
 
 // This key signs registrations against the canonical ERC-8004 Identity
 // Registry, so whoever holds it can transfer the agent identities it owns and
@@ -23,6 +24,10 @@ const CONTRACT = '0x8004A818BFB912233c491871b3d84c89A494BD9e';
 
 const abi = JSON.parse(fs.readFileSync('lib/trusttrader/IdentityRegistry.json', 'utf8'));
 const account = privateKeyToAccount(DEPLOYER_KEY);
+// The key that leaked from THIS file still opens the identities this script
+// registers. Checked on the derived address, so it fires no matter which
+// variable supplied the key. See scripts/lib/compromised-signer.cjs.
+assertNotCompromised(account.address, 'register-agents-erc8004');
 
 const walletClient = createWalletClient({
   account,

@@ -169,3 +169,122 @@ Purging would only reduce future discovery of an already-dead key.
 
 `scripts/scan-secrets.mjs` exits non-zero if a usable credential reappears in
 the working tree. Wire it into CI or a pre-commit hook to keep it that way.
+
+---
+
+# The EVM deployer key — OPEN, and the only rotation that is still needed
+
+Everything above concerns Supabase keys and is settled. This section is a
+different incident with a different answer: **this one is real, it is not
+inert, and rotating it is a manual operation.**
+
+## What leaked
+
+`scripts/register-agents-erc8004.js:9` held a literal EVM private key. It is out
+of the working tree (PR #25), but a private key committed to git is in that
+history permanently — **no commit removes it**. Rotation is what makes the
+history entry harmless: it turns the leaked key into a key to an empty account.
+
+Verified on-chain 2026-08-14 (address derived locally, queried via `pg_net`):
+
+```
+0xdf6b8215d193b11b4903d223729c3cf7a6de271d
+  ~0.059 testnet ETH, nonce 0x6f — live and used
+  ownerOf(3747 SOPHIA)   = 0xdf6b…271d   <- leaked
+  ownerOf(3748 RAVEN)    = 0xdf6b…271d   <- leaked
+  ownerOf(3750 GUARDIAN) = 0xdf6b…271d   <- leaked
+  ownerOf(3749 ATLAS)    = 0x7b84…3261   (elsewhere, unaffected)
+  owner() [registry admin] = 0x5472…2603 (NOT the leaked key — registry is safe)
+```
+
+**Financial exposure is nil** (testnet). **Identity exposure is total for three
+of four agents**: anyone reading the repo can transfer them or rewrite their
+on-chain metadata. For a project whose thesis is verifiable agent identity, that
+is the exposure that counts.
+
+## Why no agent session executes this
+
+Rotating requires the leaked key *and* a fresh key to be present in the
+executing environment. An agent session keeps a transcript. **Pulling a live
+private key into a context that keeps records is the same class of mistake that
+caused this leak** — it would be remediating an incident by reproducing it.
+
+So `scripts/rotate-erc8004-deployer.mjs` is a **local** script. Run it from a
+laptop, in a shell where you exported the key yourself.
+
+## The runbook
+
+**1. Generate the fresh signer.** Keep it off this repo.
+
+```bash
+node -e "const w=require('ethers').Wallet.createRandom(); \
+         console.log('address:', w.address); console.log('key:', w.privateKey)"
+```
+
+**2. Dry run.** Nothing is broadcast without `--execute`, and steps 1–3 of the
+pre-flight still run, so this is a real rehearsal rather than a no-op.
+
+```bash
+export TRINITY_COMPROMISED_KEY=0x...          # this shell only; never .env
+node scripts/rotate-erc8004-deployer.mjs \
+  --tokens 3747,3748,3750 \
+  --to 0xYourFreshSigner \
+  --confirm-to 0xYourFreshSigner \
+  --expect-from 0xdf6b8215d193b11b4903d223729c3cf7a6de271d
+```
+
+`--confirm-to` must repeat `--to` exactly. **A wrong `--to` is the worst outcome
+this operation can produce**: a valid-but-unowned destination takes all three
+identities irrecoverably, and nothing downstream can distinguish it from the
+intended address. `--expect-from` guards the source the same way.
+
+**3. Execute**, after reading the plan. Re-run the same command with
+`--execute`. Transfers are one at a time and awaited; ownership is then
+**re-read from chain** rather than inferred from receipts, and the script exits
+non-zero if any identity did not arrive.
+
+**4. Install the fresh key** as `TRINITY_DEPLOYER_PRIVATE_KEY` in the deployment
+secret store — and see the hazard below before considering this done.
+
+**5. Close** `autonomous_tasks` #73 with the transaction hashes. Do not close it
+on a partial run.
+
+## The hazard that would make a completed rotation look done while it is not
+
+`scripts/broadcast.js` reads:
+
+```js
+process.env.TRINITY_DEPLOYER_PRIVATE_KEY || process.env.TRINITY_DEPLOYER
+```
+
+**Setting the primary variable is not sufficient evidence the old key is gone.**
+An environment where `TRINITY_DEPLOYER` still holds the leaked key and the
+primary is unset keeps signing with the compromised address — rotation would
+read as complete while the exposure continued. Audit **every** name, in every
+environment, plus `.env.local` and shell profiles.
+
+## What is enforced in code now
+
+`scripts/lib/compromised-signer.cjs` refuses to sign with the leaked address.
+It is checked on the **derived address**, not on a variable name, so it fires
+no matter which route supplied the key. Wired into `scripts/broadcast.js` and
+`scripts/register-agents-erc8004.js`; both exit 1 rather than broadcasting.
+
+`npm run check:identity` asserts the address is matched in both lower-case and
+EIP-55 checksummed form, that an unrelated address is not flagged, and that
+**both call sites actually invoke the guard** — a guard nothing calls is
+decoration.
+
+**This is not a substitute for rotating.** It stops *our* scripts using the key.
+Anyone who reads git history still holds it and can act on-chain independently
+until the identities are moved.
+
+## After rotating
+
+- Add the new address to nothing that gets committed.
+- Leave the leaked address in `scripts/lib/compromised-signer.cjs`. It is a
+  public address, not a secret, and the guard must keep working forever — the
+  key never stops being public.
+- `scripts/check-identity.mjs` also contains that address as **test data**, in an
+  assertion that an ERC-8004 binding is *claimed, never proven*. Rotation does
+  not invalidate it; do not "fix" it.

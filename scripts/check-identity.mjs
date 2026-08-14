@@ -1490,6 +1490,42 @@ await check('a WELL-SIGNED loosened link FAILS at verification', async () => {
   assert.ok(v.links.some((l) => /loosens caveats/.test(l.detail)), JSON.stringify(v.links));
 });
 
+// --- compromised signer guard ------------------------------------------------
+//
+// The leaked deployer key cannot be removed from git history, so the only thing
+// that can be enforced in code is that OUR scripts refuse to sign with it. These
+// assertions exist because that guard is the kind of safety check that silently
+// stops working — a renamed constant or a case mismatch would make it pass
+// everything, and nothing else would notice.
+
+await check('the leaked deployer address is recognised in any case form', async () => {
+  const { isCompromised } = await import(pathToFileURL(join(process.cwd(), 'scripts/lib/compromised-signer.cjs')).href)
+    .then((m) => m.default ?? m);
+  assert.equal(isCompromised('0xdf6b8215d193b11b4903d223729c3cf7a6de271d'), true, 'lower-case');
+  assert.equal(
+    isCompromised('0xDf6B8215d193b11b4903d223729c3Cf7A6de271D'), true,
+    'EIP-55 checksummed form is the SAME address and must not slip through'
+  );
+});
+
+await check('an unrelated address is not flagged', async () => {
+  const { isCompromised } = await import(pathToFileURL(join(process.cwd(), 'scripts/lib/compromised-signer.cjs')).href)
+    .then((m) => m.default ?? m);
+  assert.equal(isCompromised('0x7b84000000000000000000000000000000003261'), false);
+  assert.equal(isCompromised(undefined), false, 'a missing address must not throw');
+  assert.equal(isCompromised(''), false);
+});
+
+await check('both signing scripts actually call the guard', async () => {
+  // A guard nothing invokes is decoration. Assert the call sites by name rather
+  // than trusting that they were wired, because wiring is what rots.
+  for (const f of ['scripts/broadcast.js', 'scripts/register-agents-erc8004.js']) {
+    const src = readFileSync(f, 'utf8');
+    assert.ok(/require\(['"]\.\/lib\/compromised-signer\.cjs['"]\)/.test(src), `${f} does not require the guard`);
+    assert.ok(/assertNotCompromised\(/.test(src), `${f} requires the guard but never calls it`);
+  }
+});
+
 rmSync(outDir, { recursive: true, force: true });
 
 if (failed === 0) {

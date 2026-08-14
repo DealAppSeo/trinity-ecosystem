@@ -90,7 +90,7 @@ unless the underlying world changed.
 | Sub-task routing granularity | **Sean** | Architecturally significant; reshapes the task model and `router.ts`. |
 | **Newcomer adoption lag** | **Sean** (policy, not code) | Attacked in Sprint Y and **there is almost nothing there** — see CLOSED. What remains is a policy question: how likely is a newly added agent to be better than the incumbents? Every lever trades gem-detection against dud-rejection, so the answer decides the setting. No simulator can supply it. |
 | `marginFloor` adoption of 1000 | open, low priority | The retune is **answered** (see CLOSED); applying it to the simulator re-bases Sprint P's panel figures, so it needs those re-measured first. Nothing in production is affected — the parameter has no caller. |
-| Rotate the leaked EVM key | **Sean** | Owns 3 live ERC-8004 identities, in git history. A commit cannot fix it. See PR #25. |
+| Rotate the leaked EVM key | **Sean** | Owns 3 live ERC-8004 identities (3747/3748/3750), in git history. A commit cannot fix it, and **no agent session should run it** — rotating needs the live key in a transcripted context, which is how it leaked. **Runbook: `docs/KEY-ROTATION.md` § The EVM deployer key.** Code now refuses to *sign* with it (`scripts/lib/compromised-signer.cjs`), which is not the same as rotating. |
 
 ---
 
