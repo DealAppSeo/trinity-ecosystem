@@ -2588,3 +2588,129 @@ transiently.
 - `.github/workflows/prior-work.yml` has still never executed on GitHub.
 - Whether the `scan-secrets.mjs` working-tree fix conflicts with PR #25, which
   edits the same file's pattern list.
+
+---
+
+## 2026-08-14 — Sprint X: cold-start weighting
+
+Picked up the one item in `TRUST-HARNESS.md` § "Not yet built" that was both
+explicitly NOT CHECKED and free of a Sean gate: *"whether a newcomer added
+mid-run can now earn trust."* Everything here is `scripts/harness-newcomer.mjs`
+(`npm run sim:newcomer`) plus the A/B seam added to `harness-simulate.mjs`.
+
+### The ceiling, computed before anything was run
+
+Exploration is gated on `confidence < 0.5` and confidence is `n/(n+K)`, so
+exploration stops exactly at n = 20 — and nothing else in the harness hands an
+expert calls the ranking would not pick. A **flawless** newcomer therefore
+graduates at a closed-form ceiling:
+
+```
+observed(20)   = 8549 bps      EWMA alpha 0.06 from the 5000 prior
+confidence(20) = 0.500
+earned(20)     = 6775 bps      <- the graduation ceiling
+```
+
+Checked against the real `ReputationLedger`, not just derived: 6775 vs 6775,
+delta 0.3 bps. **PREDICTION, published before measuring:** any incumbent above
+**67.75%** true quality permanently out-ranks a perfect newcomer, so the
+cold-start cliff documented as closed at n=15 is merely relocated to n=20.
+
+### The prediction was REFUTED
+
+40 seeds: the newcomer wins an unassisted decision in **95%** of them and
+becomes the dominant expert in **80%**. The closed form assumed the incumbent's
+earned score sits at its true quality. It does not — under winner-take-all the
+leader's EWMA random-walks, and on the headline seed the incumbent fell from
+8455 to 6698 bps on a true quality of 0.80. The ceiling is real; it does not
+bind, because what it is measured against moves too.
+
+What a late arrival actually pays is a **lag**, not a lock-out. Against an
+omniscient router that adopts the best present expert immediately: **94.77% of
+bound, 4.82pp** left on the table.
+
+### The defect that was actually there
+
+Looking for the lock-out found something else, and it is not about newcomers.
+Pre-fix, on the headline seed, `vet-85` — the **best** veteran — took **20 of
+3000** calls, all of them exploration handouts, and froze at 6052 bps while the
+router rode `vet-80` on early luck. Over 200 seeds the pool failed to identify
+its own best member **41 times**.
+
+Root cause: `trustWeight` scored **any** cold expert at a flat 0.5, and
+`coldStart` covers two opposite situations — *no* evidence and *thin* evidence.
+An expert emits up to 20 outcomes before graduating and all 20 were discarded,
+including the failures that should have demoted it.
+
+### The fix, and what it cost to get right
+
+`ExpertProfile.observations` (optional) lets the router tell the two apart.
+With evidence, rank on the ledger's shrunk score; without it — or when the
+caller does not supply the count — floor at the midpoint.
+
+The first attempt swapped outright and **broke a routing test**: a caller
+passing `earnedScore: 0, coldStart: true` was then ranked at zero, scoring "no
+evidence" identically to "proven terrible". The profile's ledger-derived
+contract is documented and unenforced, so the test was right and the change was
+wrong. A pure one-sided floor fixed the safety hole but kept only **0.42pp of
+the 1.34pp** — because most of the win comes from the DOWNWARD direction, which
+a floor blocks. Hence the observation count.
+
+| measurement | before | after | delta |
+|---|---|---|---|
+| trust-only world, point-estimate ranking, 200 paired seeds | 81.58% | 82.93% | **+1.34pp** ± 0.27, t = 9.8, 164/200 up |
+| trust-only world, UCB ranking (what the sim ships), 200 seeds | 81.79% | 82.65% | **+0.86pp** ± 0.19, t = 8.7, 155/200 up |
+| full simulator, top-1, 24 paired seeds | 91.79% | 92.43% | **+0.64pp** ± 0.44, t = 2.83, 19/24 up |
+| full simulator, % of omniscient top-1 bound, 24 seeds | 97.31% | 98.16% | **+0.85pp** ± 0.57, t = 2.92, 20/24 up |
+| full simulator, panel-of-3, 24 paired seeds | 96.48% | 96.45% | −0.03pp ± 0.19, t = −0.28 — **no effect** |
+| pool identifies its best member, 200 seeds | 159/200 | 170/200 | +11 |
+| calls reaching the best expert, 200 seeds | 1793 | 2177 | +384 of 3000 |
+
+The remaining top-1 gap to the omniscient bound goes **2.69pp → 1.84pp**: about
+**32%** of the entire remaining prize for top-1 routing, in a mechanism the
+index lists as CLOSED.
+
+### Why this is not the artefact we were fooled by before
+
+`confidenceK` once looked like a win because a gem was planted in the pool. The
+signature here is the opposite: the win is **largest with no newcomer present at
+all** (+1.30pp) and **smallest in the planted-gem world** (+0.83pp), and the
+gem's traffic share goes **down** (51.2% → 48.8%) while quality goes up. It is
+not "explore more"; it is "rank a cold expert on the evidence it has".
+
+Under UCB ranking the gem world is the *largest* win (+2.12pp) and the gem's
+share rises, which is the artefact signature — so the **veterans-only** number
+is the one quoted, and the gem number is the least trustworthy of the four.
+
+### Mutation testing
+
+Five mutations of the new router logic, all compiled, all caught: evidence never
+detected (1 fail), evidence always assumed (3), midpoint floor removed (3),
+default flipped to midpoint (2), warm path forced to midpoint (3). Baseline
+58 passed / 0 failed restored after each.
+
+### Also
+
+`tsc --noEmit` is now **4** errors, not 25 — PR #25 deleted the file holding all
+25. The CI baseline in `prior-work.yml` was still 25, so 21 new errors could
+have landed without the gate saying a word. Lowered to 4.
+
+### Single seed decided nothing here — twice
+
+The main simulator on its published seed showed the panel arm at 99.23% → 98.62%
+and that read as a regression. Across 24 paired seeds it is −0.03pp ± 0.19pp.
+Separately, the trust-only measurement was first run on `earnedScore` when the
+simulator actually ships `upperConfidenceBound` — the wrong sample, caught by
+reading the simulator rather than assuming it. Both numbers changed materially
+once corrected.
+
+### NOT CHECKED
+
+- Everything above is simulator evidence. No `agent_repid` replay, no live LLM.
+- Sections 3–6 of `harness-newcomer.mjs` neutralise similarity and congestion on
+  purpose; the full-simulator row is the one to quote for a world that varies
+  them.
+- Whether any caller outside the simulator supplies `observations`.
+  `lib/mcp/fleet.ts` does not, and therefore keeps the conservative floor.
+- The 4.82pp adoption-lag prize is measured but **not attacked**. This sprint
+  took the ranking defect; the lag itself is still open.

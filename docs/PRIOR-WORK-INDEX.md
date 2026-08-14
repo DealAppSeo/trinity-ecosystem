@@ -62,7 +62,9 @@ unless the underlying world changed.
 
 | area | verdict | evidence |
 |---|---|---|
-| **Top-1 routing quality** | At **97.9%** of the omniscient bound. Total remaining prize for any router / scheduler / capacity / timeout change: **2.00pp**. | `TRUST-HARNESS.md`, Sprint L |
+| **Top-1 routing quality** | At **98.16%** of the omniscient bound (24 paired seeds), up from 97.31% before Sprint X. Remaining prize for any router / scheduler / capacity / timeout change: **1.84pp**. The single-seed 97.9% from Sprint L is consistent with this and is **not** retracted — it is one seed, and per-seed ratios range 95.8–99.7%. | `TRUST-HARNESS.md`, Sprints L and X |
+| **Cold-start weighting** | **Fixed, Sprint X.** A cold expert is no longer scored at a flat 0.5; `ExpertProfile.observations` separates *no* evidence from *thin* evidence. **+0.85pp of bound**, t = 2.92, no panel effect. Do not restore the flat midpoint — the ablation seam is `--cold-start-midpoint`. | Sprint X |
+| **Can a mid-run newcomer earn trust?** | **Yes**, 95% of 40 seeds — refuting the closed-form prediction that it could not. The 6775 bps graduation ceiling is real but does not bind, because incumbents' EWMA scores move too. | Sprint X, `npm run sim:newcomer` |
 | **Panel membership selection** | At **99.23%** of the omniscient panel-of-3 bound. **0.75pp** left. | Sprint P |
 | **Panel size** | **3** is the cost-adjusted optimum. 4 buys +1.25pp for **+298% p99**; 5 is strictly dominated. | Sprint P |
 | **Whether to run panels at all** | Gated adaptively on measured uplift (`AdaptivePanelPolicy`). Do not hardcode a policy. | Sprint O |
@@ -79,6 +81,7 @@ unless the underlying world changed.
 | **Task key on `repid_score_events`** | **Sean** | THE blocker. Co-failure correlation is not computable without it, and that decides whether panels ever run. Needs a real task key or a join table linking events to task instances. |
 | `20260813210000_agent_repid_earned_observations.sql` | **Sean** | Written, deliberately **UNAPPLIED**. `SupabaseReputationStore` refuses to load/save without it. |
 | Sub-task routing granularity | **Sean** | Architecturally significant; reshapes the task model and `router.ts`. |
+| **Newcomer adoption lag** | open | Measured, **not attacked**. An expert joining mid-run reaches only **94.77%** of the omniscient adoption bound: **4.82pp** on the table, the largest unclaimed simulator prize known. Sprint X fixed the *ranking* defect found alongside it; the lag itself is untouched. |
 | `marginFloor` retune | open | Current 2000 escalates on ~91% of real pairs (cron-only). Not changed — every cut of that data moved the number. |
 | Rotate the leaked EVM key | **Sean** | Owns 3 live ERC-8004 identities, in git history. A commit cannot fix it. See PR #25. |
 

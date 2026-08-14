@@ -43,6 +43,9 @@ const SCATTER_WRONG = argv.includes('--scatter-wrong');
 // difficulty a per-task property all experts share, which correlates their
 // errors through the task rather than through the answer key.
 const HARDNESS_W = arg('hardness', 0);
+// Restore the pre-2026-08-14 cold-start rule: a flat 0.5 trust weight for any
+// cold expert, discarding whatever evidence it has already produced.
+const COLD_MIDPOINT = argv.includes('--cold-start-midpoint');
 
 
 const { load } = compileHarness();
@@ -321,7 +324,15 @@ function runHarness(seed, panel = null) {
     clock,
     limiter,
     capacity,
-    { explorationRate: 0.12, congestionWeight: 0.9, trustFloor: 2000, alternatesCount: Math.max(3, PANEL_SIZE + 1) },
+    {
+      explorationRate: 0.12,
+      congestionWeight: 0.9,
+      trustFloor: 2000,
+      alternatesCount: Math.max(3, PANEL_SIZE + 1),
+      // Ablation seam for the 2026-08-14 cold-start change. `--cold-start-midpoint`
+      // restores the flat 0.5, so the A/B can be re-run rather than trusted.
+      coldStartWeighting: COLD_MIDPOINT ? 'midpoint' : 'earned',
+    },
     new SeededRng(seed ^ 0x5eed)
   );
 
@@ -356,6 +367,11 @@ function runHarness(seed, panel = null) {
       earnedScore: ledger.upperConfidenceBound(e.id, 2500),
       perceivedScore: e.claimedScore, // carried, never ranked on
       coldStart: ledger.isColdStart(e.id),
+      // Supplied so the router can distinguish "no evidence" from "thin
+      // evidence". Without it the router must stay conservative and never rank
+      // a cold expert below the midpoint, which discards every failing
+      // observation an expert makes before it graduates. See router.ts.
+      observations: ledger.observations(e.id),
     }));
 
   // Abandoned calls we have stopped waiting for but cannot prove are dead.

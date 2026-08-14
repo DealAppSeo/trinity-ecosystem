@@ -7,18 +7,23 @@
 # not conflict, and a distinct job name means a failure here says *which* gate
 # broke without opening the log.
 #
-# WHY NOT JUST `npm run check`. On this branch it exits 1, and would have landed
-# red on day one. Its final step is `npx tsc --noEmit`, and there are 25
-# PRE-EXISTING type errors — all in `src/graphs/motor-squad-graph.ts`, a file
-# that imports a package which is not in package.json and never has been. PR #25
-# deletes it. Gating on a red command would make this workflow permanently red
-# and therefore ignored, which is the failure mode the repo's own tooling
-# argues against.
+# WHY NOT JUST `npm run check`. It exits 1 on pre-existing type errors and would
+# have landed red on day one. Gating on a red command makes a workflow
+# permanently red and therefore ignored, which is the failure mode the repo's
+# own tooling argues against.
 #
-# So tsc is gated on the REGRESSION instead of on zero: the repo's documented
-# convention is "compare against 25". That catches new errors on the first push
-# that introduces one, while staying green against a backlog this branch did
-# not create and must not silently adopt.
+# So tsc is gated on the REGRESSION instead of on zero. That catches new errors
+# on the first push that introduces one, while staying green against a backlog
+# this branch did not create and must not silently adopt.
+#
+# BASELINE LOWERED 25 -> 4 ON 2026-08-14. The original 25 were all in
+# `src/graphs/motor-squad-graph.ts`, which PR #25 deleted. The 4 that remain are
+# two genuine ones: a `Set` iteration in `lib/trust/cross-llm-verifier.ts` and
+# three BigInt literals in `lib/trusttrader/trade_pipeline.ts`, both wanting a
+# higher `target`. Leaving the threshold at 25 after the backlog cleared would
+# have let 21 new errors land without the gate saying a word — a gate that
+# cannot fail is the defect this repo keeps finding, so the notice below exists
+# to make the next drop just as loud.
 
 name: prior-work
 
@@ -62,18 +67,26 @@ jobs:
           npm run check:harness-agreement
           npm run check:mcp-fleet
 
-      # Threshold, not zero. See the header: 25 is the documented baseline and
-      # every one of them predates this branch. `|| true` on the count keeps the
+      # Not a test suite — an analysis. It is here because its section 2 exits 1
+      # when the ledger's constants drift away from the closed-form model the
+      # analysis is written on. Without that, changing `confidenceK` or `alpha`
+      # would leave a document full of numbers describing a harness that no
+      # longer exists, and nothing would say so.
+      - name: newcomer analysis (its own model must still match the ledger)
+        run: npm run sim:newcomer > /dev/null
+
+      # Threshold, not zero. See the header for why 4, and for why the number
+      # must be lowered whenever it drops. `|| true` on the count keeps the
       # pipeline from dying on grep's exit-1-when-no-match, which would report
       # zero errors as a failure.
-      - name: tsc must not exceed the 25-error baseline
+      - name: tsc must not exceed the 4-error baseline
         run: |
           COUNT=$(npx tsc --noEmit 2>&1 | grep -cE "error TS" || true)
-          echo "tsc --noEmit: $COUNT errors (baseline 25)"
-          if [ "$COUNT" -gt 25 ]; then
-            echo "::error::tsc regressed: $COUNT errors, baseline is 25"
+          echo "tsc --noEmit: $COUNT errors (baseline 4)"
+          if [ "$COUNT" -gt 4 ]; then
+            echo "::error::tsc regressed: $COUNT errors, baseline is 4"
             exit 1
           fi
-          if [ "$COUNT" -lt 25 ]; then
+          if [ "$COUNT" -lt 4 ]; then
             echo "::notice::tsc improved to $COUNT. Lower the baseline in this workflow so it cannot silently drift back."
           fi
