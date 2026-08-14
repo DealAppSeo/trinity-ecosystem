@@ -422,6 +422,8 @@ draft.
 | ~~137 anon-readable / 4 anon-writable~~ | **RETRACTED** | measurement omitted `PUBLIC`-role policies; superseded by the row above |
 | anon can READ `agent_preflight_control` over PostgREST | **VERIFIED** | live 200 using a publishable key, via `pg_net` |
 | anon can WRITE those tables | **VERIFIED (privilege level)** | RLS off + `has_table_privilege` I/U/D true; **write deliberately not exercised** |
+| **`agent_preflight_control` anon write is CLOSED** | **VERIFIED (live, 2026-08-14)** | RLS enabled + SELECT-only policy. Same publishable key: read **200**, insert **401 / 42501**, row count unchanged. The write path was finally exercised — against the fix, where rejection is the pass condition |
+| The other 59 anon-writable tables | **STILL OPEN** | held for a soak period, not swept in one change |
 | `scan-secrets.mjs` ignores `--root` | **VERIFIED** | source reads only `--history`; output cited a file absent from the target repos |
 | No new credential leak in 8 repos | **VERIFIED (working tree)** | re-scanned per repo; every usable hit triaged by hand |
 | trinity-ecosystem gate green | **VERIFIED** | tsc / check / test:e2e / build all exit 0 |
