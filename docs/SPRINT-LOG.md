@@ -2932,3 +2932,106 @@ frontier above is what makes that a decision rather than a guess.
   task is equally hard. A world with shared task difficulty is exactly where a
   task-blind signal should do worst, and that was not swept.
 - No production caller exists, so none of this is validated against one.
+
+---
+
+## 2026-08-14 — Sprint Z2: floor 1000 applied, Sprint P re-measured
+
+Sprint Z answered the `marginFloor` retune and declined to apply it because
+doing so re-bases Sprint P's published panel figures. Applied now, with those
+figures re-derived. `harness-simulate.mjs` `PANEL_CFG` is **1000**; sweep with
+`--margin-floor N`.
+
+### A reporting bug found on the way in
+
+The panel section divided by `runOraclePanel(SEED, 3)` unconditionally and
+printed the label `the harness panel of 3` regardless of `--panel-size`. Any run
+at size 4 or 5 therefore reported its ratio **against the wrong denominator
+under the wrong name** — and that ratio is the one number a reader quotes from
+that section. Fixed to use `PANEL_SIZE` for both. Sprint P's size comparison
+appears to have been made on raw quality rather than this ratio, so its
+conclusion is not affected, but the bug would have poisoned any re-derivation
+including this one.
+
+### The re-measurement — 20 seeds, both floors
+
+The originals were single-seed. Every number below is a 20-seed mean.
+
+| floor | size | panel q | % of panel-of-k bound | calls | p99 ms | escal % |
+|---|---|---|---|---|---|---|
+| 2000 | 3 | 96.38% | 98.17% | 2.77 | 362 | 88.4% |
+| 2000 | 4 | 98.17% | 98.62% | 3.80 | 852 | 93.7% |
+| 2000 | 5 | 97.96% | 98.74% | 4.43 | 925 | 92.0% |
+| **1000** | **3** | **95.37%** | **97.15%** | **2.12** | **214** | **55.6%** |
+| 1000 | 4 | 96.53% | 96.97% | 2.96 | 450 | 65.0% |
+| 1000 | 5 | 96.55% | 97.32% | 3.60 | 903 | 68.8% |
+
+**Entry 1 — panel membership selection.** Now **97.15% ± 0.25** of the
+omniscient panel-of-3 bound, **2.80pp** left. Sprint P published **99.23% /
+0.75pp**. Most of that gap is **not** the floor: the same 20-seed measurement at
+floor 2000 gives **98.17% ± 0.16**, so ~1.06pp of the difference is seed
+variance in a single-seed figure and ~1.02pp is the floor change. Not retracted
+— 99.23% is reproducible on its own seed — but it should never have been quoted
+as the fleet number.
+
+**And the published seed is the best of the twenty.** At floor 1000 the ratio
+spans **96.31–98.72%** across the 20 seeds, median 97.16, and the default seed
+`20260813` sits at **98.72 — the maximum**. That is not a coincidence to shrug
+at: every single-seed figure in this document was taken on the seed the
+simulator ships as its default, so the whole family of them skews to the
+favourable end. Quote the multi-seed mean, or say which seed.
+
+**Entry 2 — panel size.** Split, because half of it survived and half did not.
+
+- **`5` is strictly dominated by `4`: CONFIRMED**, at both floors, on 20 seeds.
+  At floor 1000 it buys **+0.01pp** for **3× the p99**. Stronger evidence than
+  the original had.
+- **`3` is the cost-adjusted optimum: REOPENED.** The number that closed it no
+  longer holds. Sprint P rejected 4 at *+1.25pp for +298% p99*. Measured now:
+  at floor 2000, 4 buys **+1.79pp for +135% p99**; at floor 1000, **+1.16pp for
+  +110% p99** — roughly a **2.7× better exchange rate** than the one that
+  justified the rejection. 3 may well still be right. It is no longer
+  *established* by the evidence cited for it, and settling it needs an explicit
+  pp-per-p99 exchange rate, which this repo has never written down. Moved to
+  OPEN rather than restated.
+
+**Entry 3 — crossing the single-expert ceiling.** Still **crossed**, which is
+the qualitative claim that matters, but the magnitude is far more
+configuration-dependent than any single number admits. Same seed (20260813),
+same floor 2000:
+
+| configuration | vs omniscient top-1 |
+|---|---|
+| default (agreeing-bloc errors, hardness 0) | **+2.10pp** |
+| `--scatter-wrong` | +3.80pp |
+| `--hardness 0.5` | **−0.10pp** — not crossed |
+| `--scatter-wrong --hardness 0.5` | +6.90pp |
+
+Over 20 seeds at the default: **+2.34pp** at floor 2000, **+1.34pp** at floor
+1000. **The published +4.70pp is not reproduced by any configuration tried
+here, and is NOT retracted** — retracting a figure whose configuration you
+cannot identify is a guess, not a correction. What is established is that the
+number swings from −0.10pp to +6.90pp across documented flags on one seed, so
+**quoting it without naming the configuration is meaningless**, and that is the
+defect to fix rather than the digit.
+
+### What this cost, honestly
+
+Applying 1000 lowers headline panel quality (96.38% → 95.37% at size 3) and the
+ceiling-crossing margin (+2.34 → +1.34pp). It buys a **41% p99 reduction**
+(362 → 214 ms) and **23% fewer calls** (2.77 → 2.12), and it moves escalation
+from 88% of tasks — where the signal is nearly a coin flip — to 56%, where it is
+worth +0.55pp over random. That is the trade Sprint Z priced and it is a trade,
+not a free win.
+
+### NOT CHECKED
+
+- Simulator evidence. `EscalationPolicy` still has no production caller, so
+  nothing here changes shipped behaviour.
+- The panel-size comparison at a fixed floor is not a clean cost experiment:
+  sizes 3/4/5 escalate at *different rates* (55.6/65.0/68.8% at floor 1000)
+  because the panel feeds the ledger, which moves the margin distribution. The
+  quality and p99 columns are still directly comparable; a rate-matched
+  size comparison was not run.
+- The exchange rate that would settle panel size 3 vs 4 does not exist anywhere
+  in this repo.

@@ -665,7 +665,22 @@ const { m: harness, ledger, breakers, capacity, timeouts } = runHarness(SEED);
 // Third arm: same harness, plus escalation-gated plurality aggregation. Built
 // because the ceiling analysis at the bottom showed top-1 has ~2pp left and
 // aggregation is the only mechanism that can cross the single-expert bound.
-const PANEL_CFG = { panelSize: PANEL_SIZE, escalateCfg: { marginFloor: arg('margin-floor', 2000) } };
+// ESCALATION FLOOR: 1000, LOWERED FROM 2000 ON 2026-08-14 BY MEASUREMENT.
+//
+// Sprint Z swept it and 2000 was not a defensible point on the curve. It
+// escalated 89% of tasks — nearly always-panel — so it bought +4.30pp over
+// top-1 at +75% p99, while 1000 buys +3.11pp at +18% p99. The p99 knee sits
+// between 1000 and 1500, and marginal efficiency falls monotonically across the
+// range (3.20 pp per extra call at floor 250, 2.43 at 2000). Sprint P rejected
+// panel size 4 at +1.25pp for +298% p99; 2000 fails that same exchange rate.
+//
+// It is also where the escalation SIGNAL is worth having. Against random
+// escalation at a matched rate (`--escalate-random`), floor 1000 is +0.55pp
+// (t = 3.78, 18/20 seeds) while floor 2000 is +0.27pp (t = 2.06) — at 89%
+// escalation there is almost nothing left to select.
+//
+// Sweep it with `--margin-floor N`; the frontier is in SPRINT-LOG.md Sprint Z.
+const PANEL_CFG = { panelSize: PANEL_SIZE, escalateCfg: { marginFloor: arg('margin-floor', 1000) } };
 const { m: panelArm, agreement: panelAgreement } = runHarness(SEED, PANEL_CFG);
 // Fourth arm: the panel, gated on whether panels have measurably paid here.
 const ADAPTIVE_CFG = {
@@ -1250,13 +1265,19 @@ for (const k of [3, 4, 5]) {
     `  ${`omniscient PANEL of ${k} ceiling`.padEnd(34)} ${pctC(runOraclePanel(SEED, k)).padStart(8)}`
   );
 }
-console.log(`  ${'the harness panel of 3 (earned)'.padEnd(34)} ${pctC(panelCorrect).padStart(8)}`);
+console.log(
+  `  ${`the harness panel of ${PANEL_SIZE} (earned)`.padEnd(34)} ${pctC(panelCorrect).padStart(8)}`
+);
 {
-  const c3 = runOraclePanel(SEED, 3);
+  // MUST be the bound for the size actually run. This divided by the panel-of-3
+  // bound unconditionally and printed "panel of 3" in the label, so any run with
+  // `--panel-size 4` reported a ratio against the wrong denominator under the
+  // wrong name — the one number in this section a reader would quote.
+  const ck = runOraclePanel(SEED, PANEL_SIZE);
   console.log(
-    `\n  The panel arm is at ${pctC(panelCorrect / c3)} of the omniscient panel-of-3 bound.`
+    `\n  The panel arm is at ${pctC(panelCorrect / ck)} of the omniscient panel-of-${PANEL_SIZE} bound.`
   );
   console.log(
-    `  Remaining prize for choosing panel MEMBERS better: ${((c3 - panelCorrect) * 100).toFixed(2)}pp.`
+    `  Remaining prize for choosing panel MEMBERS better: ${((ck - panelCorrect) * 100).toFixed(2)}pp.`
   );
 }
