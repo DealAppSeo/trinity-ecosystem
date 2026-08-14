@@ -1498,3 +1498,88 @@ output — dead-code elimination, another non-mutation. Re-run as
   nothing measures that lag.
 - Still simulator-only. Where real experts sit on the W axis remains the whole
   question, and still needs the 152,001-outcome replay.
+
+---
+
+## Sprint P — the panel's own ceiling, before tuning the panel
+
+Sprint L's lesson applied one level up, deliberately, before repeating its
+mistake. Having established that top-1 routing sat at 97.9% of its bound, the
+obvious next move was to tune the panel — size, thresholds, membership. That is
+precisely the move Sprint L showed to be unwise **without first measuring the
+bound**. So the bound came first.
+
+`runOraclePanel` picks members by true instantaneous quality instead of earned
+reputation, then aggregates identically under the same pessimistic wrong-answer
+model. Membership is omniscient; **weighting deliberately is not** — weights stay
+uniform, because a ledger that already knew the truth would make the whole
+harness unnecessary and the bound meaningless.
+
+| arm | correct |
+|---|---|
+| omniscient TOP-1 ceiling | 94.25% |
+| omniscient PANEL of 3 ceiling | 97.70% |
+| omniscient PANEL of 4 ceiling | **99.70%** |
+| omniscient PANEL of 5 ceiling | 99.40% |
+| the harness panel of 3 (earned) | 96.95% |
+
+**The panel arm is at 99.23% of the omniscient panel-of-3 bound. Choosing
+members better is worth 0.75pp — it is done.** Any further work on panel
+membership selection is the Sprint J/K mistake a third time.
+
+Size is a different axis, and the ceilings said 4 was worth 2.00pp more than 3.
+Measured in the real arm:
+
+| size | correct | calls/task | p99 | ceiling |
+|---|---|---|---|---|
+| 2 | 92.65% | 1.79 | 183 ms | — |
+| **3** | **96.95%** | **2.77** | **216 ms** | 97.70% |
+| 4 | 98.20% | 3.80 | **859 ms** | 99.70% |
+| 5 | 98.00% | 4.63 | 912 ms | 99.40% |
+
+### Panel of 3 stays the default, and the reason is the p99
+
+Going 3 → 4 buys **+1.25pp for +37% calls and +298% p99** (216 → 859 ms). The
+latency is the disqualifier, not the call count: a panel pays its SLOWEST
+member, and the fourth-ranked expert in this pool is `decayer` at 6× latency or
+a staller costing the full idle deadline. The marginal return also halves —
+2.69pp per extra call going top-1 → 3, but 1.21pp per extra call going 3 → 4.
+
+**5 is strictly dominated**: lower correctness than 4 (98.00% vs 98.20%) at
+higher cost, and its ceiling is lower too (99.40% vs 99.70%). The fifth-best
+expert in this pool is bad enough to add wrong votes faster than right ones.
+That is a property of THIS pool's quality distribution, not a general law about
+panel sizes, and should not be quoted as one.
+
+### What is now closed on this axis
+
+- Routing: 2.00pp from the bound. Closed (Sprint L).
+- Panel membership: 0.75pp from the bound. Closed (here).
+- Panel size: 3 is the cost-adjusted optimum; 4 is available if latency is free;
+  5 is dominated. Closed.
+- Whether to panel at all: measured and gated adaptively (Sprints N, O).
+
+**Everything reachable inside the simulator on this axis has now been reached.**
+What remains is not a tuning question, and no further increment against this
+model will produce a number worth having.
+
+### Evidence
+
+341 assertions, 0 failures. `tsc --noEmit` 25 — unchanged. `next build` clean.
+Portability holds. Published world verified unchanged at 92.3% / p99 179 /
+tau 0.643 after the `alternatesCount` change — that parameter feeds only the
+panel path, since the top-1 arm re-routes by exclusion rather than by reading
+the alternates list. Checked by running it, not by reading it.
+
+### NOT CHECKED
+
+- The panel ceilings use uniform weights. A ceiling with omniscient WEIGHTING
+  too would be higher, and is not computed, because it is not a bound any real
+  system could approach.
+- Panel sizes above 5 are unmeasured; with 8 experts and this quality
+  distribution they would include experts whose true quality is 0.35.
+- Everything remains simulator-only. Five sprints have now ended on this same
+  line, which is itself the finding: **the binding constraint is no longer the
+  harness, it is the absence of real data.** The 152,001 labelled outcomes in
+  `repid_score_events` would settle where real experts sit on the W axis, which
+  is the one input that decides whether any of this runs in production.

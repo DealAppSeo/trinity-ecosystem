@@ -32,6 +32,7 @@ const AS_JSON = argv.includes('--json');
 // full harness against the naive baseline conflates it with every other
 // mechanism and would credit the timeout for wins it did not produce.
 const NO_TIMEOUT = argv.includes('--no-timeout');
+const PANEL_SIZE = arg('panel-size', 3);
 // Wrong answers scatter (realistic) vs form an agreeing bloc (pessimistic).
 // The headline panel number uses the bloc model deliberately.
 const SCATTER_WRONG = argv.includes('--scatter-wrong');
@@ -320,7 +321,7 @@ function runHarness(seed, panel = null) {
     clock,
     limiter,
     capacity,
-    { explorationRate: 0.12, congestionWeight: 0.9, trustFloor: 2000, alternatesCount: 3 },
+    { explorationRate: 0.12, congestionWeight: 0.9, trustFloor: 2000, alternatesCount: Math.max(3, PANEL_SIZE + 1) },
     new SeededRng(seed ^ 0x5eed)
   );
 
@@ -633,7 +634,7 @@ const { m: harness, ledger, breakers, capacity, timeouts } = runHarness(SEED);
 // Third arm: same harness, plus escalation-gated plurality aggregation. Built
 // because the ceiling analysis at the bottom showed top-1 has ~2pp left and
 // aggregation is the only mechanism that can cross the single-expert bound.
-const PANEL_CFG = { panelSize: 3, escalateCfg: { marginFloor: 2000 } };
+const PANEL_CFG = { panelSize: PANEL_SIZE, escalateCfg: { marginFloor: 2000 } };
 const { m: panelArm, agreement: panelAgreement } = runHarness(SEED, PANEL_CFG);
 // Fourth arm: the panel, gated on whether panels have measurably paid here.
 const ADAPTIVE_CFG = {
@@ -1166,5 +1167,65 @@ console.log(
   console.log(
     `  its own verdict: uplift ${au.upliftPp === null ? 'n/a' : au.upliftPp.toFixed(2) + 'pp'}` +
       `, rescued ${au.rescued}, spoiled ${au.spoiled}.`
+  );
+}
+
+// ── THE PANEL'S OWN CEILING ──────────────────────────────────────────────────
+//
+// Sprint L's lesson, applied one level up before repeating its mistake. Having
+// found that top-1 routing was at 97.9% of its bound and that further routing
+// work therefore could not pay, the obvious next move is to tune the panel —
+// size, thresholds, membership. That is exactly the move Sprint L showed to be
+// unwise WITHOUT first knowing the bound.
+//
+// So: what would an omniscient PANEL score? Same aggregation, same pessimistic
+// wrong-answer model, but membership chosen by true instantaneous quality
+// rather than by earned reputation. That is the best any panel of this size can
+// do, and the gap to it is the entire remaining prize for panel tuning.
+function runOraclePanel(seed, size) {
+  const world = makeWorld(seed);
+  const clock = new ManualClock(0);
+  const agg = new PluralityAggregator(clock, { minProposals: 2 });
+  let correct = 0;
+  for (let i = 0; i < TASKS; i += 1) {
+    const p = i / TASKS;
+    const hardness = HARDNESS ? HARDNESS[i] : 0.5;
+    const members = [...EXPERTS]
+      .sort((a, b) => instantQuality(b, p) - instantQuality(a, p))
+      .slice(0, size);
+    const proposals = [];
+    for (const e of members) {
+      const r = world.call(e, p, hardness);
+      if (r.hang || !r.ok) continue;
+      const key = r.correct ? 'right' : SCATTER_WRONG ? `wrong:${e.id}` : 'wrong';
+      // Omniscient membership, but NOT omniscient weighting — weights stay
+      // uniform, because a ledger that already knew the truth would make the
+      // whole harness unnecessary and the bound meaningless.
+      proposals.push({ expert: e.id, key, answer: key, earnedScore: 5000 });
+    }
+    if (proposals.length === 0) continue;
+    const a = agg.aggregate(proposals);
+    if (a.outcome === 'DECIDED' && a.key === 'right') correct += 1;
+  }
+  return correct / TASKS;
+}
+
+console.log(`\n  PANEL CEILING — how much is left for panel tuning?`);
+console.log(`  ${'arm'.padEnd(34)} ${'correct'.padStart(8)}`);
+console.log(`  ${'-'.repeat(34)} ${'-'.repeat(8)}`);
+console.log(`  ${'omniscient TOP-1 ceiling'.padEnd(34)} ${pctC(oracle).padStart(8)}`);
+for (const k of [3, 4, 5]) {
+  console.log(
+    `  ${`omniscient PANEL of ${k} ceiling`.padEnd(34)} ${pctC(runOraclePanel(SEED, k)).padStart(8)}`
+  );
+}
+console.log(`  ${'the harness panel of 3 (earned)'.padEnd(34)} ${pctC(panelCorrect).padStart(8)}`);
+{
+  const c3 = runOraclePanel(SEED, 3);
+  console.log(
+    `\n  The panel arm is at ${pctC(panelCorrect / c3)} of the omniscient panel-of-3 bound.`
+  );
+  console.log(
+    `  Remaining prize for choosing panel MEMBERS better: ${((c3 - panelCorrect) * 100).toFixed(2)}pp.`
   );
 }
