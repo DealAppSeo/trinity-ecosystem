@@ -15,7 +15,7 @@ Probed all six products end to end — surface, deployment, repo — from outsid
 container via `pg_net`. Three findings no status check surfaces:
 
 1. **The fleet control plane is anon-writable.** `LESSONS` S1 says "two tables are
-   `USING(true)` for anon". Measured: **137 anon-readable, 4 anon-writable, 15 with
+   `USING(true)` for anon". Measured: **193 anon-readable, 60 anon-writable, 15 with
    RLS disabled entirely**, all 15 carrying anon I/U/D grants — including
    `agent_preflight_control`, which holds `global_pause`. [VERIFIED] anon READ proven
    end to end over real PostgREST with a **publishable key that ships in the browser

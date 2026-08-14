@@ -141,9 +141,21 @@ Measured live against `pg_catalog` [VERIFIED]:
 
 | | documented | **actual** |
 |---|---:|---:|
-| tables anon-readable via `USING(true)` | 2 | **137** (140 policies) |
-| tables with an anon **write** policy | — | **4** |
+| tables anon-**readable** (effective) | 2 | **193** = 15 RLS-off + 178 open policy |
+| tables anon-**writable** (effective) | — | **60** = 15 RLS-off + 45 open policy |
 | tables with **RLS disabled entirely** | — | **15** |
+| tables RLS-on with no policy (locked) | — | 52 |
+| total tables in `public` | — | 621 |
+
+> **Correction, 2026-08-14.** The first published version of this table said
+> **137 readable / 4 writable**. Both were wrong and the write figure was wrong by
+> 15×. The query counted only policies whose `polroles` *explicitly names* `anon`,
+> and silently dropped every policy granted to `PUBLIC` (`polroles = '{0}'`) — which
+> covers `anon` just as completely. It also scored a policy as open on the strength
+> of the role alone, without checking whether its `USING` clause was literally
+> `true`; the corrected count excludes conditioned policies such as
+> `auth.uid() = user_id`, which apply to `anon` but deny it. Superseded figures:
+> **137 readable, 4 writable — do not cite.**
 
 All **15 RLS-disabled tables carry full anon `SELECT`/`INSERT`/`UPDATE`/`DELETE`
 grants**. RLS off means no policy filters the query; the grant is the only gate, and
@@ -178,13 +190,54 @@ fleet's pause switch to prove a point is precisely the fence the preflight contr
 draws. `has_table_privilege('anon', …, 'UPDATE') = true` with `relrowsecurity =
 false` is definitive in Postgres.
 
-The four anon-**writable** RLS-on tables are `antigravity_prompt_queue` (UPDATE
-policy, and I/U/D grants), `sprint_updates`, `trinity_research_log`, `trinity_retros`
-— all `USING(true)`. An anon-writable **prompt queue** is an unauthenticated
-prompt-injection channel into an agent loop. Mitigating fact, and it is worth
-stating plainly rather than dramatising: that queue holds **0 rows** and the other
-three were last written in Feb–Mar 2026. So the exposure is **latent, not currently
-being exploited** — an open door in a room nobody is using.
+**The "latent exposure" claim in the first version of this document was wrong, and
+it was wrong in the way this repo keeps getting wrong: the sample was mistaken for
+the population.** That version named four writable tables, observed that
+`antigravity_prompt_queue` holds 0 rows and the other three were last written in
+Feb–Mar 2026, and concluded the exposure was *"latent, not currently being
+exploited — an open door in a room nobody is using."*
+
+The room is not empty. Counting all 60 anon-writable tables by rows [VERIFIED]:
+
+```
+trinity_artifacts        155,428 rows   open policy   <- I/U/D by anon
+trinity_agent_logs       139,659 rows   open policy
+trinity_task_tags         13,045 rows   open policy
+autonomous_logs            6,840 rows   open policy
+trinity_evolution_vault    5,031 rows   open policy
+repid_experiment_log       2,322 rows   RLS OFF
+peer_verify_dropped_log    1,654 rows   RLS OFF
+anfis_routing_logs / agent_capabilities / trinity_agent_registry / …
+```
+
+Roughly **324,000 rows of agent memory, artifacts and execution history are
+anonymously deletable** by anyone holding a key that ships in the browser bundle.
+`trinity_evolution_vault` and `trinity_agent_registry` are agent state, not logs.
+The correct characterisation is the opposite of the one published: this is a live
+**integrity** exposure of the fleet's working memory, and only the confidentiality
+half is mild (see below). No evidence of actual exploitation was sought or found —
+"not currently being exploited" was never measured and should not have been written.
+
+An anon-writable **prompt queue** remains an unauthenticated prompt-injection
+channel into an agent loop; that part of the original finding stands.
+
+### What is *not* exposed — the confidentiality half
+
+Checked directly, because "193 readable tables" invites the wrong conclusion
+[VERIFIED]. Of every anon-readable table carrying a secret- or PII-shaped column:
+
+| table | rows | populated sensitive values |
+|---|---:|---|
+| `repid_agents` (`webhook_secret`) | 176 | **0** |
+| `user_keys` (`trinity_api_key`) | 0 | 0 |
+| `managers` (`api_key_encrypted`) | 6 | **0** |
+| `aidebate_users`, `clashy_waitlist`, `demo_views` (emails) | 0 | 0 |
+| `trustex_identities` (`proof_of_life_email`) | 5 | **5** |
+| `trinity_system_config` (`deployer_wallet`) | 1 | 1 (a public address) |
+
+**No API key, secret or token is exposed through the anon path.** The entire
+confidentiality loss is **5 email addresses** in `trustex_identities`. That is real
+and should be closed, but it is not the emergency; the 324k deletable rows are.
 
 `repid_config` remaining anon-readable is already logged as BLOCKED_FOR_SEAN and is
 **still open** [VERIFIED — 103 rows, returned 200 to the publishable key].
@@ -199,8 +252,16 @@ Supabase's own advisor agrees, at scale: **369 advisories**, including 59
 The same reason as `v_fleet_truth`: **the instrument was pointed at a sample, and
 the sample was mistaken for the population.** LESSONS S1 recorded two tables because
 two tables had been looked at. Nothing had ever counted them. One `pg_policy` query
-— the one at the top of this section — takes seconds and would have said 137 at any
+— the one at the top of this section — takes seconds and would have said 193 at any
 point in the last several months.
+
+And then the count itself was got wrong twice over, which is the sharper lesson: the
+first corrected query was still pointed at a sample — policies naming `anon` — and
+missed the `PUBLIC` grants that dominate the real answer. **Counting is not the same
+as counting the right set.** The check that caught it was cheap and should be the
+default: assert the parts sum to the whole (`15 + 178 + 52 + … = 621`), because a
+census that does not reconcile against the population is another sample wearing a
+census's clothes.
 
 ---
 
@@ -305,7 +366,8 @@ draft.
    deploy state is knowable while HyperDAG's is not.
 6. **Fix `www.trustmarket.dev`** — add the hostname so a certificate issues.
 7. **Decide TrustMedical.dev**: build it or stop listing it.
-8. **Correct `LESSONS` S1** from "two tables" to 137/4/15, with the query that says so.
+8. **Correct `LESSONS` S1** from "two tables" to 193 readable / 60 writable / 15
+   RLS-off, with the query that says so.
 
 ## 6. Verification record
 
@@ -318,7 +380,10 @@ draft.
 | hyperdag.org bytes match no commit | **VERIFIED** | every `index.html` revision sized vs live 28,908 |
 | hyperdag.org newest prod deploy is ERROR, built from `repid-engine` | **VERIFIED** | Vercel `list_deployments` metadata |
 | www.trustmarket.dev fails TLS | **VERIFIED** | 2 probes (https + http upgrade), both SSL errors |
-| 137 anon-readable / 4 anon-writable / 15 RLS-off tables | **VERIFIED** | `pg_policy` + `pg_class` + `has_table_privilege` |
+| 193 anon-readable / 60 anon-writable / 15 RLS-off, of 621 tables | **VERIFIED** | `pg_policy` + `pg_class` + `has_table_privilege`, `PUBLIC` roles included, `USING` clause required literal `true`; parts reconcile to 621 |
+| ~324k rows in anon-writable tables (`trinity_artifacts` 155,428, `trinity_agent_logs` 139,659) | **VERIFIED** | `pg_class.reltuples` joined to the writable set |
+| no API key/secret/token exposed via anon read | **VERIFIED** | direct `count(*)` of populated secret columns; all 0 except 5 emails |
+| ~~137 anon-readable / 4 anon-writable~~ | **RETRACTED** | measurement omitted `PUBLIC`-role policies; superseded by the row above |
 | anon can READ `agent_preflight_control` over PostgREST | **VERIFIED** | live 200 using a publishable key, via `pg_net` |
 | anon can WRITE those tables | **VERIFIED (privilege level)** | RLS off + `has_table_privilege` I/U/D true; **write deliberately not exercised** |
 | `scan-secrets.mjs` ignores `--root` | **VERIFIED** | source reads only `--history`; output cited a file absent from the target repos |

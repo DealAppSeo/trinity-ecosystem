@@ -77,6 +77,14 @@ const RETRACTED = [
     claim: '32e0e809 is the best cron performer at 66.7%',
     truth: 'tail windows spanned different time periods; it ranks LAST on both cron domains',
   },
+  {
+    id: 'anon-137-4',
+    pattern: /\b137\s*(tables\s*)?anon-?read|\b137\s*readable\b|\b4\s*anon-?writable\b/i,
+    claim: '137 anon-readable / 4 anon-writable tables',
+    truth:
+      'the query counted only policies naming anon and dropped PUBLIC-role policies; ' +
+      'effective access is 193 readable / 60 writable of 621 tables',
+  },
 ];
 
 /**
@@ -89,6 +97,9 @@ const ALLOWED = new Set([
   'docs/PRIOR-WORK-INDEX.md',
   'scripts/repid-replay.mjs',
   'scripts/check-prior-work.mjs',
+  // Records the 137/4 figures in order to retract them, in the same document
+  // that first published them.
+  'docs/FULL-STACK-E2E-ASSESSMENT-2026-08-14.md',
 ]);
 
 const SKIP_DIRS = new Set([

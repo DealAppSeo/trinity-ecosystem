@@ -82,7 +82,7 @@ unless the underlying world changed.
 | Sub-task routing granularity | **Sean** | Architecturally significant; reshapes the task model and `router.ts`. |
 | `marginFloor` retune | open | Current 2000 escalates on ~91% of real pairs (cron-only). Not changed — every cut of that data moved the number. |
 | Rotate the leaked EVM key | **Sean** | Owns 3 live ERC-8004 identities, in git history. A commit cannot fix it. See PR #25. |
-| **Anon write grants on 15 RLS-disabled tables** | **Sean** | Includes `agent_preflight_control` — the `global_pause` switch. Anon read VERIFIED live over PostgREST with the browser-shipped publishable key; write verified at the privilege level. `LESSONS` S1 says "two tables"; it is **137 readable / 4 writable / 15 RLS-off**. See `FULL-STACK-E2E-ASSESSMENT-2026-08-14.md` §2. |
+| **Anon write grants on 15 RLS-disabled tables** | **Sean** | Includes `agent_preflight_control` — the `global_pause` switch. Anon read VERIFIED live over PostgREST with the browser-shipped publishable key; write verified at the privilege level. `LESSONS` S1 says "two tables"; it is **193 readable / 60 writable / 15 RLS-off**, of 621. **~324k rows are anonymously deletable** (`trinity_artifacts` 155,428, `trinity_agent_logs` 139,659) — the earlier "latent, nobody is using that room" reading was wrong. Confidentiality loss is small and bounded: **no key or token is anon-readable**, only 5 emails in `trustex_identities`. Priority is **integrity**, not secrets. See `FULL-STACK-E2E-ASSESSMENT-2026-08-14.md` §2. |
 | `scan-secrets.mjs` ignores unknown flags | open | `--root` is silently dropped, so it scans the cwd repo and reports confidently about a tree it never opened. Same §3. |
 | hyperdag.org serves bytes in no commit | open | Live content came from a Vercel Instant Rollback to a pre-git-connection deploy; newest prod deploy is ERROR and built from `repid-engine`. Same §1. |
 
@@ -104,6 +104,8 @@ correction.
 | **56%** of margins under the floor | same contamination as the drift figure | as above |
 | `32e0e809` is the **best cron performer (66.7%)** | tail-150 windows spanned different time periods per agent | it ranks **last** on both cron domains on full-slice data |
 | "router.ts + quorum.ts already IS RouteMoA" | refuted by measurement — a fail-closed gate scored abstentions as wrong | plurality aggregation is a separate mechanism, and it is what pays |
+| **137** anon-readable / **4** anon-writable tables | the census counted only policies naming `anon` and dropped every `PUBLIC`-role policy, then scored a policy open on its role without checking its `USING` clause | **193 readable / 60 writable / 15 RLS-off**, of 621 |
+| anon write exposure is "**latent, not currently being exploited**" | the four tables looked at held 0 rows; the population holds ~**324k** — `trinity_artifacts` (155,428) and `trinity_agent_logs` (139,659) are anon-writable | a live **integrity** exposure; "not being exploited" was never measured |
 
 ---
 
