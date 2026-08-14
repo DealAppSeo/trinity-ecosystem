@@ -28,7 +28,7 @@ restate their findings.
 | **AITrinitySymphony.com** | ✅ 200 | Vercel (`www`, apex) **+** Railway (`app`) | `trinity-ecosystem` | ✅ **both at `3ddca6b` = `origin/main` HEAD** |
 | **RepID** | ✅ 200 | Railway `repid-engine-production` | `repid-engine` | ✅ `c207e8c` = HEAD of `main` |
 | **TrustShell.dev** | ✅ 200 | Vercel (`trustshell-landing`) | `trustshell` | ⚠️ **unknowable — no version endpoint** |
-| **HyperDAG.org** | ✅ 200 | Vercel (`hyperdag-org`) | `hyperdag-landing` | ❌ **serving content in no commit** |
+| **HyperDAG.org** | ✅ 200 | Vercel (**`hyperdag-trust`**) | `hyperdag-landing` | ✅ **current — prod deploy READY at `fbf8253` = main HEAD; live bytes md5-identical to the repo.** An earlier "serving content in no commit" verdict here was **RETRACTED**, see §1 |
 | **TrustMarket.dev** | ⚠️ 200 placeholder | Vercel (`trustmarket-coming-soon`) | `trustmarket` (private) | ❌ **MVP repo is not what ships** |
 | **TrustMedical.dev** | ❌ **parked domain** | registrar parking page | **none exists** | ❌ **product does not exist** |
 
@@ -52,44 +52,59 @@ via `pg_net`; the host is proxy-denied to direct `curl`]. It is also by a wide
 margin the best-engineered repo here: **1,776 files, 6 CI workflows, ~450 test
 files**. Nothing else in the ecosystem is close.
 
-### HyperDAG.org — live content that exists in no commit
+### ~~HyperDAG.org — live content that exists in no commit~~ **RETRACTED 2026-08-14**
 
-This is the most surprising finding of the assessment, and it is invisible from
-the outside because the site returns a healthy 200.
+> **This finding was wrong. hyperdag.org is healthy, current, and fully
+> reproducible from source.** It was published as "the most surprising finding of
+> the assessment"; it was in fact the most wrong. Do not cite any part of it.
+>
+> Re-probed the same day it was published, after a reviewer correctly refused to
+> accept a dated snapshot as current. Both errors below were mine, and they
+> compounded — each on its own would have produced a false alarm.
 
-The live page is 28,908 bytes. Byte-for-byte it matches **no commit** in
-`hyperdag-landing` — I checked every revision of `index.html` [VERIFIED]:
+**Error 1 — the wrong Vercel project.** There are two similarly-named projects.
+The finding examined `hyperdag-org`, whose name matches the domain. But
+`hyperdag-org` serves **no custom domain at all** — its `domains` array holds only
+`*.vercel.app` URLs [VERIFIED]. The site is served by **`hyperdag-trust`**
+(`prj_dCnluMVr737d1wyhPbnc3WblKMYw`), whose domains include `hyperdag.org` and
+`www.hyperdag.org`. Everything alarming — the `state: ERROR` production deploy,
+the `githubCommitRepo: repid-engine` metadata — is true of `hyperdag-org`, a
+project with no traffic, and false of the one that serves the site.
 
-| commit | date | `index.html` bytes |
-|---|---|---:|
-| `22a0d5a` (**HEAD**) | 2026-07-24 | 29,093 |
-| `42d3856` | 2026-07-23 | 28,906 |
-| `b7274ba` | 2026-07-19 | **0 — file deleted** |
-| *(live)* | — | **28,908** |
+`hyperdag-trust`'s newest **production** deployment is `dpl_7677Yu3L…`:
+`state: READY`, `target: production`, built from `hyperdag-landing` on `main` at
+commit `fbf8253` — the repository's own HEAD [VERIFIED].
 
-The Vercel deployment history explains it. The last **READY** production deployment
-is `b7274ba` (2026-07-20), whose commit message is
-*"revert: remove my index.html — it wrongly replaced the v0 site … The v0 landing is
-restored via **Vercel Instant Rollback** to the pre-git-connection deployment."*
+**Error 2 — a unit mismatch, and it is the one that should sting.** The claim
+rested on 28,908 ≠ 29,093. Those are the *same file measured two ways*: the live
+figure came from Postgres `length(content)`, which counts **characters**, and the
+repo figure from `wc -c`, which counts **bytes**. The file contains 185 multi-byte
+UTF-8 characters. Confirmed by hashing both [VERIFIED]:
 
-So the bytes being served today come from a **rolled-back, pre-git-connection
-deployment** — a v0-generated artifact that was never committed to any repository.
-`hyperdag-landing` HEAD is not deployed, and could not reproduce the live site if
-it were.
+```
+live  www.hyperdag.org   md5 ff2ef682522185a58e942b1dbd84c6d3
+repo  index.html         md5 ff2ef682522185a58e942b1dbd84c6d3   ← identical
+```
 
-Two further defects sit on top of that:
+The live page is **byte-for-byte** the committed file. The "Instant Rollback to a
+pre-git deployment" story was constructed to explain a discrepancy that did not
+exist, and is unsupported by the deployment history.
 
-1. **The newest production deployment is `state: ERROR`** (2026-07-21 05:11 UTC) —
-   the site is up only because Vercel keeps the last good build serving, exactly
-   the trap CLAUDE.md warns about.
-2. **That failed deployment was built from the wrong repository.** Its metadata is
-   `githubCommitRepo: repid-engine`, branch `feat/cc-2026-07-20-factcheck-counter`,
-   commit `22e0903`. The `hyperdag-org` Vercel project is git-connected to
-   `repid-engine`, not to `hyperdag-landing`.
+**What this cost, and the lesson that generalises.** The assessment already
+contained one census error of exactly this shape — the anon-access counts, where
+the instrument was pointed at a sample and the sample mistaken for the population.
+This is the same defect in a different disguise: *two numbers were compared
+without checking they were the same kind of number.* A byte count and a character
+count are not comparable, and nothing in the pipeline said so. The check that
+would have caught it costs one command — hash both sides, do not diff their
+lengths. Comparing derived scalars when the artifacts themselves are available is
+the error; `md5` was available the whole time.
 
-Net: **hyperdag.org is an unreproducible production surface.** If that rollback
-deployment is ever deleted or expires, the site cannot be rebuilt from source, and
-nobody would learn this from a status check.
+The endpoint added in `hyperdag-landing` PR #5 is **still worth having**, but for
+the opposite reason to the one it was justified with: this episode is proof that
+inferring a deployment's identity from *outside* is error-prone. `GET /api/version`
+would have answered "which commit is this?" in one request and prevented two wrong
+conclusions.
 
 ### TrustMedical.dev — not a product
 
@@ -354,7 +369,7 @@ registrations most plausibly live — other L2s, and **all ERC-20/NFT holdings**
 | `trustshell` | 2026-08-08 | 130 | 1 | 6 | Active, thin CI |
 | `hyperdag-protocol` | 2026-08-06 | 95 | 1 | 10 | Active |
 | `HyperDAG-core` | 2026-08-10 | 27 | **0** | 3 | Active, **no CI** |
-| `hyperdag-landing` | 2026-07-24 | 5 | **0** | 0 | **Not deployed** (§1) |
+| `hyperdag-landing` | 2026-07-24 | 5 | **0** | 0 | **Deployed and current** — serves hyperdag.org via `hyperdag-trust` at `fbf8253` = HEAD. (An earlier "Not deployed" verdict here was retracted, §1.) |
 | `aitrinitysymphony-landing` | 2026-08-07 | 3 | **0** | 0 | Static |
 | `repid` | **2026-05-07** | 43 | **0** | 0 | **Dormant ~3 months** |
 | `trustrails-dev` | **2026-05-06** | 174 | **0** | 0 | **Dormant ~3 months**, serves trustrails.dev |
@@ -394,9 +409,15 @@ draft.
    Open since 2026-08-13.
 3. **Make `scan-secrets.mjs` fail on unknown flags**, and give it a real `--root`.
    A security tool that silently reports on the wrong tree is worse than none.
-4. **Rebuild hyperdag.org from source.** Commit the live bytes to `hyperdag-landing`,
-   repoint the `hyperdag-org` Vercel project away from `repid-engine`, and redeploy.
-   Until then the surface is unreproducible.
+4. ~~**Rebuild hyperdag.org from source.**~~ **WITHDRAWN** — the premise was wrong;
+   see the retraction in §1. hyperdag.org is served by `hyperdag-trust`, whose
+   production deploy is READY at `fbf8253` (= `main` HEAD) and whose live bytes are
+   md5-identical to the committed `index.html`. Nothing needs rebuilding.
+   What *is* worth doing, and is a much smaller job: **delete or clearly label the
+   unused `hyperdag-org` project.** It serves no domain, its latest production
+   deploy is `state: ERROR`, and its name matches the live domain closely enough
+   that it cost this assessment a false headline finding. A decoy project named
+   after a domain it does not serve is a trap for the next reader too.
 5. **Add `/api/version` to the other five surfaces.** It is ~15 lines, it already
    exists in this repo to copy, and it is the only reason the AITrinitySymphony
    deploy state is knowable while HyperDAG's is not.
@@ -413,8 +434,10 @@ draft.
 | repid-engine live at `c207e8c`, Supabase+HashKey connected | **VERIFIED** | `GET /health` via `pg_net` |
 | TrustMedical.dev is a parked domain | **VERIFIED** | https fails both hosts; http 200 returns registrar page with `/parked` |
 | No `trustmedical` repo or Vercel project | **VERIFIED** | GitHub search 0 results; 18 Vercel projects listed |
-| hyperdag.org bytes match no commit | **VERIFIED** | every `index.html` revision sized vs live 28,908 |
-| hyperdag.org newest prod deploy is ERROR, built from `repid-engine` | **VERIFIED** | Vercel `list_deployments` metadata |
+| ~~hyperdag.org bytes match no commit~~ | **RETRACTED** | compared a character count to a byte count; live and repo `index.html` are md5-identical (`ff2ef682…`) |
+| ~~hyperdag.org newest prod deploy is ERROR, built from `repid-engine`~~ | **RETRACTED** | true of project `hyperdag-org`, which serves **no custom domain**; the serving project is `hyperdag-trust` |
+| hyperdag.org is served by `hyperdag-trust`, prod deploy READY at `fbf8253` = main HEAD | **VERIFIED** | Vercel `get_project` domains + `list_deployments`, re-probed 2026-08-14 |
+| live hyperdag.org content is byte-identical to the committed `index.html` | **VERIFIED** | md5 both sides — `ff2ef682522185a58e942b1dbd84c6d3` |
 | www.trustmarket.dev fails TLS | **VERIFIED** | 2 probes (https + http upgrade), both SSL errors |
 | 193 anon-readable / 60 anon-writable / 15 RLS-off, of 621 tables | **VERIFIED** | `pg_policy` + `pg_class` + `has_table_privilege`, `PUBLIC` roles included, `USING` clause required literal `true`; parts reconcile to 621 |
 | ~324k rows in anon-writable tables (`trinity_artifacts` 155,428, `trinity_agent_logs` 139,659) | **VERIFIED** | `pg_class.reltuples` joined to the writable set |

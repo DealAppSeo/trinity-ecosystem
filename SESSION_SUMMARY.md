@@ -31,11 +31,17 @@ container via `pg_net`. Three findings no status check surfaces:
    all-zero keys, the public Hardhat account #0, `sk-abcdef…` fixtures, and the
    settled-inert legacy anon JWT (`disabled: true` [VERIFIED]).
 
-3. **hyperdag.org serves bytes in no commit.** Live 28,908 bytes match no revision of
-   `index.html`; the last READY deploy (`b7274ba`) *deleted* the file, and its message
-   says the site was restored by **Vercel Instant Rollback to a pre-git-connection
-   deployment**. Newest production deploy is **ERROR** and was built from
-   **`repid-engine`**, the wrong repo. The surface is unreproducible from source.
+3. ~~**The HyperDAG landing surface was reported as serving uncommitted content.**~~
+   **RETRACTED the same day.** The
+   site is healthy, current and reproducible. Two compounding errors, both mine:
+   the finding read its deployment state off **`hyperdag-org`**, a project that
+   serves **no custom domain** (the site is served by **`hyperdag-trust`**, whose
+   production deploy is **READY** at `fbf8253` = `main` HEAD); and its central
+   discrepancy compared a Postgres `length()` **character** count against `wc -c`
+   **bytes** on the same file — **md5 is identical on both sides**
+   (`ff2ef682522185a58e942b1dbd84c6d3`). Comparing derived scalars when the
+   artifacts themselves were available is the whole error; hashing both sides costs
+   one command. See the retraction in `FULL-STACK-E2E-ASSESSMENT-2026-08-14.md` §1.
 
 Also: **TrustMedical.dev is a parked domain** (registrar page, HTTPS fails both hosts)
 with **no repo and no Vercel project** [VERIFIED]. `www.trustmarket.dev` fails TLS.
