@@ -111,8 +111,12 @@ try {
     NODE_ENV: 'production',
     PORT: String(port),
     NEXT_PUBLIC_SUPABASE_URL: stubUrl,
-    SUPABASE_SECRET_KEY: 'sb_secret_e2e_stub_not_a_real_key',
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_e2e_stub',
+    // Deliberately NOT shaped like `sb_secret_…`. The stub never checks the key,
+    // so a realistic-looking literal bought nothing and tripped check:secrets,
+    // which is right to flag a prefixed opaque key — it cannot know a literal is
+    // fake. Keep these obviously non-credential.
+    SUPABASE_SECRET_KEY: 'e2e-stub-key-unchecked-by-postgrest-stub',
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'e2e-stub-publishable-unchecked',
     // Left unset on purpose, and asserted below:
     //   AGENT_SOPHIA_SECRET_BYTES -> SolanaExecutor must report simulated
     //   BFT_ENFORCEMENT_MODE      -> observe mode, verdict NOT CHECKED

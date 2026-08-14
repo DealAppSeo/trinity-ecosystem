@@ -434,3 +434,59 @@ derived from a model I built myself and never checked against the system that
 produces the data. A8 was caught by reading the output. A9 was caught only
 because the user asked me to go grep the writer — which is to say, it was not
 caught by me at all.
+
+---
+
+## 2026-08-14 — session 01Ke9Y (claude-opus-5, cloud) — building the E2E suite
+
+### A10 — the security gate went green over exactly the state I ran it in
+
+I added an E2E harness, ran `npm run check` (which begins with `check:secrets`),
+got **exit 0**, committed, pushed. CI failed on the first step:
+
+```
+USABLE  opaque:sb_secret  scripts/e2e/run-e2e.mjs
+```
+
+The harness set `SUPABASE_SECRET_KEY` to a realistic-looking placeholder. The
+scanner is right to flag a prefixed opaque key — it cannot know a literal is
+fake. That part is my bug, and the fix is trivial: the stub never validates the
+key, so it had no business looking like one.
+
+**The part worth writing down is why the local run said clean.** `scan-secrets.mjs`
+enumerated `git ls-files` and then read each file with `git show HEAD:<file>`. So
+it scanned neither of the two states that actually exist before a commit:
+
+1. **An untracked file** — not in `ls-files`, never scanned. Mine was untracked.
+2. **An uncommitted edit to a tracked file** — `git show HEAD:<file>` returns the
+   *committed* blob, so a key added and not yet committed scans clean.
+
+This is a pre-commit check that could not see the working tree. It reported
+success over a file it had never opened — the same shape as the skipped E2E step
+scored as a pass (#414), the build green over undefined references, and the
+credential check green with no credential. Three prior instances are already in
+this file, and I walked into the fourth while building a suite whose entire
+premise is that a gate must not go green without executing something.
+
+Fixed: scan the working tree (`ls-files` + `--others --exclude-standard`, read
+from disk, skip binary by NUL byte). Verified by reproducing both false-greens
+against the new version — an untracked file with a key, and an uncommitted edit
+to a tracked one — and confirming each is now reported.
+
+Then the fixed scanner flagged **its own comment**, because I had written the
+literal prefix into the prose explaining the fix. Also correct behaviour. The
+comment now says so, since the next person to document this will hit it too.
+
+**The rule.** A check that reads from `HEAD` is not a pre-commit check, it is a
+post-commit check running early. Before trusting any local gate, ask which bytes
+it actually opened — and if the answer is "the committed ones," it cannot tell
+you anything about the change you are about to make. The cheapest proof that a
+detector works is to hand it the thing it is supposed to catch.
+
+### What went right
+
+The E2E suite was verified by **breaking the code**: reintroducing the four RepID
+literals into `pay/route.ts` produced 3 FAILED, core 6/8, exit 1. An assertion
+suite that has never been observed to fail is an untested assertion. That step
+also caught a hollow test of my own — both dual-signature assertions were passing
+while blocked at `kya_validation`, so the gate under test never ran.

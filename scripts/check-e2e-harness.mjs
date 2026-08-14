@@ -140,7 +140,7 @@ const stub = createPostgrestStub({
 });
 
 const url = await stub.listen();
-const db = createClient(url, 'sb_secret_test');
+const db = createClient(url, 'e2e-stub-key-unchecked');
 
 await check('select + eq returns the matching row', async () => {
   const { data, error } = await db.from('widgets').select('*').eq('name', 'beta');

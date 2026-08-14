@@ -18,6 +18,8 @@
 // scan; this is that scan, kept.
 
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const HISTORY = process.argv.includes('--history');
 
@@ -197,13 +199,45 @@ const repoRoot = git(['rev-parse', '--show-toplevel']).trim();
 const remote = git(['remote', 'get-url', 'origin'], { allowNoMatch: true }).trim() || '(no origin)';
 console.log(`scanning ${repoRoot}\n         ${remote}\n`);
 
-const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
-for (const file of tracked) {
-  // -I skips binary; a lockfile carries integrity hashes that look like nothing
-  // else but produce no useful signal here.
+// Scan the WORKING TREE, not HEAD, and include untracked files.
+//
+// This used to be `git ls-files` + `git show HEAD:<file>`, which reported clean
+// on two things it had never read:
+//
+//   1. A new file that had not been `git add`ed yet — invisible to `ls-files`.
+//   2. An uncommitted EDIT to a tracked file — `git show HEAD:<file>` returns the
+//      COMMITTED blob, so a key added and not yet committed scanned clean.
+//
+// Both matter because this is the check you run BEFORE committing. It reported
+// "No credential-shaped strings found" over an untracked file holding a prefixed
+// opaque key literal, and CI — which sees the committed file — failed on it. A
+// local gate that goes green on exactly the state a developer is in when they run
+// it is the house defect in miniature. Found 2026-08-14; see LESSONS.
+//
+// Note this scans the scanner too, so prose here must not contain a
+// credential-shaped token — the first version of this very comment tripped it.
+//
+// --exclude-standard honours .gitignore, so node_modules and .next stay out.
+const listed = [
+  ...git(['ls-files', '-z']).split('\0'),
+  ...git(['ls-files', '-z', '--others', '--exclude-standard']).split('\0'),
+].filter(Boolean);
+
+for (const file of [...new Set(listed)]) {
+  // A lockfile carries integrity hashes that look like nothing else but produce
+  // no useful signal here.
   if (file === 'package-lock.json' || file.endsWith('.pack')) continue;
-  const blob = git(['show', `HEAD:${file}`]);
-  if (blob) scanText(blob, file, findings);
+  let buf;
+  try {
+    buf = readFileSync(join(repoRoot, file));
+  } catch {
+    // Tracked but deleted from the working tree, or an unreadable symlink.
+    // Nothing on disk to scan; history mode still covers the committed copy.
+    continue;
+  }
+  // Skip binary the way `grep -I` does: a NUL byte in the first 8KB.
+  if (buf.subarray(0, 8192).includes(0)) continue;
+  scanText(buf.toString('utf8'), file, findings);
 }
 
 if (HISTORY) {
