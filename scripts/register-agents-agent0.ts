@@ -67,18 +67,21 @@ async function registerAll() {
       // Trust models supported
       agent.setTrust(true, true, false); // reputation + crypto-economic
 
-      let registration;
-      
-      // MOCK FOR DEMO IF NO REAL KEYS
-      if (!process.env.TRINITY_DEPLOYER_PRIVATE_KEY) {
-        registration = { agentId: Math.floor(Math.random() * 10000) };
-      } else {
-        if (useHTTP) {
-            registration = await agent.registerHTTP(`${railwayUrl}/.well-known/agent-card.json`);
-        } else {
-            registration = await agent.registerIPFS();
-        }
-      }
+      // The demo branch that used to stand in here returned
+      // `{ agentId: Math.floor(Math.random() * 10000) }`, and that number was
+      // then POSTed to production as `agent_id_onchain` and rendered as a
+      // `did:pkh:` identity in a public agent card. A random integer presented
+      // as an on-chain identity is worse than no identity. The signer is now
+      // required above, so there is nothing to fall back to.
+      // registerHTTP/registerIPFS resolve to a TransactionHandle, which carries
+      // only `hash` and the wait methods — it has no `agentId`. Reading
+      // `.agentId` off the handle yielded undefined, and that undefined was
+      // POSTed below as `agent_id_onchain`. The id only exists once the
+      // transaction is mined and the receipt is decoded.
+      const handle = useHTTP
+        ? await agent.registerHTTP(`${railwayUrl}/.well-known/agent-card.json`)
+        : await agent.registerIPFS();
+      const { result: registration } = await handle.waitMined();
 
       results[a.name] = registration.agentId;
       console.log(`  ✓ ${a.name} => agentId: ${registration.agentId}`);

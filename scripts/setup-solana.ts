@@ -4,7 +4,9 @@
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/spl-token';
 import * as fs from 'fs';
-import * as bs58 from 'bs58';
+// bs58 v6 ships a single default export; `import * as bs58` binds the module
+// namespace, whose only key is `default`, so `bs58.encode` is undefined.
+import bs58 from 'bs58';
 
 async function main() {
   const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
