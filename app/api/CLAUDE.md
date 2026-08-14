@@ -14,8 +14,11 @@ Two consequences that have both bitten:
    routes never execute during it. `tsc --noEmit` caught it — the build could not.
 
 So: `npx tsc --noEmit` before claiming a route change is safe, and compare the
-error count to the base branch rather than reading "it compiled" as clean. This
-repo carries ~37 pre-existing type errors; the number moving is the signal.
+error count to the base branch rather than reading "it compiled" as clean. The
+baseline is **25** pre-existing type errors (measured 2026-08-13 on
+`claude/e2e-mvp-packaging-plttzn`); the number moving is the signal. This file
+said "~37" until 2026-08-13, which is the kind of stale number that turns a
+regression into a rounding error — re-measure rather than trusting this line.
 
 ## These routes hold the service key — that is the point
 

@@ -1,5 +1,35 @@
 # CLAUDE.md — operational ground truth
 
+## FIRST: read `docs/PRIOR-WORK-INDEX.md`
+
+**Before you plan, build, or quote a number.** It lists what is already CLOSED
+(with the measurement that closed it), what is OPEN and who owns it, and which
+figures have been RETRACTED and must never be cited again.
+
+This is not a formality. Two full sprints were once spent optimising a component
+already at **97.9% of its theoretical bound**, because nobody had measured the
+bound. Four published numbers had to be retracted, three for the same root
+cause. Both were cheap to prevent and expensive to discover.
+
+Three habits carry most of the value:
+
+- **Suspect the target before the measurement, and the measurement before the
+  code.** Compute the ceiling before optimising toward it — it is usually one
+  cheap calculation, and it tells you whether the work can pay at all.
+- **Suspect the sample before the measurement.** Every real-data retraction here
+  came from an assumption about the *shape* of the data made without checking
+  it: interleaving assumed order did not matter; `id desc` assumed id tracked
+  time; a fixed-length tail assumed equal volumes meant equal windows.
+- **A caveat is a debt.** A number published with an unpaid caveat is
+  provisional — do not state it flat. Two retractions were caught by caveats
+  their own author had written and then ignored.
+
+**When you finish, add your result to the index.** `npm run check:prior-work`
+enforces the mechanical half — a new file citing a retracted figure fails the
+build, and a doc missing from the index fails it too.
+
+---
+
 Read this before touching anything. It is deliberately short: it holds only facts
 that are **not discoverable from the code** and that have already cost someone a
 wasted hour. Architecture narrative lives in `CLAUDE_HANDOFF_TRINITY.md`; current
