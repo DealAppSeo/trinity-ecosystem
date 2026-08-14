@@ -51,6 +51,8 @@ part of `npm run check`, so it fails the same gate everything else does.
 | End-to-end audit, 2026-08-12 | `docs/E2E-AUDIT.md` | — |
 | Ten-subsystem health scores against executed evidence, 2026-08-14 | `docs/ECOSYSTEM-HEALTH-2026-08-14.md` | re-scoring the subsystems yourself |
 | All six products from DNS to repo — what is live, what is parked, what is unreproducible, 2026-08-14 | `docs/FULL-STACK-E2E-ASSESSMENT-2026-08-14.md` | re-probing the domains yourself |
+| **Software Trust Foundation — the harness half, ENFORCED.** Eight controls, one per domain, mechanical rather than asserted; three outcomes; **all eight mutation-tested** by deliberately breaking each and confirming it turns red. Writing TF-02 found a live bug: `cross-llm-verifier.ts` read only legacy key names, so it returned null and silently dropped every record | `scripts/check-trust-foundation.mjs` — run `npm run check:trust` | running it; each control names the incident that earned it |
+| **Software Trust Foundation — the mesh and surfaces half, MEASURED.** Eight domains across Supabase, the dispatch harness, six products and ten repos. Every cell is a dated measurement or the words NOT MEASURED — no cell describes a control that merely ought to exist | `docs/TRUST-FOUNDATION-MESH-SURFACES-2026-08-14.md` | re-measuring; the weakest domains are named explicitly |
 | Poseidon2 parameters, the circuit contract, and why we do not implement it | `docs/POSEIDON2-PARAMETER-REQUEST.md` | choosing a parameter set independently |
 | The paste-ready Poseidon2 request to send the other lane | `docs/POSEIDON2-HANDOVER-MESSAGE.md` | rewriting the ask from scratch |
 
