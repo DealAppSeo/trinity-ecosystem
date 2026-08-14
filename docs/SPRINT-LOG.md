@@ -2265,3 +2265,89 @@ worth the rekey. Co-failure — the input that decides whether panels ever run �
 
 Nothing further should be measured from ad-hoc slices of this table. The next
 useful step is a schema change (a task key, or a join table), and that is Sean's.
+
+---
+
+## Sprint X — hard-wiring the lessons, and marking PR #24 ready
+
+Two asks: mark the PR ready for review, and make the session's lessons
+enforceable so agents stop duplicating work and start reading what others did.
+
+### PR #24 is out of draft
+
+28 commits, 341 assertions, tsc 25, build clean, description already rewritten
+to match reality.
+
+### The problem being solved
+
+Advice in a document decays into a file nobody opens. Concretely, this session:
+
+- spent **two full sprints** optimising a component already at **97.9% of its
+  theoretical bound**, because nobody had measured the bound;
+- published **four numbers** that later sprints had to retract, three of them
+  from the same root cause;
+- nearly re-cited a retracted figure (lift 1.283) **after writing the warning
+  against it myself**.
+
+The last one matters most: the guard existed, in the file being edited, and it
+still nearly failed. So the fix cannot be another paragraph.
+
+### What was built
+
+**`docs/PRIOR-WORK-INDEX.md`** — one entry point. A protocol, a table of where
+the authoritative answer lives for each question, a **CLOSED** list (with the
+measurement that closed each item, so reopening one requires new evidence), an
+**OPEN** list naming owners, a **RETRACTED** list, and the four rules that would
+have prevented every mistake above.
+
+**`scripts/check-prior-work.mjs`** / `npm run check:prior-work`, wired into
+`npm run check`. It enforces the two mechanically checkable invariants:
+
+1. **A retracted number cannot reappear.** Six patterns, specific enough not to
+   trip on unrelated digits. Historical files that legitimately record them
+   (`SPRINT-LOG.md`, `TRUST-HARNESS.md`, `repid-replay.mjs`) are allowlisted
+   **by exact path** — deleting the record would hide the correction, which is
+   worse than the original error, but a *new* file inherits no exemption.
+2. **No doc may be invisible.** Every `docs/*.md` must be named in the index.
+
+**`CLAUDE.md` gains a FIRST block** pointing at the index, above everything
+else, since that file loads automatically for every agent in this repo.
+
+### Verified, not assumed
+
+Passes clean: 249 files scanned, 6 patterns, 11 docs reachable. Then
+mutation-tested, because a gate that cannot fail is not a gate:
+
+| violation introduced | result |
+|---|---|
+| new doc citing +446% / lift 1.283 / +2419 bps | **3 failures**, exit 1 |
+| doc added but not indexed | **1 failure**, exit 1, names the file |
+| `## RETRACTED` heading removed from the index | **1 failure**, exit 1 ("the index has been gutted") |
+
+All three restored and re-verified clean afterwards.
+
+### What this deliberately does NOT do
+
+**It cannot verify that an agent read the index, and it does not pretend to.**
+A check that claims to measure something it cannot is the exact defect this repo
+keeps finding. It enforces two mechanical invariants; the rest of the protocol
+is honour-system, placed in `CLAUDE.md` where it loads automatically.
+
+The retracted-claim patterns are also a judgement call: too loose and false
+positives teach people to skip the gate, which is how a gate dies. They are
+tuned narrow, so a sufficiently reworded citation would slip through. That is
+the deliberate trade.
+
+### Evidence
+
+341 harness assertions + prior-work VERIFIED, 0 failures. `tsc --noEmit` 25 —
+unchanged. `next build` clean. Sim untouched at 92.3% / tau 0.643 / p99 179.
+
+### NOT CHECKED
+
+- Whether the index actually changes agent behaviour. Unmeasurable from here;
+  the honest test is whether a future session skips work already on the CLOSED
+  list.
+- The index is a snapshot like everything else in this repo. It will rot unless
+  finishing work includes updating it — which is why the doc-reachability check
+  exists, though that catches only missing files, not stale content.
