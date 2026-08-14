@@ -1,0 +1,228 @@
+# Priority 3 — the agent execution loop: scope
+
+**Status:** SCOPED, not started. Needs three decisions from Sean before Stage B.
+**Written:** 2026-08-14, before any loop code exists.
+
+---
+
+## The measurement that scopes this
+
+Before proposing a loop, the question is what a loop would be *for*. Measured
+this session, across `lib/` and `app/` (excluding test scripts and the defining
+module itself):
+
+| dimension | settings defined | production consumers |
+|---|---|---|
+| `loops.*` | 7 | **0** |
+| `tools.*` | 5 | **0** |
+| `memory.*` | 11 | **0** |
+| `reliability.*` | 6 | **0** |
+| `permissions.*` | 7 | **0** |
+| `verification.*` | 8 | **0** |
+
+**47 settings, zero consumers.** `HarnessProfile.ts` resolves them through a
+four-layer ladder with authority tagging, bounds clamping, and 31 assertions.
+Nothing reads the result. `lib/trustshell/index.ts:63` already records the same
+shape for one module: *"MemoryRecall was written, tested (44 assertions) and then
+never exported."*
+
+The same is true of the subsystems themselves:
+
+| subsystem | state | reached by |
+|---|---|---|
+| 13 reliability modules (`harness/`) | built, measured to within 2.00pp of bound | test scripts |
+| `MemoryRecall` — tiering, RRF fusion, budgets | 44 assertions | test scripts |
+| `memory-authz` — dual-auth namespace access | built | nothing |
+| `ControlProof` / `capability` / `delegation` / `caveat` | 168 assertions | E2E verify route only |
+| `reputation-transition` — committed history | 168 assertions | **no producer** |
+| `EarnedMetrics` — decay, shrinkage, three states | 30 assertions | `repid-predicate` |
+| `BFTEngine` — real LLM panel | live | payment path |
+
+So **Priority 3 is not "build an agent loop."** It is: *build the executor that
+is the missing consumer for six subsystems that are already built, tested, and
+wired to nothing.* The loop body is the small part. The connections are the work,
+and they are the reason the work pays.
+
+### The ceiling argument
+
+Per the standing rule — compute the bound before optimising toward it. Routing is
+**closed** at 97.9% of the omniscient bound, total remaining prize 2.00pp
+(`PRIOR-WORK-INDEX.md`). **Any loop work justified by "better routing" or "better
+scheduling" is dead on arrival** and should be refused on sight.
+
+The value here is not an optimisation. It is 0 → 1 on *enforcement*: today no
+code path can refuse an agent action on the basis of an authorization artifact,
+because nothing presents one. That is a different axis from the closed sprints,
+and it is why this is worth a sprint when routing is not.
+
+### It also unblocks two things already waiting on it
+
+1. **The vault cutover.** `CustodyShadow` cannot produce a cutover decision until
+   something presents a ControlProof at the custody gate. Every observation will
+   read `not_comparable` until then — that is the measurement, and it says
+   adoption is zero. The loop is the thing that would present one.
+2. **The reputation history.** `reputation-transition.ts` has no producer. A loop
+   that emits an outcome per turn is exactly the producer, and it closes the
+   chain the whole system is premised on: outcomes → committed events → read-time
+   score → routing weight. Right now that chain is broken at exactly one link.
+
+---
+
+## What is genuinely new, versus what is wiring
+
+Almost all of it is wiring. **One piece is new work:**
+
+**The MCP direction is inverted.** `lib/mcp/server.ts` exposes Trinity's fleet
+*as* MCP tools — Trinity is the tool **provider**, serving external agents.
+`executeTool` in `fleet.ts` is single-shot dispatch, not a loop. An agent loop
+needs Trinity to be an MCP **client**. `jsonrpc.ts` already exists and its framing
+is reusable, so this is one module, not a subsystem — but it is the only part
+that is not connecting things that already exist.
+
+**One upgrade to the identity layer falls out.** `caveat.ts` currently reports
+stateful caveats (`maxCalls`) as `NOT_CHECKED`, because nothing holds per-session
+state. The loop *is* that state holder. Wiring it turns `tools.max_writes_per_session`
+and `maxCalls` from NOT_CHECKED into VERIFIED — a real strengthening of the
+authorization layer, not just a consumer for it.
+
+---
+
+## Three stages, each independently shippable
+
+### Stage A — the kernel
+
+`lib/trustshell/harness/loop.ts`. Pure and portable: no Supabase, no Next, no
+imports outside `harness/` — the rule `scripts/harness-portability-check.mjs`
+already enforces. Every external thing arrives through an injected interface:
+the model client, the tool dispatcher, the clock, the authority.
+
+A turn is: model call → proposed tool calls → **authorization check** → dispatch
+→ observations → repeat. The authorization check is not new code; it is
+`permits()` and `evaluateCaveats()`, the same functions that guard payments and
+vaults.
+
+The property that makes it worth building: **the loop cannot grant itself
+anything.** Its authority is a ControlProof it did not issue, its capabilities
+attenuate only downward, and a tool outside `tools.allowed` fails closed.
+
+Settings enforced, each already specified and bounded:
+
+| setting | enforcement | already exists? |
+|---|---|---|
+| `loops.max_iterations_per_task` | hard stop, as a **typed outcome** not an exception | spec only |
+| `loops.no_progress_abort_after` | see the open decision below | spec only |
+| `loops.max_concurrent_tasks` | `PullQueue` + `capacity.ts` | **built** — wire, do not rebuild |
+| `loops.max_subtask_depth` | `MAX_DELEGATION_DEPTH = 4` | **built** |
+| `loops.can_spawn_subtasks` | `delegate()` refuses | **built** |
+| `loops.claim_lease_minutes` | `fleet.ts` leases | **built** |
+| `loops.stop_requires_typed_handoff` | the loop cannot end in prose — it ends VERIFIED / NOT_CHECKED / FAILED | the three-outcome rule |
+| `tools.allowed` | `permits()` against granted capabilities | **built** |
+| `tools.irreversible_requires_human` | the dual-auth gate | **built** |
+| `tools.max_writes_per_session` | stateful caveat, newly checkable | upgrade |
+
+### Stage B — outcomes become reputation events
+
+Each completed turn emits a `ReputationEvent` into the committed history. This is
+the producer Priority 2 lacks, and it is what makes a score *earned* rather than
+written — the defect behind both LESSONS A11 and the retracted RepID figures.
+
+**Blocked on three decisions that are not mine** (they are the verifier
+obligations named in `TRANSITION_CONTRACT.mustAlsoHold`, and no circuit can
+discharge them):
+
+1. **Who is in the group authorized to write reputation history?** A loop cannot
+   be trusted to write its own outcomes without this — that is self-report, which
+   is precisely what a reputation layer exists to replace (`harness/types.ts`
+   makes the same argument about `AuctionSwarm`).
+2. **What is an epoch?** A day, a task, an evaluation round. The granularity *is*
+   the write budget, because a nullifier spends once per `(subject, epoch)`.
+3. **Where does the head root live, and who holds it?** `prevRoot` must be the
+   verifier's current head, or a prover forks the history and both branches
+   verify.
+
+Stage A ships without these. Stage B does not start until they are answered.
+
+### Stage C — sub-agents (Priority 4)
+
+Mostly falls out. `delegate()` already attenuates capabilities, audience, time
+and start-time per link; depth is capped at 4; `harness-bundle.ts` already packs
+a delegated sub-agent's portable state, and the E2E suite already verifies a
+delegated worker over HTTP against a host that issued nothing. A spawned
+sub-agent is a loop holding a delegated ControlProof. The new part is
+concurrency accounting against `loops.max_concurrent_tasks`, which `capacity.ts`
+already models.
+
+---
+
+## What will NOT be verifiable in a sandboxed session
+
+Stated up front, because the recurring defect in this repo is a system reporting
+success it has not earned.
+
+`trinity-litellm.railway.app` is **proxy-denied** from this container (403 on
+CONNECT, verified 2026-08-14), exactly like `repid-engine-production.up.railway.app`
+and the Supabase REST host. So:
+
+- **A real model turn cannot be exercised here.** The loop can be built and
+  tested exhaustively against an injected fake model — that is what the injected
+  interface is for — but "the loop drove a live LLM" is **NOT CHECKED** in any
+  agent session, and must be reported that way rather than inferred from a green
+  suite.
+- This is the same discipline as `PendingPoseidon2Scheme`: build the seam, refuse
+  to fake the thing behind it. A fake model that returns plausible tool calls is
+  fine for testing control flow and is *not* evidence the loop works.
+
+Everything else — authorization, attenuation, caveat enforcement, iteration
+bounds, typed handoff, transcript shape, sub-agent depth — is fully testable
+offline, because none of it depends on what the model says.
+
+---
+
+## Explicit non-goals
+
+- **No reimplementation of the OpenAI Agents SDK.** `harness/` permits zero new
+  dependencies and zero imports outside itself; that constraint is what makes it
+  portable, and it is enforced by a check. The kernel is a small executor with
+  injected interfaces, not a framework.
+- **No routing, scheduling, capacity or timeout changes.** Closed at 97.9% of
+  bound. See `PRIOR-WORK-INDEX.md`.
+- **No planning or reflection layer.** No measurement in this repo supports one,
+  and inventing a subsystem to justify a loop is how the two wasted sprints
+  started.
+- **No live authorization change.** Stage A enforces against a ControlProof an
+  agent presents. It does not alter `VaultPermission`, which is a Sean-gated
+  cutover pending shadow data.
+
+---
+
+## The one open design question I cannot answer alone
+
+**What counts as "progress" for `loops.no_progress_abort_after`?**
+
+Every other setting has an unambiguous enforcement point. This one does not, and
+getting it wrong fails in both directions: too loose and an agent burns its
+budget re-running a failing call; too strict and a legitimately slow agent is
+killed mid-task.
+
+The definition I would default to, absent direction: *a turn makes progress if it
+produced a tool result differing from the previous result for the same
+`(tool, arguments)`.* It is cheap, needs no semantics, and catches the actual
+observed failure mode (retrying an identical call). It will misfire on
+legitimately idempotent polling, which is why it is a stated assumption rather
+than a silent one.
+
+---
+
+## Recommended order
+
+1. **Stage A kernel** — the largest single piece, fully testable offline, no
+   decisions needed.
+2. **MCP client** — the one genuinely new module.
+3. **Stateful caveat enforcement** — small, and upgrades NOT_CHECKED to VERIFIED
+   in the layer that already exists.
+4. *(gate: the three Stage-B decisions)*
+5. **Stage B** — reputation events, closing the earned-score chain.
+6. **Stage C** — sub-agents, mostly assembly.
+
+Steps 1–3 are worth doing before any decision arrives. Step 4 is where this
+stops being my call.
