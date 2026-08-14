@@ -106,11 +106,32 @@ mistake, which is the one condition that makes the fabrication detector go dark
 | Entire confidentiality loss | **5 email addresses** in `trustex_identities` |
 | Publishable keys map to `anon` and ship in the browser bundle — public by design, 5 live | verified |
 
-**Status.** One table closed (§3). **59 remain**, held deliberately for a soak
-period rather than swept in one change so that a regression has one obvious
-cause. `trinity_agent_logs` and `trinity_artifacts` are the priority: they are
-the fleet's working memory, and they are the tables a Supabase-based agent
-handoff bus would sit beside.
+**Status — updated 2026-08-14, batch 2 applied.** The *destructive* path on the
+two largest tables is **CLOSED**: `trinity_agent_logs` and `trinity_artifacts` no
+longer permit anonymous UPDATE or DELETE. Verified live with the browser-shipped
+publishable key — INSERT **201**, DELETE of that exact row **200 `[]`** with the
+row still present on re-read, so blocked rather than unmatched.
+
+**The scope was chosen rather than maximal, and the reason is worth recording.**
+`trustrails-dev`'s `lib/trustshell/*` resolve
+`SUPABASE_SERVICE_ROLE_KEY || NEXT_PUBLIC_SUPABASE_ANON_KEY` — they **fall back to
+the anon key**, and the legacy service name is a disabled JWT on this project, so
+those writers may be inserting as `anon` on a surface that is currently serving.
+Revoking anon INSERT would have closed a small risk by breaking live logging.
+Deleting 324k rows of agent history is unrecoverable; appended noise is not. So
+the destructive path was closed in full and the append path was left intact.
+
+**Residual, OPEN:** anon can still APPEND to both tables. Narrow the INSERT
+policies to `service_role` once `trustrails-dev` is moved onto
+`SUPABASE_SECRET_KEY` — that is one env change and one follow-up migration.
+
+**Still OPEN:** the other ~57 anon-writable tables, held for a soak period so a
+regression has one obvious cause.
+
+*Counts at closure were 141,164 and 161,457 — exact `count(*)`. The 139,659 and
+155,428 quoted earlier in this document's first draft were `reltuples` planner
+estimates. Both tables are growing, which is independent evidence that the
+writers survived the change.*
 
 **The shape of the original error is worth keeping.** The first census
 undercounted the writable set by roughly fifteenfold and the readable set by
