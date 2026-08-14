@@ -2351,3 +2351,94 @@ unchanged. `next build` clean. Sim untouched at 92.3% / tau 0.643 / p99 179.
 - The index is a snapshot like everything else in this repo. It will rot unless
   finishing work includes updating it — which is why the doc-reachability check
   exists, though that catches only missing files, not stale content.
+
+---
+
+## Sprint Y — the index check reaches CI, and a red check that read green for eight sprints
+
+Asked to put the index check in CI. Doing that required first discovering that
+`npm run check` did not pass at all, and that one of its members had been
+failing since Sprint D while being reported as green — by me, repeatedly.
+
+### The check that was red the whole time
+
+`npm run check:harness-portable` has exited **1 since `1f54a40` (Sprint D)**. The
+violation:
+
+```
+lib/trustshell/harness/transform.ts: references 'window.', tying the harness to a runtime.
+```
+
+The offending line is **English prose in a comment**: *"turns in between are
+usually the most disposable thing in the window."* — the word `window` followed
+by a full stop, matching the banned `window.` token.
+
+**Why it read as green for eight sprints, which is the part that matters.** My
+verification loop was:
+
+```bash
+npm run check:$s 2>&1 | grep -oE "[0-9]+ passed, [0-9]+ failed" || echo "portable ok"
+```
+
+The portability script printed neither shape — a prose line on success, a
+different prose line on failure. The grep matched nothing either way, and the
+`||` fallback printed **"portable ok"**. Two outcomes where three were needed,
+which is the exact defect `CLAUDE.md` names as this codebase's recurring one,
+committed inside the loop meant to catch it. Every "portability holds" in
+Sprints K–X was unearned, and the PR body's "portability enforced" was too.
+
+### Both halves fixed
+
+**The false positive.** The checker now strips comments before scanning, with a
+quote-aware stripper so `'https://x'` cannot eat the rest of a line and hide a
+real violation. A comment cannot tie the harness to a runtime; only code can.
+Rewording the prose would have been the wrong fix — a checker that fires on
+English gets worked around by editing the English, leaving the real constraint
+unenforced while looking green.
+
+**The misreadable output.** It now prints `harness-portability: N passed, M
+failed`, the same shape as every other suite, so a runner grepping the common
+format cannot fall through to its own default.
+
+Mutation-tested, and the first attempt was **invalid**: the anchor
+`export function approximateTokens` does not exist in that file (it is
+`export const`), so two mutations silently applied nothing and "passed". Caught
+by checking the anchor. Re-run against a real anchor:
+
+| mutation | result |
+|---|---|
+| `window.innerWidth` in code | 1 failure, exit 1 |
+| `process.env` after a URL string literal | 1 failure, exit 1 |
+| `require('node:fs')` | 1 failure, exit 1 |
+| external import of `@supabase/supabase-js` | 1 failure, exit 1 |
+
+### CI
+
+`.github/workflows/prior-work.yml`. Separate from PR #25's `check.yml` so the
+branches do not conflict, with a distinct job name so a failure says which gate
+broke.
+
+**It does not run `npm run check`, and the reason is load-bearing.** That
+command exits 1 on this branch: its last step is `npx tsc --noEmit` and there
+are **25 pre-existing errors**, all in `src/graphs/motor-squad-graph.ts` — a
+file importing a package that is not in `package.json` and never has been, which
+PR #25 deletes. Gating on it would have landed permanently red, and a gate that
+cannot pass gets ignored.
+
+So tsc is gated on **regression, not zero**: fails above 25, the repo's
+documented baseline, and emits a `::notice::` if the count drops so the baseline
+gets lowered rather than silently drifting back up.
+
+Every step verified locally before commit: prior-work 0, portability 0, nine
+suites 0, tsc 25 → would pass.
+
+### NOT CHECKED
+
+- **The workflow has never executed on GitHub.** Locally-green steps are not the
+  same as a green run; YAML, `npm ci` on a clean cache, and the runner's Node 20
+  are all unverified until it actually runs. Treat the first run as the test.
+- Whether PR #25's `check.yml` and this file interact badly once both land. They
+  overlap deliberately (that `npm run check` includes `check:prior-work`), but
+  the combination has not been observed.
+- How many other check scripts print a non-standard shape and could be misread
+  the same way. Only the portability one was fixed; the rest were not audited.
