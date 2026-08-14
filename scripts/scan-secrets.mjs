@@ -4,8 +4,16 @@
 // git history. Reports what kind of credential each hit is and whether it is
 // complete enough to use. Never prints a secret value.
 //
-//   node scripts/scan-secrets.mjs              # tracked files at HEAD
-//   node scripts/scan-secrets.mjs --history    # every commit reachable from any ref
+//   node scripts/scan-secrets.mjs                    # working tree of the cwd repo
+//   node scripts/scan-secrets.mjs --history          # + every commit reachable from any ref
+//   node scripts/scan-secrets.mjs --root ../other    # scan a DIFFERENT repository
+//
+// An unrecognised flag is a hard error. It used to be ignored: `--root` was not
+// implemented, and passing it scanned the current directory instead and reported
+// a clean result *for the wrong repository*, once per target. Eight repos were
+// "scanned" that way and all eight results were this repo. A scanner that
+// silently redefines its own target is the house defect in its purest form —
+// success reported for work not done. See LESSONS D4.
 //
 // Exit code is 1 if a *usable privileged* credential is found in the working
 // tree, 0 otherwise. History hits never fail the run: history cannot be edited
@@ -21,7 +29,39 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const HISTORY = process.argv.includes('--history');
+// Argument parsing rejects what it does not understand. The previous version
+// asked only `argv.includes('--history')`, which means every other token — a
+// typo, a flag from a newer version, `--root` — was accepted and ignored.
+const { HISTORY, ROOT } = parseArgs(process.argv.slice(2));
+
+function parseArgs(argv) {
+  let history = false;
+  let root = null;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--history') {
+      history = true;
+    } else if (arg === '--root') {
+      root = argv[++i];
+      if (!root || root.startsWith('--')) fail('--root requires a path argument');
+    } else if (arg.startsWith('--root=')) {
+      root = arg.slice('--root='.length);
+      if (!root) fail('--root= requires a path argument');
+    } else {
+      fail(`unrecognised argument "${arg}"`);
+    }
+  }
+  return { HISTORY: history, ROOT: root };
+}
+
+function fail(message) {
+  console.error(
+    `scan-secrets: ${message}\n\n` +
+      `usage: node scripts/scan-secrets.mjs [--history] [--root <path>]\n\n` +
+      `Refusing to run rather than scan a target you did not ask for.`
+  );
+  process.exit(2);
+}
 
 // A Supabase/PostgREST legacy key is a JWT. Three segments means header,
 // payload and signature — i.e. usable. Two means the value was truncated
@@ -95,9 +135,13 @@ const GIT_GREP_ERE = [
 // git distinguishes "ran, found nothing" (exit 1) from "could not run" (exit
 // 128, or a signal). Collapsing those into an empty string is how a scanner
 // reports success it has not earned, so only exit 1 is treated as no-match.
+// `-C <root>` is applied here, in the single choke point every git call goes
+// through, rather than at the call sites. A per-call-site opt-in is how you get
+// a scanner that reads one repo's file list and another repo's blobs.
 function git(args, { allowNoMatch = false } = {}) {
+  const full = ROOT ? ['-C', ROOT, ...args] : args;
   try {
-    return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 1 << 28 });
+    return execFileSync('git', full, { encoding: 'utf8', maxBuffer: 1 << 28 });
   } catch (err) {
     if (allowNoMatch && err.status === 1) return '';
     if (err.status === 128 || err.status === undefined) {
@@ -243,7 +287,16 @@ for (const file of [...new Set(listed)]) {
 if (HISTORY) {
   const commits = git(['rev-list', '--all']).split('\n').filter(Boolean);
   process.stderr.write(`scanning ${commits.length} commits…\n`);
-  const seen = new Set(findings.map((f) => f.fingerprint));
+  // Deduplicate history hits against EACH OTHER, but never against the working
+  // tree. Seeding this set with the working-tree fingerprints — which is what it
+  // used to do — makes a secret that is in both places report as working-tree
+  // only, and prints "0 usable in history" over a secret that is in history.
+  // The two demand different remedies: a working-tree hit is fixed by a commit,
+  // a history hit only by rotation. Collapsing them recommends the wrong one.
+  const seen = new Set();
+  const workingTreeByFingerprint = new Map(
+    findings.filter((f) => !f.where.startsWith('history:')).map((f) => [f.fingerprint, f])
+  );
   for (const commit of commits) {
     // Whole matching lines, not `-o`. The assignment check above needs the text
     // *before* the match to tell a secret key from a transaction signature, and
@@ -255,13 +308,24 @@ if (HISTORY) {
     for (const f of batch) {
       if (seen.has(f.fingerprint)) continue;
       seen.add(f.fingerprint);
+      // Present in the working tree too: annotate that finding rather than
+      // listing the same secret twice, but record that history is implicated.
+      const inTree = workingTreeByFingerprint.get(f.fingerprint);
+      if (inTree) {
+        inTree.alsoInHistory = f.where;
+        continue;
+      }
       findings.push(f);
     }
   }
 }
 
 const workingTreeRisk = findings.filter((f) => f.usable && !f.where.startsWith('history:'));
-const historyRisk = findings.filter((f) => f.usable && f.where.startsWith('history:'));
+// A working-tree secret that is ALSO in history counts as a history risk, because
+// removing it from the working tree does not remove it from history.
+const historyRisk = findings.filter(
+  (f) => f.usable && (f.where.startsWith('history:') || f.alsoInHistory)
+);
 
 if (findings.length === 0) {
   console.log('No credential-shaped strings found.');
@@ -276,7 +340,11 @@ for (const f of findings) {
       : f.kind === 'solana:base58-88'
         ? 'ambiguous'
         : 'public';
-  console.log(`${status.padEnd(9)} ${f.kind.padEnd(22)} ${f.where}\n${' '.repeat(10)}${f.fingerprint} — ${f.detail}`);
+  const alsoIn = f.alsoInHistory ? ` (also in ${f.alsoInHistory})` : '';
+  console.log(
+    `${status.padEnd(9)} ${f.kind.padEnd(22)} ${f.where}${alsoIn}\n` +
+      `${' '.repeat(10)}${f.fingerprint} — ${f.detail}`
+  );
 }
 
 console.log(
