@@ -477,6 +477,14 @@ Then the fixed scanner flagged **its own comment**, because I had written the
 literal prefix into the prose explaining the fix. Also correct behaviour. The
 comment now says so, since the next person to document this will hit it too.
 
+**A permanent artifact, so nobody chases it.** That placeholder is now in git
+history at `afbb28c0`, and `scan-secrets --history` reports it forever as
+`USABLE opaque:sb_secret history:afbb28c0`. It is **not a credential** — it was
+never a valid key, the E2E stub never validated it, and there is nothing to
+rotate. It is a fake string that happens to match a real detection rule. Do not
+add it to an allowlist either: an allowlist that hides one prefixed opaque key
+hides the next real one. Leave it reported and leave this note pointing at it.
+
 **The rule.** A check that reads from `HEAD` is not a pre-commit check, it is a
 post-commit check running early. Before trusting any local gate, ask which bytes
 it actually opened — and if the answer is "the committed ones," it cannot tell

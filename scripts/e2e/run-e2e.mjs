@@ -127,9 +127,15 @@ try {
   delete serverEnv.BFT_ENFORCEMENT_MODE;
 
   console.log(`\nnext start on ${base} …`);
+  // detached puts the child in its OWN process group, so cleanup can signal the
+  // whole tree. `npx next start` forks a separate `next-server` process; killing
+  // the npx wrapper alone orphans it, and it keeps holding the port. The CI log
+  // said so out loud — "Terminate orphan process: pid (2671) (next-server)" —
+  // and locally it left a server per run. See the group kill in `finally`.
   server = spawn('npx', ['next', 'start', '-p', String(port)], {
     env: serverEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
   });
   const serverLog = [];
   server.stdout.on('data', (d) => serverLog.push(String(d)));
@@ -389,10 +395,25 @@ try {
     ledger.failed('run_aborted', err?.message ?? String(err));
   }
 } finally {
-  if (server) {
-    server.kill('SIGTERM');
-    await new Promise((r) => setTimeout(r, 300));
-    if (!server.killed) server.kill('SIGKILL');
+  if (server?.pid) {
+    // Negative pid signals the whole process group — the npx wrapper AND the
+    // next-server it forked. `server.kill()` reaches only the wrapper.
+    const killGroup = (signal) => {
+      try { process.kill(-server.pid, signal); } catch { /* already gone */ }
+    };
+    killGroup('SIGTERM');
+    // Wait for it to actually die rather than assuming SIGTERM landed.
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      try { process.kill(-server.pid, 0); } catch { break; }
+      if (i === 19) killGroup('SIGKILL');
+    }
+    // Say so if the port is still held; a leaked server breaks the NEXT run,
+    // which would otherwise look like an unrelated failure.
+    try {
+      process.kill(-server.pid, 0);
+      console.warn(`WARNING: server process group ${server.pid} survived SIGKILL; port may still be held`);
+    } catch { /* gone, as intended */ }
   }
   if (stub) await stub.close();
 }
