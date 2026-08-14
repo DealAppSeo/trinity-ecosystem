@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier;
 try {
   execFileSync(
     localTsc(),
@@ -40,6 +40,7 @@ try {
       'lib/trustshell/identity/nonce-store.ts',
       'lib/trustshell/identity/delegation.ts',
       'lib/trustshell/identity/repid-predicate.ts',
+      'lib/trustshell/identity/nullifier.ts',
       '--outDir', outDir,
       // Pin the root so output layout does not move when a module gains an
       // import from outside identity/ — repid-predicate.ts imports
@@ -64,6 +65,7 @@ try {
   nonceStore = await import(pathToFileURL(join(base, 'nonce-store.js')).href);
   delegation = await import(pathToFileURL(join(base, 'delegation.js')).href);
   repidPredicate = await import(pathToFileURL(join(base, 'repid-predicate.js')).href);
+  nullifier = await import(pathToFileURL(join(base, 'nullifier.js')).href);
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -1186,6 +1188,131 @@ await check('the default verifier still rejects a toy-hasher disclosure', async 
   const res = await disclosure.verifyDisclosure(d); // default: sha256 only
   assert.equal(res.valid, false, 'a verifier accepted an algorithm it does not implement');
   assert.match(res.reason, /unsupported hash/);
+});
+
+// --- nullifier / commitment binding contract --------------------------------
+
+await check('THE POSEIDON2 PLACEHOLDER REFUSES TO COMPUTE', async () => {
+  // The single most important assertion in this section. An implementation with
+  // invented parameters would emit plausible values, pass its own tests, and
+  // agree with nobody — discovered only when two systems compare a root in
+  // production. It must throw, not approximate.
+  const s = new nullifier.PendingPoseidon2Scheme();
+  assert.equal(s.parametersKnown, false);
+  await assert.rejects(s.commit('secret'), /parameters are not available/);
+  await assert.rejects(s.nullify('secret', 'd', 'sc'), /parameters are not available/);
+});
+
+await check('the refusal names exactly what is missing', async () => {
+  const s = new nullifier.PendingPoseidon2Scheme();
+  const msg = await s.commit('x').then(() => '', (e) => e.message);
+  for (const needed of ['field', 'width', 'round constants', 'test vectors']) {
+    assert.ok(msg.includes(needed), `refusal does not name '${needed}'`);
+  }
+  assert.match(msg, /POSEIDON2-PARAMETER-REQUEST/);
+});
+
+await check('the scheme tag says PENDING, so it cannot be mistaken for a real set', () => {
+  const s = new nullifier.PendingPoseidon2Scheme();
+  assert.match(s.scheme, /PENDING/);
+});
+
+await check('commit and nullifier tags are distinct', () => {
+  assert.notEqual(nullifier.BINDING_TAGS.commit, nullifier.BINDING_TAGS.nullifier);
+});
+
+// A toy scheme, only to exercise the CONTRACT. Explicitly not Poseidon2 and not
+// cryptographically meaningful — it exists so the statement/witness plumbing is
+// testable before the real parameters land.
+//
+// Uses SHA-256 rather than a string template: the first draft was
+// `C(${secret})`, which embedded the secret verbatim in its own output, and the
+// leak assertion below caught it. A toy that echoes its input would make that
+// assertion pass vacuously against any real scheme.
+const toyDigest = async (...parts) => {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(parts.join('\u001f')));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+};
+const toyScheme = {
+  scheme: 'poseidon2-v1-PENDING-PARAMETERS',
+  parametersKnown: false,
+  commit: async (secret) => toyDigest('toy:commit', secret),
+  nullify: async (secret, domain, scope) => toyDigest('toy:null', secret, domain, scope),
+};
+
+await check('a binding statement puts the secret in the WITNESS, never public', async () => {
+  const st = await nullifier.buildBindingStatement({
+    secret: 'holder-seed-xyz', domain: 'trinity', scope: 'ownership:3747', scheme: toyScheme,
+  });
+  const pub = JSON.stringify(st.publicInputs);
+  assert.ok(!pub.includes('holder-seed-xyz'), `the secret leaked into publicInputs: ${pub}`);
+  assert.equal(st.privateWitness.secret, 'holder-seed-xyz');
+  assert.equal(st.publicInputs.domain, 'trinity');
+  assert.equal(st.publicInputs.scope, 'ownership:3747');
+});
+
+await check('different scopes yield different nullifiers (unlinkability)', async () => {
+  const mk = (scope) => nullifier.buildBindingStatement({
+    secret: 'same-secret', domain: 'trinity', scope, scheme: toyScheme,
+  });
+  const a = await mk('ownership:3747');
+  const b = await mk('ownership:3748');
+  assert.notEqual(a.publicInputs.nullifier, b.publicInputs.nullifier,
+    'the same secret produced one nullifier across scopes — contexts are linkable');
+  assert.equal(a.publicInputs.commitment, b.publicInputs.commitment,
+    'the commitment should be stable across scopes');
+});
+
+await check('domain and scope are REQUIRED', async () => {
+  const base = { secret: 's', domain: 'd', scope: 'sc', scheme: toyScheme };
+  await assert.rejects(nullifier.buildBindingStatement({ ...base, domain: '' }), /domain is required/);
+  await assert.rejects(nullifier.buildBindingStatement({ ...base, scope: '' }), /scope is required/);
+  await assert.rejects(nullifier.buildBindingStatement({ ...base, secret: '' }), /secret is required/);
+});
+
+await check('RECOMPUTATION IS NOT A ZK PROOF, and says so', async () => {
+  const st = await nullifier.buildBindingStatement({
+    secret: 's1', domain: 'trinity', scope: 'ownership:1', scheme: toyScheme,
+  });
+  const v = await nullifier.verifyBindingByRecomputation(st, toyScheme);
+  assert.equal(v.valid, true, v.reason);
+  assert.equal(v.provenWithoutSecret, false,
+    'a recomputation that required the secret claimed to prove without it');
+  assert.match(v.reason, /honest-prover binding/);
+});
+
+await check('a tampered commitment or nullifier FAILS recomputation', async () => {
+  const st = await nullifier.buildBindingStatement({
+    secret: 's1', domain: 'trinity', scope: 'ownership:1', scheme: toyScheme,
+  });
+  const badC = JSON.parse(JSON.stringify(st));
+  badC.publicInputs.commitment = await toyScheme.commit('a-different-secret');
+  assert.equal((await nullifier.verifyBindingByRecomputation(badC, toyScheme)).valid, false);
+
+  const badN = JSON.parse(JSON.stringify(st));
+  badN.publicInputs.nullifier = await toyScheme.nullify('other', 'trinity', 'ownership:1');
+  assert.equal((await nullifier.verifyBindingByRecomputation(badN, toyScheme)).valid, false);
+});
+
+await check('a scheme mismatch is refused rather than recomputed', async () => {
+  const st = await nullifier.buildBindingStatement({
+    secret: 's', domain: 'd', scope: 'sc', scheme: toyScheme,
+  });
+  const other = { ...toyScheme, scheme: 'some-other-set' };
+  const v = await nullifier.verifyBindingByRecomputation(st, other);
+  assert.equal(v.valid, false);
+  assert.match(v.reason, /but the supplied scheme is/);
+});
+
+await check('the circuit contract names the four ways a working proof can be wrong', () => {
+  const c = nullifier.CIRCUIT_CONTRACT;
+  assert.equal(c.privateWitness.length, 1);
+  assert.ok(c.publicInputs.includes('domain') && c.publicInputs.includes('scope'),
+    'domain/scope must be PUBLIC — as witness, unlinkability is forgeable');
+  assert.equal(c.relations.length, 2);
+  assert.ok(c.mustAlsoHold.length >= 4, 'the soundness caveats were dropped');
+  assert.ok(c.mustAlsoHold.some((s) => /same secret/.test(s)));
+  assert.ok(c.mustAlsoHold.some((s) => /absorption order/.test(s)));
 });
 
 rmSync(outDir, { recursive: true, force: true });
