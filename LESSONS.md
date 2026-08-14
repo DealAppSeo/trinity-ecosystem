@@ -498,3 +498,59 @@ literals into `pay/route.ts` produced 3 FAILED, core 6/8, exit 1. An assertion
 suite that has never been observed to fail is an untested assertion. That step
 also caught a hollow test of my own — both dual-signature assertions were passing
 while blocked at `kya_validation`, so the gate under test never ran.
+
+---
+
+## A11 — a vault gate resting on a boolean nobody can check (2026-08-14)
+
+**[VERIFIED] via Supabase MCP this session.** Found while measuring whether
+wiring `ControlProof` into the payment path would be a migration or greenfield.
+It is greenfield, and the measurement is why.
+
+`agent_kya_registry` has a `custodian_zkp_proof` column. It is **NULL in all 12
+rows.** Meanwhile five agents — NEXUS, ORCH, SHOFET, SOPHIA, VERITAS — carry
+`human_custody_verified = true`. Nothing backs it: no proof, and
+`custodian_linked_at` is NULL on every one of them, so the link has no
+provenance either. The column built to hold the evidence has never held any.
+
+That boolean is not inert. Traced through the code:
+
+```
+agent_kya_registry.human_custody_verified
+  -> KYAValidator.ts:26   humanCustodyVerified: data.human_custody_verified
+  -> KYAValidator.ts:68   humanCustodyBound: profile.humanCustodyVerified
+  -> ComplianceReceipt.ts:53 -> kya_compliance_receipts.human_custody_bound
+  -> ZKPAttestation publicSignals
+  -> VaultPermission.ts:48   if (vault.requires_human_custody && !profile.humanCustodyVerified)
+```
+
+`institution_config.require_human_custody_vault` is **true** across all three
+rows, threshold 50,000 USDC. So a **vault access decision** is gated on a
+self-asserted flag. `require_human_custody_payment` is false, which bounds the
+blast radius — the payment path does not gate on it today — but the value still
+reaches compliance receipts and the attestation's public signals, which is how
+an internal assumption becomes an external claim.
+
+Two more things the same query surfaced:
+
+- **`custodian_tier = 'qualified_investor'` on 7 agents.** That is a regulatory
+  characterisation, asserted with no evidence recorded anywhere in the row.
+- **TORCH and W3C contradict themselves**: `custodian_link_active = true` with
+  `custodian_spending_authority = 250000`, but `human_custody_verified = false`.
+  Two fields describing one relationship disagree — the same shape as the
+  `x402_settlements.status` vs `.is_simulated` split in A9. Whichever field a
+  reader happens to consult decides the answer.
+
+**The rule.** A column named `*_verified` records that someone wrote `true`. It
+is evidence of an assertion, never of a verification, unless a companion column
+holds the artefact that can be re-checked — and then the check must actually run.
+Here the companion column exists and is empty, which is worse than not having
+it: its presence implies a verification step that no code performs.
+
+**Not fixed by flipping anything.** Setting those booleans to `false` would
+break vault access for five agents on the strength of a finding, and setting
+them `true` is what created the problem. The fix is a `ControlProof` in
+`custodian_zkp_proof` that `VaultPermission` re-checks, so the gate depends on
+something reopenable. That path is built (`lib/trustshell/identity/`) and not yet
+wired — deliberately, because changing a live authorization gate is a
+Sean-gated decision, not a sprint convenience.
