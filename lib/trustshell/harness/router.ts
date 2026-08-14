@@ -180,11 +180,18 @@ export class TrustRouter {
         return false;
       }
 
-      if (this.capacity.inFlight(e.id) >= this.capacity.slots(e.id)) {
+      // Measured against COMMITTED, not in-flight. A slot stranded on a call we
+      // abandoned but could not kill is still claimed on the far side; treating
+      // it as free is how a hung expert keeps being handed work.
+      if (this.capacity.committed(e.id) >= this.capacity.slots(e.id)) {
+        const stranded = this.capacity.stranded(e.id);
         rejected.push({
           expert: e.id,
           reason: 'at_capacity',
-          detail: `In-flight ${this.capacity.inFlight(e.id)} has reached the ${this.capacity.slots(e.id)}-slot allowance.`,
+          detail:
+            `In-flight ${this.capacity.inFlight(e.id)}` +
+            (stranded > 0 ? ` plus ${stranded} stranded on abandoned calls` : '') +
+            ` has reached the ${this.capacity.slots(e.id)}-slot allowance.`,
         });
         return false;
       }

@@ -359,4 +359,112 @@ check('three hangs trip a threshold-3 breaker; two do not', () => {
   eq(consecutive, 3, 'the third hang reaches the threshold');
 });
 
+// ── the abandonment ledger (Sprint K) ────────────────────────────────────────
+//
+// Expiry is not an ending. Every assertion here fails if `sweep()` goes back to
+// deleting the attempt, which silently asserts that giving up and the work
+// finishing are the same event.
+
+check('a swept attempt becomes an UNSETTLED abandonment, not a forgotten one', () => {
+  const { clock, tp } = mk();
+  tp.begin('stalled', 't1');
+  clock.advance(IDLE);
+  eq(tp.sweep().length, 1, 'the hang is detected');
+  eq(tp.inFlight(), 0, 'we are no longer waiting on it');
+  eq(tp.unsettledCount(), 1, 'but we have not established that it stopped');
+  eq(tp.unsettledFor('stalled'), 1, 'attributed to the expert holding the resource');
+  eq(tp.unsettledFor('alpha'), 0, 'and to no one else');
+});
+
+check('the abandonment ledger does not drain itself over time', () => {
+  // A timer-based expiry here would make the leak invisible again — the exact
+  // failure this module exists to catch. Fails if any auto-expiry is added.
+  const { clock, tp } = mk();
+  tp.begin('stalled', 't1');
+  clock.advance(IDLE);
+  tp.sweep();
+  clock.advance(RUN * 1000);
+  eq(tp.sweep().length, 0, 'an abandoned attempt is never re-swept');
+  eq(tp.unsettledCount(), 1, 'and waiting does not account for it');
+});
+
+check('settling accounts for an abandonment exactly once', () => {
+  const { clock, tp } = mk();
+  const a = tp.begin('stalled', 't1');
+  clock.advance(IDLE);
+  tp.sweep();
+  eq(tp.settle(a.id, 'confirmed_dead'), true, 'first settle succeeds');
+  eq(tp.settle(a.id, 'confirmed_dead'), false, 'a double-settle must not report freeing a second resource');
+  eq(tp.unsettledCount(), 0, 'ledger clear');
+  eq(tp.dispositions().confirmed_dead, 1, 'counted once');
+});
+
+check('settling an attempt that is still in flight is refused', () => {
+  const { tp } = mk();
+  const a = tp.begin('alpha', 't1');
+  eq(tp.settle(a.id, 'confirmed_dead'), false, 'it was never abandoned');
+  eq(tp.inFlight(), 1, 'and it is still live');
+  eq(tp.settle('no-such-attempt', 'confirmed_dead'), false, 'unknown ids too');
+});
+
+check('presumed_dead is counted apart from confirmed_dead', () => {
+  // Merging them would hide a transport that cannot actually kill anything —
+  // a fleet running entirely on presumption would look fully accounted for.
+  const { clock, tp } = mk();
+  const a = tp.begin('stalled', 't1');
+  const b = tp.begin('stalled', 't2');
+  clock.advance(IDLE);
+  tp.sweep();
+  tp.settle(a.id, 'confirmed_dead');
+  tp.settle(b.id, 'presumed_dead');
+  const d = tp.dispositions();
+  eq(d.confirmed_dead, 1, 'one observed');
+  eq(d.presumed_dead, 1, 'one merely assumed');
+  eq(d.returned_late, 0, 'and none came back');
+});
+
+check('a LATE return settles its abandonment instead of vanishing', () => {
+  // An expert that comes back after we stopped waiting frees its resource. If
+  // complete() returned null here the abandonment would never settle and a
+  // recovered expert would read as a permanent leak.
+  const { clock, tp } = mk();
+  const a = tp.begin('stalled', 't1');
+  clock.advance(IDLE);
+  tp.sweep();
+  eq(tp.unsettledCount(), 1, 'abandoned');
+  clock.advance(500);
+  eq(tp.complete(a.id), IDLE + 500, 'duration is measured from the original start, not the sweep');
+  eq(tp.unsettledCount(), 0, 'the late return accounted for it');
+  eq(tp.dispositions().returned_late, 1, 'and is labelled as late, not as a normal completion');
+});
+
+check('completing a genuinely unknown attempt still returns null', () => {
+  const { tp } = mk();
+  eq(tp.complete('never-existed'), null, 'unknown stays unknown');
+});
+
+check('a heartbeat CANNOT resurrect an abandoned attempt', () => {
+  // Self-report must not be able to reclaim a resource the harness gave up on,
+  // for the same reason a heartbeat cannot extend the run deadline.
+  const { clock, tp } = mk();
+  const a = tp.begin('stalled', 't1');
+  clock.advance(IDLE);
+  tp.sweep();
+  eq(tp.heartbeat(a.id, 'still here!'), false, 'refused');
+  eq(tp.inFlight(), 0, 'it is not back in flight');
+  eq(tp.unsettledCount(), 1, 'and it is still owed an account');
+});
+
+check('unsettled() names the expert and how long we waited before giving up', () => {
+  const { clock, tp } = mk();
+  tp.begin('stalled', 't1');
+  clock.advance(IDLE);
+  tp.sweep();
+  const [u] = tp.unsettled();
+  eq(u.attempt.expert, 'stalled', 'expert named');
+  eq(u.expiry, 'idle', 'which deadline gave up');
+  eq(u.elapsedAtAbandonMs, IDLE, 'how long it had been alive');
+  eq(u.abandonedAt, IDLE, 'when we gave up');
+});
+
 report();

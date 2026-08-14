@@ -887,3 +887,148 @@ its magnitude is not.
    `decision=APPROVE hal_score=0`.
 4. `hal_canary_cases`: 18 cases, 0 internal.
 5. Reconcile `v_node_truth.is_live` with the tri-state rule.
+
+---
+
+## Sprint K — abandonment accounting, and the sprint loop STOPS
+
+**Item taken:** *Cancellation*, from the `TRUST-HARNESS.md` "Not yet built"
+list — which the sprint prompt names as authoritative over its own backlog.
+
+**Why not backlog item 5.** The prompt's item 5 says to propose
+`hal_quorum_receipts` / `hal_quorum_validator_votes` because "a writer targets
+them". Grepped the whole repo for `hal_quorum`, `quorum_receipt`,
+`validator_vote`, and `from('hal…')`: **the writer does not exist here.** The
+claim comes from a live-DB audit of another surface, and this session has no
+Supabase. Writing a schema for a writer I cannot read means inventing column
+names and shipping a file that looks authoritative and is guesswork — the exact
+defect this repo catalogues. Left undone, deliberately, with the reason stated.
+
+### What was built
+
+`release`-on-timeout was a false assertion. `TimeoutPolicy` detects a hang and
+the caller stops waiting; it cannot stop the EXPERT, because it holds no handle
+on the transport. Handing the slot back claims we watched the call end, which we
+did not. The gap between "gave up" and "ended" is where a hung expert holds a
+slot the governor believes is free — a **phantom slot**.
+
+- `capacity.ts` — `strand()` / `reclaim()` / `stranded()` / `committed()` /
+  `available()`. Three dispositions for a slot, not two. `acquire()` and the
+  router's gate both measure `committed`, so a stranded slot cannot be handed
+  out twice. `slots()` is deliberately NOT reduced: rated capability and claims
+  against it are different things.
+- `timeout.ts` — an abandonment ledger. `sweep()` moves an expiry into it
+  instead of forgetting it; `settle(id, disposition)` accounts for it as
+  `confirmed_dead` / `returned_late` / `presumed_dead`. `complete()` on an
+  abandoned attempt settles it as a late return rather than returning null, so a
+  recovered expert does not read as a permanent leak. `unsettled()` is a leak
+  gauge and **nothing drains it on a timer** — that would make the leak
+  invisible again.
+- `harness-simulate.mjs` — hang path strands instead of releasing, with the
+  caller owning the abort grace period. The governor never invents one.
+
+### What improved
+
+**Nothing measurable. Say it plainly: this produced no performance gain.**
+
+| scenario (W = concurrency) | calls sunk into hangs | useful completions |
+|---|---|---|
+| always hangs, W=1..8 | release 3/4/4/6 → strand 3/4/4/6 | +0.0% |
+| hangs 45%, W=1..8 | release 4/4/4/6 → strand 4/4/4/6 | +0.0% |
+| hangs 45%, ledger blind (ablation) | release 8/6/4/7 → strand 8/6/4/7 | +0.0% |
+
+Full sim unchanged and re-verified: correctness **92.3%**, tau **0.643**, p99
+**179**, hangs 1. The experiment script's validity guard still reports MATCH.
+
+### What the measurement actually found — after two wrong guesses
+
+Guess 1 was "the circuit breaker covers it". Half true: `failureCount` in
+`circuit-breaker.ts` is **consecutive** and reset by every success, so an
+intermittent hanger never trips it. Built that scenario. Still zero.
+
+Guess 2 was "the reputation ledger covers it". Ablated the ledger so hangs
+produce no reputation signal. **Still zero.** Two mechanisms named, neither was
+the answer — so I instrumented instead of guessing again.
+
+Guess 3 was written into the script before it was measured, and was wrong:
+"slots collapse before a second call can be stranded". The instrumentation says
+**peak stranded = 6**. The stranding is real and substantial. What kills the
+effect is the ORDER:
+
+1. All 6 calls are admitted **in the first tick, at full base slots, before one
+   hang has been observed**. No slot accounting can prevent that — there was
+   nothing yet to account for.
+2. They all hang. `capacity.observe(expert, elapsedMs, ok=false)`, already
+   called on every expiry since Sprint C, folds a 1500 ms sample into the
+   latency EWMA *and* divides the allowance by `consecutiveErrors`, collapsing
+   slots 6 → **minSlots=1**.
+3. The expert is never selected again, **in either arm**. Every admission
+   stranding would have blocked was already blocked by a 1-slot allowance.
+
+So the mechanism is correct and **redundant** — redundant against a layer an
+earlier sprint wired. It stops being redundant against a transport that hangs
+without producing a latency sample to observe.
+
+### Kept, unlike the quantile allocator — and why that is not special pleading
+
+Sprint J removed the quantile allocator because it did not do what its name
+claimed. This is a different case and the distinction is load-bearing:
+`strand`/`reclaim` does exactly what it claims, at zero measured cost, and it is
+the only thing in the harness that can represent "gave up, still running". The
+old arm books every abandonment as `presumed_dead` **and** a free slot — it
+reports an accounting it never performed. That is the recurring defect of this
+codebase, and removing the fix because the throughput delta is zero would
+restore it. **Observability gain, not a performance gain. Not dressed up as one.**
+
+### Evidence
+
+278 assertions, 0 failures (routing 52 ↑7, timeout 38 ↑9, consensus 46,
+mcp-fleet 35, aggregate 28, escalate 26, transform 31, reputation 22).
+`tsc --noEmit` 25 — baseline, unchanged. `next build` clean. Portability holds.
+
+Five mutations, all caught:
+
+| mutation | result |
+|---|---|
+| `strand()` behaves like `release()` | 4 failures |
+| router gate uses `inFlight` not `committed` | 1 failure |
+| `acquire()` uses `inFlight` not `committed` | 1 failure |
+| `sweep()` deletes without recording | 7 failures |
+| `complete()` returns null for an abandoned attempt | 1 failure |
+
+### NOT CHECKED
+
+- Whether stranding pays against a real transport. Every number above is from
+  the modelled world; the case where it would matter (a hang with no latency
+  signal) is not reachable in this simulator.
+- Nobody calls `strand`/`reclaim` outside the simulator. `lib/mcp/fleet.ts`
+  still has no in-flight accounting to strand.
+- Real-data replay (152,001 labelled outcomes) — needs Supabase. Sean-gated.
+
+---
+
+# STOPPED
+
+The sprint loop is disabled. **Two stop conditions hold independently:**
+
+1. **Two consecutive firings with no measurable improvement.** Sprint J (the
+   quantile budget allocator) measured exactly zero and was removed. Sprint K
+   measured exactly zero and was kept on correctness grounds. Two in a row is
+   the documented stop, and it is the correct read: the harness's remaining
+   defects are no longer the kind that a further increment moves.
+2. **Backlog exhausted.** Items 1–3 are built (timeout split, transform,
+   Postgres reputation store — the last blocked on an unapplied migration).
+   Item 4 (sub-task routing granularity) was judged architecturally significant
+   on 2026-08-13 and belongs to Sean. Item 5's premise is false in this repo,
+   as recorded above.
+
+**What should happen next is a decision, not another increment.** The single
+highest-value open item is **Phase 0.1, the real-data replay**: run the 152,001
+labelled outcomes in `repid_score_events` through `ReputationLedger`. No schema
+change, no migration, no risk. It would convert every number in this log from
+simulator evidence to real-data evidence — which is the standing NOT CHECKED
+that caps the value of everything above it. It needs Supabase and it needs Sean.
+
+Also awaiting Sean, unchanged:
+`supabase/migrations/20260813210000_agent_repid_earned_observations.sql`,
+written and deliberately not applied.

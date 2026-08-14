@@ -571,9 +571,20 @@ only as good as that model.
   mid-run can now earn trust — the hang-under-trust scenario still warm-starts
   its veteran, and that warm start has not been retested against the new
   default.
-- **Cancellation.** `TimeoutPolicy` reports expiry; it cannot cancel the
-  underlying call, because it holds no handle on the transport. The caller must
-  abandon the work itself, and nothing currently checks that it does.
+- **Cancellation — accounted for, still not performed.** `TimeoutPolicy` reports
+  expiry; it still cannot cancel the underlying call, because it holds no handle
+  on the transport. What changed in Sprint K is that abandonment is no longer
+  *silent*. `sweep()` moves the expiry into an abandonment ledger the caller must
+  `settle()` as `confirmed_dead` / `returned_late` / `presumed_dead`, and
+  `CapacityGovernor.strand()` holds the slot until `reclaim()` — so giving up on
+  a call can no longer be mistaken for the call ending, which is what let a hung
+  expert keep a slot the governor thought was free.
+  **This measured as zero throughput improvement** and was kept on correctness
+  grounds only; `capacity.observe(…, ok=false)` already collapses a hanging
+  expert to `minSlots` before the stranding can block anything. See Sprint K in
+  `SPRINT-LOG.md` for the numbers and the two wrong guesses that preceded them.
+  Still open: actually cancelling, and any caller outside the simulator —
+  `lib/mcp/fleet.ts` has no in-flight accounting to strand.
 - **Summarisation quality.** `transform.ts` accepts a `summarise` callback and
   charges its tokens, but supplies none — the dropped middle is simply gone
   unless a caller provides one. Nothing measures whether a summary preserves

@@ -180,6 +180,7 @@ function emptyMetrics() {
     hangStallMs: 0,
     hangsByIdle: 0,
     hangsByRun: 0,
+    abortsLanded: 0,
   };
 }
 
@@ -291,9 +292,25 @@ function runHarness(seed) {
       coldStart: ledger.isColdStart(e.id),
     }));
 
+  // Abandoned calls we have stopped waiting for but cannot prove are dead.
+  // The transport is modelled as taking a grace period to land an abort; until
+  // it does, the slot stays stranded and the expert is not handed more work.
+  const pendingAborts = [];
+  const ABORT_GRACE_MS = IDLE_TIMEOUT_MS * 2;
+
   for (let i = 0; i < TASKS; i += 1) {
     const progress = i / TASKS;
     clock.advance(100); // virtual arrival interval
+
+    // Land any aborts whose grace period has elapsed. Reclaiming on a schedule
+    // the CALLER owns, rather than inside the governor, is deliberate: the
+    // governor must never invent a grace period it cannot observe.
+    while (pendingAborts.length > 0 && pendingAborts[0].at <= clock.now()) {
+      const done = pendingAborts.shift();
+      capacity.reclaim(done.expert);
+      timeouts.settle(done.attemptId, 'confirmed_dead');
+      m.abortsLanded += 1;
+    }
 
     const task = { id: `t${i}`, requires: ['hal'], estimatedTokens: 1 };
     const tried = [];
@@ -352,9 +369,11 @@ function runHarness(seed) {
         m.hangsHit += 1;
         clock.advance(IDLE_TIMEOUT_MS);
         const expired = timeouts.sweep();
-        capacity.release(id);
 
         for (const e of expired) {
+          // NOT release. We stopped waiting; the expert did not stop working.
+          // Releasing here is the phantom slot — see capacity.ts.
+          capacity.strand(e.attempt.expert);
           if (e.kind === 'idle') m.hangsByIdle += 1;
           else m.hangsByRun += 1;
           m.hangStallMs += e.elapsedMs;
@@ -363,6 +382,11 @@ function runHarness(seed) {
           capacity.observe(e.attempt.expert, e.elapsedMs, false);
           breakers.recordFailure(e.attempt.expert);
           updateEarned(e.attempt.expert, false);
+          pendingAborts.push({
+            expert: e.attempt.expert,
+            attemptId: e.attempt.id,
+            at: clock.now() + ABORT_GRACE_MS,
+          });
         }
         continue;
       }
@@ -492,6 +516,18 @@ console.log(`            ${RUN_TIMEOUT_MS}ms run deadline it is GENEROUSLY credi
 console.log(`  harness:  ${h.hangsHit} hang(s) — ${h.hangsByIdle} caught by the idle deadline, ${h.hangsByRun} by the run deadline.`);
 console.log(`            mean detection ${h.meanHangDetectMs.toFixed(0)}ms vs ${b.meanHangDetectMs.toFixed(0)}ms, a ${(b.meanHangDetectMs / Math.max(1, h.meanHangDetectMs)).toFixed(1)}x faster stall.`);
 console.log(`  attempts still in flight at end of run: ${timeouts.inFlight()} (a leak would show here)`);
+console.log(
+  `  abandoned attempts: ${harness.abortsLanded} settled as confirmed_dead, ` +
+    `${timeouts.unsettledCount()} still unaccounted for (a leak would show here too)`
+);
+console.log(
+  `  stranded slots at end of run: ${EXPERTS.reduce((n, e) => n + capacity.stranded(e.id), 0)}` +
+    ` — a slot we stopped waiting on but never confirmed free. Never released on a`
+);
+console.log(
+  `  timeout: giving up on a call does not stop the expert running it, and handing`
+);
+console.log(`  that slot back is how a hung expert keeps being sent work.`);
 
 // ── context-bloat measurement ────────────────────────────────────────────────
 //

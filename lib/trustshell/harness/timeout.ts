@@ -34,6 +34,31 @@
 // portability check forbids runtime globals, and a poll-based design is exactly
 // reproducible under an injected clock — a timer-based one is not testable
 // without real elapsed time.
+//
+// EXPIRY IS NOT AN ENDING. This module cannot cancel anything; it holds no
+// handle on the transport. So a swept attempt is not finished, it is
+// ABANDONED — we stopped waiting, and the expert may still be working. Sweeping
+// used to forget the attempt at that point, which quietly asserted the stronger
+// claim: that giving up and the work ending are the same event. They are not,
+// and the gap between them is where a hung expert keeps holding a capacity slot
+// the governor thinks is free.
+//
+// So `sweep()` moves the attempt into an abandonment ledger, where it stays
+// until the caller settles it:
+//
+//   settle(id, 'confirmed_dead')  the transport really killed it — the socket
+//                                 closed, the subprocess reaped, the request
+//                                 aborted and the abort landed.
+//   settle(id, 'returned_late')   it came back after we stopped waiting. The
+//                                 result is unusable (we already re-routed) but
+//                                 the resource is genuinely free.
+//   settle(id, 'presumed_dead')   we waited out a grace period and gave up on
+//                                 ever knowing. An admission, not a confirmation.
+//
+// `unsettled()` is therefore a leak gauge: attempts nobody can account for. A
+// caller that never settles will see it grow without bound, which is the point.
+// The alternative — expiring the ledger on a timer — would make the leak
+// invisible again, which is the failure mode this whole file exists to catch.
 
 import type { Clock, ExpertId } from '@/lib/trustshell/harness/types';
 
@@ -89,6 +114,25 @@ export interface TimeoutExpiry {
   basis: string;
 }
 
+/**
+ * How an abandoned attempt was finally accounted for.
+ *
+ * `presumed_dead` is deliberately not a synonym for `confirmed_dead`. One is an
+ * observation, the other is a caller running out of patience — and a fleet
+ * where most abandonments are presumed rather than confirmed has a transport
+ * problem that a merged label would hide.
+ */
+export type AbandonDisposition = 'confirmed_dead' | 'returned_late' | 'presumed_dead';
+
+export interface AbandonedAttempt {
+  attempt: AttemptHandle;
+  /** The expiry that caused the abandonment. */
+  expiry: TimeoutKind;
+  abandonedAt: number;
+  /** How long the attempt had been alive when we gave up on it. */
+  elapsedAtAbandonMs: number;
+}
+
 export interface AttemptView {
   attempt: AttemptHandle;
   startedAt: number;
@@ -112,6 +156,13 @@ export interface AttemptView {
  */
 export class TimeoutPolicy {
   private readonly attempts = new Map<AttemptId, AttemptRecord>();
+  /** Swept attempts awaiting a disposition. See the header. */
+  private readonly abandoned = new Map<AttemptId, AbandonedAttempt>();
+  private readonly settled: Record<AbandonDisposition, number> = {
+    confirmed_dead: 0,
+    returned_late: 0,
+    presumed_dead: 0,
+  };
   /** Monotonic, so attempt ids are deterministic. No Math.random here. */
   private seq = 0;
 
@@ -170,12 +221,61 @@ export class TimeoutPolicy {
     return true;
   }
 
-  /** Mark an attempt finished. Returns its duration, or null if unknown. */
+  /**
+   * Mark an attempt finished. Returns its duration, or null if unknown.
+   *
+   * An attempt that was already swept still completes here — that is an expert
+   * returning after we stopped waiting, and it is exactly the evidence that
+   * frees its stranded slot. Silently returning null for it would leave the
+   * abandonment unsettled forever and make a recovered expert look like a leak.
+   */
   complete(id: AttemptId): number | null {
     const a = this.attempts.get(id);
-    if (!a) return null;
-    this.attempts.delete(id);
-    return this.clock.now() - a.startedAt;
+    if (a) {
+      this.attempts.delete(id);
+      return this.clock.now() - a.startedAt;
+    }
+    const ab = this.abandoned.get(id);
+    if (ab) {
+      this.settle(id, 'returned_late');
+      return this.clock.now() - (ab.abandonedAt - ab.elapsedAtAbandonMs);
+    }
+    return null;
+  }
+
+  /**
+   * Account for an abandoned attempt.
+   *
+   * Returns false for an unknown id, for an attempt still in flight, and for
+   * one already settled — a caller must never read a double-settle as having
+   * freed a second resource.
+   */
+  settle(id: AttemptId, disposition: AbandonDisposition): boolean {
+    if (!this.abandoned.delete(id)) return false;
+    this.settled[disposition] += 1;
+    return true;
+  }
+
+  /** Abandoned attempts nobody has accounted for yet. A leak gauge. */
+  unsettled(): AbandonedAttempt[] {
+    return [...this.abandoned.values()];
+  }
+
+  /** How many abandoned attempts are still unaccounted for. */
+  unsettledCount(): number {
+    return this.abandoned.size;
+  }
+
+  /** Unsettled abandonments for one expert — what is stranding its slots. */
+  unsettledFor(expert: ExpertId): number {
+    let n = 0;
+    for (const a of this.abandoned.values()) if (a.attempt.expert === expert) n += 1;
+    return n;
+  }
+
+  /** Counts by disposition, for the confirmed-vs-presumed ratio. */
+  dispositions(): Record<AbandonDisposition, number> {
+    return { ...this.settled };
   }
 
   private expiryFor(a: AttemptRecord): TimeoutExpiry | null {
@@ -225,11 +325,13 @@ export class TimeoutPolicy {
   }
 
   /**
-   * Report every breached attempt and drop it.
+   * Report every breached attempt and move it to the abandonment ledger.
    *
-   * Dropping is what makes this idempotent: an expiry is surfaced exactly once,
-   * so a caller polling in a loop cannot double-count one hang as a run of
-   * failures and trip a breaker on a single incident.
+   * Moving out of `attempts` is what makes this idempotent: an expiry is
+   * surfaced exactly once, so a caller polling in a loop cannot double-count one
+   * hang as a run of failures and trip a breaker on a single incident.
+   *
+   * It moves rather than deletes because the work is not over — see the header.
    */
   sweep(): TimeoutExpiry[] {
     const expired: TimeoutExpiry[] = [];
@@ -237,7 +339,16 @@ export class TimeoutPolicy {
       const e = this.expiryFor(a);
       if (e) expired.push(e);
     }
-    for (const e of expired) this.attempts.delete(e.attempt.id);
+    const now = this.clock.now();
+    for (const e of expired) {
+      this.attempts.delete(e.attempt.id);
+      this.abandoned.set(e.attempt.id, {
+        attempt: e.attempt,
+        expiry: e.kind,
+        abandonedAt: now,
+        elapsedAtAbandonMs: e.elapsedMs,
+      });
+    }
     return expired;
   }
 

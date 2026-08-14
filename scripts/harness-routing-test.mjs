@@ -202,6 +202,73 @@ check('acquire refuses past the slot allowance and release frees one', () => {
   eq(c.acquire('a'), true, 'freed slot reusable');
 });
 
+// ── stranded slots (Sprint K) ────────────────────────────────────────────────
+//
+// The whole point: abandoning a call is not the same as ending it. Every
+// assertion below fails if `strand` is implemented as `release`.
+
+check('a stranded slot is NOT free — abandoning a call does not end it', () => {
+  const clock = new ManualClock(0);
+  const c = new CapacityGovernor(clock, { baseSlots: 2, minSlots: 1, maxSlots: 4 });
+  c.acquire('a');
+  c.acquire('a');
+  c.strand('a'); // gave up waiting; the expert may still be running it
+  eq(c.inFlight('a'), 1, 'no longer awaiting it');
+  eq(c.stranded('a'), 1, 'but still claimed');
+  eq(c.committed('a'), 2, 'committed is unchanged by giving up');
+  eq(c.available('a'), 0, 'so there is no headroom');
+  eq(c.acquire('a'), false, 'and the slot cannot be handed out a second time');
+});
+
+check('reclaim is what frees a stranded slot, and only reclaim', () => {
+  const clock = new ManualClock(0);
+  const c = new CapacityGovernor(clock, { baseSlots: 2, minSlots: 1, maxSlots: 4 });
+  c.acquire('a');
+  c.acquire('a');
+  c.strand('a');
+  clock.advance(1_000_000); // time alone must not launder a stranded slot
+  eq(c.available('a'), 0, 'a stranded slot does not expire on its own');
+  c.reclaim('a');
+  eq(c.stranded('a'), 0, 'confirmed dead');
+  eq(c.available('a'), 1, 'now there is headroom');
+  eq(c.acquire('a'), true, 'and it is admittable');
+});
+
+check('stranding does not reduce the expert rated slot count', () => {
+  const clock = new ManualClock(0);
+  const c = new CapacityGovernor(clock, { baseSlots: 4, minSlots: 1, maxSlots: 8 });
+  const before = c.slots('a');
+  c.acquire('a');
+  c.strand('a');
+  eq(c.slots('a'), before, 'capability is unchanged; only the claim on it moved');
+});
+
+check('strand with nothing in flight is a no-op, not a negative claim', () => {
+  const clock = new ManualClock(0);
+  const c = new CapacityGovernor(clock, { baseSlots: 2, minSlots: 1, maxSlots: 4 });
+  c.strand('a');
+  eq(c.stranded('a'), 0, 'nothing was in flight to strand');
+  eq(c.inFlight('a'), 0, 'and in-flight did not go negative');
+  c.acquire('a');
+  c.reclaim('a');
+  c.reclaim('a');
+  eq(c.stranded('a'), 0, 'over-reclaiming floors at zero');
+  eq(c.inFlight('a'), 1, 'and does not steal from in-flight');
+});
+
+check('view reports the stranded/committed/available split', () => {
+  const clock = new ManualClock(0);
+  const c = new CapacityGovernor(clock, { baseSlots: 4, minSlots: 1, maxSlots: 8 });
+  c.acquire('a');
+  c.acquire('a');
+  c.strand('a');
+  const v = c.view('a');
+  eq(v.stranded, 1, 'stranded surfaced');
+  eq(v.committed, 2, 'committed surfaced');
+  eq(v.available, 2, 'available surfaced');
+  truthy(/stranded/.test(v.basis), `basis must name the stranding, got: ${v.basis}`);
+});
+
 // ── router ───────────────────────────────────────────────────────────────────
 
 function harness(overrides = {}, seed = 42) {
@@ -266,6 +333,34 @@ check('at-capacity experts are rejected with a reason', () => {
   for (let i = 0; i < 4; i += 1) capacity.acquire('a');
   const d = router.route({ id: 't1', requires: ['hal'] }, [expert('a')]);
   eq(d.unroutableReason, 'at_capacity', 'reason surfaced');
+});
+
+check('an expert whose slots are all STRANDED is refused work', () => {
+  // The phantom-slot bug in one assertion. Before Sprint K the router measured
+  // `inFlight`, which a strand decrements — so a hung expert looked idle and
+  // kept being handed tasks. This fails if the gate goes back to `inFlight`.
+  const { router, capacity } = harness({ explorationRate: 0 });
+  for (let i = 0; i < 4; i += 1) capacity.acquire('a');
+  for (let i = 0; i < 4; i += 1) capacity.strand('a');
+  eq(capacity.inFlight('a'), 0, 'nothing is being awaited — the naive view of "idle"');
+  const d = router.route({ id: 't1', requires: ['hal'] }, [expert('a')]);
+  eq(d.selected, null, 'but it must not be routed to');
+  eq(d.unroutableReason, 'at_capacity', 'reason surfaced');
+  truthy(
+    /stranded/.test(d.rejected[0].detail),
+    `the rejection must say WHY it looks idle, got: ${d.rejected[0].detail}`
+  );
+});
+
+check('routing resumes once the stranded slots are reclaimed', () => {
+  // The other half: stranding must not be a one-way door that permanently
+  // zeroes an expert. That would trade a phantom slot for a phantom outage.
+  const { router, capacity } = harness({ explorationRate: 0 });
+  for (let i = 0; i < 4; i += 1) capacity.acquire('a');
+  for (let i = 0; i < 4; i += 1) capacity.strand('a');
+  for (let i = 0; i < 4; i += 1) capacity.reclaim('a');
+  const d = router.route({ id: 't1', requires: ['hal'] }, [expert('a')]);
+  eq(d.selected, 'a', 'the expert is routable again');
 });
 
 check('open circuits are excluded from candidacy', () => {

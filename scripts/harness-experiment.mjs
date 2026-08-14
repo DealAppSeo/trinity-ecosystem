@@ -953,3 +953,268 @@ for (const [label, cfg] of [['always', null], ['margin<1000', { marginFloor: 100
   const extra = r.callsPerTask - base.callsPerTask;
   console.log(`  ${label.padEnd(22)} ${gain.toFixed(2).padStart(6)}pp / ${extra.toFixed(2)} calls = ${(gain / extra).toFixed(2)} pp per extra call`);
 }
+
+
+// ── (h) THE PHANTOM SLOT — concurrency, and what a timeout does NOT do ───────
+//
+// Sprint K. `TimeoutPolicy` detects a hang and the caller stops waiting. It
+// cannot stop the EXPERT: it holds no handle on the transport. So the slot that
+// call occupies is not free, and the question this section answers is how much
+// that matters.
+//
+// It cannot be answered by harness-simulate.mjs. That simulator dispatches one
+// task at a time, so `inFlight` is never more than 1, capacity never binds, and
+// release-vs-strand is unobservable BY CONSTRUCTION. Wiring the strand into it
+// (which was done) correctly moves no headline number. Reporting that as either
+// a win or a regression would be reading noise; this is the world where the
+// mechanism is actually load-bearing.
+//
+// The world: W tasks in flight at once against a 3-expert pool. `stalled` is the
+// best-ranked expert and hangs on EVERY call, never returning. The caller polls,
+// sweeps expiries, and re-dispatches.
+//
+// THE CONFOUND, NAMED UP FRONT: the circuit breaker already catches an expert
+// that hangs repeatedly. So the honest question is not "does anything catch
+// this" — something does — but how much work piles onto a hung expert in the
+// window BEFORE the breaker opens. With W in flight, that window is not one
+// call wide. Both arms run with the breaker ON, so the breaker's contribution is
+// held constant and the delta is attributable to the slot accounting alone.
+
+console.log(`\n\n(h) THE PHANTOM SLOT — a hung expert under concurrency`);
+console.log('='.repeat(78));
+
+const POLL_MS = 500;
+const ABORT_GRACE_MS = 3000;
+const IDLE_MS = 1500;
+const RUN_MS = 10_000;
+
+function phantomRun({ strand, workers, hangRate = 1, ledgerSeesHangs = true, ticks = 400 }) {
+  const clock = new ManualClock(0);
+  const rng = new SeededRng(0xfa11);
+  const limiter = new LeakyBucketLimiter(clock, { tokensPerMinute: 100_000 });
+  const capacity = new CapacityGovernor(clock, { baseSlots: 6, minSlots: 1, maxSlots: 12 });
+  const breakers = new CircuitBreakerRegistry(clock, {
+    thresholdFailures: 3,
+    resetTimeoutMs: 30_000,
+    successesToClose: 2,
+  });
+  const timeouts = new TimeoutPolicy(clock, { runTimeoutMs: RUN_MS, idleTimeoutMs: IDLE_MS });
+  const ledger = new ReputationLedger({ prior: 5000, alpha: 0.06, confidenceK: 20, coldStartConfidence: 0.5 });
+  const router = new TrustRouter(
+    clock,
+    limiter,
+    capacity,
+    { explorationRate: 0, congestionWeight: 0, trustFloor: 0, alternatesCount: 2 },
+    new SeededRng(7)
+  );
+
+  // `stalled` is warm-started as the best expert in the pool, so the router
+  // genuinely wants it. A hung expert nobody would have picked proves nothing.
+  for (let i = 0; i < 300; i += 1) ledger.record('stalled', true);
+  for (let i = 0; i < 60; i += 1) ledger.record('alpha', i % 5 !== 0);
+  for (let i = 0; i < 60; i += 1) ledger.record('bravo', i % 6 !== 0);
+
+  const POOL = ['stalled', 'alpha', 'bravo'];
+  const profiles = () =>
+    POOL.map((id) => ({
+      id,
+      capabilities: ['hal'],
+      earnedScore: ledger.earnedScore(id),
+      perceivedScore: 0,
+      coldStart: ledger.isColdStart(id),
+    }));
+
+  const live = []; // { expert, attemptId, doneAt | null for a hang }
+  const aborts = [];
+  let admittedToStalled = 0;
+  let hungCalls = 0;
+  let completed = 0;
+  let seq = 0;
+  let maxStranded = 0;
+  let minSlotsSeen = Infinity;
+  let maxConcurrentOnStalled = 0;
+
+  for (let t = 0; t < ticks; t += 1) {
+    clock.advance(POLL_MS);
+
+    // land confirmed aborts (strand arm only ever fills this)
+    while (aborts.length > 0 && aborts[0].at <= clock.now()) {
+      const a = aborts.shift();
+      capacity.reclaim(a.expert);
+      timeouts.settle(a.attemptId, 'confirmed_dead');
+    }
+
+    // retire finished calls
+    for (let i = live.length - 1; i >= 0; i -= 1) {
+      const c = live[i];
+      if (c.doneAt !== null && c.doneAt <= clock.now()) {
+        timeouts.complete(c.attemptId);
+        capacity.release(c.expert);
+        breakers.recordSuccess(c.expert);
+        ledger.record(c.expert, true);
+        completed += 1;
+        live.splice(i, 1);
+      }
+    }
+
+    // sweep hangs
+    for (const e of timeouts.sweep()) {
+      const idx = live.findIndex((c) => c.attemptId === e.attempt.id);
+      if (idx >= 0) live.splice(idx, 1);
+      breakers.recordFailure(e.attempt.expert);
+      // Ablation: with this off the hang produces no reputation signal, which
+      // isolates whether the ledger is what actually covers this case.
+      if (ledgerSeesHangs) ledger.record(e.attempt.expert, false);
+      capacity.observe(e.attempt.expert, e.elapsedMs, false);
+      if (strand) {
+        capacity.strand(e.attempt.expert);
+        aborts.push({
+          expert: e.attempt.expert,
+          attemptId: e.attempt.id,
+          at: clock.now() + ABORT_GRACE_MS,
+        });
+      } else {
+        // The pre-Sprint-K behaviour: hand the slot straight back, while the
+        // expert on the other side is still holding it.
+        capacity.release(e.attempt.expert);
+        timeouts.settle(e.attempt.id, 'presumed_dead');
+      }
+    }
+
+    // admit up to the concurrency limit
+    while (live.length < workers) {
+      const d = router.route({ id: `t${seq}`, requires: ['hal'], estimatedTokens: 1 }, profiles(), {
+        isCircuitOpen: (id) => breakers.isOpen(id),
+      });
+      if (!d.selected) break;
+      const id = d.selected;
+      if (!capacity.acquire(id)) break;
+      seq += 1;
+      const a = timeouts.begin(id, `t${seq}`);
+      const hangs = id === 'stalled' && rng.next() < hangRate;
+      if (id === 'stalled') admittedToStalled += 1;
+      if (hangs) hungCalls += 1;
+      live.push({ expert: id, attemptId: a.id, doneAt: hangs ? null : clock.now() + 200 });
+    }
+
+    maxStranded = Math.max(maxStranded, capacity.stranded('stalled'));
+    minSlotsSeen = Math.min(minSlotsSeen, capacity.slots('stalled'));
+    maxConcurrentOnStalled = Math.max(
+      maxConcurrentOnStalled,
+      live.filter((c) => c.expert === 'stalled').length
+    );
+  }
+
+  return {
+    admittedToStalled,
+    hungCalls,
+    completed,
+    breakerOpen: breakers.isOpen('stalled'),
+    maxStranded,
+    minSlotsSeen,
+    maxConcurrentOnStalled,
+    strandedAtEnd: POOL.reduce((n, id) => n + capacity.stranded(id), 0),
+    unsettled: timeouts.unsettledCount(),
+    dispositions: timeouts.dispositions(),
+  };
+}
+
+function phantomTable(hangRate, note, ledgerSeesHangs = true) {
+  console.log(`\n  ${note}`);
+  console.log(
+    `  ${'conc.'.padEnd(7)} ${'calls sunk into hangs'.padStart(26)} ${'useful completions'.padStart(24)}  breaker`
+  );
+  console.log(`  ${'-'.repeat(7)} ${'-'.repeat(26)} ${'-'.repeat(24)}  -------`);
+  for (const workers of [1, 2, 4, 8]) {
+    const rel = phantomRun({ strand: false, workers, hangRate, ledgerSeesHangs });
+    const str = phantomRun({ strand: true, workers, hangRate, ledgerSeesHangs });
+    const dh = rel.hungCalls === 0 ? 0 : ((str.hungCalls - rel.hungCalls) / rel.hungCalls) * 100;
+    const dc = rel.completed === 0 ? 0 : ((str.completed - rel.completed) / rel.completed) * 100;
+    console.log(
+      `  W=${String(workers).padEnd(5)} ` +
+        `release ${String(rel.hungCalls).padStart(4)} -> strand ${String(str.hungCalls).padStart(4)}` +
+        ` (${(dh >= 0 ? '+' : '') + dh.toFixed(0)}%)`.padStart(8) +
+        `   ${String(rel.completed).padStart(6)} -> ${String(str.completed).padStart(6)}` +
+        ` (${(dc >= 0 ? '+' : '') + dc.toFixed(1)}%)`.padStart(10) +
+        `  ${rel.breakerOpen ? 'OPEN' : 'closed'}`
+    );
+  }
+}
+
+phantomTable(
+  1,
+  'ALWAYS hangs. The breaker owns this case: 3 consecutive failures and the'
+);
+console.log(`  expert is excluded, so the slot accounting never gets to matter.`);
+
+phantomTable(
+  0.45,
+  'HANGS 45% OF THE TIME. `failureCount` in circuit-breaker.ts is CONSECUTIVE and'
+);
+console.log(
+  `  is reset by every success, so an intermittent hanger never trips the breaker —`
+);
+console.log(`  it stays closed for the whole run. Nothing but the slot accounting is left.`);
+
+phantomTable(
+  0.45,
+  'ABLATION — 45% hangs, and the LEDGER IS BLIND to them. Not a realistic config:',
+  false
+);
+console.log(
+  `  it exists to answer "is the slot accounting inert, or is something else already`
+);
+console.log(
+  `  covering it?" If strand wins only here, the ledger is the covering mechanism.`
+);
+
+{
+  const str = phantomRun({ strand: true, workers: 8, hangRate: 0.45 });
+  const rel = phantomRun({ strand: false, workers: 8, hangRate: 0.45 });
+  console.log(
+    `\n  Accounting at W=8, 45% hang rate. strand: ${str.strandedAtEnd} slot(s) still stranded, ` +
+      `${str.unsettled} unsettled, ${str.dispositions.confirmed_dead} confirmed dead.`
+  );
+  console.log(
+    `  release: ${rel.dispositions.presumed_dead} presumed dead, ${rel.strandedAtEnd} stranded.` +
+      ` The old arm books every abandonment as a`
+  );
+  console.log(
+    `  free slot and calls it settled — it has no way to represent "gave up, still running".`
+  );
+
+  // WHY THE DELTA IS ZERO. Measured, not inferred — and NOT the reason first
+  // guessed. The first draft of this block asserted that slots collapse before
+  // a second call can be stranded; the instrumentation says 6 were stranded at
+  // peak. The stranding is real. It is the ORDER of events that makes it moot.
+  console.log(`\n  WHY the delta is zero — measured, and not what it first looked like:`);
+  console.log(
+    `  peak stranded slots on stalled: ${str.maxStranded}, peak concurrent calls: ${str.maxConcurrentOnStalled}, minimum slot`
+  );
+  console.log(
+    `  allowance seen: ${str.minSlotsSeen} (base 6). The stranding is substantial, not absent:`
+  );
+  console.log(
+    `    1. All ${str.maxConcurrentOnStalled} calls are admitted in the FIRST tick, at full base slots, before one`
+  );
+  console.log(
+    `       hang has been observed. No slot accounting can prevent that — there was`
+  );
+  console.log(`       nothing yet to account for.`);
+  console.log(`    2. They all hang. capacity.observe(expert, elapsedMs, ok=false), already`);
+  console.log(`       called on every expiry, folds a 1500ms sample into the latency EWMA and`);
+  console.log(
+    `       divides the allowance by consecutiveErrors — collapsing it to minSlots=${str.minSlotsSeen}.`
+  );
+  console.log(`       The ledger demotes the expert over the same failures.`);
+  console.log(`    3. It is never selected again, in EITHER arm. Every admission stranding`);
+  console.log(`       would have blocked was already blocked by a 1-slot allowance and a`);
+  console.log(`       demoted score.`);
+  console.log(
+    `  So the mechanism is correct and REDUNDANT here — redundant against layers that`
+  );
+  console.log(
+    `  exist only because earlier sprints wired them. It stops being redundant against`
+  );
+  console.log(`  a transport that hangs without producing a latency sample to observe.`);
+}
