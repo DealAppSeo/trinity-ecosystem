@@ -11,7 +11,7 @@
     "check:secrets": "node scripts/scan-secrets.mjs",
     "check:legacy-key": "node scripts/check-legacy-key.mjs",
     "check:mcp-fleet": "node scripts/mcp-fleet-smoke.mjs",
-    "check": "npm run check:secrets && npm run check:auth && npm run check:harness && npm run check:transcript && npm run check:memory && npm run check:mcp-fleet && npm run check:harness-portable && npm run check:harness-routing && npm run check:harness-consensus && npm run check:harness-agreement && npm run check:prior-work && npm run check:earned && npm run check:zkp && npm run check:identity && npm run check:e2e-harness && npx tsc --noEmit",
+    "check": "npm run check:secrets && npm run check:auth && npm run check:harness && npm run check:transcript && npm run check:memory && npm run check:mcp-fleet && npm run check:harness-portable && npm run check:harness-routing && npm run check:harness-consensus && npm run check:harness-agreement && npm run check:prior-work && npm run check:earned && npm run check:zkp && npm run check:identity && npm run check:e2e-harness && npm run check:trust && npx tsc --noEmit",
     "north": "node scripts/north-star.mjs",
     "graph": "graphify update .",
     "graph:ecosystem": "bash scripts/graph-ecosystem.sh",
@@ -38,7 +38,8 @@
     "sim:harness": "node scripts/harness-simulate.mjs",
     "experiment": "node scripts/harness-experiment.mjs",
     "repid:replay": "node scripts/repid-replay.mjs",
-    "check:identity": "node scripts/check-identity.mjs"
+    "check:identity": "node scripts/check-identity.mjs",
+    "check:trust": "node scripts/check-trust-foundation.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "latest",
