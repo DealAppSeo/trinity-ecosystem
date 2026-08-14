@@ -100,11 +100,17 @@ signed grant is worse than no caveat, because it reads as a control.
    `docs/POSEIDON2-PARAMETER-REQUEST.md`. Blocks the real binding scheme; the
    contract and tests are already written against it.
 
-4. **Decide the `ControlProof` → `VaultPermission` wiring** (LESSONS A11).
-   Recommended: shadow mode — verify the proof, log agreement/disagreement
-   against the existing `human_custody_verified` boolean, change no behaviour.
-   That measures the migration before committing to it; if the two ever
-   disagree you learn it from a log rather than from a locked-out agent.
+4. **`ControlProof` → `VaultPermission`: SHADOW MODE BUILT, awaiting data.**
+   `lib/trustshell/CustodyShadow.ts` observes at the custody gate and changes
+   nothing. Run `SHADOW_ANALYSIS_SQL` after it has been live a while.
+
+   **Read `not_comparable` first.** Nothing presents a ControlProof to the vault
+   path yet, so early observations will be almost entirely that. It is the
+   measurement — it says adoption is zero — not a sign the two approaches agree.
+
+   The cutover decision needs `shadow_looser` to be zero or fully understood:
+   that is the direction where switching GRANTS access the live gate currently
+   refuses. `shadow_stricter` only tightens, which is recoverable.
 
 5. **PR #25** is open; #24 is merged.
 

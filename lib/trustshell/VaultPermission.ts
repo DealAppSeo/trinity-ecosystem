@@ -5,11 +5,15 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import type { VaultAccessRequest, VaultAccessResult } from './types';
 import { KYAValidator } from './KYAValidator';
 import { BFTAuthorizer } from './BFTAuthorizer';
+import { CustodyShadow } from './CustodyShadow';
 
 export class VaultPermissionGate {
   private get supabase() { return getSupabaseAdmin(); }
   private kya    = new KYAValidator();
   private bft    = new BFTAuthorizer();
+  // Lazy client, per lib/CLAUDE.md — a getter, not a field initialiser holding
+  // a live client, so nothing is constructed at import time.
+  private get custodyShadow() { return new CustodyShadow(() => getSupabaseAdmin()); }
 
   async checkAccess(req: VaultAccessRequest): Promise<VaultAccessResult> {
     // Get vault config
@@ -44,7 +48,23 @@ export class VaultPermissionGate {
       return { permitted: false, reason, agentRepid: profile.repidScore, minRequired: vault.min_repid_required };
     }
 
-    // Check human custody for vault ops
+    // ---- SHADOW MODE (LESSONS A11) -----------------------------------------
+    // Observe what a ControlProof would decide at this gate, record it, and
+    // change nothing. The live decision below is untouched and still rests on
+    // `human_custody_verified`. `observe` never throws — an observability path
+    // that can break vault access is worse than no observability.
+    //
+    // Expect `not_comparable` on essentially every observation at first:
+    // nothing presents a proof yet. That is the measurement, not a failure.
+    await this.custodyShadow.observe({
+      agentName: req.agentName,
+      vaultId: req.vaultId,
+      legacyCustodyVerified: profile.humanCustodyVerified,
+      vaultRequiresCustody: !!vault.requires_human_custody,
+      controlProof: req.controlProof,
+    });
+
+    // Check human custody for vault ops — UNCHANGED, still the live gate.
     if (vault.requires_human_custody && !profile.humanCustodyVerified) {
       const reason = 'Vault requires human custody binding — 4FA soulbound token required';
       await this.logAccess(req, 'denied', profile.repidScore, vault.min_repid_required, reason);

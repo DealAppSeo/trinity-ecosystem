@@ -212,6 +212,31 @@ something makes it prove which.
 
 ---
 
+## Custody shadow mode (LESSONS A11)
+
+`VaultPermission.ts:48` denies vault access on
+`agent_kya_registry.human_custody_verified` — `true` for five agents while
+`custodian_zkp_proof` is NULL in all twelve rows. A live authorization decision
+resting on an assertion nobody can re-check.
+
+`CustodyShadow` now watches that gate and **changes nothing**. Three properties,
+each mutation-tested:
+
+1. **Never alters the decision.** The legacy verdict is what the caller acts on.
+2. **Never throws into the caller.** An observability path that can break vault
+   access is worse than no observability — a malformed proof, a missing table
+   and a throwing client are all contained and recorded as `error`.
+3. **Expects to be uninformative at first, and says so.** Nothing presents a
+   proof yet, so early observations are almost all `not_comparable`. Reading
+   that as agreement would be this repo's own defect one layer up, so the
+   recorded detail states explicitly that it is *not* agreement.
+
+`shadow_looser` (legacy denies, proof allows) is reported separately from
+`shadow_stricter` rather than averaged into a disagreement rate: only one of
+those directions grants access the live gate refuses.
+
+---
+
 ## Credential rotation
 
 `scripts/rotate-erc8004-deployer.mjs` moves the ERC-8004 identities off the
