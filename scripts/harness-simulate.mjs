@@ -35,6 +35,14 @@ const NO_TIMEOUT = argv.includes('--no-timeout');
 // Wrong answers scatter (realistic) vs form an agreeing bloc (pessimistic).
 // The headline panel number uses the bloc model deliberately.
 const SCATTER_WRONG = argv.includes('--scatter-wrong');
+// SHARED TASK DIFFICULTY — the assumption Sprint L rested on and did not test.
+// At 0 (the default, and the published world) every task is identical and each
+// expert's correctness is an independent coin flip, so a panel of 3 gets three
+// independent draws. Real experts fail on the SAME hard tasks. This makes
+// difficulty a per-task property all experts share, which correlates their
+// errors through the task rather than through the answer key.
+const HARDNESS_W = arg('hardness', 0);
+
 
 const { load } = compileHarness();
 const { ManualClock } = await load('types');
@@ -48,6 +56,15 @@ const { TimeoutPolicy } = await load('timeout');
 const { ContextTransformer, approximateTokens } = await load('transform');
 const { PluralityAggregator } = await load('aggregate');
 const { EscalationPolicy } = await load('escalate');
+// Drawn from a dedicated stream and shared by EVERY arm, so all arms see the
+// identical difficulty sequence. Drawing it inside a world would give each arm
+// a different one and make the comparison meaningless.
+const HARDNESS = (() => {
+  if (HARDNESS_W <= 0) return null;
+  const r = new SeededRng(SEED ^ 0xd1ff);
+  return Array.from({ length: TASKS }, () => r.next());
+})();
+
 
 // The run/idle split. IDLE is short because it measures time since the last
 // observed progress; RUN has to be long enough for the slowest legitimate task,
@@ -148,7 +165,7 @@ function makeWorld(seed) {
   return {
     rng,
     /** Simulate one call. Returns latency, success, and ground-truth correctness. */
-    call(expert, progress) {
+    call(expert, progress, hardness = 0.5) {
       const degraded = expert.degradesAt !== undefined && progress >= expert.degradesAt;
       const failing = expert.failsAt !== undefined && progress >= expert.failsAt;
 
@@ -166,7 +183,11 @@ function makeWorld(seed) {
 
       const errorRate = failing ? 1.0 : expert.errorRate * (degraded ? 10 : 1);
       const ok = rng.next() > errorRate;
-      const quality = degraded ? expert.trueQuality * 0.4 : expert.trueQuality;
+      const base = degraded ? expert.trueQuality * 0.4 : expert.trueQuality;
+      // Symmetric around 0.5 so the MEAN quality is unchanged; only the
+      // variance across tasks rises. A harder-than-average task lowers every
+      // expert's chance at once, which is exactly the correlation being tested.
+      const quality = Math.max(0, Math.min(1, base + HARDNESS_W * (0.5 - hardness) * 2));
       const correct = ok && rng.next() < quality;
 
       return { latencyMs: Math.round(latency), ok, correct, hang: false };
@@ -234,7 +255,7 @@ function runBaseline(seed) {
     for (let attempt = 0; attempt < 2 && !done; attempt += 1) {
       const expert = ranked[attempt];
       if (!expert) break;
-      const r = world.call(expert, progress);
+      const r = world.call(expert, progress, HARDNESS ? HARDNESS[i] : 0.5);
       m.perExpert.set(expert.id, m.perExpert.get(expert.id) + 1);
       if (expert.degradesAt !== undefined && progress >= expert.degradesAt) m.callsToDegraded += 1;
       if (expert.failsAt !== undefined && progress >= expert.failsAt) m.callsToCrasher += 1;
@@ -381,7 +402,7 @@ function runHarness(seed, panel = null) {
             limiter.tryConsume(id, 1);
             capacity.acquire(id);
             const h = timeouts.begin(id, task.id);
-            const r = world.call(expert, progress);
+            const r = world.call(expert, progress, HARDNESS ? HARDNESS[i] : 0.5);
             m.perExpert.set(id, m.perExpert.get(id) + 1);
             m.panelCalls += 1;
             if (id === 'rookie') m.rookieCalls += 1;
@@ -489,7 +510,7 @@ function runHarness(seed, panel = null) {
       limiter.tryConsume(id, 1);
       capacity.acquire(id);
       const attempt = timeouts.begin(id, task.id);
-      const r = world.call(expert, progress);
+      const r = world.call(expert, progress, HARDNESS ? HARDNESS[i] : 0.5);
 
       // `tried` already holds this pick, so length 1 means it is the first.
       // NOT `attempt === 0`: the loop variable is shadowed a few lines above by
@@ -863,7 +884,7 @@ function runOracle(seed) {
   let correct = 0;
   for (let i = 0; i < TASKS; i += 1) {
     const p = i / TASKS;
-    const r = world.call(bestExpertAt(p), p);
+    const r = world.call(bestExpertAt(p), p, HARDNESS ? HARDNESS[i] : 0.5);
     if (r.correct) correct += 1;
   }
   return correct / TASKS;
@@ -984,4 +1005,42 @@ console.log(
 console.log(
   `  => extra evidence contributes ${((evidenceCorrect - achieved) * 100).toFixed(2)}pp;` +
     ` aggregation itself contributes ${((panelCorrect - evidenceCorrect) * 100).toFixed(2)}pp.`
+);
+
+// ── WHERE THE PANEL STOPS PAYING ─────────────────────────────────────────────
+//
+// The number above is only as good as one modelling assumption: that each
+// expert's correctness is an INDEPENDENT draw. A panel of 3 is worth paying for
+// because it buys three independent chances. Real experts fail on the SAME hard
+// tasks, and to the extent they do, the extra calls buy nothing.
+//
+// `--hardness W` makes difficulty a per-task property every expert shares,
+// symmetric around the mean so average quality is unchanged and only the
+// task-to-task variance rises. Measured across 3 seeds, panel vs top-1:
+//
+//   W=0.0   +4.70pp     the published world — errors fully independent
+//   W=0.2   +4.90pp
+//   W=0.4   +3.75pp
+//   W=0.6   +2.55 / +0.85 / +3.80 pp
+//   W=0.8   +0.65 / +0.05 / -0.05 pp   <- the gain is gone
+//   W=1.0   -0.85 / +0.05 / -0.70 pp   <- and it inverts
+//
+// **The panel stops paying at W ~= 0.8 and becomes a net loss at 1.0, while
+// still costing 2.77x the calls.** Against the omniscient ceiling the crossover
+// is earlier still, around W ~= 0.7.
+//
+// So the Sprint L result is not unconditional and must not be quoted as if it
+// were. It holds while expert errors are substantially independent. The
+// deployment question this implies is measurable on real traffic before
+// enabling anything: how often do two experts get the SAME task wrong?
+console.log(
+  `\n  BOUNDARY: this gain assumes expert errors are independent. Re-run with` +
+    ` --hardness W`
+);
+console.log(
+  `  to correlate them through shared task difficulty. The advantage decays to` +
+    ` zero at`
+);
+console.log(
+  `  W~0.8 and inverts at 1.0, at unchanged cost. See the note above this line.`
 );

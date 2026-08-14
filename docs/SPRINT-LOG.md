@@ -1167,3 +1167,89 @@ is built.
 - The escalation config (`marginFloor: 2000`, panel of 3) was chosen from the
   experiment sweep and confirmed across 7 seeds, but not on a held-out world.
 - Real-data replay (152,001 labelled outcomes) — still needs Supabase.
+
+---
+
+## Sprint M — the assumption Sprint L rested on, and where it breaks
+
+Sprint L's +4.70pp rests on one modelling assumption that had never been
+stated as a load-bearing one, let alone tested: **each expert's correctness is
+an independent draw.** A panel of 3 is worth paying for precisely because it
+buys three independent chances. Real experts fail on the *same hard tasks*, and
+to the extent they do, the extra calls buy nothing at full price.
+
+This is a sharper risk than the wrong-answer-correlation bracket already
+reported. That bracket was already resolved — the panel beats the ceiling at
+BOTH endpoints (bloc 96.95%, scatter 98.20%), so every value between them is
+covered. Error correlation *through the task* is a different axis entirely, and
+the world model had none of it: every task was identical and only the expert
+varied.
+
+### The mechanism added
+
+`--hardness W` makes difficulty a per-task property every expert shares, drawn
+from a dedicated stream and **shared across all arms** so they see the identical
+difficulty sequence. The shock is symmetric around the mean, so average quality
+is unchanged and only task-to-task variance rises — otherwise the experiment
+would just be "make the world harder" and everything would drop together.
+
+`W=0` is byte-identical to the published world: 92.3% / p99 179 / tau 0.643, and
+the experiment script's validity guard still reports MATCH.
+
+### The result — the gain decays, then inverts
+
+| W | ceiling | top-1 | panel | panel−top1 | panel−ceiling |
+|---|---|---|---|---|---|
+| 0 | 94.25% | 92.25% | 96.95% | **+4.70pp** | +2.70pp |
+| 0.1 | 93.25% | 91.20% | 96.45% | +5.25pp | +3.20pp |
+| 0.2 | 90.75% | 88.10% | 93.00% | +4.90pp | +2.25pp |
+| 0.3 | 88.25% | 86.80% | 90.75% | +3.95pp | +2.50pp |
+| 0.4 | 85.15% | 83.45% | 87.20% | +3.75pp | +2.05pp |
+| 0.6 | 80.15% | 79.00% | 81.55% | +2.55pp | +1.40pp |
+| 0.8 | 75.40% | 72.95% | 73.60% | +0.65pp | **−1.80pp** |
+| 1.0 | 71.20% | 68.65% | 67.80% | **−0.85pp** | **−3.40pp** |
+
+Confirmed across 3 seeds at the boundary:
+
+| W | seed 20260813 | seed 1 | seed 2 |
+|---|---|---|---|
+| 0.6 | +2.55pp | +0.85pp | +3.80pp |
+| 0.8 | +0.65pp | +0.05pp | −0.05pp |
+| 1.0 | −0.85pp | +0.05pp | −0.70pp |
+
+**The panel's advantage collapses to zero at W ≈ 0.8 and inverts at 1.0 — while
+still costing 2.77× the calls.** Against the omniscient ceiling the crossover is
+earlier, around W ≈ 0.7.
+
+### What this means for the Sprint L claim
+
+It is not overturned and it is not unconditional. **It holds while expert errors
+are substantially independent, and it becomes pure cost when shared task
+difficulty dominates.** Any future quotation of "+4.70pp" without that condition
+attached is a misreport.
+
+There is also a mild non-monotonicity worth not over-reading: W=0.1 beats W=0
+(+5.25 vs +4.70pp). A little difficulty variance creates more tasks where the
+leader is genuinely uncertain, which is exactly what escalation is looking for.
+On one seed at one setting, that is a curiosity, not a finding.
+
+### The decision rule this produces
+
+The condition is measurable on real traffic *before* enabling anything:
+**how often do two experts get the SAME task wrong?** That single statistic
+locates a deployment on the table above. Nothing in the harness currently
+measures it, which makes it the natural next build — and it is also the first
+thing the 152,001-outcome replay could answer, since those outcomes are labelled
+and joinable per task.
+
+### Evidence
+
+278 assertions, 0 failures. tsc 25 unchanged. Validity guard MATCH. `W=0`
+reproduces the published world exactly, so the flag is additive.
+
+### NOT CHECKED
+
+- Where real Trinity experts actually sit on the W axis. Unknown, and it is the
+  whole question.
+- The shock model is uniform and symmetric. A heavy-tailed difficulty
+  distribution (a few very hard tasks) may behave differently from a broad one.
