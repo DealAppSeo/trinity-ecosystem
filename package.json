@@ -31,7 +31,8 @@
     "check:harness-reputation": "node scripts/harness-reputation-test.mjs",
     "check:harness-agreement": "node scripts/harness-agreement-test.mjs",
     "sim:harness": "node scripts/harness-simulate.mjs",
-    "experiment": "node scripts/harness-experiment.mjs"
+    "experiment": "node scripts/harness-experiment.mjs",
+    "repid:replay": "node scripts/repid-replay.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "latest",

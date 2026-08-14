@@ -1583,3 +1583,94 @@ the alternates list. Checked by running it, not by reading it.
   harness, it is the absence of real data.** The 152,001 labelled outcomes in
   `repid_score_events` would settle where real experts sit on the W axis, which
   is the one input that decides whether any of this runs in production.
+
+---
+
+## Sprint Q — the replay, and a finding that changes what it is worth
+
+Sprint P closed the simulator axis: routing 2.00pp from its bound, panel
+membership 0.75pp from its bound, panel size resolved, whether-to-panel gated
+adaptively. The binding constraint became the absence of real data. So this
+sprint took the one item left on the critical path and removed it from that path
+as far as is possible without credentials.
+
+`scripts/repid-replay.mjs` (`npm run repid:replay`). Read-only: SELECTs only, no
+migration, nothing touched that is Sean-gated. `--dry-run` introspects and stops.
+
+### The finding, which matters more than the script
+
+**The replay answers two different questions, and only one of them is certainly
+answerable from this table.**
+
+- **Q1 — does the ledger rank real agents sensibly?** Needs `agent_id` and an
+  outcome column. Both are recorded as existing. **Answerable.**
+- **Q2 — where does the real fleet sit on the correlation axis?** This is the
+  question blocking Sprints L–P. It decides whether panels run at all: the
+  panel's value swings from +4.70pp to −0.85pp across that axis. **Q2 needs a
+  column grouping events by TASK, and no such column is recorded anywhere in
+  this repo.**
+
+Only `agent_id` and `decision_outcome` are documented (ROADMAP §1.2, §1.3).
+Grepped the whole repo: nothing references a task, decision, request or
+correlation id on `repid_score_events`. If none exists, **the replay validates
+the ledger but does not settle the panel question**, and six sprints of
+conditional results stay conditional.
+
+That is worth knowing before anyone schedules the work, and it is why the script
+**introspects the schema first and reports what is missing** rather than
+assuming a column name. Substituting a timestamp bucket or any other proxy for a
+real task key would report a correlation that is an artefact of the join — a
+number that looks like the answer and is not. The script says so explicitly and
+refuses to do it.
+
+Same standard as declining backlog item 5's migration: **discover the schema, do
+not assert one.**
+
+### What it does with the parts that are certain
+
+- Replays outcomes through the real `ReputationLedger` at harness defaults.
+- Maps `decision_outcome` **explicitly and case-folded** — the enum has 13
+  values over 152,001 rows including case-duplicate pairs (`approved` 46 /
+  `APPROVED` 30) and values that are not outcomes at all (`test`, `profit`,
+  `RESTORE`). Unrecognised values are counted as **unmapped and excluded, never
+  defaulted**; a default either way would manufacture the result. It prints the
+  unmapped values so a new one surfaces instead of being absorbed.
+- Reads `repid_score_events` directly rather than joining to `agent_repid`, so
+  it does **not** inherit the 43% join leak — at the cost of reporting UUIDs.
+- Derives earned score and confidence through the ledger's own accessors rather
+  than re-implementing shrinkage, so the two cannot drift.
+
+### Caveats the script prints itself
+
+- **No `ORDER BY`.** The ledger's EWMA is order-dependent, so scores are
+  indicative until re-run ordered by the real event timestamp. Flagged in output
+  rather than left for a reader to notice.
+- **The outcome mapping is a judgement, not a fact.** `vetoed` (115,885) and
+  `flagged` (21,976) are read as failures. If `flagged` means "held for review"
+  rather than "wrong", 137,861 rows change meaning and so does every score.
+  Printed as CONFIRM THIS BEFORE PUBLISHING.
+
+### Verified without a database
+
+Both failure paths, by running them:
+
+| condition | behaviour |
+|---|---|
+| no credentials | `NOT MEASURED`, exit **2**, nothing queried |
+| unreachable host | `Nothing below can be trusted. Stopping rather than guessing.`, exit **1** |
+
+Neither path reports empty data as a finding, which is the failure mode this
+repo keeps catching. Client construction follows `scripts/north-star.mjs`: lazy,
+inside `main()`, documented key names, and no dummy fallback — a dummy returns
+empty result sets that read as "no data" instead of "misconfigured".
+
+341 assertions unchanged, `tsc` 25, published world untouched.
+
+### NOT CHECKED
+
+- **The script has never been run against the real database.** Its behaviour on
+  live data is unverified, by construction. It is written to fail loudly rather
+  than quietly, and that is all that can be claimed for it.
+- Whether a task key exists at all. `--dry-run` answers this in one command and
+  costs nothing; that is the single most informative thing anyone with
+  credentials can do next.
