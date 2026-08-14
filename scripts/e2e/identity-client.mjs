@@ -28,7 +28,6 @@ const MODULES = [
   'capability.ts',
   'nonce-store.ts',
   'delegation.ts',
-  'capability.ts',
 ];
 
 /**
