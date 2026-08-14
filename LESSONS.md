@@ -623,3 +623,80 @@ that each make the other redundant are invisible to it, and "each one is
 individually redundant" is exactly the argument that deletes both. When a
 comment says a check is redundant *here* but load-bearing *in the circuit* —
 which is now written in two files — mutate the pair, not the parts.
+
+---
+
+## A13 — an optional callback that is never absent, and a replay defence that recorded nothing (2026-08-14)
+
+**[VERIFIED] — both found by tests while building `loop-authorizer.ts`, the
+adapter binding the agent loop to `ControlProof`. Neither was visible by
+reading.**
+
+### 1. `valueOf` is on `Object.prototype`, so the option was never optional
+
+The adapter took an optional callback for extracting the value an action moves,
+so the `maxValue` caveat could be applied:
+
+```ts
+export interface ControlProofAuthorizerInput {
+  valueOf?: (call: ToolCall) => { asset: string; amount: number } | undefined;
+}
+// ...
+value: args.valueOf?.(request.call),
+```
+
+A caller who omits it gets `Object.prototype.valueOf` — **a function**, which
+`?.` therefore calls, and which returns the container object. So `ctx.value`
+became a truthy object with `asset: undefined`, `evaluateCaveats` skipped its
+`if (!ctx.value)` NOT_CHECKED branch, and every call was refused with *"cap is
+denominated in USDC but the action moves undefined"*.
+
+The failure direction was safe here — it denied rather than allowed — but that
+is luck, not design. The same shape with an allowlist-shaped default would have
+failed open.
+
+**The rule.** An optional property named after anything on `Object.prototype` is
+never absent: `valueOf`, `toString`, `constructor`, `hasOwnProperty`,
+`isPrototypeOf`, `propertyIsEnumerable`, `toLocaleString`. `?.` does not protect
+you, because the property genuinely resolves — up the prototype chain. Rename
+it. A `Object.hasOwn` guard also works and leaves the trap set for the next
+person.
+
+Worth noting what did NOT catch it: `strict` TypeScript compiled it without a
+murmur, because the inherited member satisfies no type check that was being
+made, and the *shape* of the failure — a denial — looked like ordinary
+authorization behaviour.
+
+### 2. `seenNonces` was read and never written, so replay defence prevented nothing
+
+`verifyControlProof` says so in its own doc comment — *"Caller-managed spent
+set. Single-process only; **the caller adds the nonce after a successful
+verification**"* — and the adapter passed the set in, got `replay: VERIFIED`
+back, and walked away without adding anything.
+
+Every session therefore verified. A proof could be replayed into unlimited
+concurrent sessions, and the check reported VERIFIED each time. This is the
+`custodian_zkp_proof` shape from A11 exactly: a control that reads as enforced,
+returns the outcome that means "enforced", and enforces nothing.
+
+It was caught by an assertion on the *side effect* rather than the verdict —
+`assert.equal(seen.size, 1)` — not by any assertion about what the verifier
+returned. **When a check's correctness depends on the caller completing it,
+assert on the state the caller was supposed to change.** A verdict of VERIFIED
+is what the broken version produced.
+
+The related mutation is worth recording because it survived the first pass: a
+delegated chain has a nonce per link, and the replay check runs against the
+ROOT. Recording the leaf's nonce is a no-op for a direct grant, where leaf and
+root are the same object, so **only a delegation fixture separates them**. A
+test that covers just the simple shape leaves the whole chain replayable.
+
+### And the boundary, again
+
+`>=` versus `>` at exactly `expiresAt` survived a test that checked one second
+past expiry. `verifyControlProof` uses `now >= expiresAt`, so `>` would make the
+two authorization paths disagree for exactly one millisecond. A one-instant
+disagreement between two paths that both claim to enforce the same grant is only
+ever found in production. **Test the instant, not a point safely past it** —
+this is the third time that lesson has been paid for here, after the `maxValue`
+cap and the rate limiter.

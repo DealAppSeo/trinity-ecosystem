@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat, memAuthz, harness, transition;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat, memAuthz, harness, transition, loopAuthz, loopKernel;
 try {
   execFileSync(
     localTsc(),
@@ -45,6 +45,7 @@ try {
       'lib/trustshell/identity/memory-authz.ts',
       'lib/trustshell/identity/harness-bundle.ts',
       'lib/trustshell/identity/reputation-transition.ts',
+      'lib/trustshell/identity/loop-authorizer.ts',
       '--outDir', outDir,
       // Pin the root so output layout does not move when a module gains an
       // import from outside identity/ — repid-predicate.ts imports
@@ -74,6 +75,13 @@ try {
   memAuthz = await import(pathToFileURL(join(base, 'memory-authz.js')).href);
   harness = await import(pathToFileURL(join(base, 'harness-bundle.js')).href);
   transition = await import(pathToFileURL(join(base, 'reputation-transition.js')).href);
+  loopAuthz = await import(pathToFileURL(join(base, 'loop-authorizer.js')).href);
+  // The kernel compiles to trustshell/harness/, not trustshell/identity/ — the
+  // adapter imports it, so tsc emits it alongside. Loading it here lets the
+  // adapter be tested against the real loop rather than a stand-in.
+  loopKernel = await import(
+    pathToFileURL(join(outDir, 'trustshell', 'harness', 'loop.js')).href
+  );
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -2200,6 +2208,384 @@ await check('the read-time half points at a file that exists and shrinks toward 
     'shrinking toward the fleet mean is the reputation-laundering vector'
   );
   assert.equal(r.publicInputRequired, 'now');
+});
+
+// --- the loop authorizer: the identity layer finally has a caller -----------
+//
+// Before this adapter, the whole identity layer was reachable from one E2E
+// verify route and nothing in the system asked it for permission before acting.
+
+const LOOP_AUD = 'trinity:agent-loop';
+
+const mkAuthz = async (over = {}) => {
+  const human = over.human ?? (await identity.createHumanSSID());
+  const agent = over.agent ?? (await identity.createAgentIdentity('LOOPER'));
+  const proof =
+    over.proof ??
+    (await controlProof.issueControlProof({
+      human,
+      agent,
+      audience: over.audience ?? LOOP_AUD,
+      capabilities: over.capabilities ?? ['tool:read'],
+      caveats: over.caveats,
+      ttlSeconds: over.ttlSeconds ?? 3600,
+      now: over.issuedAt,
+    }));
+  return {
+    human,
+    agent,
+    proof,
+    built: await loopAuthz.createControlProofAuthorizer({
+      proof,
+      audience: over.audience ?? LOOP_AUD,
+      toolCapabilities: over.toolCapabilities ?? { read_thing: 'tool:read' },
+      declaredValue: over.declaredValue,
+      now: over.now,
+      seenNonces: over.seenNonces ?? new Set(),
+    }),
+  };
+};
+
+const session = (over = {}) => ({
+  turn: 1,
+  totalCalls: 0,
+  callsByTool: {},
+  writes: 0,
+  deniedAttempts: 0,
+  ...over,
+});
+const toolCall = (name, args = {}) => ({ id: 'c1', name, args });
+const ask = (built, name, args = {}, sess = session()) =>
+  built.authorizer.authorize({ call: toolCall(name, args), effect: 'read', session: sess });
+
+await check('a verified proof authorizes a mapped, permitted tool', async () => {
+  const { built } = await mkAuthz();
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, true, v.reason);
+  assert.deepEqual(built.grantedCapabilities, ['tool:read']);
+});
+
+await check('AN UNMAPPED TOOL IS DENIED — an undecided permission reads as no', async () => {
+  // The same rule as the kernel's empty allowlist. A tool with no capability
+  // mapping is one nobody has decided about, and defaulting to allow would make
+  // the least-configured deployment the most permissive.
+  const { built } = await mkAuthz({ toolCapabilities: {} });
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, false, 'an unmapped tool was authorized');
+  assert.match(v.reason, /no capability is mapped/);
+});
+
+await check('a mapped tool whose capability is not granted is denied', async () => {
+  const { built } = await mkAuthz({
+    capabilities: ['tool:read'],
+    toolCapabilities: { write_thing: 'tool:write' },
+  });
+  const v = await ask(built, 'write_thing');
+  assert.equal(v.allowed, false, 'an ungranted capability was honoured');
+  assert.match(v.reason, /not permitted by the granted capabilities/);
+});
+
+await check('wildcards attenuate by WHOLE SEGMENT, through the adapter', async () => {
+  // `pay:usd*` must not cover `pay:usdt`. Asserted here as well as in
+  // capability.ts because this is the path an actual tool call takes, and a
+  // sound algebra wired up wrongly is indistinguishable from an unsound one.
+  const wide = await mkAuthz({
+    capabilities: ['pay:*'],
+    toolCapabilities: { send: 'pay:usdc' },
+  });
+  assert.equal((await ask(wide.built, 'send')).allowed, true, 'pay:* should cover pay:usdc');
+
+  const partial = await mkAuthz({
+    capabilities: ['pay:usd*'],
+    toolCapabilities: { send: 'pay:usdt' },
+  });
+  assert.equal(
+    (await ask(partial.built, 'send')).allowed,
+    false,
+    'a partial-segment wildcard reached a different asset'
+  );
+});
+
+await check('A GRANT THAT EXPIRES MID-SESSION STOPS AUTHORIZING', async () => {
+  // The reason anything is re-checked per call. A 25-turn loop can outlive its
+  // grant, and an expiry that only applies at session start is decorative for
+  // the longest and least supervised part of the run.
+  const t0 = new Date('2026-08-14T12:00:00Z');
+  let clock = t0;
+  const { built } = await mkAuthz({
+    issuedAt: t0,
+    ttlSeconds: 60,
+    now: () => clock,
+  });
+  assert.equal((await ask(built, 'read_thing')).allowed, true, 'should be valid at issue');
+
+  clock = new Date(t0.getTime() + 61_000);
+  const after = await ask(built, 'read_thing');
+  assert.equal(after.allowed, false, 'an expired grant still authorized');
+  assert.match(after.reason, /expired/);
+  assert.match(after.reason, /does not stretch/, 'the refusal should say why');
+});
+
+await check('EXPIRY IS EXCLUSIVE AT THE BOUNDARY INSTANT', async () => {
+  // Found by mutation: `>=` vs `>` at exactly expiresAt survived a test that
+  // only checked a second past it. The instant matters because
+  // verifyControlProof uses `now >= expiresAt`, so a `>` here would make the
+  // adapter and the verifier disagree for exactly one millisecond — and a
+  // one-instant disagreement between two authorization paths is the kind of
+  // thing that is only ever found in production.
+  const t0 = new Date('2026-08-14T12:00:00Z');
+  let clock = t0;
+  const { built } = await mkAuthz({ issuedAt: t0, ttlSeconds: 60, now: () => clock });
+
+  clock = new Date(t0.getTime() + 59_999);
+  assert.equal((await ask(built, 'read_thing')).allowed, true, 'one ms before expiry must pass');
+
+  clock = new Date(t0.getTime() + 60_000); // exactly expiresAt
+  const atBoundary = await ask(built, 'read_thing');
+  assert.equal(atBoundary.allowed, false, 'the expiry instant itself must refuse');
+  assert.match(atBoundary.reason, /expired/);
+});
+
+await check('A DELEGATED PROOF SPENDS THE ROOT NONCE, not the link nonce', async () => {
+  // Found by mutation: recording the leaf's nonce instead of the root's is a
+  // no-op for a direct grant, because leaf and root are the same object. Only a
+  // delegation chain separates them — and the replay check runs against the
+  // ROOT, so recording a link nonce records a value nothing ever tests and the
+  // whole chain replays freely.
+  const seen = new Set();
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: LOOP_AUD, capabilities: ['tool:*'], ttlSeconds: 3600,
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  assert.notEqual(link.grant.nonce, root.grant.nonce, 'the fixture needs distinct nonces');
+
+  const args = {
+    proof: link, audience: LOOP_AUD,
+    toolCapabilities: { read_thing: 'tool:read' }, seenNonces: seen,
+  };
+  await loopAuthz.createControlProofAuthorizer(args);
+  assert.ok(seen.has(root.grant.nonce), 'the ROOT nonce should have been spent');
+  await assert.rejects(
+    loopAuthz.createControlProofAuthorizer(args),
+    /did not verify/,
+    'a delegated chain replayed'
+  );
+});
+
+await check('A CLOCK THAT JUMPS BACKWARDS does not pre-activate a grant', async () => {
+  // The notBefore check is unreachable by forward time alone: construction
+  // already verifies the validity window, and if notBefore passed then, it
+  // passes for every later call. It exists for clock REGRESSION — an NTP
+  // correction stepping the clock back behind the grant's start — which is the
+  // only way the branch fires. Tested that way, so it is not an unreachable
+  // line nobody can exercise. (An unconstrained field is the `frontier` bug;
+  // an untestable branch is its neighbour.)
+  const t0 = new Date('2026-08-14T12:00:00Z');
+  let clock = new Date(t0.getTime() + 1_000);
+  const { built } = await mkAuthz({ issuedAt: t0, ttlSeconds: 600, now: () => clock });
+  assert.equal((await ask(built, 'read_thing')).allowed, true, 'valid before the step');
+
+  clock = new Date(t0.getTime() - 5_000); // the clock steps backwards
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, false, 'a backwards clock authorized before notBefore');
+  assert.match(v.reason, /not yet valid/);
+});
+
+await check('MAXCALLS IS ENFORCED, NOT REPORTED — the caveat debt is settled', async () => {
+  // caveat.ts has said since it was written that an unenforced caveat is worse
+  // than no caveat, and reported maxCalls as NOT_CHECKED because nothing
+  // counted. The loop counts. This is that NOT_CHECKED becoming a verdict.
+  const { built } = await mkAuthz({ caveats: [{ type: 'maxCalls', limit: 2 }] });
+
+  const first = await ask(built, 'read_thing', {}, session({ totalCalls: 0 }));
+  const second = await ask(built, 'read_thing', {}, session({ totalCalls: 1 }));
+  const third = await ask(built, 'read_thing', {}, session({ totalCalls: 2 }));
+
+  assert.equal(first.allowed, true, 'call 1 of 2');
+  assert.equal(second.allowed, true, 'call 2 of 2 — the boundary must be inclusive');
+  assert.equal(third.allowed, false, 'a limit of 2 permitted a third call');
+  assert.match(third.reason, /maxCalls/);
+  assert.match(first.reason, /1 caveat\(s\) VERIFIED/, 'it must report VERIFIED, not NOT_CHECKED');
+});
+
+await check('maxValue is enforced through the adapter, including wrong asset', async () => {
+  const declaredValue = (c) => (c.args.amount ? { asset: c.args.asset, amount: c.args.amount } : undefined);
+  const { built } = await mkAuthz({
+    caveats: [{ type: 'maxValue', asset: 'USDC', amount: 100 }],
+    toolCapabilities: { send: 'tool:read' },
+    declaredValue,
+  });
+  assert.equal((await ask(built, 'send', { asset: 'USDC', amount: 100 })).allowed, true, 'exactly the cap must pass');
+  assert.equal((await ask(built, 'send', { asset: 'USDC', amount: 101 })).allowed, false, 'over the cap');
+  // A cap on USDC says nothing about USDT — refusing beats treating it as inapplicable.
+  assert.equal((await ask(built, 'send', { asset: 'USDT', amount: 1 })).allowed, false, 'asset switch routed around the cap');
+});
+
+await check('an UNDECLARED value leaves maxValue NOT_CHECKED, and says so in the verdict', async () => {
+  // caveatsPermit does not fail on NOT_CHECKED, so the call proceeds — but the
+  // unapplied cap must be visible in the record rather than vanishing into an
+  // "allowed" that reads as fully verified.
+  const { built } = await mkAuthz({
+    caveats: [{ type: 'maxValue', asset: 'USDC', amount: 100 }],
+  });
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, true, 'NOT_CHECKED must not refuse the action');
+  assert.match(v.reason, /NOT_CHECKED/, 'an unapplied cap disappeared from the verdict');
+});
+
+await check('the toolAllowlist caveat is enforced', async () => {
+  const { built } = await mkAuthz({
+    caveats: [{ type: 'toolAllowlist', tools: ['other_tool'] }],
+  });
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, false, 'a tool outside the caveat allowlist was authorized');
+  assert.match(v.reason, /toolAllowlist/);
+});
+
+await check('A BAD PROOF REFUSES THE SESSION rather than denying every call', async () => {
+  // Both are safe; they say different things. An authorizer that denies
+  // everything looks, in a transcript, exactly like an agent whose tools were
+  // all out of scope — which would hide a configuration failure inside what
+  // reads as normal agent behaviour.
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('LOOPER');
+  const impostor = await identity.createHumanSSID();
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: LOOP_AUD, capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  proof.grant.humanDid = impostor.did; // signature no longer verifies
+
+  await assert.rejects(
+    loopAuthz.createControlProofAuthorizer({
+      proof, audience: LOOP_AUD, toolCapabilities: { read_thing: 'tool:read' }, seenNonces: new Set(),
+    }),
+    (e) => e.name === 'ProofRejected'
+  );
+});
+
+await check('a proof for another audience refuses the session', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('LOOPER');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: 'trinity:vault', capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  await assert.rejects(
+    loopAuthz.createControlProofAuthorizer({
+      proof, audience: LOOP_AUD, toolCapabilities: { read_thing: 'tool:read' }, seenNonces: new Set(),
+    }),
+    /did not verify/
+  );
+});
+
+await check('THE NONCE IS SPENT ONCE PER SESSION, NOT PER CALL', async () => {
+  // If the adapter consumed a nonce per tool call, the second call of every
+  // session would be refused as a replay of the first — the replay defence
+  // would break the thing it protects.
+  const seen = new Set();
+  const { built } = await mkAuthz({ seenNonces: seen });
+  for (let i = 0; i < 5; i += 1) {
+    const v = await ask(built, 'read_thing', {}, session({ totalCalls: i }));
+    assert.equal(v.allowed, true, `call ${i + 1} was refused as a replay`);
+  }
+  assert.equal(seen.size, 1, 'exactly one nonce should have been spent');
+});
+
+await check('a replayed proof refuses a SECOND session', async () => {
+  const seen = new Set();
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('LOOPER');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: LOOP_AUD, capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  const args = {
+    proof, audience: LOOP_AUD, toolCapabilities: { read_thing: 'tool:read' }, seenNonces: seen,
+  };
+  await loopAuthz.createControlProofAuthorizer(args);
+  await assert.rejects(loopAuthz.createControlProofAuthorizer(args), /did not verify/);
+  assert.equal(seen.size, 1, 'the replay must not add a second nonce');
+});
+
+await check('a DELEGATED sub-agent carries only what it was delegated', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: LOOP_AUD, capabilities: ['tool:*'], ttlSeconds: 3600,
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  const built = await loopAuthz.createControlProofAuthorizer({
+    proof: link,
+    audience: LOOP_AUD,
+    toolCapabilities: { read_thing: 'tool:read', write_thing: 'tool:write' },
+    seenNonces: new Set(),
+  });
+  assert.equal(built.delegationDepth, 1, 'depth');
+  assert.deepEqual(built.grantedCapabilities, ['tool:read'], 'the worker carries only its delegation');
+  assert.equal((await ask(built, 'read_thing')).allowed, true, 'delegated capability');
+  assert.equal(
+    (await ask(built, 'write_thing')).allowed,
+    false,
+    'the worker reached a capability only its supervisor held'
+  );
+});
+
+// --- kernel + adapter, together ---------------------------------------------
+
+await check('THE LOOP AND THE ADAPTER WORK TOGETHER, and the agent still cannot over-claim', async () => {
+  // The integration that is the point of both files. The agent calls a tool it
+  // holds and one it does not, then claims VERIFIED. The refusal is real, and
+  // the claim is reduced because of it.
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('LOOPER');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: LOOP_AUD, capabilities: ['tool:read'], ttlSeconds: 3600,
+  });
+  const { authorizer } = await loopAuthz.createControlProofAuthorizer({
+    proof,
+    audience: LOOP_AUD,
+    toolCapabilities: { read_thing: 'tool:read', write_thing: 'tool:write' },
+    seenNonces: new Set(),
+  });
+
+  let turn = 0;
+  const result = await loopKernel.runAgentLoop({
+    taskId: 'integration',
+    policy: {
+      maxIterations: 5,
+      noProgressAbortAfter: 3,
+      toolsAllowed: ['read_thing', 'write_thing'],
+      irreversibleRequiresHuman: [],
+      untrustedOutputSources: [],
+      maxWritesPerSession: 10,
+      toolEffects: { read_thing: 'read', write_thing: 'write' },
+    },
+    model: {
+      async turn() {
+        turn += 1;
+        if (turn === 1) return { calls: [{ id: 'a', name: 'read_thing', args: {} }] };
+        if (turn === 2) return { calls: [{ id: 'b', name: 'write_thing', args: {} }] };
+        return { calls: [], handoff: { outcome: 'VERIFIED', summary: 'all done', evidence: [] } };
+      },
+    },
+    tools: { async call() { return { content: 'result' }; } },
+    authorizer,
+    clock: { now: () => 0 },
+  });
+
+  assert.equal(result.turns[0].calls[0].verdict.allowed, true, 'the held capability should pass');
+  assert.equal(result.turns[1].calls[0].verdict.allowed, false, 'the unheld capability should be refused');
+  assert.equal(result.claimed, 'VERIFIED', 'the agent claimed VERIFIED');
+  assert.equal(result.outcome, 'NOT_CHECKED', 'the claim survived a refused call');
+  assert.match(result.downgradedBecause ?? '', /refused/, 'and the downgrade names the refusal');
 });
 
 rmSync(outDir, { recursive: true, force: true });

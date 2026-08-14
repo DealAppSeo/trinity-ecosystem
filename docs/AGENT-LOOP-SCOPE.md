@@ -176,11 +176,55 @@ idempotent polling; that cost is documented at the definition rather than left
 to be discovered, and is why `loops.no_progress_abort_after` defaults to 3
 rather than 1.
 
-**Not yet built, and deliberately:** the `Authorizer` adapter that binds the
-port to `ControlProof` / `capability` / `caveat`. The port is defined and
-required (no default — an optional authorizer would make "forgot to pass one"
-indistinguishable from "authorized everything"), and the adapter is the next
-piece.
+### The `Authorizer` adapter — BUILT 2026-08-14
+
+`lib/trustshell/identity/loop-authorizer.ts`, 18 new assertions inside
+`check:identity` (168 → 186), 15 mutants all killed.
+
+**This is the first thing in the system that asks the identity layer for
+permission before acting.** 168 assertions of dual-auth grants, attenuation,
+delegation chains and caveats were reachable from exactly one E2E verify route
+and nothing consulted them.
+
+**It settles the caveat debt.** `caveat.ts` has said since it was written that
+an unenforced caveat is worse than no caveat, and reported `maxCalls` as
+NOT_CHECKED because nothing counted calls across requests. The loop counts;
+passing `session.totalCalls` as `callsSoFar` makes it a real verdict. The kernel
+change that made this safe is on `SessionCounters`: **every count excludes the
+call being authorized**, stated on the type, because otherwise a `maxCalls: 2`
+caveat permits one call and the boundary is the only place it shows.
+
+**Verification is split, and the split is forced.** Signatures, audience,
+chain attenuation and the nonce are checked ONCE at construction — cryptographic
+facts cannot change mid-session, and `NonceStore.consume()` is atomic and single
+use, so calling it per tool call would refuse the second call of every session
+as a replay of the first. The validity window, the tool's required capability
+and every caveat are re-checked ON EVERY CALL, because a 25-turn loop can
+outlive its grant and an expiry that applies only at session start is decorative
+for the longest and least supervised part of the run.
+
+**A bad proof refuses the session** (`ProofRejected`) rather than returning an
+authorizer that denies everything. Both are safe and they say different things:
+deny-everything looks, in a transcript, exactly like an agent whose tools were
+all out of scope, which would hide a configuration failure inside what reads as
+normal behaviour.
+
+**Two real defects found by the tests, neither visible by reading** — both
+written up as LESSONS A13:
+
+- **`valueOf` is on `Object.prototype`**, so the optional value-extractor option
+  was never absent. Omitting it resolved to the inherited method, which `?.`
+  happily called and which returns the container — a truthy value object with
+  `asset: undefined`. Renamed to `declaredValue`.
+- **`seenNonces` was read and never written**, so replay defence reported
+  VERIFIED and prevented nothing — the `custodian_zkp_proof` shape from A11
+  exactly. Caught by asserting on the side effect (`seen.size`) rather than the
+  verdict, which is what the broken version got right.
+
+Mutation also caught two boundaries a passing suite had not reached: `>=` versus
+`>` at exactly `expiresAt` (one millisecond of disagreement with
+`verifyControlProof`), and recording a *leaf* nonce instead of the root's, which
+is a no-op for a direct grant and leaves an entire delegation chain replayable.
 
 ### Stage B — outcomes become reputation events
 
@@ -282,10 +326,7 @@ than a silent one.
 ## Recommended order
 
 1. ~~**Stage A kernel**~~ — **DONE 2026-08-14.**
-2. **The `Authorizer` adapter** — binds the port to `ControlProof`, `capability`
-   and `caveat`. Lives outside `harness/`, because that is the whole point of
-   the port. This is where stateful caveats become checkable, since the kernel
-   already hands `SessionCounters` to every authorization call.
+2. ~~**The `Authorizer` adapter**~~ — **DONE 2026-08-14**, see below.
 3. **MCP client** — the one genuinely new module.
 4. *(gate: the three Stage-B decisions)*
 5. **Stage B** — reputation events, closing the earned-score chain.

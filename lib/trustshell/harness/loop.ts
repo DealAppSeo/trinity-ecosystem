@@ -184,10 +184,21 @@ export interface ToolDispatcher {
   call(call: ToolCall): Promise<DispatchResult>;
 }
 
-/** Per-session state. The loop holds it; the authorizer reads it. */
+/**
+ * Per-session state. The loop holds it; the authorizer reads it.
+ *
+ * EVERY COUNT EXCLUDES THE CALL BEING AUTHORIZED. "Calls so far" means before
+ * this one, which is what a limit of N has to mean if N calls are to be
+ * permitted — `caveat.ts` evaluates `maxCalls` as `callsSoFar < limit` for
+ * exactly this reason. Stated on the type rather than left to each adapter,
+ * because an off-by-one here silently grants or refuses one extra call and the
+ * boundary is the only place it shows.
+ */
 export interface SessionCounters {
   /** Turns completed so far. */
   turn: number;
+  /** Calls across all tools, denied attempts included. */
+  totalCalls: number;
   /** Calls per tool name, including denied attempts. */
   callsByTool: Readonly<Record<string, number>>;
   /** Calls that consumed write budget (effect `write` or `unknown`). */
@@ -418,8 +429,10 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult
   let stopReason: StopReason = 'iteration_budget_exhausted';
   let handoff: TypedHandoff | undefined;
 
+  let totalCalls = 0;
   const counters = (): SessionCounters => ({
     turn: turns.length,
+    totalCalls,
     callsByTool: { ...callsByTool },
     writes,
     deniedAttempts,
@@ -455,7 +468,14 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult
 
     for (const call of proposed.calls) {
       const effect = policy.toolEffects[call.name] ?? 'unknown';
+
+      // Snapshot BEFORE incrementing. `SessionCounters` means "before this
+      // call" — see the type. Incrementing first would hand the authorizer a
+      // count that includes the call it is being asked to rule on, and a
+      // `maxCalls: 2` caveat would then permit only one.
+      const session = counters();
       callsByTool[call.name] = (callsByTool[call.name] ?? 0) + 1;
+      totalCalls += 1;
 
       const verdict = await decide({
         call,
@@ -465,7 +485,7 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult
         maxWrites: policy.maxWritesPerSession,
         writesSoFar: writes,
         authorizer,
-        session: counters(),
+        session,
       });
 
       if (!verdict.allowed) {

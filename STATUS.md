@@ -59,6 +59,7 @@ and it is isolated behind one interface.
 | `harness-bundle.ts` | the portable harness — parts signed together so they cannot be spliced |
 | `reputation-transition.ts` | reputation as a constrained append, not a mutable column — proves the sequence, never the score |
 | `harness/loop.ts` | the agent execution kernel — an agent cannot certify above what the harness observed |
+| `loop-authorizer.ts` | binds the loop to `ControlProof` — the first thing that asks this layer for permission |
 
 ---
 
