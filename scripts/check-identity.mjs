@@ -18,7 +18,7 @@
 // location, so a temp dir outside the repo would fail to find any dependency.
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat, memAuthz, harness;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat, memAuthz, harness, transition;
 try {
   execFileSync(
     localTsc(),
@@ -44,6 +44,7 @@ try {
       'lib/trustshell/identity/caveat.ts',
       'lib/trustshell/identity/memory-authz.ts',
       'lib/trustshell/identity/harness-bundle.ts',
+      'lib/trustshell/identity/reputation-transition.ts',
       '--outDir', outDir,
       // Pin the root so output layout does not move when a module gains an
       // import from outside identity/ — repid-predicate.ts imports
@@ -72,6 +73,7 @@ try {
   caveat = await import(pathToFileURL(join(base, 'caveat.js')).href);
   memAuthz = await import(pathToFileURL(join(base, 'memory-authz.js')).href);
   harness = await import(pathToFileURL(join(base, 'harness-bundle.js')).href);
+  transition = await import(pathToFileURL(join(base, 'reputation-transition.js')).href);
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -800,12 +802,21 @@ await check('no raw control bytes in identity source (wire format must be readab
   // format impossible to read off the source. This suite shipped exactly that
   // bug: the Merkle leaf separator was a NUL that looked like a space, so the
   // interop spec handed to another implementer was wrong. Escapes only.
+  //
+  // ENUMERATED, NOT LISTED. This was a hardcoded list of seven filenames, and
+  // it covered none of the six modules added after it was written — including
+  // the one where a raw U+001F landed the same day this comment was updated.
+  // A guard that has to be maintained is a guard that silently stops guarding.
+  // This script is scanned too, because the second raw byte landed here.
   const files = [
-    'did.ts', 'disclosure.ts', 'identity.ts',
-    'capability.ts', 'proof-provider.ts', 'control-proof.ts', 'nonce-store.ts',
+    ...readdirSync('lib/trustshell/identity')
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => `lib/trustshell/identity/${f}`),
+    'scripts/check-identity.mjs',
   ];
+  assert.ok(files.length > 10, 'the directory scan found suspiciously few files');
   for (const f of files) {
-    const buf = readFileSync(`lib/trustshell/identity/${f}`);
+    const buf = readFileSync(f);
     for (const b of buf) {
       const isAllowedWhitespace = b === 0x09 || b === 0x0a || b === 0x0d;
       assert.ok(
@@ -1895,6 +1906,300 @@ await check('a DELEGATED sub-agent can carry its own harness', async () => {
   const v = await harness.verifyHarness(bundle, { audience: AUD, seenNonces: new Set() });
   assert.equal(v.valid, true, JSON.stringify(v.parts, null, 2));
   assert.deepEqual(v.grantedCapabilities, ['pay:usdc'], 'the worker should carry only what it was delegated');
+});
+
+// --- reputation as a constrained transition ---------------------------------
+//
+// The claim under test is narrow on purpose: the SEQUENCE, not the score. Every
+// assertion here either defends that claim or defends the boundary around it.
+
+const TX_DOMAIN = 'trinity:reputation';
+const TX_SECRETS = ['w1', 'w2', 'w3', 'w4'];
+const TX_EVENT = {
+  subject: 'agent:TORCH',
+  signal: 'bft_vote_correct',
+  observedAt: '2026-08-14T00:00:00Z',
+};
+
+const mkTransition = async (opts = {}) => {
+  const { commitments, group } = await mkGroup(TX_SECRETS);
+  const event = opts.event ?? TX_EVENT;
+  const secret = opts.secret ?? 'w1';
+  const scope = opts.scope ?? transition.scopeForSubject(event.subject, opts.epoch ?? '2026-08-14');
+  const prevRoot = opts.prevRoot ?? transition.GENESIS_ROOT;
+  const eventCommitment = await transition.commitEvent(event, toyScheme);
+  return {
+    publicInputs: {
+      prevRoot,
+      newRoot: await transition.appendEvent(prevRoot, eventCommitment, toyScheme),
+      nullifier: await toyScheme.nullify(secret, TX_DOMAIN, scope),
+      domain: TX_DOMAIN,
+      scope,
+      groupRoot: group.root,
+    },
+    privateWitness: {
+      event,
+      eventCommitment,
+      secret,
+      appenderCommitment: await toyScheme.commit(secret),
+      membership: group.pathFor(commitments[0]),
+    },
+  };
+};
+
+await check('a well-formed transition recomputes, and never claims to be a proof', async () => {
+  const st = await mkTransition();
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, true, v.reason);
+  assert.equal(v.provenWithoutWitness, false, 'recomputation reported itself as witness-free');
+});
+
+await check('THE VERDICT STATES THE BOUNDARY — sequence, not score', async () => {
+  const st = await mkTransition();
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.match(v.reason, /SEQUENCE, never the score/);
+  // The two things it genuinely cannot establish must be named in the verdict
+  // itself, not only in the contract — a caller reads the verdict.
+  assert.match(v.reason, /unspent/);
+  assert.match(v.reason, /prevRoot is the head/);
+});
+
+await check('EVERY PUBLIC INPUT IS LOAD-BEARING — mutating any one fails', async () => {
+  // The generic form of the `frontier` bug: a field declared in the contract
+  // that nothing actually constrains. Enumerated from the contract, so adding a
+  // field without wiring it in fails here rather than shipping unconstrained.
+  const mutators = {
+    prevRoot: (st) => { st.publicInputs.prevRoot = 'zkrepid:reputation-genesis:v0'; },
+    newRoot: (st) => { st.publicInputs.newRoot = 'f'.repeat(64); },
+    nullifier: (st) => { st.publicInputs.nullifier = '0'.repeat(64); },
+    domain: (st) => { st.publicInputs.domain = 'trinity:other'; },
+    scope: (st) => { st.publicInputs.scope = transition.scopeForSubject('agent:RIVAL', '2026-08-14'); },
+    groupRoot: (st) => { st.publicInputs.groupRoot = 'a'.repeat(64); },
+  };
+  for (const field of transition.TRANSITION_CONTRACT.publicInputs) {
+    assert.ok(mutators[field], `no mutation defined for public input '${field}'`);
+    const st = await mkTransition();
+    mutators[field](st);
+    const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+    assert.equal(v.valid, false, `mutating public input '${field}' still verified`);
+  }
+});
+
+await check('EVERY WITNESS FIELD IS LOAD-BEARING — mutating any one fails', async () => {
+  const mutators = {
+    event: (st) => { st.privateWitness.event = { ...st.privateWitness.event, signal: 'veritas_miss' }; },
+    eventCommitment: (st) => { st.privateWitness.eventCommitment = 'b'.repeat(64); },
+    secret: (st) => { st.privateWitness.secret = 'w2'; },
+    appenderCommitment: (st) => { st.privateWitness.appenderCommitment = 'c'.repeat(64); },
+    membership: (st) => { st.privateWitness.membership = []; },
+  };
+  for (const field of transition.TRANSITION_CONTRACT.privateWitness) {
+    assert.ok(mutators[field], `no mutation defined for witness field '${field}'`);
+    const st = await mkTransition();
+    mutators[field](st);
+    const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+    assert.equal(v.valid, false, `mutating witness field '${field}' still verified`);
+  }
+});
+
+await check('AN OUTSIDER CANNOT APPEND — non-membership fails even with a consistent statement', async () => {
+  const st = await mkTransition({ secret: 'outsider' });
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, 'a non-member extended a subject\'s reputation history');
+  assert.match(v.reason, /not a member of the group/);
+});
+
+await check('THE BORROWED-MEMBER ATTACK FAILS — a real commitment, someone else\'s secret', async () => {
+  // Found by COMPOUND mutation: deleting the appender reopen check AND walking
+  // membership from the witness commitment left every other assertion green,
+  // because no fixture separated the two values. Group leaves are public by
+  // construction — that is what makes the root shareable — so an outsider can
+  // always obtain a member's commitment and path. What they cannot obtain is
+  // the secret behind it, and that is the only thing standing between them and
+  // an append. Tested at the point where the two come apart.
+  const { commitments, group } = await mkGroup(TX_SECRETS);
+  const st = await mkTransition({ secret: 'outsider' });
+  st.privateWitness.appenderCommitment = commitments[0];   // a genuine member's
+  st.privateWitness.membership = group.pathFor(commitments[0]);
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, 'an outsider appended using a borrowed commitment');
+  assert.match(v.reason, /appender commitment does not reopen/);
+});
+
+await check('THE SCOPE MUST BIND THE SUBJECT', async () => {
+  // A scope that does not name the subject makes one write authorization valid
+  // against every agent's history — the cheapest possible reputation attack.
+  const st = await mkTransition({ scope: 'reputation:everything' });
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false);
+  assert.match(v.reason, /does not bind this subject/);
+});
+
+await check('the scope must carry a NON-EMPTY epoch, not just the subject', async () => {
+  // A subject prefix with nothing after it is a scope that never rotates, i.e.
+  // one authorization appending forever. Rejected at both ends.
+  assert.throws(() => transition.scopeForSubject('agent:TORCH', ''), /epoch is required/);
+  const bare = ['reputation', 'agent:TORCH', ''].join(String.fromCharCode(31));
+  const st = await mkTransition({ scope: bare });
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, 'an epoch-less scope was accepted');
+});
+
+await check('nullifiers separate by subject and by epoch', async () => {
+  const a = transition.scopeForSubject('agent:TORCH', 'e1');
+  const b = transition.scopeForSubject('agent:RIVAL', 'e1');
+  const c = transition.scopeForSubject('agent:TORCH', 'e2');
+  const [na, nb, nc] = await Promise.all(
+    [a, b, c].map((s) => toyScheme.nullify('w1', TX_DOMAIN, s))
+  );
+  assert.notEqual(na, nb, 'one nullifier across subjects — a write grant leaks to other agents');
+  assert.notEqual(na, nc, 'one nullifier across epochs — the write budget is unbounded');
+});
+
+await check('THE APPEND IS POSITIONAL — H(prev, event) is not H(event, prev)', async () => {
+  // Found by mutation: replacing the append with a SORTED two-input hash left
+  // every other assertion here green, because the multi-event order test
+  // compares chains whose inner roots already differ. A commutative node hash
+  // makes "root R extended by event E" indistinguishable from "root E extended
+  // by R", so an attacker can reinterpret which value was the history and which
+  // was the event. Asserted at the single-append level, where it is visible.
+  const a = 'aa'.repeat(16);
+  const b = 'bb'.repeat(16);
+  assert.notEqual(
+    await transition.appendEvent(a, b, toyScheme),
+    await transition.appendEvent(b, a, toyScheme),
+    'the append is order-insensitive — history and event are interchangeable'
+  );
+});
+
+await check('APPEND ORDER IS PART OF THE HISTORY', async () => {
+  const mk = (signal) => transition.commitEvent(
+    { subject: 'agent:TORCH', signal, observedAt: '2026-08-14T00:00:00Z' }, toyScheme
+  );
+  const [a, b] = await Promise.all([mk('bft_vote_correct'), mk('veritas_catch')]);
+  const ab = await transition.appendEvent(
+    await transition.appendEvent(transition.GENESIS_ROOT, a, toyScheme), b, toyScheme);
+  const ba = await transition.appendEvent(
+    await transition.appendEvent(transition.GENESIS_ROOT, b, toyScheme), a, toyScheme);
+  assert.notEqual(ab, ba, 'reordering two events left the root unchanged');
+});
+
+await check('DROPPING AN EVENT CHANGES THE ROOT', async () => {
+  const mk = (signal) => transition.commitEvent(
+    { subject: 'agent:TORCH', signal, observedAt: '2026-08-14T00:00:00Z' }, toyScheme
+  );
+  const [a, b] = await Promise.all([mk('bft_vote_incorrect'), mk('x402_settled')]);
+  let full = transition.GENESIS_ROOT;
+  for (const c of [a, b]) full = await transition.appendEvent(full, c, toyScheme);
+  const truncated = await transition.appendEvent(transition.GENESIS_ROOT, b, toyScheme);
+  assert.notEqual(full, truncated, 'removing the unflattering event was invisible');
+});
+
+await check('TWO EVENTS CANNOT SHARE AN ENCODING — the concatenation collision', async () => {
+  // The bug this encoding exists to prevent. Joined with '', these two produce
+  // the identical string: '1' + '2026' === '12' + '026'. One commitment, two
+  // reopenings, and "which event was committed" has two answers.
+  const one = { subject: 'a', signal: 'latency_sample', value: 1, observedAt: '2026' };
+  const two = { subject: 'a', signal: 'latency_sample', value: 12, observedAt: '026' };
+  assert.equal(
+    [one.value, one.observedAt].join('') , [two.value, two.observedAt].join(''),
+    'the fixture no longer exercises the collision it was written for'
+  );
+  const [c1, c2] = await Promise.all([
+    transition.commitEvent(one, toyScheme), transition.commitEvent(two, toyScheme),
+  ]);
+  assert.notEqual(c1, c2, 'two distinct events share one commitment');
+});
+
+await check('a field containing the separator is REFUSED, not escaped', async () => {
+  const sep = String.fromCharCode(31);
+  await assert.rejects(
+    transition.commitEvent(
+      { subject: `a${sep}b`, signal: 'x402_settled', observedAt: '2026' }, toyScheme),
+    /field separator/
+  );
+  assert.throws(() => transition.scopeForSubject(`a${sep}b`, 'e1'), /field separator/);
+});
+
+await check('an unknown signal is refused rather than committed', async () => {
+  await assert.rejects(
+    transition.commitEvent(
+      { subject: 'a', signal: 'totally_made_up', observedAt: '2026' }, toyScheme),
+    /unknown signal/
+  );
+  // Type and runtime list must agree, or the boundary check is decorative.
+  assert.equal(transition.REPUTATION_SIGNALS.length, 7);
+});
+
+await check('an incomplete event is refused at commit time', async () => {
+  const base = { subject: 'a', signal: 'x402_settled', observedAt: '2026' };
+  await assert.rejects(transition.commitEvent({ ...base, subject: '' }, toyScheme), /subject is required/);
+  await assert.rejects(transition.commitEvent({ ...base, observedAt: '' }, toyScheme), /observedAt is required/);
+});
+
+await check('GENESIS_ROOT is not hash-shaped, so a history root cannot pass as a group root', async () => {
+  const g = transition.GENESIS_ROOT;
+  assert.ok(!/^[0-9a-f]{64}$/i.test(g), 'the genesis constant looks like a digest');
+  assert.notEqual(g, '');
+  const commitments = await Promise.all(TX_SECRETS.map((s) => toyScheme.commit(s)));
+  assert.ok(!commitments.includes(g), 'the genesis constant collides with a member commitment');
+  // And the contract must not rely on this argument silently.
+  assert.ok(
+    transition.TRANSITION_CONTRACT.mustAlsoHold.some((s) => /domain-separated in the circuit/.test(s)),
+    'the circuit is left to inherit an argument instead of a constraint'
+  );
+});
+
+await check('the event tag is distinct from the identity tags', () => {
+  assert.notEqual(transition.TRANSITION_TAG, transition.IDENTITY_TAGS.commit);
+  assert.notEqual(transition.TRANSITION_TAG, transition.IDENTITY_TAGS.nullifier);
+  assert.deepEqual(transition.IDENTITY_TAGS, nullifier.BINDING_TAGS);
+});
+
+await check('RECOMPUTATION DOES NOT DETECT A REPLAY — and the contract says whose job it is', async () => {
+  // Verifying the same statement twice succeeds twice. That is correct: a spent
+  // set is state this function does not have. The failure would be pretending
+  // otherwise, so this asserts the limit rather than a fix.
+  const st = await mkTransition();
+  const first = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  const second = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(first.valid, true);
+  assert.equal(second.valid, true, 'the fixture no longer demonstrates the limit');
+  assert.ok(
+    transition.TRANSITION_CONTRACT.mustAlsoHold.some((s) => /SPENT against a durable set/.test(s)),
+    'replay protection is not assigned to anyone'
+  );
+});
+
+await check('the transition contract names the four things no circuit can discharge', () => {
+  const c = transition.TRANSITION_CONTRACT;
+  assert.equal(c.version, 'zkrepid-reputation-transition-v2');
+  for (const [name, re] of [
+    ['spent set', /SPENT against a durable set/],
+    ['head-of-chain', /CURRENT head the verifier holds/],
+    ['trusted group root', /VERIFIER independently trusts/],
+    ['epoch schedule', /epoch inside scope advances on a schedule/],
+    ['borrowed member', /appenderCommitment the circuit COMPUTED/],
+    ['tag separation', /event tag is distinct/],
+    ['positional node hash', /chain node hash is POSITIONAL/],
+  ]) {
+    assert.ok(c.mustAlsoHold.some((s) => re.test(s)), `mustAlsoHold does not name: ${name}`);
+  }
+  assert.equal(c.relations.length, 6);
+  assert.match(c.provesTheSequenceNotTheScore, /does NOT prove\s+the resulting score/);
+  assert.match(c.observedAtIsAsserted, /A prover controls it/);
+});
+
+await check('the read-time half points at a file that exists and shrinks toward ZERO', () => {
+  const r = transition.READ_TIME_SCORING;
+  // A dangling pointer here is how the two halves drift apart: the contract
+  // would keep saying "the other half lives over there" after it moved.
+  readFileSync(join(process.cwd(), r.implementedBy), 'utf8');
+  assert.ok(
+    r.appliedAtReadTime.some((s) => /shrinkage toward ZERO/.test(s)),
+    'shrinking toward the fleet mean is the reputation-laundering vector'
+  );
+  assert.equal(r.publicInputRequired, 'now');
 });
 
 rmSync(outDir, { recursive: true, force: true });

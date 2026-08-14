@@ -57,6 +57,7 @@ and it is isolated behind one interface.
 | `nullifier.ts` | the circuit contract — statement/witness, and a placeholder that refuses |
 | `memory-authz.ts` | dual-auth memory access — read never implies write; fails closed |
 | `harness-bundle.ts` | the portable harness — parts signed together so they cannot be spliced |
+| `reputation-transition.ts` | reputation as a constrained append, not a mutable column — proves the sequence, never the score |
 
 ---
 
@@ -276,19 +277,37 @@ needed, with test vectors as the acceptance criterion.
 
 ### The contract this lane owns
 
+**Corrected 2026-08-14 — the commitment is PRIVATE.** The first version of this
+contract made `commitment` a public input and called the result unlinkable. That
+was wrong. A commitment is stable by design, so publishing it beside every
+nullifier links all of a holder's presentations: scope-varying nullifiers give
+unlinkability *across scopes* and do nothing when a fixed identifier travels
+alongside. That is pseudonymity wearing unlinkability's name. The holder now
+proves Merkle **membership** in a public group, as Semaphore does.
+
 ```
-public:  commitment, nullifier, domain, scope, tagCommit, tagNullifier
-private: secret
+public:  groupRoot, nullifier, domain, scope, tagCommit, tagNullifier
+private: secret, commitment, membership path
+
          commitment == H(tagCommit    ‖ secret)
          nullifier  == H(tagNullifier ‖ secret ‖ domain ‖ scope)
+         MerkleVerify(commitment, membership) == groupRoot
 ```
 
-`CIRCUIT_CONTRACT` exports this as data, plus four ways a circuit can produce a
-valid proof and still be wrong: two independent secrets satisfying each relation
-separately; `domain`/`scope` as witness rather than public (a prover then picks
-them after seeing the challenge and unlinkability is forgeable); unconstrained
-tags letting a commitment replay as a nullifier; and an absorption order that is
-conventional rather than constrained.
+`CIRCUIT_CONTRACT` (version `zkrepid-binding-v2`) exports this as data, plus six
+ways a circuit can produce a valid proof and still be wrong: two independent
+secrets satisfying each relation separately; `domain`/`scope` as witness rather
+than public (a prover then picks them after seeing the challenge and
+unlinkability is forgeable); unconstrained tags letting a commitment replay as a
+nullifier; an absorption order that is conventional rather than constrained;
+membership proven over an independent witness value rather than the commitment
+the circuit computed (the borrowed-member attack); and a prover-supplied
+`groupRoot`, which proves membership of a group they invented.
+
+**And one property no circuit can supply: unlinkability is bounded by the group
+size.** A root over one commitment identifies the holder exactly.
+`describeAnonymitySet()` exists so that number travels with the claim rather
+than being assumed.
 
 ### Two levels of assurance, never conflated
 
@@ -307,6 +326,89 @@ identity proof, and the type will not let a caller blur it.
 | unlinkable | **no** — the signature names the signer | **yes**, per `(domain, scope)` |
 
 Neither subsumes the other, and that is the design rather than indecision.
+
+---
+
+## Reputation as a constrained transition
+
+`reputation-transition.ts`. The defect this targets is the one that produced
+LESSONS A11 and the retracted RepID figures alike: a value that can be *written*
+rather than *earned*. `human_custody_verified` is `true` for five agents with
+nothing behind it. If a score can only move through a transition a circuit
+constrains, forging it means forging history.
+
+### The boundary, which is forced rather than chosen
+
+```
+IN circuit      each event is well-formed, appended by a member of the group
+                authorized to write THIS subject's history, and chained onto the
+                previous root — nothing inserted, reordered, or removed.
+OUT of circuit  the score: EarnedMetrics' 30-day decay and empirical-Bayes
+                shrinkage, applied at READ time with the current clock as input.
+```
+
+Decay is time-dependent — a score changes with **no new events**, so there is no
+leaf at the moment of decay for a circuit to constrain. In-circuit decay needs a
+trusted clock inside the proof, which is a genuinely hard and separate problem.
+
+So the honest claim is *"these events happened, in this order, appended by
+authorized members, and none were inserted or removed"* — **not** "the score is
+3723". The score is a pure function of a proven sequence plus a public
+timestamp: strictly stronger than a number in a table, and weaker than a proven
+score, which nobody has. `TRANSITION_CONTRACT.provesTheSequenceNotTheScore`
+carries that sentence as data so it cannot be lost between the two lanes.
+
+```
+public:  prevRoot, newRoot, nullifier, domain, scope, groupRoot
+private: event, eventCommitment, secret, appenderCommitment, membership
+
+  eventCommitment    == H(TRANSITION_TAG ‖ subject ‖ signal ‖ value ‖ observedAt)
+  appenderCommitment == H(tagCommit ‖ secret)
+  nullifier          == H(tagNullifier ‖ secret ‖ domain ‖ scope)
+  MerkleVerify(appenderCommitment, membership) == groupRoot
+  newRoot            == H(prevRoot ‖ eventCommitment)
+  scope              == "reputation" ‖ subject ‖ epoch
+```
+
+**The scope binds the subject and an epoch, and both are load-bearing.** Without
+the subject, one write authorization is valid against *every* agent's history —
+a member granted the right to record TORCH's outcomes could spend it against a
+competitor. Without an epoch, a nullifier authorizes unbounded appends, which is
+the exact state append-only history exists to prevent. `scopeForSubject()`
+refuses an empty epoch rather than defaulting to one, because the granularity
+*is* the write budget.
+
+**`observedAt` is asserted, not proven.** A prover controls it. Read-time decay
+therefore rests on an assertion until a trusted time source exists, and
+`TRANSITION_CONTRACT.observedAtIsAsserted` says so rather than leaving it to be
+discovered.
+
+Four obligations are the **verifier's**, and no circuit can discharge them: the
+nullifier must be spent against a durable set; `prevRoot` must be the head the
+verifier holds (a prover supplying an old root forks the history and both
+branches verify); `groupRoot` must be independently trusted; and the epoch must
+advance on a schedule the verifier controls.
+
+### What mutation testing found here
+
+Nineteen mutations, seventeen killed on the first pass. The two survivors were
+both worth the run:
+
+- **A sorted (commutative) node hash survived** every assertion, because the
+  multi-event order test compares chains whose inner roots already differ. A
+  commutative node hash makes "root R extended by event E" indistinguishable
+  from the reverse. Now asserted at the single-append level, where it is visible.
+- **The borrowed-member attack survived as a compound mutation** — deleting the
+  appender reopen check *and* walking membership from the witness commitment.
+  Group leaves are public by construction, so an outsider can always obtain a
+  member's commitment and path; the secret is the only thing between them and an
+  append. Now has its own fixture.
+
+Two bugs were found before testing, by writing the assertions: `frontier` was
+declared in the witness and constrained by nothing (the generic form is now a
+test that mutates *every* field the contract declares), and the event encoding
+joined its fields with `''`, so `{value: 1, observedAt: '2026…'}` and
+`{value: 12, observedAt: '026…'}` produced one commitment with two reopenings.
 
 ---
 

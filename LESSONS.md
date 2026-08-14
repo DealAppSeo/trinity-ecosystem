@@ -554,3 +554,72 @@ them `true` is what created the problem. The fix is a `ControlProof` in
 something reopenable. That path is built (`lib/trustshell/identity/`) and not yet
 wired — deliberately, because changing a live authorization gate is a
 Sean-gated decision, not a sprint convenience.
+
+---
+
+## A12 — a witness field that nothing constrained, and a "canonical" encoding that was a concatenation (2026-08-14)
+
+**[VERIFIED] — both found while writing assertions for
+`reputation-transition.ts`, before either had shipped.**
+
+Two bugs in one file, and neither was visible by reading it. Both were in code I
+had written an hour earlier and described in its own header as correct.
+
+**1. `frontier` was declared in the witness and constrained by nothing.** The
+`TransitionStatement` type listed a `frontier: MembershipStep[]`, the contract
+listed it under `privateWitness`, and the verifier never read it. A prover could
+supply anything. It was left over from a balanced-tree design that a chain
+replaced — the field survived the redesign because a type declaration does not
+have to be used to compile.
+
+Reading the file finds nothing: it looks like a field that is *for* something.
+The generic form is now a test that mutates **every field the contract
+declares** — public inputs and witness alike — and requires each mutation to
+fail verification. A field nothing constrains is now a failing test, not a code
+review that has to notice an absence.
+
+**2. The event encoding joined its fields with the empty string.** The doc
+comment above it said "canonically encoded field by field". It was a
+concatenation, and concatenation collides: `{value: 1, observedAt: '2026…'}` and
+`{value: 12, observedAt: '026…'}` produce the identical string. One commitment,
+two reopenings, and "which event was committed" has two answers — in an
+append-only history, permanently.
+
+A separator only helps if the separator cannot appear in a field, so a field
+containing U+001F is now **refused rather than escaped**. An escaping rule is a
+second thing both lanes have to implement identically, which is a second place
+to disagree.
+
+**And the writing-it-down failure, again.** The separator landed in the source
+as a raw control byte rather than as a six-character escape sequence — exactly
+the mistake logged for `disclosure.ts` and `nonce-store.ts`, in a file whose
+comment warns about it, three lines above the bug. It happened a second time in
+the test file. Both were caught by a byte scan, not by reading, because a raw
+control byte is invisible in every diff and every review. **Assume it happened;
+scan the bytes.**
+
+### Two mutants survived a suite that had just gone green
+
+Nineteen mutations, seventeen killed. The survivors were the whole value of the
+run:
+
+- **A commutative node hash survived everything.** The multi-event order test
+  compares chains whose *inner* roots already differ, so it stays sensitive even
+  when a single append is order-blind. But `H(prev, event) == H(event, prev)`
+  means "root R extended by event E" is indistinguishable from the reverse, and
+  an attacker picks which value was the history. The property has to be asserted
+  at the single-append level, where it is actually visible.
+
+- **The borrowed-member attack needed a COMPOUND mutation to expose.** Deleting
+  the appender's reopen check survived on its own; walking membership from the
+  witness commitment survived on its own; together they let an outsider append
+  using a genuine member's public commitment and path while nullifying with
+  their own secret. Group leaves are public by construction — that is what makes
+  a root shareable — so the secret is the only thing standing between an
+  outsider and a write.
+
+**The rule.** Single-mutation testing finds single points of failure. Two checks
+that each make the other redundant are invisible to it, and "each one is
+individually redundant" is exactly the argument that deletes both. When a
+comment says a check is redundant *here* but load-bearing *in the circuit* —
+which is now written in two files — mutate the pair, not the parts.

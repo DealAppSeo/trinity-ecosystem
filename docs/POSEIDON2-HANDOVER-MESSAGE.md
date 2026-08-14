@@ -83,6 +83,44 @@ checking explicitly rather than inferring from "it verifies":
 size. A root over one commitment identifies the holder exactly. Report the
 anonymity set with any privacy claim.
 
+**A second circuit, same hash, sequenced behind the first.** The reputation
+transition (`lib/trustshell/identity/reputation-transition.ts`,
+`TRANSITION_CONTRACT`, version `zkrepid-reputation-transition-v2`). It reuses
+your parameter set exactly — no new hash, no new tree shape:
+
+```
+public:  prevRoot, newRoot, nullifier, domain, scope, groupRoot
+private: event, eventCommitment, secret, appenderCommitment, membership
+
+  eventCommitment    == H(TRANSITION_TAG ‖ subject ‖ signal ‖ value ‖ observedAt)
+  appenderCommitment == H(tagCommit ‖ secret)
+  nullifier          == H(tagNullifier ‖ secret ‖ domain ‖ scope)
+  MerkleVerify(appenderCommitment, membership) == groupRoot
+  newRoot            == H(prevRoot ‖ eventCommitment)
+  scope              == "reputation" ‖ subject ‖ epoch
+```
+
+`‖` is U+001F throughout, and a field containing it is **refused** rather than
+escaped — an escaping rule is a second thing both lanes have to implement
+identically. `TRANSITION_TAG` is `zkrepid:reputation-event:v1`, distinct from
+your commit/nullifier tags and required to be constrained, so an event
+commitment cannot be replayed as an identity commitment.
+
+**What it proves and what it does not.** It proves the event SEQUENCE — that
+events happened in this order, appended by authorized members, with none
+inserted or removed. It does **not** prove the resulting score. Decay and
+empirical-Bayes shrinkage are time-dependent, so a score changes with no new
+events and there is no leaf for a circuit to constrain at the moment of decay;
+both stay at read time with the clock as a public input. Please do not describe
+the transition circuit as proving a reputation value — that is the overclaim we
+are specifically trying to avoid, and it is stated as data in
+`TRANSITION_CONTRACT.provesTheSequenceNotTheScore`.
+
+Two more circuit obligations worth naming: the chain node hash must be
+**positional** (`H(prev, event) ≠ H(event, prev)`, or an attacker chooses which
+value was the history), and history chain nodes must be domain-separated from
+group-tree nodes rather than both being a bare two-input hash.
+
 **What we bring:** `BindingStatement` (public/private split, typed),
 `IBindingScheme` (one implementation per parameter set — swapping in the real
 one changes no caller), `verifyBindingByRecomputation` (honest-prover binding
