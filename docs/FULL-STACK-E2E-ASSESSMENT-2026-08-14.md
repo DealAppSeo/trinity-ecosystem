@@ -307,6 +307,42 @@ Caveat, paid rather than left implicit: these were `--depth 50` clones, so **his
 was not scanned** and older commits could still hold live credentials. The leaked
 EVM deployer key (task #73) is a history problem and remains outstanding.
 
+### The caveat, paid — full history scan of `trinity-ecosystem` [VERIFIED]
+
+Done 2026-08-14 after `--root` was fixed (see below). This clone is **not** shallow
+(`is-shallow-repository = false`, 577 commits reachable), so the scan is complete
+for this repository. The other eight remain history-unscanned.
+
+**Working tree: 0 usable. History: 7 usable.** Five are benign, and the two that
+are not were missed by every prior scan:
+
+| hit | commit | verdict |
+|---|---|---|
+| `jwt:service_role` ×2, exp 2035 | `504bba66`, `5a6f93cf` | settled-inert — key disabled, no action |
+| `evm:secret-key-placeholder` `0x0000…`, `0xabcd…` | `fdefbd8c`, `3a22570c` | placeholders |
+| `opaque:sb_secret` | `afbb28c0` | **false positive** — matches documentation prose about the `sb_secret_…` key *format*, not a value. The pattern reads the format string as the thing it describes |
+| **`evm:secret-key`** `0xdf6b…` | `3a22570c` | **REAL** — `DEPLOYER_KEY`, hardcoded in `scripts/register-agents-erc8004.js` |
+| **`solana:secret-key`** | `e5b0d884` | **REAL** — `AGENT_SOPHIA_PRIVKEY`, captured into `audit_output.txt` from a local `.env.local` |
+
+Both real keys are absent from the working tree and permanent in history. Derived
+addresses, and what is actually at risk [VERIFIED via public RPC through `pg_net`]:
+
+```
+EVM  0xdf6b8215D193b11B4903d223729c3CF7A6de271d   mainnet 0 wei, Base 0 wei, nonce 0
+SOL  43TSvktkyt3Fjb1C7eAkzW94GoFpD3Gi3ukGZhNA8FND  mainnet 0 lamports
+```
+
+**The EVM address is not incidental: it is exactly `trinity_system_config.
+deployer_wallet`** — the fleet's live deployer identity, whose private key is
+readable by anyone with history access. Two facts bound this: the repository is
+**private** (`visibility: private`, 0 forks) and the key has **nonce 0**, so it has
+never sent a mainnet transaction. Rotate it, but it is not an emergency.
+
+Scope of that reassurance, stated rather than implied: `eth_getBalance` was checked
+on **Ethereum mainnet, Base and Solana mainnet only**. Testnets — where the ERC-8004
+registrations most plausibly live — other L2s, and **all ERC-20/NFT holdings** are
+**NOT CHECKED**; a zero native balance is not a zero portfolio.
+
 ---
 
 ## 4. Repository health
@@ -389,7 +425,11 @@ draft.
 | `scan-secrets.mjs` ignores `--root` | **VERIFIED** | source reads only `--history`; output cited a file absent from the target repos |
 | No new credential leak in 8 repos | **VERIFIED (working tree)** | re-scanned per repo; every usable hit triaged by hand |
 | trinity-ecosystem gate green | **VERIFIED** | tsc / check / test:e2e / build all exit 0 |
-| Credentials in repo **history** | **NOT CHECKED** | `--depth 50` clones; `--history` not run |
+| Credentials in `trinity-ecosystem` **history** | **VERIFIED** | full `--history` scan, 577 commits, clone confirmed not shallow; 7 usable, 2 real |
+| `0xdf6b…271d` is the live `deployer_wallet` and its key is in history | **VERIFIED** | derived from the committed key; equals `trinity_system_config.deployer_wallet` |
+| Both leaked keypairs hold 0 native balance, deployer nonce 0 | **VERIFIED** | public RPC via `pg_net` — ETH mainnet, Base, Solana mainnet |
+| Token/NFT holdings and testnet activity for those addresses | **NOT CHECKED** | only native balance queried, on 3 chains |
+| Credentials in the **other 8 repos'** history | **NOT CHECKED** | `--depth 50` clones; `--history` not run there |
 | `trustmarket` repo contents | **NOT CHECKED** | private; `add_repo` needs approval |
 | Which commit TrustShell/repid/trustrails serve | **NOT CHECKED** | no version endpoint exists on those surfaces |
 | Railway internals beyond `/health` | **NOT CHECKED** | host proxy-denied to this container |
