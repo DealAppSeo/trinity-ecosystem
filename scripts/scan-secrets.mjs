@@ -18,6 +18,8 @@
 // scan; this is that scan, kept.
 
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const HISTORY = process.argv.includes('--history');
 
@@ -142,13 +144,41 @@ const repoRoot = git(['rev-parse', '--show-toplevel']).trim();
 const remote = git(['remote', 'get-url', 'origin'], { allowNoMatch: true }).trim() || '(no origin)';
 console.log(`scanning ${repoRoot}\n         ${remote}\n`);
 
-const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
-for (const file of tracked) {
-  // -I skips binary; a lockfile carries integrity hashes that look like nothing
-  // else but produce no useful signal here.
+// FIXED 2026-08-14. This loop used to read `git show HEAD:${file}` — the last
+// COMMIT — while listing files from the index. Two consequences, both measured:
+//
+//   * A credential added to an already-tracked file and not yet committed was
+//     invisible. Staged or unstaged, the scan reported "No credential-shaped
+//     strings found" and exited 0, because it was reading the previous version
+//     of the file. A pre-commit secret scan that cannot see the commit you are
+//     about to make has inverted its own purpose.
+//   * A newly ADDED file crashed the run: `ls-files` lists the index, but
+//     `HEAD:<new file>` does not exist, so git exited 128 and the guard threw.
+//
+// Now it reads the WORKING TREE, which is what is about to be committed, and
+// `--others --exclude-standard` adds untracked-but-not-ignored files so a brand
+// new file carrying a key is caught before it is ever staged. History scanning
+// below is unchanged — that legitimately reads commits.
+const listed = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
+  .split('\0')
+  .filter(Boolean);
+const scannedFiles = [...new Set(listed)];
+for (const file of scannedFiles) {
+  // A lockfile carries integrity hashes that look like nothing else but produce
+  // no useful signal here; .pack is binary.
   if (file === 'package-lock.json' || file.endsWith('.pack')) continue;
-  const blob = git(['show', `HEAD:${file}`]);
-  if (blob) scanText(blob, file, findings);
+  let text;
+  try {
+    text = readFileSync(join(repoRoot, file), 'utf8');
+  } catch {
+    // Listed in the index but absent from disk (deleted, or a broken symlink).
+    // Nothing to scan, and it is not an error — the committed content is still
+    // covered by --history.
+    continue;
+  }
+  // Skip binaries: a NUL byte in the first chunk is the same heuristic git uses.
+  if (text.slice(0, 8000).includes('\0')) continue;
+  scanText(text, file, findings);
 }
 
 if (HISTORY) {
@@ -176,6 +206,7 @@ const historyRisk = findings.filter((f) => f.usable && f.where.startsWith('histo
 
 if (findings.length === 0) {
   console.log('No credential-shaped strings found.');
+  console.log('scan-secrets: 0 usable, 0 failed');
   process.exit(0);
 }
 
@@ -199,4 +230,10 @@ if (historyRisk.length > 0) {
   console.log('History hits cannot be removed by a commit. Rotate the credential; see docs/KEY-ROTATION.md.');
 }
 
+// One status line in the shared shape, on every path. See LESSONS: a script
+// whose success and failure lines share no greppable token is a script a
+// runner will eventually misread as passing.
+console.log(
+  `scan-secrets: ${findings.length - workingTreeRisk.length} passed, ${workingTreeRisk.length} failed`
+);
 process.exit(workingTreeRisk.length > 0 ? 1 : 0);

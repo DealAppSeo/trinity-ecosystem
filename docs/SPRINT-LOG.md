@@ -2442,3 +2442,86 @@ suites 0, tsc 25 → would pass.
   the combination has not been observed.
 - How many other check scripts print a non-standard shape and could be misread
   the same way. Only the portability one was fixed; the rest were not audited.
+
+---
+
+## Sprint Z — audit of all 17 check scripts
+
+Asked to audit the rest for the defect found in Sprint Y: a script whose output
+shape a runner could misread as passing. Found that, and found something worse.
+
+### The bigger finding: the secret scanner could not see the working tree
+
+`scan-secrets.mjs` listed files from the **index** (`git ls-files`) but read
+their contents from **`HEAD`** (`git show HEAD:${file}`). Measured, not inferred:
+
+| case | before | after |
+|---|---|---|
+| `sb_secret_…` added to a tracked file, uncommitted | **"No credential-shaped strings found", exit 0** | detected, exit 1 |
+| same, staged | **"No credential-shaped strings found", exit 0** | detected, exit 1 |
+| key in a brand-new file, staged | **crash**: `git show HEAD:… status 128` | detected, exit 1 |
+| key in a brand-new file, untracked | not scanned | detected, exit 1 |
+| `anon` JWT (public by design) | — | reported, **exit 0**, correctly not a failure |
+
+**A pre-commit secret scan that reads the previous commit has inverted its own
+purpose.** It could only find credentials that were already committed — which is
+precisely the situation PR #25 documents, where a private key sat in the tree.
+Running the scanner more often would not have helped; it would have reported
+clean until after the commit landed.
+
+Fixed to read the working tree, with `--others --exclude-standard` so a new file
+carrying a key is caught before it is ever staged. History scanning is unchanged
+— that legitimately reads commits.
+
+### Output-shape audit, all 17
+
+Now 16 of 17 print the shared `N passed, M failed` token. Normalised:
+`scan-secrets`, `check-transcript-parser`, and **`check-prior-work` — my own,
+written one sprint after diagnosing this exact defect.**
+
+`check-legacy-key` is the deliberate exception and was left alone: it exits **2**
+for "NOT CHECKED — the proxy denies CONNECT to `*.supabase.co` from this
+container". That is the third outcome working correctly, and forcing it into a
+passed/failed line would collapse "we could not look" into "it is fine". It now
+prints a greppable `NOT CHECKED` marker instead, and it is deliberately not in
+`npm run check`.
+
+### Failure-exit verification — VERIFIED / NOT CHECKED, honestly split
+
+| script(s) | exits non-zero on failure? |
+|---|---|
+| 8 × `harness-*` suites (shared `createChecker`) | **VERIFIED** — observed exiting 1 across this session's mutation tests |
+| `harness-portable` | **VERIFIED** — 4 valid mutations, all exit 1 |
+| `scan-secrets` | **VERIFIED** — 4 cases above |
+| `check-prior-work` | **VERIFIED** — 3 violations, all exit 1 |
+| `check-legacy-key` | **VERIFIED** — exits 2, by design |
+| `check-auth-policy`, `check-harness-profile`, `check-memory-recall`, `mcp-fleet-smoke`, `check-transcript-parser` | **NOT CHECKED** |
+
+The last row is the honest part. I ran mutations against three of them and all
+three still reported passing — **but the mutations were arbitrary** (increment
+the first integer; insert a space before the first `return`; rewrite the first
+quoted lowercase string). A space before `return` changes nothing semantically,
+so "it still passed" is not evidence the script cannot fail. That is the
+invalid-mutation trap for the fourth time this session, and the answer is the
+same: **an invalid mutation is not evidence.** Marked NOT CHECKED rather than
+claimed either way. Proving it needs a semantically meaningful mutation per
+script, which needs reading each script's assertions.
+
+Earlier in the same audit I also grepped for `process.exit(1)` and concluded
+`scan-secrets` had no failure path. It does — at line 202, written as a ternary
+`process.exit(workingTreeRisk.length > 0 ? 1 : 0)`. **The grep was the flawed
+instrument, not the script.** The empirical test is what settled it, in both
+directions.
+
+### Evidence
+
+16 scripts exit 0 on a clean tree; `tsc --noEmit` 25, unchanged. No harness
+module was touched.
+
+### NOT CHECKED
+
+- Failure-exit for the five scripts above.
+- Whether the working-tree change to `scan-secrets.mjs` conflicts with PR #25,
+  which edits the same file's pattern list. Different regions, so a clean merge
+  is likely but unobserved.
+- `.github/workflows/prior-work.yml` still has never run on GitHub.

@@ -195,6 +195,10 @@ if (unmeasured > 0) {
       'From a cloud session that is expected: the agent proxy denies CONNECT to\n' +
       '*.supabase.co. Re-run from a laptop before recording any verdict.'
   );
+  // Greppable THIRD outcome. This neither passed nor failed — the network was
+  // unreachable — and forcing it into a passed/failed line would collapse
+  // "we could not look" into "it is fine", which is the defect this repo names.
+  console.log('check-legacy-key: NOT CHECKED (network denied from this container)');
   process.exit(2);
 }
 console.log('No privileged legacy key was accepted.');
