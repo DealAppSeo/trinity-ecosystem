@@ -10,10 +10,12 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import {
   measureRate,
+  measureLatencyMs,
   unmeasured,
   describeEvidence,
   type EarnedMetricSet,
   type EvidenceReport,
+  type MeasuredMetric,
   type Observation,
 } from './EarnedMetrics';
 
@@ -74,10 +76,10 @@ export class EarnedMetricsRepository {
     const resolved = await this.resolveAgent(agentName);
 
     const noSuchAgent = (): EarnedMetricSet => ({
-      bftAccuracy: unmeasured(BFT_ABSENT),
+      bftAccuracy: unmeasured(`no agent in repid_agents matches "${agentName}" — ${BFT_SPARSE}`),
       veritasCatchRate: unmeasured(`no agent in repid_agents matches "${agentName}"`),
       x402SuccessRate: unmeasured(`no agent in repid_agents matches "${agentName}"`),
-      latencyMs: unmeasured(LATENCY_ABSENT),
+      latencyMs: unmeasured(`no agent in repid_agents matches "${agentName}" — ${LATENCY_SPARSE}`),
     });
 
     if (!resolved) {
@@ -96,7 +98,7 @@ export class EarnedMetricsRepository {
 
     const { data, error } = await this.supabase
       .from('v_agent_earned_observations')
-      .select('signal, observed_at, success, domain')
+      .select('signal, observed_at, success, domain, value_ms')
       .eq('agent_id', resolved.id)
       .gte('observed_at', since)
       .order('observed_at', { ascending: false })
@@ -107,10 +109,10 @@ export class EarnedMetricsRepository {
       // with the database's own message keeps a transport fault from silently
       // becoming "this agent has no track record".
       const metrics: EarnedMetricSet = {
-        bftAccuracy: unmeasured(BFT_ABSENT),
+        bftAccuracy: unmeasured(`observation read failed: ${error.message}`),
         veritasCatchRate: unmeasured(`observation read failed: ${error.message}`),
         x402SuccessRate: unmeasured(`observation read failed: ${error.message}`),
-        latencyMs: unmeasured(LATENCY_ABSENT),
+        latencyMs: unmeasured(`observation read failed: ${error.message}`),
       };
       return {
         requestedAgent: agentName,
@@ -132,12 +134,17 @@ export class EarnedMetricsRepository {
           domain: (r.domain as string | null) ?? null,
         }));
 
+    const latencySamples = rows
+      .filter((r) => r.signal === 'latency' && r.value_ms !== null)
+      .map((r) => ({ observedAt: r.observed_at as string, latencyMs: Number(r.value_ms) }));
+
     const metrics: EarnedMetricSet = {
-      // No table records BFT outcomes per agent, so this is structurally
-      // unmeasurable rather than merely missing for this agent. It carries the
-      // heaviest default weight (0.40), which is exactly why it must not be
-      // quietly filled in.
-      bftAccuracy: unmeasured(BFT_ABSENT),
+      // Consensus verdicts from bft_payment_evaluations, counted only once the
+      // worker has actually evaluated them. This carries the heaviest default
+      // weight (0.40) and is the sparsest signal in the system, so it will
+      // usually report `insufficient` — which is the honest reading, and very
+      // different from the 94 that used to be asserted here.
+      bftAccuracy: explain(measureRate(bySignal('bft'), { now }), BFT_SPARSE),
 
       // `hallucination_caught` is recorded per scored event. Success here is the
       // ABSENCE of a caught hallucination, i.e. a clean-output rate. That is what
@@ -147,7 +154,7 @@ export class EarnedMetricsRepository {
 
       x402SuccessRate: measureRate(bySignal('x402'), { now }),
 
-      latencyMs: unmeasured(LATENCY_ABSENT),
+      latencyMs: explain(measureLatencyMs(latencySamples, { now }), LATENCY_SPARSE),
     };
 
     return {
@@ -161,12 +168,29 @@ export class EarnedMetricsRepository {
   }
 }
 
-const BFT_ABSENT =
-  'no BFT outcomes are recorded anywhere: trinity_receipt_bft_results and ' +
-  'bft_payment_evaluations both hold zero rows, so this is an unbuilt subsystem, ' +
-  'not a quiet agent. Scores zero rather than being assumed.';
+/**
+ * Attach the systemic reason a signal is thin.
+ *
+ * "This agent has no BFT verdicts" and "almost nothing in this system produces
+ * BFT verdicts" read identically at the call site, and only the second tells you
+ * where to go and fix it. The per-agent reason stays first; the systemic note is
+ * appended so neither is lost.
+ */
+function explain(metric: MeasuredMetric, systemic: string): MeasuredMetric {
+  if (metric.state === 'measured') return metric;
+  return { ...metric, reason: `${metric.reason} — ${systemic}` };
+}
 
-const LATENCY_ABSENT =
-  'no table records latency per agent: hal_classifications has 147k latency ' +
-  'samples but no agent_id, and repid_score_events has no latency column. ' +
-  'Scores as the worst point on the curve rather than being assumed.';
+const BFT_SPARSE =
+  'BFT verdicts only exist for payments that the bft/process worker has ' +
+  'evaluated, and bft_payment_evaluations currently holds zero evaluated rows ' +
+  'because the payment path has run ~12 times ever. The plumbing is complete ' +
+  '(pay enqueues, bft/process drains and writes the verdict back); what is ' +
+  'missing is volume. Scores zero until then rather than being assumed.';
+
+const LATENCY_SPARSE =
+  'latency is attributed per agent only via llm_call_log.agent_id, which is set ' +
+  'on 209 of 486,280 rows (0.04%). The remaining calls are logged without an ' +
+  'agent, and repid_score_events.llm_call_id does not recover them: 147,617 ' +
+  'events carry one and only 15 resolve against llm_call_log. Fixing attribution ' +
+  'at the write site is what unlocks this signal, not more volume.';

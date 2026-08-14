@@ -243,6 +243,15 @@ check('an insufficient metric scores zero exactly like an unmeasured one', () =>
   assert.equal(M.toScoringInputs(setOf({ bft: stale })).bftAccuracy, 0);
 });
 
+check('a MEASURED latency passes through instead of the 2000ms penalty', () => {
+  const lat = M.measureLatencyMs(
+    Array.from({ length: 20 }, () => ({ observedAt: daysAgo(0), latencyMs: 256 })),
+    { now: NOW }
+  );
+  assert.equal(lat.state, 'measured');
+  assert.equal(M.toScoringInputs(setOf({ latency: lat })).latencyMs, 256);
+});
+
 check('measured rates are expressed as percentages for the calculator', () => {
   const rows = Array.from({ length: 500 }, () => obs(0, true));
   const inputs = M.toScoringInputs(setOf({ bft: M.measureRate(rows, { now: NOW }) }));
