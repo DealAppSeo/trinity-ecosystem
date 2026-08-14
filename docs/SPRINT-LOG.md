@@ -1253,3 +1253,131 @@ reproduces the published world exactly, so the flag is additive.
   whole question.
 - The shock model is uniform and symmetric. A heavy-tailed difficulty
   distribution (a few very hard tasks) may behave differently from a broad one.
+
+---
+
+## Sprint N — building the gate, and finding my own statistic was the wrong one
+
+Sprint M ended by naming the missing measurement: **how often do two experts get
+the same task wrong?** That single number decides whether a panel is worth
+running, it varies by deployment, and nothing in the harness measured it. Built
+it: `lib/trustshell/harness/agreement.ts`, portable, 23 assertions.
+
+### What it measures, and why a ratio
+
+For every pair of experts observed on the same task:
+
+```
+observed   P(both wrong)
+expected   P(a wrong) * P(b wrong)     <- what independence would predict
+lift       observed / expected
+```
+
+The denominator is load-bearing. Two experts that are each wrong 80% of the time
+are both wrong on ~64% of tasks — an enormous raw co-failure rate that says
+nothing whatsoever about correlation. A test asserts exactly that case reads as
+lift ≈ 1.0, and it fails if the denominator is dropped.
+
+Pairwise rather than fleet-averaged, because correlation is not uniform: two
+experts on the same base model fail together, a third on a different stack may
+not. `mostIndependentPair()` names the panel actually worth running, which is
+generally **not** the two highest-earning experts.
+
+It reports `null`, never a default, when there is no evidence. A default of
+"assume independent" would recommend panels in precisely the deployment where
+they lose money.
+
+### Validating an estimator against a knob — and the estimator failing
+
+The simulator is the one place this can be *validated* rather than merely run,
+because `--hardness W` makes the true correlation a knob:
+
+| W | lift (proxy) | true panel gain |
+|---|---|---|
+| 0 | 0.77 | +4.70pp |
+| 0.2 | 1.77 | +4.90pp |
+| 0.4 | 2.14 | +3.75pp |
+| 0.6 | 2.21 | +2.55pp |
+| 0.8 | 2.23 | +0.65pp |
+| 1.0 | 2.28 | −0.85pp |
+
+**Lift is a good detector and a poor dial.** It moves decisively from 0.77 to
+1.77 as correlation appears, then **saturates at 2.1–2.3 across the entire
+region where the panel's value falls from +3.75pp to −0.85pp.** A gate on
+"lift > 2 ⇒ no panel" would disable panels at W=0.4 where they still pay 3.75
+points.
+
+The saturation is structural, not tuning. Lift is bounded above by
+`1 / P(b wrong)`, and that ceiling *falls* as tasks get harder — cancelling the
+rise it is supposed to report. No threshold fixes that.
+
+### Measuring the decision instead of a proxy for it
+
+The leader's own proposal is already among the panel's proposals, so **how often
+the aggregated answer beat the leader's** is measurable at zero extra cost, with
+no counterfactual re-run and no assumption about correlation. That is not a
+proxy for the gain; it is the gain, restricted to the tasks where it applies.
+
+| W | lift (proxy) | uplift (direct) | rescued/spoiled | true gain |
+|---|---|---|---|---|
+| 0 | 0.77 | +7.28pp | 141/16 | +4.70pp |
+| 0.2 | 1.77 | +6.54pp | 149/31 | +4.90pp |
+| 0.4 | 2.14 | +3.27pp | 127/66 | +3.75pp |
+| 0.6 | 2.21 | +1.85pp | 115/82 | +2.55pp |
+| 0.8 | 2.23 | +0.38pp | 106/99 | +0.65pp |
+| 1.0 | 2.28 | **−1.19pp** | **77/99** | **−0.85pp** |
+
+Monotone throughout, crosses zero where the real gain crosses zero, and within
+about a point of truth everywhere. `rescued`/`spoiled` tells the story on its
+own: the panel goes from rescuing **9× more than it spoils** to **spoiling more
+than it rescues**.
+
+`upliftPp` reads high at low W because it is measured only over escalated tasks
+(88% of them) while the true gain is over all tasks. That is a denominator
+difference, not disagreement, and it does not affect the sign or the crossing
+point — which is what a gate needs.
+
+**`rescued` and `spoiled` are reported apart, never only as a net.** A panel
+that rescues 200 and spoils 190 nets +10 and is a coin flip dressed as a
+mechanism; one that rescues 60 and spoils 0 nets less and is strictly better. A
+test asserts the two are distinguishable, and fails if only the net is stored.
+
+### The honest shape of this sprint
+
+I built a statistic, validated it against ground truth, **found it unfit for the
+job I built it for, and said so in the module header rather than shipping a
+threshold on it.** Both statistics are kept: lift answers "are these experts
+correlated at all", which is diagnostic and true; uplift answers "is this panel
+paying", which is the decision. Only the second should be gated on.
+
+The pattern this repo keeps hitting is a system reporting success it has not
+earned. A saturating proxy with a threshold bolted on would have been exactly
+that — a gate that looked principled and fired in the wrong place.
+
+### Evidence
+
+301 assertions, 0 failures (agreement 23 new). `tsc --noEmit` 25 — unchanged.
+`next build` clean. Portability holds. Validity guard MATCH; the published
+world is untouched at 92.3% / 179 / 0.643.
+
+Four mutations, all caught:
+
+| mutation | result |
+|---|---|
+| report raw co-failure instead of the ratio | 5 failures |
+| default to "independent" with no evidence | 1 failure |
+| assign pair counts by position, not identity | 1 failure |
+| drop the rescued/spoiled split, keep the net | 2 failures |
+
+### NOT CHECKED
+
+- **The chicken-and-egg is real and unsolved.** A pair is measurable only on
+  tasks where both were called, which a top-1 router never does. So uplift
+  requires already running panels. That is an explore/exploit problem — run a
+  small share of panels purely to measure — and it is not built. The module
+  reports `confident: false` rather than pretending otherwise.
+- Nothing consumes either statistic yet. `EscalationPolicy` does not read them;
+  wiring uplift into the escalation decision is the next build, and it needs the
+  exploration policy above to have any data to read.
+- Where real Trinity experts sit. Still the whole question, still needs the
+  152,001-outcome replay.

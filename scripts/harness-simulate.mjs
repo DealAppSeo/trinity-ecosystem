@@ -56,6 +56,7 @@ const { TimeoutPolicy } = await load('timeout');
 const { ContextTransformer, approximateTokens } = await load('transform');
 const { PluralityAggregator } = await load('aggregate');
 const { EscalationPolicy } = await load('escalate');
+const { AgreementTracker } = await load('agreement');
 // Drawn from a dedicated stream and shared by EVERY arm, so all arms see the
 // identical difficulty sequence. Drawing it inside a world would give each arm
 // a different one and make the comparison meaningless.
@@ -326,6 +327,9 @@ function runHarness(seed, panel = null) {
   // Panel machinery. Null unless this arm is the aggregating one, so the
   // top-1 arm is byte-for-byte the run it was before.
   const plurality = panel ? new PluralityAggregator(clock, { minProposals: 2 }) : null;
+  // Only the panel arm can feed this: a pair is measurable only on tasks where
+  // BOTH experts were called, which a top-1 router never does.
+  const agreement = panel ? new AgreementTracker({ minCoObservations: 50 }) : null;
   const escalation = panel ? new EscalationPolicy(clock, panel.escalateCfg ?? {}) : null;
 
   // Earned reputation, learned from observed outcomes. Confidence-weighted:
@@ -453,6 +457,13 @@ function runHarness(seed, panel = null) {
             }
           }
 
+          // One call per TASK with every observation together — the task
+          // boundary is the whole quantity of interest and is unrecoverable if
+          // outcomes are fed one at a time.
+          agreement.recordTask(
+            proposals.map((pr) => ({ expert: pr.expert, correct: pr.key === 'right' }))
+          );
+
           // A panel pays its SLOWEST member, not the sum: the calls are
           // concurrent. Charging the sum would invent a cost the design avoids.
           m.latencies.push(slowest || 200);
@@ -475,8 +486,13 @@ function runHarness(seed, panel = null) {
             continue;
           }
           const a = plurality.aggregate(proposals);
+          // The leader's own proposal is already in hand, so measuring what the
+          // panel bought costs nothing extra and needs no counterfactual re-run.
+          const leadProp = proposals.find((pr) => pr.expert === members[0]);
+          const panelRight = a.outcome === 'DECIDED' && a.key === 'right';
+          if (leadProp) agreement.recordPanelOutcome(leadProp.key === 'right', panelRight);
           m.completed += 1;
-          if (a.outcome === 'DECIDED' && a.key === 'right') m.correct += 1;
+          if (panelRight) m.correct += 1;
           continue;
         }
         // Not escalated: fall through to the ordinary top-1 path below.
@@ -597,7 +613,7 @@ function runHarness(seed, panel = null) {
     if (!done) m.failed += 1;
   }
 
-  return { m, ledger, breakers, capacity, timeouts };
+  return { m, ledger, breakers, capacity, timeouts, agreement };
 }
 
 // ── run and report ───────────────────────────────────────────────────────────
@@ -608,7 +624,7 @@ const { m: harness, ledger, breakers, capacity, timeouts } = runHarness(SEED);
 // because the ceiling analysis at the bottom showed top-1 has ~2pp left and
 // aggregation is the only mechanism that can cross the single-expert bound.
 const PANEL_CFG = { panelSize: 3, escalateCfg: { marginFloor: 2000 } };
-const { m: panelArm } = runHarness(SEED, PANEL_CFG);
+const { m: panelArm, agreement: panelAgreement } = runHarness(SEED, PANEL_CFG);
 const { m: evidenceArm } = runHarness(SEED, { ...PANEL_CFG, aggregate: false });
 
 const summarise = (m) => {
@@ -1044,3 +1060,47 @@ console.log(
 console.log(
   `  W~0.8 and inverts at 1.0, at unchanged cost. See the note above this line.`
 );
+
+// ── CAN THE HARNESS DETECT ITS OWN BOUNDARY? ─────────────────────────────────
+//
+// The boundary above is only actionable if a live fleet can tell which side of
+// it it is on. `agreement.ts` estimates that from panel observations alone. The
+// simulator is the one place the estimator can be VALIDATED rather than merely
+// run, because here the true correlation is a knob (`--hardness W`) and the
+// estimate can be checked against it.
+{
+  const ag = panelAgreement.stats();
+  console.log(`\n  CO-FAILURE ESTIMATOR (true hardness W = ${HARDNESS_W})`);
+  console.log(
+    `  fleet lift ${ag.fleetLift === null ? 'n/a' : ag.fleetLift.toFixed(2)}` +
+      `  (1.0 = independent, higher = experts fail on the SAME tasks)` +
+      `  evidence ${ag.evidence}, confident ${ag.confident}`
+  );
+  const best = panelAgreement.mostIndependentPair();
+  if (best) {
+    console.log(
+      `  least correlated pair: ${best.a}/${best.b} lift ${best.lift.toFixed(2)}` +
+        ` over ${best.coObservations} shared tasks — the panel worth running.`
+    );
+  }
+}
+
+// The direct measurement, which needed no assumption about correlation at all.
+{
+  const u = panelAgreement.panelUplift();
+  console.log(
+    `\n  PANEL UPLIFT, measured directly on the ${u.observations} tasks a panel ran:`
+  );
+  console.log(
+    `  leader alone right ${u.leaderCorrect}, panel right ${u.panelCorrect}` +
+      `  =>  ${u.upliftPp === null ? 'n/a' : (u.upliftPp >= 0 ? '+' : '') + u.upliftPp.toFixed(2) + 'pp'}` +
+      ` on escalated tasks`
+  );
+  console.log(
+    `  rescued ${u.rescued} (leader wrong, panel right), spoiled ${u.spoiled} (leader right, panel wrong).`
+  );
+  console.log(
+    `  Reported apart on purpose: rescue 200 / spoil 190 nets +10 and is a coin`
+  );
+  console.log(`  flip dressed as a mechanism; rescue 60 / spoil 0 nets less and is better.`);
+}
