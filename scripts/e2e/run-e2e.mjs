@@ -435,7 +435,8 @@ try {
     const AUD = 'trinity:control-proof-verify';
     const identity = await loadIdentity();
     try {
-      const { identity: idm, disclosure: disc, 'control-proof': cp, delegation: dlg } = identity.mods;
+      const { identity: idm, disclosure: disc, 'control-proof': cp, delegation: dlg,
+              'harness-bundle': hb } = identity.mods;
       const postVerify = async (body) => {
         const res = await fetch(`${base}/api/trustshell/control-proof/verify`, {
           method: 'POST',
@@ -593,6 +594,70 @@ try {
         assert.equal(json.valid, true, JSON.stringify(json));
         return `child clamped to parent expiry (${link.grant.expiresAt}), verified server-side`;
       });
+
+      // ---- portable harness, presented to a host that did not issue it -----
+      {
+        const HOST = 'trinity:harness-host';
+        const postHarness = async (body) => {
+          const res = await fetch(`${base}/api/trustshell/harness/verify`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+            cache: 'no-store',
+          });
+          return { status: res.status, json: await res.json() };
+        };
+        const HASH = '0'.repeat(64);
+        const packFor = async (audience, name = 'TORCH') => {
+          const h = await idm.createHumanSSID();
+          const a = await idm.createAgentIdentity(name);
+          const authority = await cp.issueControlProof({
+            human: h, agent: a, audience, capabilities: ['pay:usdc'], ttlSeconds: 300,
+          });
+          return hb.packHarness({
+            agent: a, controllerDid: h.did, authority,
+            skills: [{ name: 'trade', contentHash: `sha256:${HASH}` }],
+            memory: { commitment: `commit-sha256:${HASH}`, itemCount: 42, takenAt: '2026-08-14T00:00:00Z' },
+          });
+        };
+
+        await ledger.check('harness_bundle_verifies_over_http', async () => {
+          const { status, json } = await postHarness({ bundle: await packFor(HOST) });
+          assert.equal(status, 200);
+          assert.equal(json.valid, true, JSON.stringify(json.parts));
+          assert.equal(json.parts.integrity.outcome, 'VERIFIED');
+          assert.equal(json.parts.authority.outcome, 'VERIFIED');
+          return 'a host that issued nothing verified identity, authority, skills and memory ref';
+        });
+
+        await ledger.check('spliced_harness_rejected_over_http', async () => {
+          // Both bundles genuine; the combination was never asserted by anyone.
+          const a = await packFor(HOST, 'TORCH');
+          const b = await packFor(HOST, 'NEXUS');
+          const { json } = await postHarness({ bundle: { ...a, authority: b.authority } });
+          assert.equal(json.valid, false, "one agent's authority rode inside another's bundle");
+          assert.equal(json.parts.integrity.outcome, 'FAILED');
+          assert.deepEqual(json.grantedCapabilities, []);
+          return 'parts spliced from two valid bundles refused server-side';
+        });
+
+        await ledger.check('harness_is_not_a_bearer_token_over_http', async () => {
+          // Minted for somewhere else: identity holds, authority does not.
+          const { json } = await postHarness({ bundle: await packFor('trinity:elsewhere') });
+          assert.equal(json.valid, false, 'a bundle minted elsewhere granted authority here');
+          assert.equal(json.parts.integrity.outcome, 'VERIFIED', 'integrity should still hold');
+          assert.equal(json.parts.authority.outcome, 'FAILED');
+          assert.deepEqual(json.grantedCapabilities, []);
+          return 'integrity VERIFIED, authority refused — identity without permission';
+        });
+
+        await ledger.check('harness_response_never_claims_skills_are_attested', async () => {
+          const { json } = await postHarness({ bundle: await packFor(HOST) });
+          assert.match(json.skillNote, /not an attestation/i);
+          assert.match(json.parts.skills.detail, /NOT an attestation/);
+          return 'the host is told to compare hashes against what it loads';
+        });
+      }
 
       await ledger.check('malformed_proof_is_a_400_not_a_forgery', async () => {
         const { status } = await postVerify({ proof: { grant: {} } });
