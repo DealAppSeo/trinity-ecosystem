@@ -72,6 +72,40 @@ Also: `MemoryRecall` is now exported from `lib/trustshell/index.ts` (421 lines a
 assertions that nothing could import), and the check scripts resolve the pinned local
 compiler instead of `npx tsc`.
 
+## Sprint 3 — the proving stack stops claiming a proof
+
+`ZKPAttestation` returned `proofSystem: 'groth16'` and a `verificationKey` over a
+SHA-256 of a timestamp dressed as an IPFS CID, and that value was published
+on-chain in a Solana memo under key `zkp`. Four signals were hardcoded `true`
+(including a sanctions check that exists nowhere), so a **failing** agent was
+attested as passing.
+
+Now: `proven:false`, `proofSystem:'none'`, a reopenable `commit-sha256:`
+commitment with its salt returned, signals **derived** from inputs, and unchecked
+claims **absent** from `publicSignals` rather than set to `false` — `false` would
+assert the agent *is* sanctioned. Memo key `zkp` → `cmt`. 14 assertions.
+
+`services/zkp-postcard/src/circuit.rs` returned
+`format!("plonky3_..._value_{}_verified_ok", value)` as proof bytes, where
+`value` is `repid − threshold − 1` — **the private input the circuit exists to
+hide**. It now returns `Err`, routing `main.rs` onto its own truthful
+`sha256_commitment_poc` fallback. **NOT COMPILED** — see below.
+
+Gate: `npm run check` exit 0, **172 assertions**, `tsc` 0 errors, `next build`
+clean. Brain: `trinity_changelog` #136.
+
+**Still false in that service, untouched and recorded:** `verify_proof` is a
+`HashMap` lookup echoing a boolean stored at write time; `get_agent_repid` is a
+hardcoded 4-entry table disagreeing with live RepID. Both need the Rust build.
+
+## Environment blocker worth fixing once
+
+**No Claude session can build Rust in this ecosystem.** The agent proxy allow-list
+has `index.crates.io` but not `static.crates.io`, so cargo resolves the sparse
+index then 403s on every `.crate` download, and there is no local cargo cache.
+This matters because the proving stack *is* the Rust part. Task **#75** covers
+the allow-list fix and the `cargo check` that verifies the change above.
+
 ## REAL vs STUB
 
 REAL and landed: EVM key detection, tsc 25→0, CI workflow, MemoryRecall export, two
@@ -80,6 +114,9 @@ Plonky3 `format!` fake proof, `ZKPAttestation`'s SHA-256 labelled `groth16`, the
 hardcoded RepID inputs in `app/api/trustrails/pay/route.ts`, the ANFIS stub.
 
 ## BLOCKED_FOR_SEAN
+
+0. **Open tasks now: #73 (rotate key, Sean), #74 (llm_call_log attribution, CC),
+   #75 (cargo verify + proxy allow-list, CC).** #70 is CLOSED.
 
 1. **`autonomous_tasks` #73 — rotate the Base Sepolia deployer key.** In git history;
    a commit cannot remove it. Generate a fresh signer and `transferFrom` 3747/3748/3750.
