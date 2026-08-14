@@ -108,10 +108,74 @@ the allow-list fix and the `cargo check` that verifies the change above.
 
 ## REAL vs STUB
 
+> **Corrected 2026-08-14.** This section was written after Sprint 1 and then went
+> stale inside its own file: it listed the Plonky3 `format!` proof, the `groth16`
+> label and the four hardcoded RepID inputs as untouched, all three of which
+> Sprints 2 and 3 *above* had already fixed. Verified against the source, not
+> against this file — `app/api/trustrails/pay/route.ts:58` reads
+> `...toScoringInputs(earned.metrics)`. Same defect the rest of the session is
+> about: a document asserting a state it had not re-checked.
+
 REAL and landed: EVM key detection, tsc 25→0, CI workflow, MemoryRecall export, two
-agent-id bugs fixed. **Unchanged and still stubbed** (documented, not touched): the
-Plonky3 `format!` fake proof, `ZKPAttestation`'s SHA-256 labelled `groth16`, the four
-hardcoded RepID inputs in `app/api/trustrails/pay/route.ts`, the ANFIS stub.
+agent-id bugs fixed, RepID computed from recorded outcomes, `ZKPAttestation`
+reporting `proven:false`, the Plonky3 `format!` proof replaced by an `Err`, and the
+E2E suite below.
+
+**Still stubbed, documented and not touched:** the ANFIS stub; `verify_proof` (a
+`HashMap` lookup echoing a boolean stored at write time) and `get_agent_repid` (a
+hardcoded 4-entry table) in `services/zkp-postcard`, both of which need the Rust
+build that task #75 unblocks.
+
+## Sprint 4 — the ecosystem can run an E2E test
+
+There was **no test runner in this repo at all** — no jest, no vitest, no
+playwright, zero `*.test.*` files. `npm run check` was seven hand-rolled assertion
+scripts over pure functions, so nothing had ever executed a route handler.
+
+`npm run test:e2e` now boots the production server (`next start`) and drives the
+real payment path over HTTP. Real handler, real `lib/trustshell`, real supabase-js,
+real query strings; only the database is replaced, by an in-memory PostgREST
+(`scripts/e2e/postgrest-stub.mjs`) — necessary because the sandbox proxy denies the
+Supabase host. The seam is at the **wire**, not at `getSupabaseAdmin()`: mocking the
+client would have replaced the layer most likely to be wrong, since a hand-written
+mock accepts any chain you write, including one PostgREST would reject.
+
+[VERIFIED] **19 VERIFIED, 3 NOT CHECKED, 0 FAILED**, core 8/8, exit 0.
+
+Two design decisions carry the weight:
+
+1. **Three outcomes.** `scripts/e2e/ledger.mjs` records VERIFIED / NOT CHECKED /
+   FAILED and fails the run when *zero core steps were verified*, so a suite that
+   skipped everything cannot exit 0. That is repid-engine #414 — where every route
+   returning 401 produced **6/6 passed, exit 0** — encoded as a guard. A step may
+   also only resolve once, so a skip cannot later be upgraded to a pass.
+2. **An unseeded table 404s rather than returning `[]`.** An empty array is
+   indistinguishable from "no matching rows", so a route reading the wrong table
+   would pass silently.
+
+**The suite was verified by breaking the code, not by reading it.** Reintroducing
+the four literals into `pay/route.ts` produced **3 FAILED, core 6/8, exit 1**, with
+the response reverting to 3971. The mutation was then reverted and the run is green
+again. An E2E suite that has never been shown to fail is an untested assertion.
+
+It also tests itself: `scripts/check-e2e-harness.mjs` (29 assertions, in
+`npm run check`) reproduces the #414 all-skipped run and asserts it exits 1, and
+drives the PostgREST stub through a **real supabase-js client** — a stub validated
+against my own idea of the wire format would only have confirmed my idea of the
+wire format.
+
+One gap this found in its own first draft: both dual-signature assertions were
+passing while blocked at `kya_validation`, because TORCH's per-tx limit denied a
+60000 payment before the signature gate ran. A `WHALE` fixture with a 200000 limit
+now reaches the gate, and it is asserted in all three directions — unsigned held at
+202, CFO+CFO rejected, **CFO+CTO accepted**. A gate that only ever closes is
+indistinguishable from a broken one.
+
+Not covered, and reported as NOT CHECKED rather than skipped: Solana broadcast (no
+signing key, devnet unreachable), the live Supabase schema (so column drift would
+not be caught), and the BFT panel (needs `BFT_ENFORCEMENT_MODE=enforce` and live
+providers). CI runs the suite **without** `--strict` for exactly that reason — under
+`--strict` the only route to green would be deleting those admissions.
 
 ## BLOCKED_FOR_SEAN
 
