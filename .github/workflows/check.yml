@@ -25,9 +25,23 @@ jobs:
           # A shallow clone would make it report a clean history it never read.
           fetch-depth: 0
 
+      # 24.x to match the Vercel project (`nodeVersion: "24.x"`, verified
+      # 2026-08-14). This was '20', which is not a version this app can run on:
+      # @supabase/realtime-js requires a native WebSocket and throws
+      # "Node.js detected but native WebSocket not found" from inside
+      # `createClient()` on Node 20. Every Supabase call in the app goes through
+      # getSupabaseAdmin() -> createClient, so CI was validating an engine where
+      # the first database call of any request would throw.
+      #
+      # Nothing caught it because no check had ever CONSTRUCTED a client — the
+      # suite was pure functions, and `next build` deliberately does not build
+      # clients (that fix is why the build stopped failing). The E2E suite is the
+      # first thing here to run a real client, and it failed on Node 20 within
+      # 36 seconds. npm ci had been printing EBADENGINE for seven packages
+      # requiring >=22 on every run, and it was read as noise.
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       # `npm ci` installs the pinned typescript. The check scripts resolve
