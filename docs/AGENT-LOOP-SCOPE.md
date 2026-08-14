@@ -1,7 +1,10 @@
 # Priority 3 — the agent execution loop: scope
 
-**Status:** SCOPED, not started. Needs three decisions from Sean before Stage B.
-**Written:** 2026-08-14, before any loop code exists.
+**Status:** **Stage A BUILT** (`lib/trustshell/harness/loop.ts`, 29 assertions,
+25 mutants all killed). Stages B and C not started; Stage B needs three
+decisions from Sean.
+**Written:** 2026-08-14, before any loop code existed. Stage A section added
+after building it.
 
 ---
 
@@ -120,6 +123,65 @@ Settings enforced, each already specified and bounded:
 | `tools.irreversible_requires_human` | the dual-auth gate | **built** |
 | `tools.max_writes_per_session` | stateful caveat, newly checkable | upgrade |
 
+### Stage A — BUILT 2026-08-14
+
+`lib/trustshell/harness/loop.ts`, `scripts/harness-loop-test.mjs` (29
+assertions), wired into `npm run check` as `check:harness-loop`, exported from
+the barrel on creation rather than later.
+
+**The property the file exists for, which was not in the original scope and
+emerged while writing it: an agent cannot self-certify above what the harness
+observed.** The model's claimed outcome is a *ceiling request*, not a verdict.
+The loop tracks what it actually observed — a denied call, an unreachable tool,
+an authorizer that could not answer, an exhausted budget — and returns the
+weaker of the two. A VERIFIED claim after any of those becomes NOT_CHECKED, and
+no prompt can talk the loop out of it, because the downgrade is arithmetic over
+recorded events rather than a judgement the model participates in.
+
+That is the direct counter to the recurring defect: a system reporting success
+it has not earned. An agent loop is where that defect would find its widest
+surface, because the agent narrates its own outcome.
+
+A self-reported **FAILED** is neither upgraded nor downgraded. The ceiling
+revokes over-claims; an agent admitting failure is the most trustworthy thing it
+emits.
+
+Everything not a typed handoff is **NOT_CHECKED, never FAILED** — running out of
+iterations means the work was not finished, not that it failed.
+
+**What mutation testing found.** 25 mutants; 22 killed on the first pass, and
+all 25 after the fixes. The three that survived were each worth the run:
+
+- **A test of mine passed for the wrong reason.** "Argument key order does not
+  fake progress" asserted only the stop *reason*. With a broken canonicaliser
+  the run still ends in `no_progress`, just two turns later, because `{a,b}` and
+  `{b,a}` each read as new once before repeating. The turn count is the real
+  assertion.
+- **The wrong mechanism was getting the credit.** Replacing the frozen policy
+  copy with a live reference survived, because the allowlist is a `Set` built at
+  entry — the *snapshot* was doing the work the freeze was credited for. The
+  scalars are where a live reference shows: `maxWritesPerSession` is read on
+  every call, so a caller could raise the budget mid-run. Now tested.
+- **A malformed mutant is not a kill.** One mutation did not compile, which
+  proves only that the type checker works. Rewritten to compile, it killed.
+
+**The two gates are tested as a pair**, per LESSONS A12, written before the
+mutation run rather than after it — the compound "both gates deleted" mutant is
+in the suite's fixture set from the start.
+
+**The progress definition shipped as the stated default** from the open question
+below: *a turn makes progress if it produced a tool result differing from the
+previous result for the same (tool, arguments)*. It misfires on legitimately
+idempotent polling; that cost is documented at the definition rather than left
+to be discovered, and is why `loops.no_progress_abort_after` defaults to 3
+rather than 1.
+
+**Not yet built, and deliberately:** the `Authorizer` adapter that binds the
+port to `ControlProof` / `capability` / `caveat`. The port is defined and
+required (no default — an optional authorizer would make "forgot to pass one"
+indistinguishable from "authorized everything"), and the adapter is the next
+piece.
+
 ### Stage B — outcomes become reputation events
 
 Each completed turn emits a `ReputationEvent` into the committed history. This is
@@ -197,6 +259,10 @@ offline, because none of it depends on what the model says.
 
 ## The one open design question I cannot answer alone
 
+**RESOLVED PROVISIONALLY 2026-08-14** — shipped as the stated default below,
+enforced in `assessProgress()`, and flagged there as an assumption rather than a
+settled answer. Still worth your review; changing it is a one-function change.
+
 **What counts as "progress" for `loops.no_progress_abort_after`?**
 
 Every other setting has an unambiguous enforcement point. This one does not, and
@@ -215,11 +281,12 @@ than a silent one.
 
 ## Recommended order
 
-1. **Stage A kernel** — the largest single piece, fully testable offline, no
-   decisions needed.
-2. **MCP client** — the one genuinely new module.
-3. **Stateful caveat enforcement** — small, and upgrades NOT_CHECKED to VERIFIED
-   in the layer that already exists.
+1. ~~**Stage A kernel**~~ — **DONE 2026-08-14.**
+2. **The `Authorizer` adapter** — binds the port to `ControlProof`, `capability`
+   and `caveat`. Lives outside `harness/`, because that is the whole point of
+   the port. This is where stateful caveats become checkable, since the kernel
+   already hands `SessionCounters` to every authorization call.
+3. **MCP client** — the one genuinely new module.
 4. *(gate: the three Stage-B decisions)*
 5. **Stage B** — reputation events, closing the earned-score chain.
 6. **Stage C** — sub-agents, mostly assembly.

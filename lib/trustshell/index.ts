@@ -103,3 +103,36 @@ export type {
   Rejection,
 } from './HarnessProfile';
 export type * from './types';
+
+// The agent execution kernel. Exported on creation rather than later, because
+// the note above MemoryRecall is what happens otherwise: a module absent from
+// the barrel is unreachable to every consumer that imports from
+// '@/lib/trustshell', which is all of them.
+export { runAgentLoop, weakerOutcome } from './harness/loop';
+export type {
+  ToolEffect as LoopToolEffect,
+  Outcome as LoopOutcome,
+  ToolCall,
+  TypedHandoff,
+  ModelTurn,
+  // Aliased: `Observation` is already taken by EarnedMetrics, where it means a
+  // reputation datum rather than a tool result. Two unrelated things with one
+  // name in one barrel is how a consumer imports the wrong one and finds out at
+  // runtime.
+  Observation as LoopObservation,
+  ModelTurnInput,
+  ModelClient,
+  DispatchResult,
+  ToolDispatcher,
+  SessionCounters,
+  AuthorizationRequest,
+  DenialKind,
+  AuthorizationVerdict,
+  Authorizer,
+  LoopPolicy,
+  CallRecord,
+  TurnRecord,
+  StopReason,
+  LoopResult,
+  RunAgentLoopInput,
+} from './harness/loop';
