@@ -3035,3 +3035,76 @@ not a free win.
   size comparison was not run.
 - The exchange rate that would settle panel size 3 vs 4 does not exist anywhere
   in this repo.
+
+---
+
+## 2026-08-14 — Sprint Z3: panel size 3 vs 4, settled
+
+Sprint Z2 reopened this and said settling it needed "an explicit pp-per-p99
+exchange rate, which this repo has never written down." **It turned out not to
+need one.** Inventing a rate would have been the wrong move — it would have
+buried a judgement call inside a number and presented the result as measured.
+
+### The reframe that removed the need
+
+Comparing sizes at a *fixed floor* conflates two different purchases: bigger
+panels **and** more escalation (at floor 1000 sizes 3/4/5 escalate 56.0 / 65.1 /
+68.0% of tasks, because the panel feeds the ledger and moves the margin
+distribution). Both are bought with the same budget.
+
+So the question is not "3 or 4" but: **given a call budget, is it better to
+panel more tasks or to make panels bigger?** If size 3 at some floor beats size
+4 at whatever floor costs the same, 3 wins across the frontier and the exchange
+rate never enters.
+
+Swept the full grid — sizes 3/4/5 × floors 250/500/1000/1500/2000/3000, 12
+seeds per cell — and took the Pareto frontier on each cost axis separately.
+
+### The answer: 3, by near-domination
+
+At **matched call cost**, 12 paired seeds:
+
+| budget | size 3 | size 4 | quality delta | p99 delta |
+|---|---|---|---|---|
+| ~2.97 calls | 96.83% @ floor 3000, p99 346 | 96.48% @ floor 1000, p99 388 | **+0.34pp** ± 0.29, t = 2.35 | **−42 ms** |
+| ~1.8 calls | 94.56% @ floor 500, p99 209 | 94.58% @ floor 250, p99 214 | −0.01pp ± 0.48, t = −0.05 (tied) | −5 ms, and −0.09 calls |
+
+**Size 4 never wins a matched-budget comparison.** At ~2.97 calls size 3 is
+better on quality *and* p99 simultaneously; at ~1.8 calls quality is a tie and
+size 3 is cheaper on both axes. That is domination, not a preference — which is
+why no pp-per-p99 rate is required to choose.
+
+On the **p99 frontier** size 3 owns the entire range it can reach (205 → 346 ms)
+and size 4 does not appear until **782 ms**. The intermediate size-4 points
+exist but are dominated: 4@1000 (388 ms, 96.48%) loses to 3@3000 (346 ms,
+96.83%) on both axes.
+
+Sprint P's conclusion therefore stands, but the reasoning that supported it
+(+1.25pp for +298% p99, one seed, one floor) does not, and had already stopped
+being true at the new floor. The right support is the matched-budget
+comparison above.
+
+### The one regime where 4 is correct, and it is not about cost
+
+**Size 3 saturates at ~96.8%.** At floor 3000 it already escalates **99.1%** of
+tasks; no further floor increase buys anything, because there is nothing left to
+escalate. Quality above ~96.8% is unreachable at size 3 *at any setting*.
+
+Exceeding it requires size 4, and the cheapest size-4 point above that ceiling
+is floor 1500: **97.59% at p99 782 ms** — a **2.3× p99 jump** for **+0.76pp**.
+
+So: **"is 4 ever right?" is a capability question — do we need better than 96.8%
+— not a cost-efficiency one.** Below that ceiling the answer is always 3. This
+is the distinction the old framing missed by comparing at a fixed floor.
+
+### NOT CHECKED
+
+- 12 seeds per cell. The decisive quality delta (+0.34pp ± 0.29, t = 2.35) only
+  just excludes zero; the p99 half of that comparison (−42 ms) is not marginal,
+  and the conclusion rests on both together.
+- Simulator evidence, default world (`--hardness 0`, agreeing-bloc errors).
+  Panel value is known to be highly configuration-dependent — see Sprint Z2,
+  where the ceiling-crossing margin ranged −0.10pp to +6.90pp across flags — so
+  the saturation ceiling of ~96.8% is a property of *this* world, not a constant.
+- `EscalationPolicy` still has no production caller; nothing here changes
+  shipped behaviour.

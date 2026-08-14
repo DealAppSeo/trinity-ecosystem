@@ -72,7 +72,8 @@ unless the underlying world changed.
 | **Is the EWMA's forgetting hurting adoption?** | **No — refuted.** Replacing `alpha 0.06` with a running mean makes the gem world **1.99pp worse** (t = −5.69). The forgetting is load-bearing: it lets an incumbent decay so a newcomer can overtake. Do not "fix" it. | Sprint Y |
 | **Can a mid-run newcomer earn trust?** | **Yes**, 95% of 40 seeds — refuting the closed-form prediction that it could not. The 6775 bps graduation ceiling is real but does not bind, because incumbents' EWMA scores move too. | Sprint X, `npm run sim:newcomer` |
 | **Panel membership selection** | At **97.15% ± 0.25** of the omniscient panel-of-3 bound, **2.80pp** left, at the floor now shipped (1000), over 20 seeds. Sprint P's **99.23% / 0.75pp** was a single seed at floor 2000; the same 20-seed measurement at floor 2000 gives **98.17% ± 0.16**, so most of the gap is seed variance, not the floor. | Sprint P, **re-measured Sprint Z2** |
-| **Panel size ≥ 5** | **5 is strictly dominated by 4** — confirmed at both floors on 20 seeds. At floor 1000 it buys **+0.01pp** over 4 for **3× the p99**. | Sprint P, re-measured Sprint Z2 |
+| **Panel size** | **3. Settled Sprint Z3 on stronger grounds than Sprint P had, and no exchange rate was needed.** Compared at *matched call budget* across a (size × floor) grid, size 3 is at least as good on quality **and** cheaper on p99 everywhere both sizes can operate — at ~2.97 calls it is **+0.34pp ± 0.29 (t = 2.35) with 42 ms lower p99**. Size 4 never wins a matched-budget comparison. **5 is strictly dominated by 4.** | Sprints P, Z2, **Z3** |
+| **When IS panel size 4 right?** | Only above size 3's ceiling. Size 3 saturates at **~96.8%** (99.1% of tasks escalated at floor 3000 — no floor buys more). Exceeding that requires size 4, at a **2.3× p99 jump** (346 → 782 ms) for +0.76pp. That is a capability question — "do we need >96.8%?" — not a cost-efficiency one. | Sprint Z3 |
 | **Whether to run panels at all** | Gated adaptively on measured uplift (`AdaptivePanelPolicy`). Do not hardcode a policy. | Sprint O |
 | **Co-failure lift as a gate signal** | **Unfit** — saturates at 2.1–2.3 across the whole decision region. Gate on `panelUplift`, never `fleetLift`. | Sprint N |
 | **Quantile budget allocator for escalation** | Built, measured **exactly zero** improvement, removed. The cap is a safety ceiling, not an allocator. | Sprint J |
@@ -84,7 +85,6 @@ unless the underlying world changed.
 
 | item | owner | note |
 |---|---|---|
-| **Is panel size 3 still the cost-adjusted optimum?** | open | **REOPENED by Sprint Z2.** The numbers that closed it no longer hold: 4 was rejected at *+1.25pp for +298% p99*, but at the floor now shipped it is **+1.16pp for +110% p99** — a ~2.7× better exchange rate — and at floor 2000 it is +1.79pp for +135%. 3 may still be right; it is no longer *established* by the evidence cited for it, and choosing needs an explicit pp-per-p99 rate this repo has never written down. |
 | **Task key on `repid_score_events`** | **Sean** | THE blocker. Co-failure correlation is not computable without it, and that decides whether panels ever run. Needs a real task key or a join table linking events to task instances. |
 | `20260813210000_agent_repid_earned_observations.sql` | **Sean** | Written, deliberately **UNAPPLIED**. `SupabaseReputationStore` refuses to load/save without it. |
 | Sub-task routing granularity | **Sean** | Architecturally significant; reshapes the task model and `router.ts`. |
