@@ -27,6 +27,11 @@ import {
   type ControlProof,
 } from '@/lib/trustshell/identity/control-proof';
 import { InMemoryNonceStore } from '@/lib/trustshell/identity/nonce-store';
+import {
+  isDelegated,
+  verifyDelegationChain,
+  type DelegatedControlProof,
+} from '@/lib/trustshell/identity/delegation';
 
 /** Never cached: the same proof must not be replayable via a cached 200. */
 export const dynamic = 'force-dynamic';
@@ -63,30 +68,69 @@ export async function POST(request: Request) {
   }
 
   const { proof, requiredCapabilities } = (body ?? {}) as {
-    proof?: ControlProof;
+    proof?: ControlProof | DelegatedControlProof;
     requiredCapabilities?: string[];
   };
 
   // Shape-check before verifying. Without this a missing field surfaces as a
   // signature failure, which reads as "someone forged a proof" rather than
   // "the caller sent the wrong thing".
-  if (!proof?.grant || !proof.humanSignature || !proof.agentSignature) {
-    return NextResponse.json(
-      { error: 'proof must carry { grant, humanSignature, agentSignature }' },
-      { status: 400 }
-    );
+  //
+  // A delegated proof carries `parent` and is shaped differently at the top
+  // level, so the two are validated separately rather than through a lowest
+  // common denominator that would accept neither properly.
+  const delegated = !!proof && isDelegated(proof as DelegatedControlProof);
+  if (delegated) {
+    const d = proof as DelegatedControlProof;
+    if (!d.grant || !d.delegatorSignature || !d.delegateSignature || !d.parent) {
+      return NextResponse.json(
+        {
+          error:
+            'delegated proof must carry { parent, grant, delegatorSignature, delegateSignature }',
+        },
+        { status: 400 }
+      );
+    }
+  } else {
+    const c = proof as ControlProof | undefined;
+    if (!c?.grant || !c.humanSignature || !c.agentSignature) {
+      return NextResponse.json(
+        { error: 'proof must carry { grant, humanSignature, agentSignature }' },
+        { status: 400 }
+      );
+    }
   }
   if (requiredCapabilities !== undefined && !Array.isArray(requiredCapabilities)) {
     return NextResponse.json({ error: 'requiredCapabilities must be an array' }, { status: 400 });
   }
 
   let result;
+  let chain: Awaited<ReturnType<typeof verifyDelegationChain>> | undefined;
   try {
-    result = await verifyControlProof(proof, {
-      audience: AUDIENCE,
-      nonceStore,
-      requiredCapabilities,
-    });
+    if (delegated) {
+      // The chain walks to its root ControlProof and verifies that with the
+      // same context, so audience and replay still apply — and the required
+      // capabilities are checked against the LEAF, which is what delegation
+      // narrowed. Checking them at the root would pass whenever the root is
+      // broad, defeating the point.
+      chain = await verifyDelegationChain(proof as DelegatedControlProof, {
+        audience: AUDIENCE,
+        nonceStore,
+        requiredCapabilities,
+      });
+      result = {
+        valid: chain.valid,
+        checks: chain.rootVerification?.checks ?? {},
+        disclosedClaims: chain.rootVerification?.disclosedClaims ?? {},
+        grantedCapabilities: chain.grantedCapabilities,
+      };
+    } else {
+      result = await verifyControlProof(proof as ControlProof, {
+        audience: AUDIENCE,
+        nonceStore,
+        requiredCapabilities,
+      });
+    }
   } catch (err) {
     // A malformed DID throws by design (did.ts) — it is a caller error, not a
     // failed verification, and conflating them would let a typo read as
@@ -104,6 +148,9 @@ export async function POST(request: Request) {
       checks: result.checks,
       disclosedClaims: result.disclosedClaims,
       grantedCapabilities: result.grantedCapabilities,
+      // Present only for a chain, so a caller cannot mistake a single proof for
+      // a delegation that was never checked link by link.
+      ...(chain ? { delegation: { depth: chain.depth, links: chain.links } } : {}),
       replayScope: REPLAY_SCOPE,
     },
     // 200 for a well-formed request even when the proof is invalid: the

@@ -435,7 +435,7 @@ try {
     const AUD = 'trinity:control-proof-verify';
     const identity = await loadIdentity();
     try {
-      const { did: _did, identity: idm, disclosure: disc, 'control-proof': cp } = identity.mods;
+      const { identity: idm, disclosure: disc, 'control-proof': cp, delegation: dlg } = identity.mods;
       const postVerify = async (body) => {
         const res = await fetch(`${base}/api/trustshell/control-proof/verify`, {
           method: 'POST',
@@ -525,6 +525,73 @@ try {
         assert.ok(!blob.includes('E2E Fixture Person'), 'a withheld claim came back from the server');
         assert.ok(!blob.includes('Silver'), 'a withheld claim came back from the server');
         return '1 of 3 claims disclosed and verified server-side; 2 withheld and absent from the response';
+      });
+
+      await ledger.check('delegated_subagent_verifies_over_http', async () => {
+        const supervisor = await idm.createAgentIdentity('SUPERVISOR');
+        const worker = await idm.createAgentIdentity('WORKER');
+        const root = await cp.issueControlProof({
+          human, agent: supervisor, audience: AUD,
+          capabilities: ['pay:*', 'read:memory'], ttlSeconds: 300,
+        });
+        const link = await dlg.delegate({
+          parent: root, delegator: supervisor, delegate: worker,
+          capabilities: ['pay:usdc'], ttlSeconds: 120,
+        });
+        const { json } = await postVerify({ proof: link, requiredCapabilities: ['pay:usdc'] });
+        assert.equal(json.valid, true, JSON.stringify(json));
+        assert.equal(json.delegation.depth, 1);
+        assert.deepEqual(json.grantedCapabilities, ['pay:usdc']);
+        return 'supervisor delegated pay:usdc to a worker; chain verified server-side';
+      });
+
+      await ledger.check('subagent_cannot_widen_authority_over_http', async () => {
+        // The forgery must be well-signed, or it fails on the signature and
+        // never reaches the attenuation rule — the exact flaw that let three
+        // mutations survive in the unit suite.
+        const supervisor = await idm.createAgentIdentity('SUPERVISOR');
+        const worker = await idm.createAgentIdentity('WORKER');
+        const root = await cp.issueControlProof({
+          human, agent: supervisor, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+        });
+        const grant = {
+          delegatorDid: supervisor.did, delegateDid: worker.did, delegateName: 'WORKER',
+          capabilities: ['pay:*'],                      // wider than the parent
+          audience: AUD, nonce: 'e2e-widen-000000000000',
+          notBefore: root.grant.notBefore, expiresAt: root.grant.expiresAt,
+        };
+        const delegatorSignature = await idm.signAs(supervisor, dlg.delegationPayload(grant));
+        const rogue = {
+          parent: root, grant, delegatorSignature,
+          delegateSignature: await idm.signAs(
+            worker,
+            `${dlg.DELEGATION_DOMAIN.countersign}|${dlg.delegationPayload(grant)}|${delegatorSignature}`
+          ),
+        };
+        const { json } = await postVerify({ proof: rogue });
+        assert.equal(json.valid, false, 'a well-signed widening verified server-side');
+        assert.ok(json.delegation.links.some((l) => /widens authority/.test(l.detail)),
+          JSON.stringify(json.delegation.links));
+        assert.deepEqual(json.grantedCapabilities, []);
+        return 'a well-signed link claiming pay:* under a pay:usdc parent was refused';
+      });
+
+      await ledger.check('subagent_cannot_outlive_its_parent_over_http', async () => {
+        const supervisor = await idm.createAgentIdentity('SUPERVISOR');
+        const worker = await idm.createAgentIdentity('WORKER');
+        const root = await cp.issueControlProof({
+          human, agent: supervisor, audience: AUD, capabilities: ['pay:*'], ttlSeconds: 60,
+        });
+        // Ask for a day; the parent has a minute. delegate() clamps.
+        const link = await dlg.delegate({
+          parent: root, delegator: supervisor, delegate: worker,
+          capabilities: ['pay:usdc'], ttlSeconds: 86_400,
+        });
+        assert.ok(new Date(link.grant.expiresAt) <= new Date(root.grant.expiresAt),
+          'child outlived parent after clamping');
+        const { json } = await postVerify({ proof: link });
+        assert.equal(json.valid, true, JSON.stringify(json));
+        return `child clamped to parent expiry (${link.grant.expiresAt}), verified server-side`;
       });
 
       await ledger.check('malformed_proof_is_a_400_not_a_forgery', async () => {

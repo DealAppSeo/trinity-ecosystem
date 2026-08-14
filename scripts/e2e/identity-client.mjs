@@ -27,6 +27,8 @@ const MODULES = [
   'control-proof.ts',
   'capability.ts',
   'nonce-store.ts',
+  'delegation.ts',
+  'capability.ts',
 ];
 
 /**
