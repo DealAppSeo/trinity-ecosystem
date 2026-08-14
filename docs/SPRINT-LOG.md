@@ -1381,3 +1381,120 @@ Four mutations, all caught:
   exploration policy above to have any data to read.
 - Where real Trinity experts sit. Still the whole question, still needs the
   152,001-outcome replay.
+
+---
+
+## Sprint O — the adaptive gate, and an invalid mutation caught for the third time
+
+Sprint N built the measurement and left the decision unbuilt. This closes it:
+`AdaptivePanelPolicy` in `agreement.ts` learns from measured uplift whether
+panels pay **in this fleet**, and turns them off when they do not.
+
+### Why a gate at all
+
+Two fixed policies each win half the range and lose the other half:
+
+| | W=0 | W=1.0 |
+|---|---|---|
+| never panel (top-1) | 92.25% | **68.65%** |
+| always panel | **96.95%** | 67.80% |
+
+Neither can be the right default, because the right answer is a property of the
+deployment and is not knowable in advance. So decide by measuring.
+
+### The design decisions that carry weight
+
+- **It gates on `panelUplift`, never `fleetLift`.** Lift saturates (Sprint N):
+  2.14 where the panel still pays +3.75pp, 2.28 where it loses. A threshold on
+  it fires in the wrong place.
+- **Exploration never stops.** While exploiting a "panels do not pay" verdict, a
+  5% trickle still runs one. Without it the decision is a one-way door: one
+  unlucky warmup and panels never run again, whatever the fleet later does. That
+  5% is the standing cost of being able to change your mind, and it is charged
+  visibly.
+- **Deterministic, not random.** Exploration fires on a counter. The portability
+  check forbids runtime globals, and a counter is exactly reproducible under
+  replay — two runs of the same workload make the same decisions.
+- **A break-even panel is declined.** `minUpliftPp` defaults above 0, because a
+  panel that breaks even still costs 3× the calls.
+
+### It works, and it picks correctly without being told
+
+| W | top-1 | always | adaptive | vs better fixed | calls always→adaptive |
+|---|---|---|---|---|---|
+| 0 | 92.25% | 96.95% | **96.95%** | +0.00pp | 2.77 → 2.77 |
+| 0.4 | 83.45% | 87.20% | **87.75%** | +0.55pp | 2.91 → 2.39 |
+| 0.8 | 72.95% | 73.60% | **74.60%** | +1.00pp | 2.90 → 1.26 |
+| 1.0 | 68.65% | 67.80% | **68.75%** | +0.10pp | 2.92 → 1.27 |
+
+Its own verdicts, which are what drove those decisions:
+
+| W | panels run | exploration | measured uplift |
+|---|---|---|---|
+| 0 | 1765 | 0 | +7.28pp → pure exploit |
+| 0.4 | 1385 | 39 | +3.94pp → mostly on |
+| 0.8 | 245 | 100 | **−2.11pp → turned off** |
+| 1.0 | 246 | 100 | **−3.36pp → turned off** |
+
+Across 3 seeds it matches always-panel **exactly** at W=0 (+0.00pp, 3/3) and
+beats the better fixed policy at W=0.8 (+1.00 / +1.10 / +1.65pp, 3/3).
+
+**One result is NOT what it looks like.** On seed 2 at W=0.8 the adaptive arm
+scored +1.65pp while using 2.83 calls against always-panel's 2.88 — it barely
+declined anything, so that gain cannot be the gate deciding well. It is
+path-dependence: panelling a slightly different set of tasks shifts the ledger
+and every downstream routing choice. The reliable, attributable claim is the
+call reduction at high W (2.90 → 1.26, −57%) with correctness held or improved.
+
+### The methodology failure, third instance today
+
+The mutation "gate on `fleetLift` instead of uplift" reported **31 passed, 0
+failed** and then **33 passed, 0 failed**. Both readings were worthless: the
+mutation **does not compile**. Removing the `u.upliftPp !== null` guard leaves
+`u.upliftPp.toFixed(2)` unguarded in the branch below, and TypeScript rejects
+it — the runner printed `harness compilation failed`, which my grep pattern did
+not match, so the absence of a failure line read as a pass.
+
+Rewritten to keep the null guard and swap only the criterion, it fails **3**
+assertions. **The hole was real and is now closed** by two new tests:
+
+- a fleet whose experts genuinely fail together (lift > 2) whose panels
+  nonetheless rescue far more than they spoil — the gate must follow the uplift;
+- its mirror, a fleet that looks independent (lift ≈ 1.0) whose panels
+  measurably lose — so the first test cannot be satisfied by ignoring evidence.
+
+Before those, gating on the saturating proxy was undetectable by the suite —
+in the sprint whose entire finding was that the proxy is the wrong thing to gate
+on.
+
+**Standing rule, restated because it keeps being violated:** a mutation that
+does not compile is not evidence. Grep for the compile-failure line, not only
+for the failure count.
+
+### Evidence
+
+341 assertions, 0 failures (agreement 33, +10). `tsc --noEmit` 25 — unchanged.
+`next build` clean. Portability holds. Validity guard MATCH; the published world
+is untouched at 92.3% / 179 / 0.643.
+
+Mutations, all caught once written validly:
+
+| mutation | result |
+|---|---|
+| gate always returns panel | 2 failures |
+| exploration dropped (one-way door) | 1 failure |
+| gate on fleetLift instead of uplift | 3 failures |
+
+`if (false) {` was also tried for the exploration mutation and produced no
+output — dead-code elimination, another non-mutation. Re-run as
+`explorationRate > 999` it fails correctly.
+
+### NOT CHECKED
+
+- Warmup costs panels in a fleet where panels lose. 150 panels of ~2000 tasks
+  is ~7.5%, unmeasured as a standalone cost.
+- The estimate is lifetime, not windowed. A fleet that changes character
+  mid-run is corrected only at the rate exploration feeds new evidence, and
+  nothing measures that lag.
+- Still simulator-only. Where real experts sit on the W axis remains the whole
+  question, and still needs the 152,001-outcome replay.

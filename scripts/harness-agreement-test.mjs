@@ -17,7 +17,7 @@
 import { compileHarness, createChecker } from './lib/harness-compile.mjs';
 
 const { load } = compileHarness();
-const { AgreementTracker } = await load('agreement');
+const { AgreementTracker, AdaptivePanelPolicy } = await load('agreement');
 
 const { check, eq, truthy, report } = createChecker('harness-agreement');
 
@@ -378,6 +378,143 @@ check('reset clears panel evidence too', () => {
   t.reset();
   eq(t.panelUplift().observations, 0, 'panel observations cleared');
   eq(t.panelUplift().upliftPp, null, 'uplift cleared');
+});
+
+// -- the adaptive gate -------------------------------------------------------
+
+check('rejects an out-of-range exploration rate', () => {
+  let n = 0;
+  for (const bad of [-0.1, 1.5]) {
+    try { new AdaptivePanelPolicy(new AgreementTracker(), { explorationRate: bad }); }
+    catch { n += 1; }
+  }
+  eq(n, 2, 'both rejected');
+});
+
+check('it panels unconditionally until it has evidence', () => {
+  const t = new AgreementTracker();
+  const pol = new AdaptivePanelPolicy(t, { warmupPanels: 20 });
+  for (let i = 0; i < 20; i += 1) {
+    const d = pol.decide();
+    eq(d.panel, true, `warmup task ${i} panels`);
+    eq(d.mode, 'warmup', 'and says so');
+    t.recordPanelOutcome(true, true); // no uplift at all
+  }
+  // Evidence now says panels buy nothing; the verdict must flip.
+  const after = pol.decide();
+  eq(after.mode === 'declined' || after.mode === 'explore', true, `flipped, got ${after.mode}`);
+});
+
+check('it keeps panelling while uplift clears the floor', () => {
+  const t = new AgreementTracker();
+  const pol = new AdaptivePanelPolicy(t, { warmupPanels: 10, minUpliftPp: 0.5 });
+  for (let i = 0; i < 10; i += 1) { pol.decide(); t.recordPanelOutcome(false, true); }
+  const d = pol.decide();
+  eq(d.panel, true, 'panels pay, so keep panelling');
+  eq(d.mode, 'exploit', 'and it is exploiting, not warming up');
+  truthy(d.upliftPp > 0.5, `uplift ${d.upliftPp} clears the floor`);
+});
+
+check('it STOPS panelling when the measured uplift goes negative', () => {
+  // The whole point: a fleet whose experts fail together must stop paying for
+  // panels. Fails if the gate is removed or always returns true.
+  const t = new AgreementTracker();
+  const pol = new AdaptivePanelPolicy(t, { warmupPanels: 10, explorationRate: 0 });
+  for (let i = 0; i < 10; i += 1) { pol.decide(); t.recordPanelOutcome(true, false); }
+  const d = pol.decide();
+  eq(d.panel, false, 'panels are actively harmful — stop');
+  eq(d.mode, 'declined', 'and say why');
+  truthy(d.upliftPp < 0, `negative uplift ${d.upliftPp}`);
+});
+
+check('a break-even panel is DECLINED, because extra calls are not free', () => {
+  const t = new AgreementTracker();
+  const pol = new AdaptivePanelPolicy(t, { warmupPanels: 10, minUpliftPp: 0.5, explorationRate: 0 });
+  for (let i = 0; i < 10; i += 1) { pol.decide(); t.recordPanelOutcome(true, true); }
+  eq(pol.decide().panel, false, 'zero uplift does not justify 3x the calls');
+});
+
+check('exploration never stops, so a verdict can be revisited', () => {
+  // Without this the decision is a one-way door: one unlucky warmup and panels
+  // never run again whatever the fleet later does. Fails if exploration is
+  // dropped once the policy starts declining.
+  const t = new AgreementTracker();
+  const pol = new AdaptivePanelPolicy(t, { warmupPanels: 5, explorationRate: 0.1 });
+  for (let i = 0; i < 5; i += 1) { pol.decide(); t.recordPanelOutcome(true, false); }
+  let explored = 0;
+  for (let i = 0; i < 500; i += 1) if (pol.decide().mode === 'explore') explored += 1;
+  truthy(explored > 0, 'it still probes');
+  const st = pol.stats();
+  truthy(st.explorationRate <= 0.1 + 1e-9, `held to budget: ${st.explorationRate}`);
+  truthy(st.explorationRate > 0.05, `and actually spends it: ${st.explorationRate}`);
+});
+
+check('explorationRate 0 makes the decision permanent, but only by choice', () => {
+  const t = new AgreementTracker();
+  const pol = new AdaptivePanelPolicy(t, { warmupPanels: 5, explorationRate: 0 });
+  for (let i = 0; i < 5; i += 1) { pol.decide(); t.recordPanelOutcome(true, false); }
+  for (let i = 0; i < 200; i += 1) eq(pol.decide().mode, 'declined', 'never probes again');
+  eq(pol.stats().explorations, 0, 'no exploration at all');
+});
+
+check('the decision always carries a basis naming the evidence', () => {
+  const t = new AgreementTracker();
+  const pol = new AdaptivePanelPolicy(t, { warmupPanels: 3 });
+  truthy(/Warming up/.test(pol.decide().basis), 'warmup explains itself');
+  for (let i = 0; i < 3; i += 1) { pol.decide(); t.recordPanelOutcome(true, false); }
+  const d = pol.decide();
+  truthy(/rescued|not paying/.test(d.basis), `basis names the evidence: ${d.basis}`);
+});
+
+check('the gate reads UPLIFT, not the saturating lift proxy', () => {
+  // The coverage hole this sprint nearly shipped. Sprint N's whole finding is
+  // that fleetLift saturates: it reads ~2.14 where a panel still pays +3.75pp
+  // and ~2.28 where the panel LOSES. A gate on lift would therefore decline in
+  // a fleet where panels are clearly working.
+  //
+  // This builds exactly that fleet: experts that DO fail together (high lift),
+  // whose panels nonetheless rescue far more than they spoil (positive uplift).
+  // The gate must follow the uplift. Fails if it is rewired to lift.
+  const t = new AgreementTracker({ minCoObservations: 10 });
+  const r = rng(1234);
+  for (let i = 0; i < 400; i += 1) {
+    const shared = r() < 0.4;
+    t.recordTask([
+      { expert: 'a', correct: !shared },
+      { expert: 'b', correct: !shared },
+    ]);
+  }
+  const lift = t.stats().fleetLift;
+  truthy(lift > 2, `these experts genuinely fail together: lift ${lift.toFixed(2)}`);
+
+  for (let i = 0; i < 100; i += 1) t.recordPanelOutcome(i >= 70, true);
+  const u = t.panelUplift();
+  truthy(u.upliftPp > 20, `yet the panel is clearly paying: ${u.upliftPp.toFixed(1)}pp`);
+
+  const pol = new AdaptivePanelPolicy(t, { warmupPanels: 10, minUpliftPp: 0.5 });
+  const d = pol.decide();
+  eq(d.panel, true, 'the gate must keep panelling on the uplift evidence');
+  eq(d.mode, 'exploit', 'exploiting a measured gain, not declining on a proxy');
+});
+
+check('a low-lift fleet whose panels do NOT pay is still declined', () => {
+  // The mirror image, so the test above cannot be satisfied by ignoring
+  // evidence entirely. Experts look independent, but panels lose anyway.
+  const t = new AgreementTracker({ minCoObservations: 10 });
+  const ra = rng(9);
+  const rb = rng(88);
+  for (let i = 0; i < 400; i += 1) {
+    t.recordTask([
+      { expert: 'a', correct: ra() >= 0.3 },
+      { expert: 'b', correct: rb() >= 0.3 },
+    ]);
+  }
+  near(t.stats().fleetLift, 1.0, 0.15, 'these look independent');
+  for (let i = 0; i < 100; i += 1) t.recordPanelOutcome(true, i < 80);
+  const pol = new AdaptivePanelPolicy(t, { warmupPanels: 10, explorationRate: 0 });
+  const d = pol.decide();
+  eq(d.panel, false, 'independent-looking, but panels measurably lose');
+  eq(d.mode, 'declined', 'so decline');
 });
 
 report();

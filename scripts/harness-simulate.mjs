@@ -56,7 +56,7 @@ const { TimeoutPolicy } = await load('timeout');
 const { ContextTransformer, approximateTokens } = await load('transform');
 const { PluralityAggregator } = await load('aggregate');
 const { EscalationPolicy } = await load('escalate');
-const { AgreementTracker } = await load('agreement');
+const { AgreementTracker, AdaptivePanelPolicy } = await load('agreement');
 // Drawn from a dedicated stream and shared by EVERY arm, so all arms see the
 // identical difficulty sequence. Drawing it inside a world would give each arm
 // a different one and make the comparison meaningless.
@@ -330,6 +330,9 @@ function runHarness(seed, panel = null) {
   // Only the panel arm can feed this: a pair is measurable only on tasks where
   // BOTH experts were called, which a top-1 router never does.
   const agreement = panel ? new AgreementTracker({ minCoObservations: 50 }) : null;
+  // Adaptive arm only: learns from measured uplift whether panels pay here.
+  const panelPolicy =
+    panel && panel.adaptive ? new AdaptivePanelPolicy(agreement, panel.adaptive) : null;
   const escalation = panel ? new EscalationPolicy(clock, panel.escalateCfg ?? {}) : null;
 
   // Earned reputation, learned from observed outcomes. Confidence-weighted:
@@ -398,7 +401,14 @@ function runHarness(seed, panel = null) {
           runnerUpEarned: d.alternates.length > 0 ? ledger.earnedScore(d.alternates[0]) : undefined,
           topConfidence: ledger.confidence(d.selected),
         });
-        if (dec.escalate && members.length >= 2) {
+        // Two gates, and they answer different questions. Escalation asks "is
+        // THIS task uncertain enough to be worth a panel". The adaptive policy
+        // asks "do panels pay AT ALL in this fleet" — a property of the
+        // deployment, learned from what panels have actually bought. A fleet
+        // whose experts fail together needs the second gate; no amount of
+        // per-task uncertainty makes a panel useful there.
+        const worthIt = panelPolicy === null ? { panel: true } : panelPolicy.decide();
+        if (dec.escalate && worthIt.panel && members.length >= 2) {
           const proposals = [];
           let slowest = 0;
           for (const id of members) {
@@ -613,7 +623,7 @@ function runHarness(seed, panel = null) {
     if (!done) m.failed += 1;
   }
 
-  return { m, ledger, breakers, capacity, timeouts, agreement };
+  return { m, ledger, breakers, capacity, timeouts, agreement, panelPolicy };
 }
 
 // ── run and report ───────────────────────────────────────────────────────────
@@ -625,6 +635,13 @@ const { m: harness, ledger, breakers, capacity, timeouts } = runHarness(SEED);
 // aggregation is the only mechanism that can cross the single-expert bound.
 const PANEL_CFG = { panelSize: 3, escalateCfg: { marginFloor: 2000 } };
 const { m: panelArm, agreement: panelAgreement } = runHarness(SEED, PANEL_CFG);
+// Fourth arm: the panel, gated on whether panels have measurably paid here.
+const ADAPTIVE_CFG = {
+  ...PANEL_CFG,
+  adaptive: { warmupPanels: 150, minUpliftPp: 0.5, explorationRate: 0.05 },
+};
+const { m: adaptiveArm, agreement: adaptiveAgreement, panelPolicy: adaptivePolicy } =
+  runHarness(SEED, ADAPTIVE_CFG);
 const { m: evidenceArm } = runHarness(SEED, { ...PANEL_CFG, aggregate: false });
 
 const summarise = (m) => {
@@ -1103,4 +1120,51 @@ console.log(
     `  Reported apart on purpose: rescue 200 / spoil 190 nets +10 and is a coin`
   );
   console.log(`  flip dressed as a mechanism; rescue 60 / spoil 0 nets less and is better.`);
+}
+
+// ── THE ADAPTIVE GATE — does measuring beat committing? ──────────────────────
+//
+// Two fixed policies each win half the range and lose the other half: always-
+// panel gains +4.70pp at W=0 and loses 0.85pp at W=1.0; never-panel does the
+// reverse. Neither can be the right default, because the right answer is a
+// property of the fleet and is not knowable in advance.
+//
+// This arm decides by measuring. It panels until it has evidence, then keeps
+// panelling only while the measured uplift clears a floor — and keeps a 5%
+// trickle running forever so the verdict can be revisited. The test is not
+// "does it beat top-1"; it is whether it tracks the BETTER of the two fixed
+// policies at both ends without being told which end it is at.
+{
+  const adaptiveCorrect = adaptiveArm.correct / TASKS;
+  const adaptiveCalls = [...adaptiveArm.perExpert.values()].reduce((a, b) => a + b, 0) / TASKS;
+  const ps = adaptivePolicy.stats();
+  const au = adaptiveAgreement.panelUplift();
+  console.log(`\n  ADAPTIVE GATE (warmup 150 panels, floor +0.5pp, 5% exploration)`);
+  console.log(
+    `  ${'arm'.padEnd(26)} ${'correct'.padStart(8)} ${'calls/task'.padStart(11)}`
+  );
+  console.log(`  ${'-'.repeat(26)} ${'-'.repeat(8)} ${'-'.repeat(11)}`);
+  console.log(
+    `  ${'top-1 (never panel)'.padEnd(26)} ${pctC(achieved).padStart(8)} ${h.callsPerTask.toFixed(2).padStart(11)}`
+  );
+  console.log(
+    `  ${'always panel'.padEnd(26)} ${pctC(panelCorrect).padStart(8)} ${panelCalls.toFixed(2).padStart(11)}`
+  );
+  console.log(
+    `  ${'adaptive'.padEnd(26)} ${pctC(adaptiveCorrect).padStart(8)} ${adaptiveCalls.toFixed(2).padStart(11)}`
+  );
+  const best = Math.max(achieved, panelCorrect);
+  console.log(
+    `  vs the BETTER of the two fixed policies: ` +
+      `${((adaptiveCorrect - best) * 100).toFixed(2)}pp` +
+      `  (>=0 means it matched or beat the better one without being told which)`
+  );
+  console.log(
+    `  panelled ${adaptiveArm.escalated} tasks; ${ps.explorations} of those were pure exploration ` +
+      `(${(ps.explorationRate * 100).toFixed(1)}%).`
+  );
+  console.log(
+    `  its own verdict: uplift ${au.upliftPp === null ? 'n/a' : au.upliftPp.toFixed(2) + 'pp'}` +
+      `, rescued ${au.rescued}, spoiled ${au.spoiled}.`
+  );
 }
