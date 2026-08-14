@@ -90,9 +90,13 @@ hardcoded RepID inputs in `app/api/trustrails/pay/route.ts`, the ANFIS stub.
    reachability moved to `is_reachable`; `liveness_signal` gained `probe_only`.
    [VERIFIED] 12/12 → **3/12** live, 12/12 reachable, 9/12 probe-only, 0/12
    heartbeat. Canonical now equals `v_fleet_liveness_strict`. Rollback tested.
-3. **Durability.** `trinity_changelog` #130 records nine harness modules, 126 assertions
-   and a 2000-task simulation. `git log --all` for that path is **empty** — the container
-   was reclaimed before a push. The brain can record a build that has no artifact.
+3. ~~**Durability — the brain can record a build with no artifact.**~~ **RETRACTED
+   2026-08-14.** The fourteen harness modules from `trinity_changelog` #130 exist on
+   PR #24's branch (`claude/e2e-mvp-packaging-plttzn`), with the portability checker.
+   The original check ran `git log --all` in a container that had fetched only
+   `origin/main`, so it could not have seen them and its silence was misread as
+   absence. Nothing was lost. Fetch all remotes before concluding a path never
+   existed.
 
 ## Next 3 commands
 

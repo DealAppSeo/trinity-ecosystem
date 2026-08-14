@@ -20,11 +20,11 @@ Railway no (proxy-denied), Base Sepolia RPC **yes indirectly** via Supabase
 | Proving stack | **1** / 10 | A genuine Plonky3 AIR that discards its proof and returns a `format!` string containing the secret |
 | Memory | **4** / 10 | Best-developed area: real schema, real backfill with a fidelity gate, recall proven in prod. Zero encryption, no portable vault, dual-auth is unverified JSON |
 | Routing & intelligence | **1** / 10 | No request-time routing exists. ANFIS service returns `confidence: 0.99` from 38 lines. No GNN |
-| Harness layer | **3** / 10 | `HarnessProfile.ts` is excellent and has zero runtime callers. The nine-module portable harness the brain records as built **is not in the repo** |
+| Harness layer | **3** / 10 | `HarnessProfile.ts` is excellent and has zero runtime callers. The 14-module portable harness exists on PR #24's branch (see §2.3 retraction), unmerged and so not yet reachable from `main` |
 | Safety & autonomy (HAL) | **2** / 10 | HAL is not in this repo; local integration is two table names in a row-count script. BFT defaults to observe mode and never runs inline |
 | Infrastructure | **4** / 10 | Dual Railway+Vercel works, `/api/version` works, Vercel green. **No CI workflows exist in this repo at all** |
 | Measurement & observability | **5** / 10 | *Raised from 3.* The canonical liveness view is fixed and now agrees with the strict view. CI exists. Still no instrumentation of routing, cost or HAL rates in this repo |
-| Fleet & orchestration | **2** / 10 | 2 of 12 agents doing work; heartbeat writer dead 27 days; 23,113 orphaned claims |
+| Fleet & orchestration | **2** / 10 | 3 of 12 agents doing work; heartbeat writer dead 27 days; 23,113 orphaned claims |
 
 **Composite: ~2.5 / 10.** The honest summary is that this is a system with
 several pieces of genuinely first-rate engineering, none of which are connected
@@ -115,21 +115,35 @@ Known trade-off: an agent that works without writing to `trinity_agent_logs` now
 reads `is_live = false`. That is a false negative, which is the right direction to
 err for a trust system, and it stays visible through `is_reachable`.
 
-### 2.3 A completed sprint exists only in the database
+### 2.3 ~~A completed sprint exists only in the database~~ — RETRACTED 2026-08-14
 
-`trinity_changelog` #130 records, in careful detail, a nine-module portable
-harness in `lib/trustshell/harness/` — types, reputation, leaky-bucket, capacity,
-router, queue, circuit-breaker, quorum, replay — with a portability checker, 126
-assertions across three suites, and a 2000-task simulation showing correctness
-48.3% → 88.8% across three build-measure-learn cycles.
+**This finding was wrong and is withdrawn.** It claimed the portable harness
+recorded in `trinity_changelog` #130 was "not in the repo, and none of it ever
+was", and ranked it the most expensive defect in the ecosystem.
 
-**None of it is in the repo, and none of it ever was.** `git log --all` for that
-path returns nothing; `scripts/harness-portability-check.mjs` does not exist. The
-container was reclaimed before a push.
+All fourteen modules exist, on the branch behind **PR #24**
+(`claude/e2e-mvp-packaging-plttzn`), together with
+`scripts/harness-portability-check.mjs`:
 
-This is the most expensive defect in the ecosystem, because it is not a bug in
-any component — it is a hole in how work becomes durable. The brain is treated as
-ground truth for what is built, and it can record a sprint that has no artifact.
+```
+lib/trustshell/harness/{aggregate,agreement,capacity,circuit-breaker,escalate,
+  leaky-bucket,queue,quorum,replay,reputation,router,timeout,transform,types}.ts
+```
+
+**How the error was made.** The check was `git log --all -- 'lib/trustshell/harness/*'`
+plus `git ls-tree origin/main`, run in a container that had only ever fetched
+`origin/main`. `--all` searches the refs that are present, and PR #24's branch was
+not among them — so the search could not have found the files, and its silence was
+read as proof of absence. The correct check is
+`git fetch origin --prune && git branch -r` first, or `git log --remotes`.
+
+Nothing was lost, and there is no durability hole of the kind this section
+asserted. The narrower true statement is that **work can be complete and invisible
+to a session that has not fetched its branch**, which is a research discipline
+problem, not an architectural one.
+
+The retraction is left in place rather than deleted, per this repo's convention
+(see PR #24's own "Retracted during this PR" table).
 
 ---
 
@@ -336,7 +350,7 @@ automatically the moment attribution is fixed, with no further change here.
 | `tsc` 25 → 8, security commit delta 0 | **VERIFIED** | counted at HEAD and HEAD~1 |
 | 128 assertions pass under TS 5.6.3 | **VERIFIED** | all four scripts, exit 0 |
 | Fleet 2/12 working vs 12/12 reported | **VERIFIED** | `v_fleet_truth` vs `v_fleet_liveness_strict` |
-| `lib/trustshell/harness/` never existed | **VERIFIED** | `git log --all -- <path>` empty |
+| ~~`lib/trustshell/harness/` never existed~~ | **RETRACTED — WRONG** | `git log --all` ran against a container holding only `origin/main`; the files are on PR #24's branch. See §2.3 |
 | Vercel build green on PR #25 | **VERIFIED** | deployment Ready |
 | RepID differs per agent post-Sprint 2 | **VERIFIED** | computed over the same view the route reads |
 | x402 status vs is_simulated disagree | **VERIFIED** | 403 `settled` vs 289 `is_simulated` |
