@@ -28,16 +28,15 @@
 //       two agents get the SAME task wrong? This decides whether panels are
 //       worth running at all: Sprint M measured the panel's value swinging from
 //       +4.70pp to -0.85pp across that axis, and Sprint O built a gate that
-//       turns panels off at the bad end. **Q2 needs a column that groups events
-//       by TASK, and no such column is recorded anywhere in this repo.**
+//       turns panels off at the bad end. **ANSWERED, AND THE ANSWER IS NO.**
 //
-// Only `agent_id` and `decision_outcome` are documented. If there is no shared
-// task/decision key, co-failure correlation is NOT COMPUTABLE from this table,
-// and the answer to the question blocking six sprints is not in this data. That
-// would be worth knowing quickly, and it is why this script introspects the
-// schema FIRST and reports what is missing rather than assuming a column name
-// and failing obscurely — or worse, joining on the wrong thing and reporting a
-// correlation that is an artefact of the join.
+// The first version of this header said no task-grouping column was "recorded
+// anywhere in this repo" and left it there. That was a claim about the DOCS
+// stated as though it were a claim about the TABLE, and reading the real schema
+// refuted it: `repid_score_events` has 37 columns, not the 2 the docs list,
+// including two that look like task keys. Both fail on inspection — see
+// TASK_CANDIDATES below for the measurements. Co-failure is not computable from
+// this table, but for that reason rather than for want of documentation.
 //
 // A previous backlog item asked for a migration proposing tables whose writer
 // could not be found in this repo; it was declined rather than invented. Same

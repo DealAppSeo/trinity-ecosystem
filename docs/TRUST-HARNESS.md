@@ -556,6 +556,71 @@ the simulated world in `harness-simulate.mjs`, whose expert behaviour is a
 model, not a measurement. The mechanisms are verified; the *magnitudes* are
 only as good as that model.
 
+## What REAL data says — and which published numbers were wrong
+
+Everything above this section comes from the modelled world in
+`harness-simulate.mjs`. On 2026-08-14 the harness was measured against
+production data for the first time (`repid_score_events`, read-only). **This
+section supersedes the scattered per-sprint claims in `SPRINT-LOG.md`, four of
+which were retracted.** Read this rather than reconstructing the chain.
+
+### Confirmed on real data
+
+- **Empirical-Bayes shrinkage does what it was built for.** Ranked by raw
+  success rate, eleven agents are joint-first at 100% — each on a *single*
+  observation — while an agent with 14,715 observations sits at 22.9%. Through
+  the ledger those eleven collapse to ~5014 (the 5000 prior) at confidence 0.05.
+  A naive rate ranking would hand the fleet to one-shot claims.
+- **The outcome enum cannot be trusted; the reputation delta can.** `flagged`
+  (21,976 rows) carries **delta 0.00** — held for review, not wrong. `approved`
+  and `correct` carry delta **−9.00**: positive names on penalties.
+  `hallucination_caught` is non-null on every sampled row and agrees with
+  `vetoed` 27,060/27,351, and is the label to use.
+- **The fleet is two disjoint pools.** `peer_verify` (~30,600 events, ~21%
+  success) is worked by exactly three agents that touch almost nothing else. A
+  global earned score ranks across two pools the router never chooses between.
+- **Domain-aware routing is worth +1.64pp, volume-weighted.** Ranks genuinely
+  scramble across domains, but the high-volume domains carry the smallest gains.
+  Not worth rekeying `ReputationLedger` for; the cheap fix is to stop ranking
+  the `peer_verify` three against the other nine.
+
+### Not answerable from this data
+
+- **Co-failure correlation — the axis that decides whether panels pay at all.**
+  `llm_call_id` is 1:1 with events; `prompt_text` repeats only because recurring
+  cron jobs repeat, so grouping on it pairs agents that answered at different
+  times about different data. Computing it anyway yields lift 1.283, **which is
+  an artefact of the join and must not be quoted.** Needs a real task key on
+  `repid_score_events`, or a join table linking events to task instances.
+  Until then the Sprint O adaptive gate has to learn it online, which is what it
+  was built for.
+
+### Retracted — do not cite these
+
+| claim | where | status |
+|---|---|---|
+| 100% of margins under `marginFloor: 2000` | Sprint S | **wrong** — computed with outcome order destroyed |
+| Fleet improved recently, +2419 bps mean drift | Sprint T | **wrong** — 57 anomalous non-cron events dominated a 17-event EWMA window |
+| 56% of margins under the floor | Sprint T | **wrong** — same contamination |
+| `32e0e809` is the best cron performer (66.7%) | Sprint U | **wrong** — tail-150 windows spanned different time periods per agent |
+
+The soundest margin figure is Sprint U's cron-only measurement (**91%** under
+`marginFloor: 2000`, median margin 870 bps), and it inherits the unaligned-time
+flaw above, so treat it as indicative. `marginFloor` has **not** been changed:
+every cut of this data has moved the number.
+
+### The methodological lesson, which cost four retractions
+
+Each wrong number came from a transformation that looked harmless — interleaving
+outcomes to recover a lost order, trusting `id` as a proxy for time, taking a
+fixed-length tail from agents with wildly different volumes. **All three were
+assumptions about the shape of the data, made without checking the shape.** In
+every case the check was one cheap query.
+
+The existing rule in this repo is *suspect the measurement before the code*.
+Add: **suspect the sample before the measurement**, and treat a number carrying
+a caveat as provisional until the caveat is paid.
+
 ## Not yet built
 
 - **Sub-task routing granularity.** Routing is per task; the brief calls for

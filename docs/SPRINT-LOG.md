@@ -2157,3 +2157,71 @@ Still Sean's call, and still not started.
 - `hallucination_caught` as the wrongness label remains inferred (Sprint R).
 
 341 assertions unchanged, `tsc` 25, published world untouched.
+
+---
+
+## Sprint W — consolidating the record, because four numbers were retracted
+
+No new measurement. Sprints S–V produced four numbers that later sprints
+retracted, and the corrections were scattered across four log entries. A reader
+arriving at `SPRINT-LOG.md` would have found **four different answers to the
+margin question** with no way to tell which survived. That is a worse failure
+than any individual wrong number, because a wrong number that is clearly
+superseded costs nothing and one that must be reconstructed from a chain of
+partial corrections costs an afternoon.
+
+### Done
+
+- **`docs/TRUST-HARNESS.md` gains a "What REAL data says" section.** It had
+  **zero** mentions of real data — the authoritative document still described a
+  simulator-only world after five sprints of production measurement. The new
+  section states what is confirmed, what is not answerable, and carries an
+  explicit **do-not-cite table** of the four retracted claims with the reason
+  each failed. It supersedes the per-sprint entries.
+- **`scripts/repid-replay.mjs` header corrected.** It still asserted that no
+  task-grouping column was "recorded anywhere in this repo" — a claim about the
+  DOCS stated as though it were about the TABLE, which Sprint R refuted by
+  reading the real schema (37 columns, not 2). The header now says co-failure is
+  uncomputable *for the measured reason* rather than for want of documentation.
+
+### The four retractions, in one place
+
+| claim | sprint | why it failed |
+|---|---|---|
+| 100% of margins under `marginFloor: 2000` | S | outcome order destroyed by interleaving |
+| fleet improved, +2419 bps mean drift | T | 57 anomalous non-cron events dominated a 17-event EWMA window |
+| 56% of margins under the floor | T | same contamination |
+| `32e0e809` best on cron at 66.7% | U | tail-150 windows spanned different time periods per agent |
+
+All three root causes are the same species: **an assumption about the shape of
+the data, made without checking the shape.** Interleaving assumed order did not
+matter. `id desc` assumed id tracked time. Tail-150 assumed equal volumes meant
+equal windows. Each check was one cheap query.
+
+### The rule this adds
+
+The repo's standing rule is *suspect the measurement before the code*. Sprint L
+added *suspect the target before either*. This adds the one that would have
+prevented all four: **suspect the sample before the measurement**, and treat any
+number carrying an unpaid caveat as provisional rather than publishing it flat.
+
+### Evidence
+
+341 assertions, 0 failures. `tsc --noEmit` 25 — unchanged. Validity guard MATCH
+(92.3% / 179 / 0.643); the published simulator world is untouched by all of
+this. `repid-replay.mjs --dry-run` still exits 2 with no credentials.
+
+### State at the end of this run
+
+**Simulator axis: closed.** Routing 2.00pp from its bound, panel membership
+0.75pp from its bound, panel size resolved at 3, whether-to-panel gated
+adaptively on measured uplift.
+
+**Real-data axis: open, and now the only one that matters.** Shrinkage confirmed.
+The outcome enum is untrustworthy and `hallucination_caught` is the label. The
+fleet is two disjoint pools. Domain-aware routing prices at +1.64pp and is not
+worth the rekey. Co-failure — the input that decides whether panels ever run —
+**cannot be computed until a task key exists.**
+
+Nothing further should be measured from ad-hoc slices of this table. The next
+useful step is a schema change (a task key, or a join table), and that is Sean's.
