@@ -1032,3 +1032,138 @@ that caps the value of everything above it. It needs Supabase and it needs Sean.
 Also awaiting Sean, unchanged:
 `supabase/migrations/20260813210000_agent_repid_earned_observations.sql`,
 written and deliberately not applied.
+
+---
+
+## Sprint L — the ceiling, and the first non-zero result in three sprints
+
+**RESUMED at the user's explicit direction**, overriding the STOPPED marker
+above. That marker stays in the record: it was the correct call under the
+sprint-loop contract, and it was also the wrong conclusion about the *system* —
+the loop had run out of increments, not out of headroom. What it was missing is
+below.
+
+### The question nobody had asked
+
+Sprints J and K both measured exactly zero. Two zeros in a row is data, not bad
+luck, and the response to it should not have been a third increment. It should
+have been: **how much room is there, and where?** That had never been measured.
+
+It is computable. No top-1 router, however perfect, can beat the best expert
+available to it. So the bound was calculated three ways — analytically from the
+world model, by running an omniscient router that always picks the
+instantaneously best expert, and against what the harness actually achieves:
+
+| | correctness |
+|---|---|
+| best single expert, perfect knowledge (analytic) | 94.05% |
+| **omniscient top-1 router, measured** | **94.25%** |
+| the harness, top-1 | 92.25% |
+| naive baseline | 41.85% |
+
+**The harness was already at 97.9% of the omniscient top-1 bound.** The entire
+remaining prize for any router, scheduler, capacity or timeout change was
+**2.00pp**. That is the whole explanation for Sprints J and K, and it would have
+been the explanation for anything else built in that direction. The other
+**5.95pp** is the best available expert simply being wrong — unreachable by
+choosing better, because there is nothing better to choose.
+
+**This should have been the first measurement taken, not the twelfth.** Every
+sprint since H was optimising a component near its ceiling without knowing where
+the ceiling was.
+
+### What crosses it
+
+Only combining experts can beat the best single expert, and `aggregate.ts` had
+measured +6.5pp doing exactly that since Sprint H — **while never being wired
+into the harness arm**. The biggest measured win in the codebase was sitting in
+the experiment script. So it was wired in: escalation screens (free, ledger-
+derived), and when the leader's margin is thin a panel of 3 runs and the
+earned-weighted plurality is taken.
+
+| arm | correct | calls/task | p99 |
+|---|---|---|---|
+| omniscient top-1 CEILING | 94.25% | 1.00 | — |
+| harness, top-1 | 92.25% | 1.02 | 179 ms |
+| **harness + escalated panel** | **96.95%** | 2.77 | 216 ms |
+
+**+4.70pp over top-1, and +2.70pp over the omniscient top-1 ceiling — crossed.**
+2.69pp per extra call. Escalated on 88% of tasks; 235 screened out as clear
+picks.
+
+**Under the PESSIMISTIC wrong-answer model.** The headline uses `wrong` as a
+single key, so every wrong answer agrees and can out-vote the one correct
+answer. Reality is the opposite — many ways to be wrong, one way to be right.
+`--scatter-wrong` measures that: **98.20%**. The pessimistic number is the one
+reported.
+
+### Robustness — 7 seeds, not 1
+
+| seed | ceiling | top-1 | panel (bloc) | panel (scatter) |
+|---|---|---|---|---|
+| 20260813 | 94.25 | 92.25 | 96.95 | 98.20 |
+| 1 | 93.85 | 91.65 | 96.10 | 98.05 |
+| 2 | 94.50 | 91.05 | 96.10 | 98.00 |
+| 3 | 94.30 | 92.90 | 96.05 | 97.75 |
+| 4 | 94.50 | 91.95 | 96.00 | 97.80 |
+| 5 | 94.70 | 91.70 | 96.30 | 97.60 |
+| 6 | 94.30 | 91.60 | 97.15 | 98.60 |
+
+Panel beats top-1 on **every** seed (+3.15 to +5.55pp) and beats the omniscient
+ceiling on **every** seed (+1.55 to +2.85pp), pessimistic model throughout.
+
+### The confound, killed rather than hand-waved
+
+A panel gathers ~3× the observations per escalated task, so its ledger is better
+informed and would route better **even if the extra answers were discarded**.
+That would make "aggregation" a mislabel for "more evidence". Ablation: call the
+panel, teach the ledger, then take the LEADER's answer and throw the rest away.
+
+| arm | correct | Δ |
+|---|---|---|
+| top-1, one call | 92.25% | — |
+| panel called, leader's answer taken (evidence only) | 90.80% | **−1.45pp** |
+| panel called, plurality answer taken | 96.95% | +4.70pp |
+
+Extra evidence contributes **−1.45pp** — slightly *negative*. Aggregation itself
+contributes **+6.15pp**. The entire gain is the mechanism.
+
+### Cost, not netted out
+
+p99 179 → 216 ms (+21%). Calls/task 1.02 → 2.77 (+171%). A panel pays its
+slowest member rather than the sum, which is why latency rises far less than
+call count. Both are stated; neither is subtracted from the headline.
+
+### A bug found by the instrumentation
+
+The first "picked the instantaneous best" counter reported `0/0`. The loop
+variable `attempt` is shadowed inside the loop body by the `AttemptHandle` from
+`timeouts.begin()`, so `attempt === 0` compares against an object and is always
+false. Fixed to key off `tried.length`. A counter that reads 0/0 is visibly
+broken; one that read a plausible-but-wrong number would not have been.
+
+### Evidence
+
+278 assertions, 0 failures. `tsc --noEmit` 25 — unchanged. `next build` clean.
+Portability holds. The experiment script's validity guard still reports MATCH
+(92.3% / 179 / 0.643), so the top-1 arm is byte-for-byte what it was — the panel
+is a third arm, not a modification of the measured one.
+
+### What this changes about the earlier sprints
+
+Nothing measured in J or K was wrong. What was wrong was the **choice of what to
+work on**, and no amount of rigour inside a sprint corrects for that. The
+recurring lesson of this repo has been "suspect the measurement before the
+code". Sprint L adds: **suspect the target before either.** Measure the ceiling
+first; a mechanism at 97.9% of its bound has 2pp to give no matter how well it
+is built.
+
+### NOT CHECKED
+
+- Everything above is the modelled world. The panel gain depends on how
+  correlated expert errors really are — modelled here as fully correlated
+  (pessimistic) and fully independent (`--scatter-wrong`). Real experts sit
+  somewhere between, and where they sit decides the real number.
+- The escalation config (`marginFloor: 2000`, panel of 3) was chosen from the
+  experiment sweep and confirmed across 7 seeds, but not on a held-out world.
+- Real-data replay (152,001 labelled outcomes) — still needs Supabase.

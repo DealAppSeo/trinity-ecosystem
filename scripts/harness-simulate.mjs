@@ -32,6 +32,9 @@ const AS_JSON = argv.includes('--json');
 // full harness against the naive baseline conflates it with every other
 // mechanism and would credit the timeout for wins it did not produce.
 const NO_TIMEOUT = argv.includes('--no-timeout');
+// Wrong answers scatter (realistic) vs form an agreeing bloc (pessimistic).
+// The headline panel number uses the bloc model deliberately.
+const SCATTER_WRONG = argv.includes('--scatter-wrong');
 
 const { load } = compileHarness();
 const { ManualClock } = await load('types');
@@ -43,6 +46,8 @@ const { QuorumEvaluator } = await load('quorum');
 const { ReputationLedger } = await load('reputation');
 const { TimeoutPolicy } = await load('timeout');
 const { ContextTransformer, approximateTokens } = await load('transform');
+const { PluralityAggregator } = await load('aggregate');
+const { EscalationPolicy } = await load('escalate');
 
 // The run/idle split. IDLE is short because it measures time since the last
 // observed progress; RUN has to be long enough for the slowest legitimate task,
@@ -116,6 +121,28 @@ const EXPERTS = [
 
 const FALLBACK_QUALITY = 0.6; // generalist used when a breaker is open
 
+/**
+ * Probability this expert returns a CORRECT answer to a call made right now.
+ *
+ * `effectiveQuality` above averages over the whole run, which is the right
+ * thing for ranking but the wrong thing for asking "who was the best choice at
+ * this moment". This is the instantaneous version, and it is what an omniscient
+ * router would maximise.
+ */
+function instantQuality(e, progress) {
+  if (e.failsAt !== undefined && progress >= e.failsAt) return 0;
+  const degraded = e.degradesAt !== undefined && progress >= e.degradesAt;
+  const errorRate = Math.min(1, e.errorRate * (degraded ? 10 : 1));
+  const quality = degraded ? e.trueQuality * 0.4 : e.trueQuality;
+  const delivered = (1 - errorRate) * quality;
+  // A hang returns nothing at all, so that share of calls delivers zero.
+  if (e.hangsAt !== undefined && progress >= e.hangsAt) return delivered * (1 - e.hangRate);
+  return delivered;
+}
+
+const bestExpertAt = (progress) =>
+  EXPERTS.reduce((a, b) => (instantQuality(b, progress) > instantQuality(a, progress) ? b : a));
+
 function makeWorld(seed) {
   const rng = new SeededRng(seed);
   return {
@@ -181,6 +208,11 @@ function emptyMetrics() {
     hangsByIdle: 0,
     hangsByRun: 0,
     abortsLanded: 0,
+    firstPicks: 0,
+    pickedBest: 0,
+    panelCalls: 0,
+    escalated: 0,
+    screenedOut: 0,
   };
 }
 
@@ -234,7 +266,7 @@ function runBaseline(seed) {
 
 // ── arm 2: full harness ──────────────────────────────────────────────────────
 
-function runHarness(seed) {
+function runHarness(seed, panel = null) {
   const world = makeWorld(seed);
   const clock = new ManualClock(0);
   const m = emptyMetrics();
@@ -269,6 +301,11 @@ function runHarness(seed) {
     { explorationRate: 0.12, congestionWeight: 0.9, trustFloor: 2000, alternatesCount: 3 },
     new SeededRng(seed ^ 0x5eed)
   );
+
+  // Panel machinery. Null unless this arm is the aggregating one, so the
+  // top-1 arm is byte-for-byte the run it was before.
+  const plurality = panel ? new PluralityAggregator(clock, { minProposals: 2 }) : null;
+  const escalation = panel ? new EscalationPolicy(clock, panel.escalateCfg ?? {}) : null;
 
   // Earned reputation, learned from observed outcomes. Confidence-weighted:
   // an expert's score is shrunk toward the neutral prior in proportion to how
@@ -316,6 +353,116 @@ function runHarness(seed) {
     const tried = [];
     let done = false;
 
+    // ── PANEL PATH ───────────────────────────────────────────────────────────
+    //
+    // Only reached when this arm was constructed with a panel config. The
+    // ceiling section at the bottom of this file is why it exists: an
+    // omniscient TOP-1 router tops out at ~94.2% on this world, and the top-1
+    // harness already reaches ~97.9% of that bound. The remaining ~5.9% is the
+    // best available expert simply being wrong, which no amount of CHOOSING can
+    // fix. Combining several experts is the only mechanism that can cross it.
+    //
+    // Escalation decides when it is worth paying for. Both signals it reads are
+    // ledger-derived and already computed, so screening costs nothing.
+    if (panel) {
+      const d = router.route(task, profiles(), { isCircuitOpen: (id) => breakers.isOpen(id) });
+      if (d.selected) {
+        const members = [d.selected, ...d.alternates].slice(0, panel.panelSize);
+        const dec = escalation.decide({
+          topEarned: ledger.earnedScore(d.selected),
+          runnerUpEarned: d.alternates.length > 0 ? ledger.earnedScore(d.alternates[0]) : undefined,
+          topConfidence: ledger.confidence(d.selected),
+        });
+        if (dec.escalate && members.length >= 2) {
+          const proposals = [];
+          let slowest = 0;
+          for (const id of members) {
+            const expert = EXPERTS.find((e) => e.id === id);
+            limiter.tryConsume(id, 1);
+            capacity.acquire(id);
+            const h = timeouts.begin(id, task.id);
+            const r = world.call(expert, progress);
+            m.perExpert.set(id, m.perExpert.get(id) + 1);
+            m.panelCalls += 1;
+            if (id === 'rookie') m.rookieCalls += 1;
+            if (expert.degradesAt !== undefined && progress >= expert.degradesAt) m.callsToDegraded += 1;
+            if (expert.failsAt !== undefined && progress >= expert.failsAt) m.callsToCrasher += 1;
+
+            if (r.hang) {
+              // A panel member that hangs contributes no proposal. The panel
+              // pays the idle deadline because it waits for the slowest member.
+              m.hangsHit += 1;
+              clock.advance(IDLE_TIMEOUT_MS);
+              slowest = Math.max(slowest, IDLE_TIMEOUT_MS);
+              for (const e of timeouts.sweep()) {
+                if (e.kind === 'idle') m.hangsByIdle += 1;
+                else m.hangsByRun += 1;
+                m.hangStallMs += e.elapsedMs;
+                capacity.strand(e.attempt.expert);
+                capacity.observe(e.attempt.expert, e.elapsedMs, false);
+                breakers.recordFailure(e.attempt.expert);
+                updateEarned(e.attempt.expert, false);
+                pendingAborts.push({
+                  expert: e.attempt.expert,
+                  attemptId: e.attempt.id,
+                  at: clock.now() + ABORT_GRACE_MS,
+                });
+              }
+              continue;
+            }
+
+            timeouts.complete(h.id);
+            capacity.release(id);
+            capacity.observe(id, r.latencyMs, r.ok);
+            slowest = Math.max(slowest, r.latencyMs);
+            if (r.ok) {
+              breakers.recordSuccess(id);
+              updateEarned(id, r.correct);
+              // CONSERVATIVE BY DEFAULT. `wrong` as a single key means every
+              // wrong answer AGREES, forming a bloc that can out-vote the one
+              // correct answer. Reality is the opposite — there are many ways
+              // to be wrong and one way to be right — so this UNDERSTATES the
+              // panel. `--scatter-wrong` measures the realistic model; the
+              // headline uses the pessimistic one on purpose.
+              const key = r.correct ? 'right' : SCATTER_WRONG ? `wrong:${id}` : 'wrong';
+              proposals.push({ expert: id, key, answer: key, earnedScore: ledger.earnedScore(id) });
+            } else {
+              breakers.recordFailure(id);
+              updateEarned(id, false);
+            }
+          }
+
+          // A panel pays its SLOWEST member, not the sum: the calls are
+          // concurrent. Charging the sum would invent a cost the design avoids.
+          m.latencies.push(slowest || 200);
+          m.escalated += 1;
+
+          if (proposals.length === 0) {
+            m.failed += 1;
+            continue;
+          }
+          // ATTRIBUTION ABLATION. A panel gathers panelSize observations per
+          // task instead of one, so its ledger is better informed and routes
+          // better — independently of any aggregation. With `aggregate: false`
+          // the panel is still CALLED and still teaches the ledger, but the
+          // answer taken is the leader's alone. Whatever that arm gains is the
+          // extra-evidence effect; only the remainder belongs to aggregation.
+          if (panel.aggregate === false) {
+            const lead = proposals.find((pr) => pr.expert === members[0]) ?? proposals[0];
+            m.completed += 1;
+            if (lead.key === 'right') m.correct += 1;
+            continue;
+          }
+          const a = plurality.aggregate(proposals);
+          m.completed += 1;
+          if (a.outcome === 'DECIDED' && a.key === 'right') m.correct += 1;
+          continue;
+        }
+        // Not escalated: fall through to the ordinary top-1 path below.
+        m.screenedOut += 1;
+      }
+    }
+
     // Up to three attempts, walking the router's ranked alternates.
     for (let attempt = 0; attempt < 3 && !done; attempt += 1) {
       const decision = router.route(task, profiles(), {
@@ -344,6 +491,14 @@ function runHarness(seed) {
       const attempt = timeouts.begin(id, task.id);
       const r = world.call(expert, progress);
 
+      // `tried` already holds this pick, so length 1 means it is the first.
+      // NOT `attempt === 0`: the loop variable is shadowed a few lines above by
+      // the AttemptHandle from timeouts.begin(), so that comparison is always
+      // false and silently reported 0/0.
+      if (tried.length === 1) {
+        m.firstPicks += 1;
+        if (id === bestExpertAt(progress).id) m.pickedBest += 1;
+      }
       m.perExpert.set(id, m.perExpert.get(id) + 1);
       if (expert.degradesAt !== undefined && progress >= expert.degradesAt) m.callsToDegraded += 1;
       if (expert.failsAt !== undefined && progress >= expert.failsAt) m.callsToCrasher += 1;
@@ -428,6 +583,12 @@ function runHarness(seed) {
 
 const baseline = runBaseline(SEED);
 const { m: harness, ledger, breakers, capacity, timeouts } = runHarness(SEED);
+// Third arm: same harness, plus escalation-gated plurality aggregation. Built
+// because the ceiling analysis at the bottom showed top-1 has ~2pp left and
+// aggregation is the only mechanism that can cross the single-expert bound.
+const PANEL_CFG = { panelSize: 3, escalateCfg: { marginFloor: 2000 } };
+const { m: panelArm } = runHarness(SEED, PANEL_CFG);
+const { m: evidenceArm } = runHarness(SEED, { ...PANEL_CFG, aggregate: false });
 
 const summarise = (m) => {
   const counts = [...m.perExpert.values()];
@@ -668,3 +829,159 @@ console.log(`  (effective quality accounts for degradation/failure partway throu
 console.log(`   ranking against nominal quality penalises the harness for correctly detecting decay)`);
 console.log(`  Boaster: claimed 10000, earned ${ledger.earnedScore('boaster')}, true quality 0.35`);
 console.log(`  Rookie:  claimed 0, earned ${ledger.earnedScore('rookie')}, true quality 0.95\n`);
+
+// ── WHERE THE REMAINING LOSS LIVES — the ceiling nobody had measured ─────────
+//
+// Two consecutive sprints of routing/capacity work measured exactly zero. That
+// is not a coincidence and it is not a broken measurement: it is what happens
+// when you optimise a component that is already near its ceiling and never
+// checked where the ceiling was.
+//
+// The single-expert ceiling is not a matter of opinion. No top-1 router, however
+// perfect, can beat the best expert available to it. This section computes that
+// bound three ways — analytically, with an omniscient router, and against what
+// the harness actually achieves — so the remaining loss can be attributed
+// instead of guessed at.
+
+console.log(`\n\nWHERE THE REMAINING LOSS LIVES`);
+console.log('='.repeat(76));
+
+// (1) Analytic bound: the best instantaneous delivered quality, averaged over
+//     the run. This is the best a top-1 router with PERFECT knowledge could do.
+let analyticCeiling = 0;
+for (let i = 0; i < TASKS; i += 1) {
+  const p = i / TASKS;
+  analyticCeiling += instantQuality(bestExpertAt(p), p);
+}
+analyticCeiling /= TASKS;
+
+// (2) Omniscient arm: actually route to that expert and see what the world
+//     returns. One call per task, no retries, no harness. Confirms the analytic
+//     figure is not an algebra error.
+function runOracle(seed) {
+  const world = makeWorld(seed);
+  let correct = 0;
+  for (let i = 0; i < TASKS; i += 1) {
+    const p = i / TASKS;
+    const r = world.call(bestExpertAt(p), p);
+    if (r.correct) correct += 1;
+  }
+  return correct / TASKS;
+}
+const oracle = runOracle(SEED);
+
+const achieved = harness.correct / TASKS;
+const routingLoss = oracle - achieved;
+const irreducible = 1 - analyticCeiling;
+
+const pctC = (x) => `${(x * 100).toFixed(2)}%`;
+console.log(`\n  best single expert, perfect knowledge (analytic)   ${pctC(analyticCeiling).padStart(8)}`);
+console.log(`  omniscient top-1 router, measured                  ${pctC(oracle).padStart(8)}`);
+console.log(`  the harness                                        ${pctC(achieved).padStart(8)}`);
+console.log(`  naive baseline                                     ${pctC(baseline.correct / TASKS).padStart(8)}`);
+console.log(`  ${'-'.repeat(52)}`);
+console.log(`  loss the harness could still recover by ROUTING    ${pctC(routingLoss).padStart(8)}`);
+console.log(`  loss NO top-1 router can recover, ever             ${pctC(irreducible).padStart(8)}`);
+console.log(
+  `\n  first-attempt picks that were the instantaneous best: ` +
+    `${harness.pickedBest}/${harness.firstPicks} (${pctC(harness.pickedBest / harness.firstPicks)})`
+);
+console.log(
+  `\n  The harness is at ${pctC(achieved / oracle)} of the omniscient top-1 bound. Routing is`
+);
+console.log(
+  `  ESSENTIALLY SOLVED on this workload: the entire remaining prize for any`
+);
+console.log(
+  `  router, scheduler, capacity or timeout change is ${pctC(routingLoss)} — which is why the`
+);
+console.log(`  last two sprints measured zero, and would have whatever they built.`);
+console.log(
+  `\n  The other ${pctC(irreducible)} is the best available expert simply being wrong. It is`
+);
+console.log(
+  `  unreachable by CHOOSING better, because there is nothing better to choose.`
+);
+console.log(
+  `  Only COMBINING experts can cross that line — several independent draws can`
+);
+console.log(
+  `  be right where any single one is wrong. aggregate.ts measured +6.5pp doing`
+);
+console.log(`  exactly that, and it is NOT wired into the arm above.`);
+
+// ── CROSSING THE CEILING — escalation-gated plurality aggregation ────────────
+//
+// The section above establishes that top-1 routing is done: ~2pp left against
+// an omniscient bound, which is why two consecutive sprints of routing and
+// capacity work measured exactly zero. The remaining ~6pp is the best available
+// expert being wrong, and no router can choose its way out of that.
+//
+// This arm is the same harness with one thing added: when the escalation policy
+// says the leader's margin is thin, call a panel of 3 and take the earned-weight
+// plurality instead of the top-1 answer. Everything else is identical.
+
+const panelRate = panelArm.escalated / TASKS;
+const panelCalls = [...panelArm.perExpert.values()].reduce((a, b) => a + b, 0) / TASKS;
+const panelCorrect = panelArm.correct / TASKS;
+
+console.log(`\n\nCROSSING THE CEILING — panel of ${PANEL_CFG.panelSize}, escalated on margin < ${PANEL_CFG.escalateCfg.marginFloor}`);
+console.log('='.repeat(76));
+console.log(
+  `  wrong-answer model: ${SCATTER_WRONG ? 'SCATTER (realistic)' : 'BLOC (pessimistic — wrong answers all agree)'}`
+);
+console.log(`\n  ${'arm'.padEnd(34)} ${'correct'.padStart(8)} ${'calls/task'.padStart(11)} ${'p99'.padStart(6)}`);
+console.log(`  ${'-'.repeat(34)} ${'-'.repeat(8)} ${'-'.repeat(11)} ${'-'.repeat(6)}`);
+console.log(
+  `  ${'omniscient top-1 CEILING'.padEnd(34)} ${pctC(oracle).padStart(8)} ${'1.00'.padStart(11)} ${'-'.padStart(6)}`
+);
+console.log(
+  `  ${'harness, top-1'.padEnd(34)} ${pctC(achieved).padStart(8)} ${h.callsPerTask.toFixed(2).padStart(11)} ${String(h.p99LatencyMs).padStart(6)}`
+);
+console.log(
+  `  ${'harness + escalated panel'.padEnd(34)} ${pctC(panelCorrect).padStart(8)} ${panelCalls.toFixed(2).padStart(11)} ${String(percentile(panelArm.latencies, 99)).padStart(6)}`
+);
+const overCeiling = panelCorrect - oracle;
+const overTop1 = panelCorrect - achieved;
+console.log(`  ${'-'.repeat(62)}`);
+console.log(
+  `  vs top-1:   ${(overTop1 >= 0 ? '+' : '') + (overTop1 * 100).toFixed(2)}pp` +
+    `   at ${(panelCalls - h.callsPerTask).toFixed(2)} extra calls/task` +
+    `   = ${((overTop1 * 100) / Math.max(0.01, panelCalls - h.callsPerTask)).toFixed(2)}pp per extra call`
+);
+console.log(
+  `  vs the omniscient top-1 ceiling: ${(overCeiling >= 0 ? '+' : '') + (overCeiling * 100).toFixed(2)}pp` +
+    ` ${overCeiling > 0 ? '— CROSSED. No top-1 router could reach here.' : '— NOT crossed.'}`
+);
+console.log(
+  `  escalated on ${(panelRate * 100).toFixed(0)}% of tasks; ${panelArm.screenedOut} screened out as clear picks.`
+);
+console.log(
+  `\n  COST, stated plainly: p99 ${h.p99LatencyMs}ms -> ${percentile(panelArm.latencies, 99)}ms, calls/task` +
+    ` ${h.callsPerTask.toFixed(2)} -> ${panelCalls.toFixed(2)}.`
+);
+console.log(
+  `  A panel pays its slowest member, not the sum, so the latency cost is far`
+);
+console.log(`  below the call cost. Neither is netted out of the headline.`);
+
+// Attribution. The panel arm gathers ~3x the observations per escalated task,
+// so its ledger is better informed and would route better even if the extra
+// answers were thrown away. This ablation throws them away.
+const evidenceCorrect = evidenceArm.correct / TASKS;
+console.log(`\n  ATTRIBUTION — where the +${((panelCorrect - achieved) * 100).toFixed(2)}pp actually comes from:`);
+console.log(
+  `  ${'top-1, one call'.padEnd(46)} ${pctC(achieved).padStart(8)}`
+);
+console.log(
+  `  ${'panel called, LEADER answer taken (evidence only)'.padEnd(46)} ${pctC(evidenceCorrect).padStart(8)}` +
+    `  ${((evidenceCorrect - achieved) * 100 >= 0 ? '+' : '') + ((evidenceCorrect - achieved) * 100).toFixed(2)}pp`
+);
+console.log(
+  `  ${'panel called, PLURALITY answer taken'.padEnd(46)} ${pctC(panelCorrect).padStart(8)}` +
+    `  ${((panelCorrect - achieved) * 100 >= 0 ? '+' : '') + ((panelCorrect - achieved) * 100).toFixed(2)}pp`
+);
+console.log(
+  `  => extra evidence contributes ${((evidenceCorrect - achieved) * 100).toFixed(2)}pp;` +
+    ` aggregation itself contributes ${((panelCorrect - evidenceCorrect) * 100).toFixed(2)}pp.`
+);
