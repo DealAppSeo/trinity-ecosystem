@@ -20,20 +20,22 @@ registry lookup. The gap: nothing checks that a *human* authorized this agent.
 - `humanCustodyBound` in `ZKPAttestation` becomes derived from a verified proof
   instead of read from a registry row.
 
-**Measurement that decides whether this pays:** count how many of the 403
-`x402_settlements` rows could carry a control proof today. If the answer is
-zero, this is a greenfield path, not a migration — and should be built as one.
+**Measurement — RUN, answer: greenfield.** `x402_settlements` has no controller
+column at all, and `agent_kya_registry.custodian_zkp_proof` is NULL in all 12
+rows. There is no existing proof to migrate, so build this as a new path rather
+than a migration. Full finding in LESSONS A11.
 
-**2. Nonce store for replay defence.**
-`checks.replay` reports `NOT_CHECKED` whenever the caller keeps no nonce state,
-which is currently always. Needs a table with a TTL matched to max grant
-lifetime. Until it exists, every control proof is replayable within its window
-and the system says so.
+**2. Nonce store — DONE in memory, BLOCKED durably.** `NonceStore.consume` is
+atomic and wired into the verify route, and replay is proven caught over HTTP.
+Cross-instance defence needs
+`supabase/migrations/20260814090000_control_proof_nonces.sql`, written and
+deliberately **unapplied** — applying to the live project is Sean-gated. Until
+then the ledger records `control_proof_replay_across_instances` as NOT CHECKED
+rather than implying full protection.
 
-**3. E2E ledger coverage.**
-Add the identity path to `scripts/e2e/run-e2e.mjs` so it is exercised through
-HTTP against a real route, not only in unit assertions. The three-outcome ledger
-already exists; the identity checks map onto it directly.
+**3. E2E ledger coverage — DONE.** Seven identity steps run against a real
+handler over HTTP; two are core, paired so the gate must be shown to both open
+and close.
 
 ---
 
@@ -73,18 +75,28 @@ signed grant is worse than no caveat, because it reads as a control.
 
 ## Blocked — needs Sean
 
-0. **Rotate the leaked deployer** — the runbook is now written and
-   pre-flighted: `scripts/rotate-erc8004-deployer.mjs`, dry-run by default.
-   Verified not-yet-exploited on 2026-08-14. This is the only item with a
-   standing window of exposure.
-1. **`static.crates.io` on the proxy allow-list** (task #75). Unblocks
+1. **Rotate the leaked deployer key** (`autonomous_tasks` #73) — the only item
+   with a standing window of exposure. The runbook is written and pre-flighted:
+   `scripts/rotate-erc8004-deployer.mjs`, dry-run by default, verifies by
+   re-reading `ownerOf` rather than trusting receipts.
+
+   Verified on-chain 2026-08-14: **not yet exploited** — nonce, balance and every
+   affected `ownerOf` unchanged since discovery. Affected identity ids are in
+   task #73, not here. Until this is done, the DID↔agentId binding cannot be
+   proven even in principle: a signature from a compromised key proves nothing
+   about who controls the agent today.
+
+2. **`static.crates.io` on the proxy allow-list** (task #75). Unblocks
    `Plonky3ProofProvider`, `services/zkp-postcard`'s `cargo check`, and the only
    change on this branch with no executed evidence behind it.
-2. **Rotate the Base Sepolia deployer key** (task #73). Owns ERC-8004 identities
-   3747/3748/3750, in git history. Until then the DID↔agentId binding cannot be
-   proven even in principle — a signature from a compromised key proves nothing
-   about who controls the agent today.
-3. **PR #24 → #25 merge is done**; PR #25 still open.
+
+3. **Decide the `ControlProof` → `VaultPermission` wiring** (LESSONS A11).
+   Recommended: shadow mode — verify the proof, log agreement/disagreement
+   against the existing `human_custody_verified` boolean, change no behaviour.
+   That measures the migration before committing to it; if the two ever
+   disagree you learn it from a log rather than from a locked-out agent.
+
+4. **PR #25** is open and green; #24 is merged.
 
 ---
 
