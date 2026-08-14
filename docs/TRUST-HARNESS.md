@@ -638,8 +638,13 @@ a caveat as provisional until the caveat is paid.
   prediction that it could not. The prediction assumed an incumbent's earned
   score sits at its true quality; under winner-take-all the leader's EWMA
   random-walks instead, so the 6775 bps graduation ceiling is real but does not
-  bind. A late arrival pays a **lag**, not a lock-out: **94.77% of the
-  omniscient adoption bound, 4.82pp** left, and that lag is **still open**.
+  bind. A late arrival pays a **lag**, not a lock-out — and that lag was
+  **re-priced in Sprint Y and is nearly spent**. The 4.82pp first published here
+  is **RETRACTED**: it was measured ranking by the point estimate rather than the
+  `upperConfidenceBound` the simulator ships. Post-join the real gap is
+  **0.45pp**, of which **0.18pp** is irreducible regret, leaving **0.27pp ±
+  0.15pp**. `npm run sim:adoption` has the three levers tried against it and why
+  none shipped.
 
   Looking for the lock-out found a different defect, which is now **fixed**: the
   router scored any cold expert at a flat 0.5, discarding all ~20 outcomes an

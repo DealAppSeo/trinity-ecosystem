@@ -64,6 +64,8 @@ unless the underlying world changed.
 |---|---|---|
 | **Top-1 routing quality** | At **98.16%** of the omniscient bound (24 paired seeds), up from 97.31% before Sprint X. Remaining prize for any router / scheduler / capacity / timeout change: **1.84pp**. The single-seed 97.9% from Sprint L is consistent with this and is **not** retracted — it is one seed, and per-seed ratios range 95.8–99.7%. | `TRUST-HARNESS.md`, Sprints L and X |
 | **Cold-start weighting** | **Fixed, Sprint X.** A cold expert is no longer scored at a flat 0.5; `ExpertProfile.observations` separates *no* evidence from *thin* evidence. **+0.85pp of bound**, t = 2.92, no panel effect. Do not restore the flat midpoint — the ablation seam is `--cold-start-midpoint`. | Sprint X |
+| **Newcomer adoption lag, re-priced** | Post-join gap to omniscient is **0.45pp** after Sprint X, not 4.82pp. **0.18pp** of it is irreducible regret (Thompson sampling cannot get it either). Attackable residual: **0.27pp ± 0.15pp**. Three levers tried, none a free win. | Sprint Y, `npm run sim:adoption` |
+| **Is the EWMA's forgetting hurting adoption?** | **No — refuted.** Replacing `alpha 0.06` with a running mean makes the gem world **1.99pp worse** (t = −5.69). The forgetting is load-bearing: it lets an incumbent decay so a newcomer can overtake. Do not "fix" it. | Sprint Y |
 | **Can a mid-run newcomer earn trust?** | **Yes**, 95% of 40 seeds — refuting the closed-form prediction that it could not. The 6775 bps graduation ceiling is real but does not bind, because incumbents' EWMA scores move too. | Sprint X, `npm run sim:newcomer` |
 | **Panel membership selection** | At **99.23%** of the omniscient panel-of-3 bound. **0.75pp** left. | Sprint P |
 | **Panel size** | **3** is the cost-adjusted optimum. 4 buys +1.25pp for **+298% p99**; 5 is strictly dominated. | Sprint P |
@@ -81,7 +83,7 @@ unless the underlying world changed.
 | **Task key on `repid_score_events`** | **Sean** | THE blocker. Co-failure correlation is not computable without it, and that decides whether panels ever run. Needs a real task key or a join table linking events to task instances. |
 | `20260813210000_agent_repid_earned_observations.sql` | **Sean** | Written, deliberately **UNAPPLIED**. `SupabaseReputationStore` refuses to load/save without it. |
 | Sub-task routing granularity | **Sean** | Architecturally significant; reshapes the task model and `router.ts`. |
-| **Newcomer adoption lag** | open | Measured, **not attacked**. An expert joining mid-run reaches only **94.77%** of the omniscient adoption bound: **4.82pp** on the table, the largest unclaimed simulator prize known. Sprint X fixed the *ranking* defect found alongside it; the lag itself is untouched. |
+| **Newcomer adoption lag** | **Sean** (policy, not code) | Attacked in Sprint Y and **there is almost nothing there** — see CLOSED. What remains is a policy question: how likely is a newly added agent to be better than the incumbents? Every lever trades gem-detection against dud-rejection, so the answer decides the setting. No simulator can supply it. |
 | `marginFloor` retune | open | Current 2000 escalates on ~91% of real pairs (cron-only). Not changed — every cut of that data moved the number. |
 | Rotate the leaked EVM key | **Sean** | Owns 3 live ERC-8004 identities, in git history. A commit cannot fix it. See PR #25. |
 
@@ -101,6 +103,7 @@ correction.
 | fleet improved, **+2419 bps** mean drift | 57 anomalous non-cron events dominated a 17-event EWMA window | no such fleet-wide improvement is established |
 | **100%** of margins under `marginFloor: 2000` | outcome order destroyed by interleaving | ~**91%**, cron-only, and itself indicative |
 | **56%** of margins under the floor | same contamination as the drift figure | as above |
+| newcomer adoption lag is **4.82pp**, the largest unclaimed prize | measured on the point-estimate ranking, not the `upperConfidenceBound` the simulator actually ships — the same wrong-sample error caught mid-Sprint-X and not propagated to this figure | post-join gap is **0.45pp**, of which **0.18pp** is irreducible; residual **0.27pp** |
 | `32e0e809` is the **best cron performer (66.7%)** | tail-150 windows spanned different time periods per agent | it ranks **last** on both cron domains on full-slice data |
 | "router.ts + quorum.ts already IS RouteMoA" | refuted by measurement — a fail-closed gate scored abstentions as wrong | plurality aggregation is a separate mechanism, and it is what pays |
 

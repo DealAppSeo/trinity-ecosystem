@@ -37,6 +37,7 @@
     "check:prior-work": "node scripts/check-prior-work.mjs",
     "sim:harness": "node scripts/harness-simulate.mjs",
     "sim:newcomer": "node scripts/harness-newcomer.mjs",
+    "sim:adoption": "node scripts/harness-adoption.mjs",
     "experiment": "node scripts/harness-experiment.mjs",
     "repid:replay": "node scripts/repid-replay.mjs",
     "check:identity": "node scripts/check-identity.mjs"

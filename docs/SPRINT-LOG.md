@@ -2629,6 +2629,12 @@ What a late arrival actually pays is a **lag**, not a lock-out. Against an
 omniscient router that adopts the best present expert immediately: **94.77% of
 bound, 4.82pp** left on the table.
 
+> **RETRACTED 2026-08-14 by Sprint Y.** That 4.82pp was measured ranking by the
+> point estimate, not the `upperConfidenceBound` the simulator ships — the same
+> wrong-sample error caught earlier in this very sprint and not propagated to
+> this figure. The real post-join gap is **0.45pp** after the fix below, and
+> **0.18pp** of that is irreducible. See Sprint Y.
+
 ### The defect that was actually there
 
 Looking for the lock-out found something else, and it is not about newcomers.
@@ -2728,5 +2734,107 @@ once corrected.
   them.
 - Whether any caller outside the simulator supplies `observations`.
   `lib/mcp/fleet.ts` does not, and therefore keeps the conservative floor.
-- The 4.82pp adoption-lag prize is measured but **not attacked**. This sprint
-  took the ranking defect; the lag itself is still open.
+- ~~The 4.82pp adoption-lag prize is measured but **not attacked**.~~
+  **Superseded by Sprint Y**: the figure is retracted and the real residual is
+  0.27pp. Do not pick this up from here.
+
+---
+
+## 2026-08-14 — Sprint Y: the adoption lag, re-priced and attacked
+
+Brief was "attack the 4.82pp adoption lag." The first move was to re-price it,
+and the prize did not survive. `npm run sim:adoption`.
+
+### The 4.82pp is RETRACTED
+
+Two independent errors, both mine, both from Sprint X:
+
+1. **Wrong sample.** It was measured ranking by `ledger.earnedScore` — the point
+   estimate — when `harness-simulate.mjs` ships `ledger.upperConfidenceBound(id,
+   2500)`. This is the *same* error caught mid-Sprint-X on the trust-only A/B
+   and corrected there; it was never propagated to the prize figure. Reproduced
+   deliberately as an arm in the new script: the point-estimate ranking gives
+   post-join **91.09%** against omniscient **94.98%**, a 3.89pp gap, and 5.20pp
+   on the overall metric — which is where 4.82pp came from.
+2. **An omniscient bound quoted as a prize.** The omniscient router is *told*
+   which expert is best. A learner has to sample to find out, and every
+   observation spent on an expert that turns out worse is a loss no algorithm
+   avoids. That is regret, a property of the problem. Quoting the omniscient gap
+   promises work that cannot be delivered — the same error as optimising toward
+   an unmeasured bound, one level up.
+
+### Re-priced, with common random numbers
+
+Every arm now sees the same coin per (task, expert): `draws[t][id]` is
+pre-generated and the outcome is `draws[t][id] < trueQuality[id]`. Sprint X
+compared arms on a shared stream consumed in *selection* order, so two arms that
+diverged were also being handed different coins. 60 seeds × 3000 tasks,
+newcomer q=0.95 joining a warm fleet at task 800:
+
+| arm | overall | post-join |
+|---|---|---|
+| omniscient (knows the answer) | 92.26% | 94.98% |
+| **Thompson sampling** | 91.54% | **94.80%** |
+| UCB1 | 89.74% | 93.37% |
+| harness, post-Sprint-X | 91.06% | 94.53% |
+| harness, pre-Sprint-X | 89.17% | 93.82% |
+| harness, pre-X, point estimate *(the retracted config)* | 87.06% | 91.09% |
+
+Decomposition of the post-join gap:
+
+| quantity | value |
+|---|---|
+| omniscient − harness (pre-X) | 1.16pp ← what Sprint X should have recorded |
+| omniscient − harness (post-X) | **0.45pp** |
+| omniscient − Thompson | **0.18pp — IRREDUCIBLE**, the cost of not knowing |
+| **Thompson − harness (post-X)** | **0.27pp ± 0.15pp**, t = 3.56, ahead on 41/60 |
+
+So the attackable residual is **0.27pp**, not 4.82pp — about a third of what
+Sprint X's own fix delivered.
+
+### Three levers, and the frontier they all hit
+
+80 fresh paired seeds, disjoint from the train and held-out sets used to pick
+them. Bold = significant at |t| > 2.
+
+| lever | veterans | dud 0.55 | median 0.80 | gem 0.95 |
+|---|---|---|---|---|
+| `optimismBps` 2500 → 1000 | +0.30 | **+0.77** | **+0.65** | **−0.88** |
+| randomised UCB bonus | +0.31 | +0.39 | +0.33 | **−0.58** |
+| running mean instead of EWMA | +0.36 | +0.22 | +0.58 | **−1.99** |
+
+**All three move the same way.** Each buys accuracy where the newcomer is
+average-or-worse and pays for it where the newcomer is genuinely excellent.
+That is the exploration/exploitation frontier, and the harness is sitting on it.
+Which point is right depends on how likely a newly added agent is to beat the
+incumbents — a fact about the real fleet that no simulator can supply. **The
+default did not move.**
+
+The `optimismBps` sweep is also a clean demonstration of why the train/held-out
+split exists. Train picked **500** on the worst-case-world criterion (+0.49pp);
+held-out **rejected** it (−0.13pp). **1000** confirmed on both (+0.48pp train,
++0.47pp held-out) and was only found because the whole range was re-swept on
+held-out — the train tie-break had silently preferred 500 over an equal-scoring
+1000. Even so, 1000 is not adopted: see the frontier above.
+
+### A hypothesis refuted outright
+
+The residual is **not** the EWMA's forgetting. Replacing `alpha 0.06` with a
+running mean — identical shrinkage, identical UCB bonus, the only difference
+being that it does not forget — makes the gem world **1.99pp worse**
+(t = −5.69). The forgetting is **load-bearing**: it lets an incumbent's score
+decay so a newcomer can overtake, which is precisely the mechanism Sprint X
+identified. Anyone "fixing" that alpha to improve adoption will make adoption
+worse.
+
+### NOT CHECKED
+
+- Simulator evidence only, similarity and congestion neutralised.
+- Thompson and UCB1 are **references, not proposals**. Neither carries the
+  harness's capacity, breaker or trust-floor semantics, and a router that ranks
+  on posterior samples cannot state *why* it chose an expert — which is most of
+  what the ledger exists to do.
+- The deciding evidence for the frontier question is the distribution of *new
+  agent quality relative to incumbents* in the real fleet. That is in principle
+  answerable from `agent_repid` history and was **not** attempted here; every
+  real-data retraction in this repo came from assuming the shape of that data.

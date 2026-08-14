@@ -91,6 +91,15 @@ jobs:
           npm run sim:newcomer > /tmp/newcomer.log
           tail -12 /tmp/newcomer.log
 
+      # Same reasoning. Two invariants that break only if the MEASUREMENT breaks:
+      # nothing may outscore the oracle (which would mean the common-random-
+      # numbers wiring is wrong), and Sprint X's cold-start fix must still be an
+      # improvement (which would mean a CLOSED entry has gone stale). ~3s.
+      - name: adoption analysis (oracle dominance, Sprint X non-regression)
+        run: |
+          npm run sim:adoption > /tmp/adoption.log
+          tail -20 /tmp/adoption.log
+
       # `|| true` on the count keeps the pipeline from dying on grep's
       # exit-1-when-no-match, which would report zero errors as a failure — the
       # one case that must read as success. On failure the errors are printed,
