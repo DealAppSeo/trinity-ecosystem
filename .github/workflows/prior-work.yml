@@ -12,18 +12,28 @@
 # permanently red and therefore ignored, which is the failure mode the repo's
 # own tooling argues against.
 #
-# So tsc is gated on the REGRESSION instead of on zero. That catches new errors
-# on the first push that introduces one, while staying green against a backlog
-# this branch did not create and must not silently adopt.
+# tsc was therefore gated on a THRESHOLD rather than on zero, so a backlog this
+# branch did not create could not make the gate permanently red. That backlog is
+# gone and the threshold is now 0, so it is a plain regression gate again.
 #
-# BASELINE LOWERED 25 -> 4 ON 2026-08-14. The original 25 were all in
-# `src/graphs/motor-squad-graph.ts`, which PR #25 deleted. The 4 that remain are
-# two genuine ones: a `Set` iteration in `lib/trust/cross-llm-verifier.ts` and
-# three BigInt literals in `lib/trusttrader/trade_pipeline.ts`, both wanting a
-# higher `target`. Leaving the threshold at 25 after the backlog cleared would
-# have let 21 new errors land without the gate saying a word — a gate that
-# cannot fail is the defect this repo keeps finding, so the notice below exists
-# to make the next drop just as loud.
+# BASELINE IS NOW 0, i.e. this is a real gate again. Two corrections got it here
+# on 2026-08-14 and the second is worth reading before touching the number.
+#
+# The original 25 were all in `src/graphs/motor-squad-graph.ts`, which PR #25
+# deleted. Leaving the threshold at 25 after that would have let 25 new errors
+# land without the gate saying a word.
+#
+# It was then set to 4, because `npx tsc --noEmit` reported 4 locally. THAT WAS
+# A CONTAMINATED MEASUREMENT. `tsconfig.json` sets `incremental: true`, and a
+# stale `tsconfig.tsbuildinfo` replays cached diagnostics for files that have
+# not changed — in this case four errors from an era when `target` was lower
+# than `es2022` (BigInt literals in `lib/trusttrader/trade_pipeline.ts`, a `Set`
+# iteration in `lib/trust/cross-llm-verifier.ts`). Under the current `es2022`
+# target none of them can occur. Deleting the file and re-running gives 0, twice.
+# CI, which checks out fresh and therefore has no tsbuildinfo, said 0 all along.
+#
+# So: a CI run disagreeing with your local count is evidence about YOUR machine
+# first. Delete `tsconfig.tsbuildinfo` and re-run before adjusting anything here.
 
 name: prior-work
 
@@ -72,21 +82,25 @@ jobs:
       # analysis is written on. Without that, changing `confidenceK` or `alpha`
       # would leave a document full of numbers describing a harness that no
       # longer exists, and nothing would say so.
+      #
+      # Its verdict is echoed rather than sent to /dev/null. A step whose only
+      # evidence is a green tick is the shape this repo keeps getting burned by,
+      # and the tail costs twelve lines.
       - name: newcomer analysis (its own model must still match the ledger)
-        run: npm run sim:newcomer > /dev/null
+        run: |
+          npm run sim:newcomer > /tmp/newcomer.log
+          tail -12 /tmp/newcomer.log
 
-      # Threshold, not zero. See the header for why 4, and for why the number
-      # must be lowered whenever it drops. `|| true` on the count keeps the
-      # pipeline from dying on grep's exit-1-when-no-match, which would report
-      # zero errors as a failure.
-      - name: tsc must not exceed the 4-error baseline
+      # `|| true` on the count keeps the pipeline from dying on grep's
+      # exit-1-when-no-match, which would report zero errors as a failure — the
+      # one case that must read as success. On failure the errors are printed,
+      # so the log says WHICH ones without a second run.
+      - name: tsc must be clean (baseline 0)
         run: |
           COUNT=$(npx tsc --noEmit 2>&1 | grep -cE "error TS" || true)
-          echo "tsc --noEmit: $COUNT errors (baseline 4)"
-          if [ "$COUNT" -gt 4 ]; then
-            echo "::error::tsc regressed: $COUNT errors, baseline is 4"
+          echo "tsc --noEmit: $COUNT errors (baseline 0)"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::error::tsc regressed: $COUNT errors, baseline is 0"
+            npx tsc --noEmit 2>&1 | grep -E "error TS" || true
             exit 1
-          fi
-          if [ "$COUNT" -lt 4 ]; then
-            echo "::notice::tsc improved to $COUNT. Lower the baseline in this workflow so it cannot silently drift back."
           fi

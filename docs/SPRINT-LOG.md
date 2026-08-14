@@ -2689,11 +2689,27 @@ detected (1 fail), evidence always assumed (3), midpoint floor removed (3),
 default flipped to midpoint (2), warm path forced to midpoint (3). Baseline
 58 passed / 0 failed restored after each.
 
-### Also
+### Also — and a fifth contaminated measurement, mine
 
-`tsc --noEmit` is now **4** errors, not 25 — PR #25 deleted the file holding all
-25. The CI baseline in `prior-work.yml` was still 25, so 21 new errors could
-have landed without the gate saying a word. Lowered to 4.
+`tsc --noEmit` is **0** errors, not 25. PR #25 deleted `motor-squad-graph.ts`,
+which held all 25. The CI baseline in `prior-work.yml` was still 25, so 25 new
+errors could have landed without the gate saying a word. It is now **0**: a
+plain regression gate, and it prints the offending lines when it trips.
+
+**I first set it to 4, from a contaminated instrument.** `npx tsc --noEmit`
+reported 4 locally — a `Set` iteration and three BigInt literals, all wanting a
+higher `target`. `tsconfig.json` targets `es2022`, under which none of those
+four diagnostics can occur, and that contradiction was visible in the numbers
+before CI was consulted. Cause: `incremental: true` plus a stale
+`tsconfig.tsbuildinfo` replaying cached diagnostics for files that had not
+changed since an era with a lower target. Delete the file and it is 0, twice
+over. CI checks out fresh, has no tsbuildinfo, and reported 0 all along.
+
+It was caught only by reading the CI log rather than trusting the green tick —
+the run passed either way, because 0 is under a threshold of 4. `CLAUDE.md`
+already warns that `tsconfig.tsbuildinfo` is a build artefact, but about
+`git stash` conflicts; that it can also manufacture **phantom compile errors**
+is now in `LESSONS.md`.
 
 ### Single seed decided nothing here — twice
 
