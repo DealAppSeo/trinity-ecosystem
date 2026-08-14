@@ -42,15 +42,25 @@ bug, not yours.
 `lib/trustshell/identity/nullifier.ts` as `CIRCUIT_CONTRACT`, so both sides can
 assert against one list rather than two readings of prose):
 
+**This changed on 2026-08-14 — please build against the version below.** Our
+first draft made `commitment` a public input and described the result as
+unlinkable. That was wrong: a stable commitment beside every nullifier links all
+of a holder's presentations. The holder now proves Merkle membership in a public
+group, as Semaphore does.
+
 ```
-public:  commitment, nullifier, domain, scope, tagCommit, tagNullifier
-private: secret
+public:  groupRoot, nullifier, domain, scope, tagCommit, tagNullifier
+private: secret, commitment, membership path
 
 commitment == H(tagCommit    ‖ secret)
 nullifier  == H(tagNullifier ‖ secret ‖ domain ‖ scope)
+MerkleVerify(commitment, membership) == groupRoot
 ```
 
-**Four ways the circuit can produce a valid proof and still be wrong.** Worth
+The membership tree needs the **same Poseidon2 parameter set** as the
+commitments, so please include whatever you use for internal-node hashing.
+
+**Six ways the circuit can produce a valid proof and still be wrong.** Worth
 checking explicitly rather than inferring from "it verifies":
 
 1. **The same secret in both relations.** Two independent secrets satisfy each
@@ -63,6 +73,15 @@ checking explicitly rather than inferring from "it verifies":
    nullifier for some `(domain, scope)`.
 4. **Absorption order constrained, not merely conventional.** A permuted order
    is a different function that verifies fine against itself.
+5. **Membership proven over the commitment the circuit COMPUTED**, not an
+   independent witness value — otherwise a prover shows membership of someone
+   else's commitment while nullifying with their own secret.
+6. **`groupRoot` is a root the verifier independently trusts.** A prover-supplied
+   root over their own tree proves membership of a group they invented.
+
+**And one the circuit cannot supply:** unlinkability is bounded by the group
+size. A root over one commitment identifies the holder exactly. Report the
+anonymity set with any privacy claim.
 
 **What we bring:** `BindingStatement` (public/private split, typed),
 `IBindingScheme` (one implementation per parameter set — swapping in the real

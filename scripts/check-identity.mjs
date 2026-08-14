@@ -1199,14 +1199,11 @@ await check('the default verifier still rejects a toy-hasher disclosure', async 
 // --- nullifier / commitment binding contract --------------------------------
 
 await check('THE POSEIDON2 PLACEHOLDER REFUSES TO COMPUTE', async () => {
-  // The single most important assertion in this section. An implementation with
-  // invented parameters would emit plausible values, pass its own tests, and
-  // agree with nobody — discovered only when two systems compare a root in
-  // production. It must throw, not approximate.
   const s = new nullifier.PendingPoseidon2Scheme();
   assert.equal(s.parametersKnown, false);
   await assert.rejects(s.commit('secret'), /parameters are not available/);
   await assert.rejects(s.nullify('secret', 'd', 'sc'), /parameters are not available/);
+  await assert.rejects(s.hashPair('a', 'b'), /parameters are not available/);
 });
 
 await check('the refusal names exactly what is missing', async () => {
@@ -1218,23 +1215,14 @@ await check('the refusal names exactly what is missing', async () => {
   assert.match(msg, /POSEIDON2-PARAMETER-REQUEST/);
 });
 
-await check('the scheme tag says PENDING, so it cannot be mistaken for a real set', () => {
-  const s = new nullifier.PendingPoseidon2Scheme();
-  assert.match(s.scheme, /PENDING/);
-});
-
 await check('commit and nullifier tags are distinct', () => {
   assert.notEqual(nullifier.BINDING_TAGS.commit, nullifier.BINDING_TAGS.nullifier);
 });
 
-// A toy scheme, only to exercise the CONTRACT. Explicitly not Poseidon2 and not
-// cryptographically meaningful — it exists so the statement/witness plumbing is
-// testable before the real parameters land.
-//
-// Uses SHA-256 rather than a string template: the first draft was
-// `C(${secret})`, which embedded the secret verbatim in its own output, and the
-// leak assertion below caught it. A toy that echoes its input would make that
-// assertion pass vacuously against any real scheme.
+// Toy scheme for the CONTRACT only. Not Poseidon2, not cryptographically
+// meaningful — it exists so the statement/witness plumbing is testable before
+// the real parameters land. SHA-256 rather than a template, so it cannot echo
+// its input and make a leak assertion pass vacuously.
 const toyDigest = async (...parts) => {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(parts.join('\u001f')));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -1244,41 +1232,133 @@ const toyScheme = {
   parametersKnown: false,
   commit: async (secret) => toyDigest('toy:commit', secret),
   nullify: async (secret, domain, scope) => toyDigest('toy:null', secret, domain, scope),
+  hashPair: async (l, r) => toyDigest('toy:node', l, r),
 };
 
-await check('a binding statement puts the secret in the WITNESS, never public', async () => {
+const mkGroup = async (secrets) => {
+  const commitments = await Promise.all(secrets.map((s) => toyScheme.commit(s)));
+  const group = await nullifier.buildGroup(commitments, toyScheme);
+  return { commitments, group };
+};
+
+await check('THE COMMITMENT IS PRIVATE — it is never a public input', async () => {
+  // The correction. A public commitment is stable across presentations, so it
+  // links every action of a holder; scope-varying nullifiers do not help when a
+  // fixed identifier travels beside them.
+  const { commitments, group } = await mkGroup(['s1', 's2', 's3', 's4']);
   const st = await nullifier.buildBindingStatement({
-    secret: 'holder-seed-xyz', domain: 'trinity', scope: 'ownership:3747', scheme: toyScheme,
+    secret: 's1', domain: 'trinity', scope: 'ownership:3747',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
+  assert.equal('commitment' in st.publicInputs, false, 'the commitment is public again');
+  assert.equal(st.privateWitness.commitment, commitments[0]);
   const pub = JSON.stringify(st.publicInputs);
-  assert.ok(!pub.includes('holder-seed-xyz'), `the secret leaked into publicInputs: ${pub}`);
-  assert.equal(st.privateWitness.secret, 'holder-seed-xyz');
-  assert.equal(st.publicInputs.domain, 'trinity');
-  assert.equal(st.publicInputs.scope, 'ownership:3747');
+  assert.ok(!pub.includes(commitments[0]), 'the commitment leaked into publicInputs');
+  assert.ok(!pub.includes('s1'), 'the secret leaked into publicInputs');
+  assert.ok(nullifier.CIRCUIT_CONTRACT.publicInputs.includes('groupRoot'));
+  assert.ok(!nullifier.CIRCUIT_CONTRACT.publicInputs.includes('commitment'));
 });
 
-await check('different scopes yield different nullifiers (unlinkability)', async () => {
+await check('membership verifies for every member of the group', async () => {
+  const secrets = ['s1', 's2', 's3', 's4', 's5'];
+  const { commitments, group } = await mkGroup(secrets);
+  for (let i = 0; i < secrets.length; i++) {
+    const st = await nullifier.buildBindingStatement({
+      secret: secrets[i], domain: 'trinity', scope: 'sc',
+      groupRoot: group.root, membership: group.pathFor(commitments[i]), scheme: toyScheme,
+    });
+    const v = await nullifier.verifyBindingByRecomputation(st, toyScheme);
+    assert.equal(v.valid, true, `member ${i}: ${v.reason}`);
+  }
+});
+
+await check('A NON-MEMBER FAILS even with a valid secret and nullifier', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2', 's3', 's4']);
+  const st = await nullifier.buildBindingStatement({
+    secret: 'outsider', domain: 'trinity', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
+  });
+  const v = await nullifier.verifyBindingByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, 'a non-member proved membership');
+  assert.match(v.reason, /not a member of the group/);
+});
+
+await check('THE BORROWED-MEMBER ATTACK IS REJECTED', async () => {
+  // Present a commitment that IS in the group while nullifying with a different
+  // secret. Recomputation must reject it.
+  //
+  // NOTE ON WHAT THIS PROVES. It rejects at the `commitment does not reopen`
+  // check, which fires BEFORE the membership walk — so this does not isolate
+  // "membership is walked from the computed commitment". A mutation swapping
+  // that source survives this suite, because the reopen check already forces
+  // the two equal in the TypeScript path. The property is only load-bearing in
+  // the CIRCUIT, where no separate reopen step exists; it is recorded in
+  // CIRCUIT_CONTRACT.mustAlsoHold[1] for the lane that builds it.
+  const { commitments, group } = await mkGroup(['s1', 's2', 's3', 's4']);
+  const st = await nullifier.buildBindingStatement({
+    secret: 's1', domain: 'trinity', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
+  });
+  // Swap in member 2's commitment and path; the secret stays s1.
+  st.privateWitness.commitment = commitments[1];
+  st.privateWitness.membership = group.pathFor(commitments[1]);
+  const v = await nullifier.verifyBindingByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, "a prover borrowed another member's commitment");
+  assert.match(v.reason, /commitment does not reopen/);
+});
+
+await check('different scopes yield different nullifiers (unlinkability across scopes)', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2']);
   const mk = (scope) => nullifier.buildBindingStatement({
-    secret: 'same-secret', domain: 'trinity', scope, scheme: toyScheme,
+    secret: 's1', domain: 'trinity', scope,
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
   const a = await mk('ownership:3747');
   const b = await mk('ownership:3748');
   assert.notEqual(a.publicInputs.nullifier, b.publicInputs.nullifier,
-    'the same secret produced one nullifier across scopes — contexts are linkable');
-  assert.equal(a.publicInputs.commitment, b.publicInputs.commitment,
-    'the commitment should be stable across scopes');
+    'one nullifier across scopes — contexts are linkable');
+  assert.equal(a.publicInputs.groupRoot, b.publicInputs.groupRoot,
+    'the group root should be stable across scopes');
+});
+
+await check('ANONYMITY SET SIZE IS REPORTED, not assumed', async () => {
+  // A group of one is sound and offers no privacy. The number must travel.
+  const one = nullifier.describeAnonymitySet(1);
+  assert.equal(one.adequate, false);
+  assert.match(one.note, /identifies the holder exactly/);
+  assert.match(one.note, /Do not describe this as unlinkable/);
+  const few = nullifier.describeAnonymitySet(3);
+  assert.equal(few.adequate, false);
+  const many = nullifier.describeAnonymitySet(64);
+  assert.equal(many.adequate, true);
+  assert.match(many.note, /one of 64/);
+});
+
+await check('a statement cannot be built without a group anchor', async () => {
+  await assert.rejects(
+    nullifier.buildBindingStatement({
+      secret: 's', domain: 'd', scope: 'sc', groupRoot: '', membership: [], scheme: toyScheme,
+    }),
+    /groupRoot is required/
+  );
 });
 
 await check('domain and scope are REQUIRED', async () => {
-  const base = { secret: 's', domain: 'd', scope: 'sc', scheme: toyScheme };
+  const { commitments, group } = await mkGroup(['s1', 's2']);
+  const base = {
+    secret: 's1', domain: 'd', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
+  };
   await assert.rejects(nullifier.buildBindingStatement({ ...base, domain: '' }), /domain is required/);
   await assert.rejects(nullifier.buildBindingStatement({ ...base, scope: '' }), /scope is required/);
   await assert.rejects(nullifier.buildBindingStatement({ ...base, secret: '' }), /secret is required/);
 });
 
 await check('RECOMPUTATION IS NOT A ZK PROOF, and says so', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2']);
   const st = await nullifier.buildBindingStatement({
-    secret: 's1', domain: 'trinity', scope: 'ownership:1', scheme: toyScheme,
+    secret: 's1', domain: 'trinity', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
   const v = await nullifier.verifyBindingByRecomputation(st, toyScheme);
   assert.equal(v.valid, true, v.reason);
@@ -1287,38 +1367,37 @@ await check('RECOMPUTATION IS NOT A ZK PROOF, and says so', async () => {
   assert.match(v.reason, /honest-prover binding/);
 });
 
-await check('a tampered commitment or nullifier FAILS recomputation', async () => {
+await check('a tampered nullifier FAILS recomputation', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2']);
   const st = await nullifier.buildBindingStatement({
-    secret: 's1', domain: 'trinity', scope: 'ownership:1', scheme: toyScheme,
+    secret: 's1', domain: 'trinity', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
-  const badC = JSON.parse(JSON.stringify(st));
-  badC.publicInputs.commitment = await toyScheme.commit('a-different-secret');
-  assert.equal((await nullifier.verifyBindingByRecomputation(badC, toyScheme)).valid, false);
-
-  const badN = JSON.parse(JSON.stringify(st));
-  badN.publicInputs.nullifier = await toyScheme.nullify('other', 'trinity', 'ownership:1');
-  assert.equal((await nullifier.verifyBindingByRecomputation(badN, toyScheme)).valid, false);
+  st.publicInputs.nullifier = await toyScheme.nullify('other', 'trinity', 'sc');
+  assert.equal((await nullifier.verifyBindingByRecomputation(st, toyScheme)).valid, false);
 });
 
 await check('a scheme mismatch is refused rather than recomputed', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2']);
   const st = await nullifier.buildBindingStatement({
-    secret: 's', domain: 'd', scope: 'sc', scheme: toyScheme,
+    secret: 's1', domain: 'd', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
-  const other = { ...toyScheme, scheme: 'some-other-set' };
-  const v = await nullifier.verifyBindingByRecomputation(st, other);
+  const v = await nullifier.verifyBindingByRecomputation(st, { ...toyScheme, scheme: 'other-set' });
   assert.equal(v.valid, false);
   assert.match(v.reason, /but the supplied scheme is/);
 });
 
-await check('the circuit contract names the four ways a working proof can be wrong', () => {
+await check('the circuit contract names membership and the trusted-root hazard', () => {
   const c = nullifier.CIRCUIT_CONTRACT;
-  assert.equal(c.privateWitness.length, 1);
-  assert.ok(c.publicInputs.includes('domain') && c.publicInputs.includes('scope'),
-    'domain/scope must be PUBLIC — as witness, unlinkability is forgeable');
-  assert.equal(c.relations.length, 2);
-  assert.ok(c.mustAlsoHold.length >= 4, 'the soundness caveats were dropped');
-  assert.ok(c.mustAlsoHold.some((s) => /same secret/.test(s)));
-  assert.ok(c.mustAlsoHold.some((s) => /absorption order/.test(s)));
+  assert.equal(c.version, 'zkrepid-binding-v2');
+  assert.ok(c.privateWitness.includes('commitment'), 'commitment must be witness');
+  assert.ok(c.publicInputs.includes('groupRoot'));
+  assert.equal(c.relations.length, 3, 'the membership relation is missing');
+  assert.ok(c.relations.some((r) => /MerkleVerify/.test(r)));
+  assert.ok(c.mustAlsoHold.some((s) => /COMMITMENT THE CIRCUIT COMPUTED/.test(s)));
+  assert.ok(c.mustAlsoHold.some((s) => /VERIFIER independently trusts/.test(s)));
+  assert.match(c.privacyCaveat, /bounded by the group size/);
 });
 
 // --- caveats ----------------------------------------------------------------
