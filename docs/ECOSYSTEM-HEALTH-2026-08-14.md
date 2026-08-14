@@ -17,7 +17,7 @@ Railway no (proxy-denied), Base Sepolia RPC **yes indirectly** via Supabase
 |---|---:|---|
 | Identity & Linking | **2** / 10 | Real ERC-8004 registry with 4 agents actually on-chain; no human SSID at all, no execution path from the app, and 3 of 4 identities sit under a leaked key |
 | Reputation (zkRepID) | **5** / 10 | *Raised from 3 by Sprint 2.* Now measured from recorded outcomes with decay and shrinkage, and it moves per agent. Still capped: two of four inputs have no data source at all |
-| Proving stack | **1** / 10 | A genuine Plonky3 AIR that discards its proof and returns a `format!` string containing the secret |
+| Proving stack | **3** / 10 | *Raised from 1.* It no longer claims a proof it lacks: `proven:false`, a reopenable commitment, derived signals. Still produces **no proof**, and the Rust fix is unverified (crates.io unreachable) |
 | Memory | **4** / 10 | Best-developed area: real schema, real backfill with a fidelity gate, recall proven in prod. Zero encryption, no portable vault, dual-auth is unverified JSON |
 | Routing & intelligence | **1** / 10 | No request-time routing exists. ANFIS service returns `confidence: 0.99` from 38 lines. No GNN |
 | Harness layer | **3** / 10 | `HarnessProfile.ts` is excellent and has zero runtime callers. The 14-module portable harness exists on PR #24's branch (see §2.3 retraction), unmerged and so not yet reachable from `main` |
@@ -150,14 +150,20 @@ The retraction is left in place rather than deleted, per this repo's convention
 ## 3. Mocks and unwired code, explicitly
 
 **Fabricated where it counts**
-- `services/zkp-postcard/src/circuit.rs:126` — the "proof" is
-  `format!("plonky3_stark_babybear_rangecheck_value_{}_verified_ok", value)`,
-  which also **leaks the private input in cleartext**. The verify endpoint is a
-  `HashMap` lookup of a boolean stored at write time. The crate has no evidence
-  of ever compiling (`check_utf8.txt:172` records 13 errors) and nothing calls it.
-- `lib/trustshell/ZKPAttestation.ts:53-63` — SHA-256 of a timestamp, base64'd,
-  prefixed `Qm` to look like an IPFS CID, emitted with `proofSystem: 'groth16'`.
-  Four public signals hardcoded `true`, including an unperformed sanctions check.
+- `services/zkp-postcard/src/circuit.rs` — the fake `format!` proof, which
+  **leaked the private input in cleartext**, now returns `Err` and routes onto
+  the service's own truthful `sha256_commitment_poc` fallback. **NOT COMPILED**:
+  `static.crates.io` is missing from the agent proxy allow-list, so cargo 403s on
+  every download and no Rust can be built in any session here (task #75).
+  **Still false and untouched:** `verify_proof` is a `HashMap` lookup echoing a
+  boolean stored at write time, and `get_agent_repid` is a 4-entry hardcoded
+  table disagreeing with live RepID. Both need the build working first.
+- ~~`lib/trustshell/ZKPAttestation.ts`~~ — **FIXED.** Was a SHA-256 of a timestamp
+  emitted with `proofSystem: 'groth16'` and published on-chain under memo key
+  `zkp`; four signals hardcoded `true`, so a *failing* agent was attested as
+  passing. Now `proven:false`, a reopenable `commit-sha256:` commitment with its
+  salt, derived signals, unchecked claims absent rather than false, memo key
+  `cmt`. 14 assertions.
 - `app/api/trustrails/pay/route.ts:41-45` — the **production** payment path feeds
   RepID four constants (`bftAccuracy: 94, veritasCatchRate: 97, x402SuccessRate:
   100, latencyMs: 180`). Every live RepID derives from these.
@@ -361,6 +367,7 @@ automatically the moment attribution is fixed, with no further change here.
 | v_fleet_truth 12/12 -> 3/12, matches strict | **VERIFIED** | counted both views after the change |
 | #134 rollback SQL actually works | **VERIFIED** | created under a temp name, reproduced the old 12/12, dropped |
 | BFT scoring path against real data | **NOT CHECKED** | zero evaluated rows exist; exercised by unit tests only |
+| zkp-postcard Rust change compiles | **NOT CHECKED** | crates.io unreachable from this container (task #75) |
 | Sprint 2 route invoked end-to-end | **NOT CHECKED** | no running server + keys in this container; the effect was computed from the view the route reads, not an HTTP call |
 | zkp-postcard crate compiles | **NOT CHECKED** | no Rust toolchain run this session |
 | Whether repid-engine HAL is healthy | **NOT CHECKED** | different repo, Railway proxy-denied |
