@@ -57,14 +57,12 @@ that declined the `hal_quorum_receipts` migration (Sprint K).
 
 ## Tier 3 — Priority 4 (sub-agents), unblocked by `capability.ts`
 
-**6. Delegation chains.**
-`capability.ts` has the algebra (`permits`, `isAttenuationOf`, `excess`); the
-chain artifact does not exist yet. A `DelegatedControlProof` carries its parent,
-and verification walks to the root checking, at every link: signature,
-`isAttenuationOf(child, parent)`, `expiry <= parent.expiry`, audience match.
+**6. Delegation chains — DONE** (`lib/trustshell/identity/delegation.ts`).
+Capability, audience, time and start-time all attenuate per link; subject
+continuity, possession and a depth bound are enforced. See STATUS.md.
 
-Time attenuates too — a child outliving its parent is an escalation, and it is
-the one people forget.
+Still open on top of it: expose chains through the verify route, and decide
+where a chain is *stored* when a supervisor spawns a worker mid-task.
 
 **7. Caveats** (`maxValue`, `maxCalls`, `toolAllowlist`). Needs a decision on who
 enforces a stateful caveat like `maxCalls`, since the verifier is stateless
@@ -75,6 +73,10 @@ signed grant is worse than no caveat, because it reads as a control.
 
 ## Blocked — needs Sean
 
+0. **Rotate the leaked deployer** — the runbook is now written and
+   pre-flighted: `scripts/rotate-erc8004-deployer.mjs`, dry-run by default.
+   Verified not-yet-exploited on 2026-08-14. This is the only item with a
+   standing window of exposure.
 1. **`static.crates.io` on the proxy allow-list** (task #75). Unblocks
    `Plonky3ProofProvider`, `services/zkp-postcard`'s `cargo check`, and the only
    change on this branch with no executed evidence behind it.
@@ -89,7 +91,8 @@ signed grant is worse than no caveat, because it reads as a control.
 ## First three commands for the next session
 
 ```bash
-npm run check                    # expect exit 0, 438 assertions
-node scripts/check-identity.mjs  # expect 57, VERIFIED
+npm run check                    # expect exit 0, 448 assertions
+node scripts/check-identity.mjs  # expect 79, VERIFIED
+npm run test:e2e                 # expect 26 VERIFIED, 0 FAILED, core 10/10
 git log --oneline -8             # orient on the identity commits
 ```

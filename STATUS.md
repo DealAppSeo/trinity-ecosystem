@@ -1,6 +1,6 @@
 # STATUS — zkRepID TrustShell identity layer
 
-**Updated:** 2026-08-14 · **Branch:** `claude/zkrepid-agentic-os-jfbi18` · **Gate:** `npm run check` exit 0, 448 assertions · E2E 26 VERIFIED / 0 FAILED, core 10/10
+**Updated:** 2026-08-14 · **Branch:** `claude/zkrepid-agentic-os-jfbi18` · **Gate:** `npm run check` exit 0, 448 assertions · `check:identity` 79 · E2E 26 VERIFIED / 0 FAILED, core 10/10
 
 ---
 
@@ -49,6 +49,7 @@ and it is isolated behind one interface.
 | `proof-provider.ts` | `IProofProvider` seam + `WebCryptoProofProvider` |
 | `control-proof.ts` | the central artifact — dual-auth authorization |
 | `nonce-store.ts` | atomic spent-nonce store — `consume`, deliberately no `has()` |
+| `delegation.ts` | sub-agent chains — capability, audience **and time** attenuate per link |
 
 ---
 
@@ -116,7 +117,7 @@ became an unverifiable boolean in the first place.
 ## Verification
 
 `npm run check` → **exit 0, 448 assertions**, `tsc --noEmit` 0 errors.
-`check:identity` → **67 assertions**, stable across 5 consecutive runs.
+`check:identity` → **79 assertions**, stable across repeated runs.
 `npm run test:e2e` → **26 VERIFIED, 4 NOT CHECKED, 0 FAILED, core 10/10**.
 
 The identity path is exercised over real HTTP against a real handler, not only
@@ -162,6 +163,65 @@ Two defects were found by running rather than reading, and both are fixed: a
 test named "A LIFTED COUNTER-SIGNATURE FAILS" that actually only tested nonce
 uniqueness, and a substring assertion (`blob.includes('412')`) that matched by
 chance inside random hex roughly one run in three.
+
+---
+
+## Delegation chains (Priority 4 foundation)
+
+`delegate()` hands a sub-agent a subset of its parent's authority. Four things
+attenuate at every link, and the third is the one that gets forgotten:
+
+| | |
+|---|---|
+| capabilities | child ⊆ parent, wildcard-aware |
+| audience | a chain cannot retarget its verifier |
+| **time** | `child.expiresAt <= parent.expiresAt` |
+| start | `child.notBefore >= parent.notBefore` |
+
+Time matters because **expiry is this system's only revocation** — there is
+deliberately no revocation registry. If a child may outlive its parent, letting
+the parent expire revokes nothing and the sub-agent keeps acting on authority
+whose source is gone.
+
+Also enforced: subject continuity (each link's delegator must be the principal
+the previous link authorized — otherwise a chain is just a pile of individually
+valid signatures), possession by counter-signature, and a depth bound, since
+verification is linear in depth and the chain arrives from whoever presents it.
+
+`requiredCapabilities` is checked against the **leaf**, never the root. Checking
+at the root would pass whenever the root is broad, which is exactly what
+delegation narrows.
+
+### A flaw this found in my own tests
+
+Three delegation mutations survived: *attenuation not enforced at verify*,
+*audience retargeting allowed*, *possession not proven*. All three for one
+reason — those tests edited the grant **after** signing, so each failed at the
+signature check and never reached the rule it claimed to exercise. Same shape as
+the lifted-counter-signature test corrected earlier in this branch.
+
+Rewritten to forge properly-signed malicious links with real keys, so only the
+*content* is hostile. All three now caught. A test that passes for the wrong
+reason is indistinguishable from one that passes for the right one, until
+something makes it prove which.
+
+---
+
+## Credential rotation
+
+`scripts/rotate-erc8004-deployer.mjs` moves the ERC-8004 identities off the
+compromised signer. Deliberately a **local** script rather than something this
+session executes: running it here would pull a live private key into a context
+that keeps a transcript, which is the same class of mistake that leaked it.
+
+Verified on-chain 2026-08-14: the key has **not been used** — nonce, balance and
+all three `ownerOf` results are unchanged from discovery. The registry is a
+genuine ERC-721 (`supportsInterface(0x80ac58cd)` = true), so `safeTransferFrom`
+is the correct call; checked, not assumed.
+
+Dry run is the default. The script verifies by re-reading `ownerOf` after each
+transfer rather than trusting receipts, and exits non-zero if any identity did
+not arrive.
 
 ---
 
