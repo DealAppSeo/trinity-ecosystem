@@ -68,3 +68,6 @@ audit_output.txt
 # ─────────────────────────────────────────────────────────────────────────────
 graphify-out/
 headroom.db
+
+# temp compile dir for check:identity
+.identity-check-*/
