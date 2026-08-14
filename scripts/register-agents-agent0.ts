@@ -20,10 +20,20 @@ const AGENTS = [
 ];
 
 async function registerAll() {
+  // No literal fallback. The previous default was a repeating-pattern key, which
+  // reads as obviously fake and is not: it derives a real, fundable address, so
+  // on any machine with the variable unset this script signed as an account
+  // whose private key is published in this repo.
+  const signer = process.env.TRINITY_DEPLOYER_PRIVATE_KEY;
+  if (!signer) {
+    console.error('TRINITY_DEPLOYER_PRIVATE_KEY is not set — refusing to register with a default signer.');
+    process.exit(1);
+  }
+
   const sdk = new SDK({
     chainId:    84532, // Base Sepolia
     rpcUrl:     process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
-    signer:     process.env.TRINITY_DEPLOYER_PRIVATE_KEY || '0xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd',
+    signer,
     ipfs:       'pinata',
     pinataJwt:  process.env.PINATA_JWT || 'dummy',
   });

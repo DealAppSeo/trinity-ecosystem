@@ -6,7 +6,19 @@ const { privateKeyToAccount } = require('viem/accounts');
 const { baseSepolia } = require('viem/chains');
 const fs = require('fs');
 
-const DEPLOYER_KEY = '0x300112a36d02c7aa2c7332af42def199708118924bdb2b41487a95234589a45c';
+// This key signs registrations against the canonical ERC-8004 Identity
+// Registry, so whoever holds it can transfer the agent identities it owns and
+// rewrite their on-chain metadata. It was previously a literal in this file and
+// is therefore in git history — see docs/KEY-ROTATION.md. Never inline it again.
+const DEPLOYER_KEY = process.env.TRINITY_DEPLOYER_PRIVATE_KEY;
+if (!DEPLOYER_KEY) {
+  console.error(
+    'TRINITY_DEPLOYER_PRIVATE_KEY is not set.\n' +
+      'This script writes to the ERC-8004 Identity Registry on Base Sepolia and will not\n' +
+      'run without an explicitly supplied signer. Export the key for this shell only.'
+  );
+  process.exit(1);
+}
 const CONTRACT = '0x8004A818BFB912233c491871b3d84c89A494BD9e';
 
 const abi = JSON.parse(fs.readFileSync('lib/trusttrader/IdentityRegistry.json', 'utf8'));
