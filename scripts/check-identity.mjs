@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat;
 try {
   execFileSync(
     localTsc(),
@@ -41,6 +41,7 @@ try {
       'lib/trustshell/identity/delegation.ts',
       'lib/trustshell/identity/repid-predicate.ts',
       'lib/trustshell/identity/nullifier.ts',
+      'lib/trustshell/identity/caveat.ts',
       '--outDir', outDir,
       // Pin the root so output layout does not move when a module gains an
       // import from outside identity/ — repid-predicate.ts imports
@@ -66,6 +67,7 @@ try {
   delegation = await import(pathToFileURL(join(base, 'delegation.js')).href);
   repidPredicate = await import(pathToFileURL(join(base, 'repid-predicate.js')).href);
   nullifier = await import(pathToFileURL(join(base, 'nullifier.js')).href);
+  caveat = await import(pathToFileURL(join(base, 'caveat.js')).href);
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -1313,6 +1315,179 @@ await check('the circuit contract names the four ways a working proof can be wro
   assert.ok(c.mustAlsoHold.length >= 4, 'the soundness caveats were dropped');
   assert.ok(c.mustAlsoHold.some((s) => /same secret/.test(s)));
   assert.ok(c.mustAlsoHold.some((s) => /absorption order/.test(s)));
+});
+
+// --- caveats ----------------------------------------------------------------
+
+await check('maxValue is enforced against the action', () => {
+  const cap = [{ type: 'maxValue', asset: 'USDC', amount: 100 }];
+  const under = caveat.evaluateCaveats(cap, { value: { asset: 'USDC', amount: 50 } });
+  assert.equal(under[0].outcome, 'VERIFIED');
+  const over = caveat.evaluateCaveats(cap, { value: { asset: 'USDC', amount: 101 } });
+  assert.equal(over[0].outcome, 'FAILED');
+  assert.equal(caveat.caveatsPermit(over), false);
+
+  // THE BOUNDARY. A cap of 100 must ALLOW 100 — "up to and including" is what a
+  // spending limit means. Tested explicitly because 50-vs-101 leaves the
+  // inclusive/exclusive choice unobserved, and a `<=` → `<` mutation survived
+  // this suite until this line existed.
+  const exact = caveat.evaluateCaveats(cap, { value: { asset: 'USDC', amount: 100 } });
+  assert.equal(exact[0].outcome, 'VERIFIED', 'a cap of 100 refused exactly 100');
+});
+
+await check('A CAP CANNOT BE ROUTED AROUND BY SWITCHING ASSET', () => {
+  // A cap on USDC says nothing about USDT. Treating it as inapplicable would
+  // let a holder move unlimited value in another asset.
+  const cap = [{ type: 'maxValue', asset: 'USDC', amount: 100 }];
+  const r = caveat.evaluateCaveats(cap, { value: { asset: 'USDT', amount: 10_000 } });
+  assert.equal(r[0].outcome, 'FAILED');
+  assert.match(r[0].detail, /denominated in USDC/);
+});
+
+await check('toolAllowlist admits only listed tools', () => {
+  const c = [{ type: 'toolAllowlist', tools: ['read', 'search'] }];
+  assert.equal(caveat.evaluateCaveats(c, { tool: 'read' })[0].outcome, 'VERIFIED');
+  assert.equal(caveat.evaluateCaveats(c, { tool: 'delete' })[0].outcome, 'FAILED');
+});
+
+await check('MAXCALLS REPORTS NOT_CHECKED RATHER THAN PASSING', () => {
+  // A limit nobody counts is not a limit. Passing it silently would make the
+  // grant misleading — worse than never claiming the limit at all.
+  const c = [{ type: 'maxCalls', limit: 5 }];
+  const r = caveat.evaluateCaveats(c, {});
+  assert.equal(r[0].outcome, 'NOT_CHECKED');
+  assert.match(r[0].detail, /needs a counter/);
+  // And it does NOT fail the action — it is reported, not fatal.
+  assert.equal(caveat.caveatsPermit(r), true);
+});
+
+await check('maxCalls IS enforced once a counter is supplied', () => {
+  const c = [{ type: 'maxCalls', limit: 3 }];
+  assert.equal(caveat.evaluateCaveats(c, { callsSoFar: 2 })[0].outcome, 'VERIFIED');
+  assert.equal(caveat.evaluateCaveats(c, { callsSoFar: 3 })[0].outcome, 'FAILED');
+});
+
+await check('an undeclared value leaves maxValue NOT_CHECKED, not passed', () => {
+  const r = caveat.evaluateCaveats([{ type: 'maxValue', asset: 'USDC', amount: 100 }], {});
+  assert.equal(r[0].outcome, 'NOT_CHECKED');
+});
+
+await check('CAVEAT ATTENUATION: tightening allowed, loosening refused', () => {
+  const parent = [{ type: 'maxValue', asset: 'USDC', amount: 100 }];
+  assert.equal(caveat.isCaveatAttenuationOf([{ type: 'maxValue', asset: 'USDC', amount: 50 }], parent), true);
+  assert.equal(caveat.isCaveatAttenuationOf([{ type: 'maxValue', asset: 'USDC', amount: 500 }], parent), false);
+});
+
+await check('DROPPING A CAVEAT COUNTS AS LOOSENING IT', () => {
+  // The case most likely to be missed: an absent caveat looks like "nothing to
+  // check" rather than "the limit was removed".
+  const parent = [{ type: 'maxValue', asset: 'USDC', amount: 100 }];
+  assert.equal(caveat.isCaveatAttenuationOf([], parent), false);
+  assert.match(caveat.caveatViolations([], parent)[0], /drops maxValue/);
+});
+
+await check('a child may ADD caveats its parent did not have', () => {
+  const parent = [{ type: 'maxValue', asset: 'USDC', amount: 100 }];
+  const child = [
+    { type: 'maxValue', asset: 'USDC', amount: 100 },
+    { type: 'toolAllowlist', tools: ['read'] },
+  ];
+  assert.equal(caveat.isCaveatAttenuationOf(child, parent), true, 'adding a limit is narrowing');
+});
+
+await check('a toolAllowlist child must be a SUBSET of its parent', () => {
+  const parent = [{ type: 'toolAllowlist', tools: ['read', 'search'] }];
+  assert.equal(caveat.isCaveatAttenuationOf([{ type: 'toolAllowlist', tools: ['read'] }], parent), true);
+  assert.equal(caveat.isCaveatAttenuationOf([{ type: 'toolAllowlist', tools: ['read', 'delete'] }], parent), false);
+});
+
+await check('caveat encoding is order-independent', () => {
+  const a = caveat.encodeCaveats([{ type: 'maxCalls', limit: 3 }, { type: 'maxValue', asset: 'USDC', amount: 1 }]);
+  const b = caveat.encodeCaveats([{ type: 'maxValue', asset: 'USDC', amount: 1 }, { type: 'maxCalls', limit: 3 }]);
+  assert.equal(a, b, 'a JSON round trip could reorder these and break the signature');
+});
+
+await check('STRIPPING A CAVEAT FROM A SIGNED GRANT BREAKS THE SIGNATURE', () => {
+  // Empty encodes distinctly from populated, so removal is always detectable.
+  assert.notEqual(caveat.encodeCaveats([]), caveat.encodeCaveats([{ type: 'maxCalls', limit: 5 }]));
+});
+
+await check('caveats ride in a signed control proof and cannot be edited', async () => {
+  const { human, agent } = await mkPrincipals();
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+    caveats: [{ type: 'maxValue', asset: 'USDC', amount: 100 }],
+  });
+  const ok = await controlProof.verifyControlProof(proof, { audience: AUD, seenNonces: new Set() });
+  assert.equal(ok.valid, true, JSON.stringify(ok.checks));
+
+  proof.grant.caveats = [{ type: 'maxValue', asset: 'USDC', amount: 1_000_000 }];
+  const tampered = await controlProof.verifyControlProof(proof, { audience: AUD, seenNonces: new Set() });
+  assert.equal(tampered.valid, false, 'a raised cap survived signature verification');
+  assert.equal(tampered.checks.humanAuthorization.outcome, 'FAILED');
+});
+
+await check('a delegation CANNOT loosen a parent caveat', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD, capabilities: ['pay:*'], ttlSeconds: 3600,
+    caveats: [{ type: 'maxValue', asset: 'USDC', amount: 100 }],
+  });
+  await assert.rejects(
+    delegation.delegate({
+      parent: root, delegator: supervisor, delegate: worker,
+      capabilities: ['pay:usdc'], ttlSeconds: 300,
+      caveats: [{ type: 'maxValue', asset: 'USDC', amount: 5000 }],
+    }),
+    /refusing to loosen caveats/
+  );
+  await assert.rejects(
+    delegation.delegate({
+      parent: root, delegator: supervisor, delegate: worker,
+      capabilities: ['pay:usdc'], ttlSeconds: 300, caveats: [],
+    }),
+    /refusing to loosen caveats/
+  );
+});
+
+await check('a delegation INHERITS parent caveats by default', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD, capabilities: ['pay:*'], ttlSeconds: 3600,
+    caveats: [{ type: 'maxValue', asset: 'USDC', amount: 100 }],
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: ['pay:usdc'], ttlSeconds: 300,
+  });
+  assert.deepEqual(link.grant.caveats, root.grant.caveats,
+    'a delegation that named no caveats silently became unconstrained');
+  const v = await delegation.verifyDelegationChain(link, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, true, JSON.stringify(v.links));
+});
+
+await check('a WELL-SIGNED loosened link FAILS at verification', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD, capabilities: ['pay:*'], ttlSeconds: 3600,
+    caveats: [{ type: 'maxValue', asset: 'USDC', amount: 100 }],
+  });
+  const rogue = await forgeLink(root, supervisor, worker, {
+    delegatorDid: supervisor.did, delegateDid: worker.did, delegateName: 'WORKER',
+    capabilities: ['pay:usdc'],
+    caveats: [{ type: 'maxValue', asset: 'USDC', amount: 999999 }],
+    audience: AUD, nonce: 'cav-loosen-0000000000',
+    notBefore: root.grant.notBefore, expiresAt: root.grant.expiresAt,
+  });
+  const v = await delegation.verifyDelegationChain(rogue, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'a well-signed loosening verified');
+  assert.ok(v.links.some((l) => /loosens caveats/.test(l.detail)), JSON.stringify(v.links));
 });
 
 rmSync(outDir, { recursive: true, force: true });

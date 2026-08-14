@@ -38,6 +38,7 @@ import { verifyAs, type AgentIdentity, type HumanSSID } from './identity';
 import { signAs } from './identity';
 import { verifyDisclosure, type Disclosure } from './disclosure';
 import { excess } from './capability';
+import { encodeCaveats, type Caveat } from './caveat';
 import type { NonceStore } from './nonce-store';
 import type { IProofProvider, PredicateStatement, ProofResult } from './proof-provider';
 
@@ -58,6 +59,16 @@ export interface AuthorizationGrant {
    * makes a captured proof useless outside the context it was minted for.
    */
   audience: string;
+  /**
+   * Limits capabilities cannot express — `maxValue`, `toolAllowlist`, `maxCalls`.
+   *
+   * ALWAYS present, even when empty. If "no caveats" were encoded by omission,
+   * an attacker stripping a caveat from a grant would produce the same signed
+   * bytes as a grant that never had one, and the signature would still verify.
+   * An empty array encodes as an empty field, which is distinct from a populated
+   * one, so removal always breaks the signature.
+   */
+  caveats: Caveat[];
   /** Replay defence within the audience. The verifier remembers spent nonces. */
   nonce: string;
   /** ISO timestamps. A grant with no expiry is refused at construction. */
@@ -127,12 +138,16 @@ export interface ControlProofVerification {
  * verify against new semantics.
  */
 export const DOMAIN = {
-  grant: 'zkrepid:control-grant:v1',
-  countersign: 'zkrepid:control-countersign:v1',
+  // v2: `caveats` joined the signed payload. The tag is bumped in the same
+  // change, because a layout change without a tag change lets a v1 signature
+  // verify against v2 semantics — i.e. a grant signed before caveats existed
+  // would read as a grant with no limits.
+  grant: 'zkrepid:control-grant:v2',
+  countersign: 'zkrepid:control-countersign:v2',
 } as const;
 
 export const GRANT_PAYLOAD_LAYOUT =
-  `${DOMAIN.grant}|humanDid|agentDid|agentName|capabilities(sorted,comma)|audience|nonce|notBefore|expiresAt`;
+  `${DOMAIN.grant}|humanDid|agentDid|agentName|capabilities(sorted,comma)|caveats(sorted,comma)|audience|nonce|notBefore|expiresAt`;
 
 /**
  * Canonical grant encoding. Sorted capabilities and a version tag, so the bytes
@@ -145,6 +160,7 @@ export function grantPayload(grant: AuthorizationGrant): string {
     grant.agentDid,
     grant.agentName,
     [...grant.capabilities].sort().join(','),
+    encodeCaveats(grant.caveats ?? []),
     grant.audience,
     grant.nonce,
     grant.notBefore,
@@ -161,6 +177,8 @@ export async function issueControlProof(input: {
   human: HumanSSID;
   agent: AgentIdentity;
   capabilities: string[];
+  /** Optional limits. Omitted means none, and encodes distinctly from any. */
+  caveats?: Caveat[];
   /** Who may accept the result. Required — see AuthorizationGrant.audience. */
   audience: string;
   ttlSeconds: number;
@@ -189,6 +207,7 @@ export async function issueControlProof(input: {
     agentDid: input.agent.did,
     agentName: input.agent.name,
     capabilities: [...input.capabilities].sort(),
+    caveats: input.caveats ?? [],
     audience: input.audience,
     nonce: input.nonce ?? randomNonce(),
     notBefore: now.toISOString(),

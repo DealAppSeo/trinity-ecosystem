@@ -32,6 +32,7 @@ import type { Did } from './did';
 import { verifyAs, type AgentIdentity } from './identity';
 import { signAs } from './identity';
 import { isAttenuationOf, excess } from './capability';
+import { encodeCaveats, caveatViolations, type Caveat } from './caveat';
 import {
   verifyControlProof,
   type CheckOutcome,
@@ -40,8 +41,10 @@ import {
 } from './control-proof';
 
 export const DELEGATION_DOMAIN = {
-  grant: 'zkrepid:delegation-grant:v1',
-  countersign: 'zkrepid:delegation-countersign:v1',
+  // v2 alongside the control-grant bump: `caveats` are part of the signed
+  // payload now, so the tag moves with the layout.
+  grant: 'zkrepid:delegation-grant:v2',
+  countersign: 'zkrepid:delegation-countersign:v2',
 } as const;
 
 /**
@@ -59,6 +62,8 @@ export interface DelegationGrant {
   delegateDid: Did;
   delegateName: string;
   capabilities: string[];
+  /** Always present. See AuthorizationGrant.caveats for why not optional. */
+  caveats: Caveat[];
   audience: string;
   nonce: string;
   notBefore: string;
@@ -88,6 +93,7 @@ export function delegationPayload(grant: DelegationGrant): string {
     grant.delegateDid,
     grant.delegateName,
     [...grant.capabilities].sort().join(','),
+    encodeCaveats(grant.caveats ?? []),
     grant.audience,
     grant.nonce,
     grant.notBefore,
@@ -103,6 +109,7 @@ function delegationCounterSignPayload(grant: DelegationGrant, delegatorSignature
 function subjectOf(p: ControlProof | DelegatedControlProof): {
   did: Did;
   capabilities: string[];
+  caveats: Caveat[];
   audience: string;
   notBefore: string;
   expiresAt: string;
@@ -111,6 +118,7 @@ function subjectOf(p: ControlProof | DelegatedControlProof): {
     return {
       did: p.grant.delegateDid,
       capabilities: p.grant.capabilities,
+      caveats: p.grant.caveats ?? [],
       audience: p.grant.audience,
       notBefore: p.grant.notBefore,
       expiresAt: p.grant.expiresAt,
@@ -119,6 +127,7 @@ function subjectOf(p: ControlProof | DelegatedControlProof): {
   return {
     did: p.grant.agentDid,
     capabilities: p.grant.capabilities,
+    caveats: p.grant.caveats ?? [],
     audience: p.grant.audience,
     notBefore: p.grant.notBefore,
     expiresAt: p.grant.expiresAt,
@@ -138,6 +147,8 @@ export async function delegate(input: {
   delegator: AgentIdentity;
   delegate: AgentIdentity;
   capabilities: string[];
+  /** Must tighten or equal the parent's. Dropping one is loosening it. */
+  caveats?: Caveat[];
   ttlSeconds: number;
   now?: Date;
   nonce?: string;
@@ -161,6 +172,15 @@ export async function delegate(input: {
     );
   }
 
+  // Caveats attenuate too, and dropping one counts as loosening — an absent
+  // caveat is an unconstrained one. Refused at construction so a supervisor
+  // cannot mint a chain that fails downstream for a reason it could have known.
+  const childCaveats = input.caveats ?? parentSubject.caveats;
+  const caveatIssues = caveatViolations(childCaveats, parentSubject.caveats);
+  if (caveatIssues.length) {
+    throw new Error(`refusing to loosen caveats: ${caveatIssues.join('; ')}`);
+  }
+
   // Time attenuates. Clamp rather than reject: a supervisor asking for a longer
   // TTL than it holds is normal (it does not track its own expiry), and
   // silently shortening is the safe reading of that intent. Widening never is.
@@ -180,6 +200,7 @@ export async function delegate(input: {
     delegateDid: input.delegate.did,
     delegateName: input.delegate.name,
     capabilities: [...input.capabilities].sort(),
+    caveats: childCaveats,
     audience: parentSubject.audience,
     nonce: input.nonce ?? randomNonce(),
     notBefore: now.toISOString(),
@@ -290,6 +311,8 @@ export async function verifyDelegationChain(
         `widens authority: [${excess(parentSubject.capabilities, link.grant.capabilities).join(', ')}]`
       );
     }
+    const cv = caveatViolations(link.grant.caveats ?? [], parentSubject.caveats);
+    if (cv.length) failures.push(`loosens caveats: ${cv.join('; ')}`);
     if (link.grant.audience !== parentSubject.audience) {
       failures.push(
         `retargets audience from '${parentSubject.audience}' to '${link.grant.audience}'`
