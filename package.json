@@ -10,7 +10,7 @@
     "check:auth": "node scripts/check-auth-policy.mjs",
     "check:secrets": "node scripts/scan-secrets.mjs",
     "check:legacy-key": "node scripts/check-legacy-key.mjs",
-    "check": "npm run check:secrets && npm run check:auth && npm run check:harness && npm run check:transcript && npm run check:memory && npm run check:earned && npx tsc --noEmit",
+    "check": "npm run check:secrets && npm run check:auth && npm run check:harness && npm run check:transcript && npm run check:memory && npm run check:earned && npm run check:zkp && npx tsc --noEmit",
     "north": "node scripts/north-star.mjs",
     "graph": "graphify update .",
     "graph:ecosystem": "bash scripts/graph-ecosystem.sh",
@@ -20,6 +20,7 @@
     "check:transcript": "node scripts/check-transcript-parser.mjs",
     "check:memory": "node scripts/check-memory-recall.mjs",
     "check:earned": "node scripts/check-earned-metrics.mjs",
+    "check:zkp": "node scripts/check-zkp-attestation.mjs",
     "trustshell:parse": "node scripts/trustshell-parse.mjs"
   },
   "dependencies": {
