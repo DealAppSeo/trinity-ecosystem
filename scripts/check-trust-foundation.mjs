@@ -312,6 +312,56 @@ const record = (id, domain, status, detail, why) =>
   );
 }
 
+// ── TF-09 · Identity & Trust (privilege) ─────────────────────────────────────
+// A privileged key must never fall back to a PUBLIC one.
+//
+// EARNED TWICE IN ONE DAY, which is why it is a control rather than a note.
+//
+//   1. lib/trust/cross-llm-verifier.ts resolved only the LEGACY service names,
+//      could not see SUPABASE_SECRET_KEY, and returned null — the caller's
+//      `if (!supabase) return` then dropped every record silently.
+//   2. trustrails-dev's lib/trustshell/* resolve
+//      `SUPABASE_SERVICE_ROLE_KEY || NEXT_PUBLIC_SUPABASE_ANON_KEY`. The legacy
+//      name is a DISABLED JWT on this project, so the live fallback is the
+//      PUBLIC key — a server-side writer silently degrading to anon privileges.
+//      That was measured across 17 files there on 2026-08-14, and it is the
+//      reason the anon INSERT policy on the agent-memory tables could not be
+//      revoked in the same change that removed anon DELETE.
+//
+// The shape is what makes it dangerous: `||` reads as a safe default, and it is
+// the opposite. A missing privileged key should FAIL LOUDLY — getSupabaseAdmin()
+// throws, which is correct — not quietly continue with less authority than the
+// code believes it has. Silent privilege downgrade is indistinguishable from
+// working, right up until a policy tightens.
+//
+// SCOPED to runtime paths (app/, lib/, supabase/). Dev scripts are excluded
+// deliberately: a one-off script falling back to anon is a much smaller blast
+// radius than a request handler doing it, and a control that flags both equally
+// gets muted. Stated rather than left implicit, since an unexplained exclusion
+// is how scope quietly becomes a loophole.
+{
+  const PRIVILEGED = /(SECRET_KEY|SERVICE_ROLE_KEY|SERVICE_KEY)/;
+  const PUBLIC_KEY = /(NEXT_PUBLIC_[A-Z_]*KEY|ANON_KEY|PUBLISHABLE)/;
+  const offenders = [];
+  for (const file of [...walk('app', isTs), ...walk('lib', isTs), ...walk('supabase', isTs)]) {
+    const src = stripComments(read(file));
+    src.split('\n').forEach((line, i) => {
+      // Same expression, privileged first, public as the `||` fallback.
+      if (line.includes('||') && PRIVILEGED.test(line) && PUBLIC_KEY.test(line)) {
+        offenders.push(`${file}:${i + 1}`);
+      }
+    });
+  }
+  record(
+    'TF-09', 'Identity & Trust (privilege)',
+    offenders.length ? 'VIOLATION' : 'ENFORCED',
+    offenders.length
+      ? `privileged key falls back to a PUBLIC key at ${offenders.join(', ')}`
+      : 'no privileged key falls back to a public one in a runtime path',
+    'silent privilege downgrade: the code keeps working with less authority than it believes it has',
+  );
+}
+
 // ── Report ───────────────────────────────────────────────────────────────────
 const pad = (s, n) => String(s).padEnd(n);
 const violations = results.filter((r) => r.status === 'VIOLATION');
