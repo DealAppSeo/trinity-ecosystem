@@ -648,3 +648,50 @@ npm run check                    # expect exit 0, 438 assertions
 node scripts/check-identity.mjs  # expect 57, VERIFIED
 git log --oneline -8
 ```
+
+### 2026-08-14 continued — cycles 2-5
+
+**Accomplished.** `44e9cd3` atomic nonce store (one `consume`, deliberately no
+`has()`; claimed only after signature checks so an invalid proof cannot burn a
+valid nonce) + fixed four raw NUL bytes that were sitting in the wire format.
+`c8396cf` E2E over real HTTP via an additive verify route — forgery, wrong
+audience, replay, escalation and disclosure tampering all rejected server-side.
+`1fc6378` rotation runbook + delegation chains. `843b5e4` RepID predicates.
+`a9a7a38` `alg` on every Disclosure. `31c4038` nullifier/commitment contract.
+
+**Numbers.** `check:identity` 57 → **104**. E2E **26 VERIFIED / 4 NOT CHECKED /
+0 FAILED, core 10/10**. Full gate exit 0 throughout.
+
+**REAL vs STUB.** REAL: dual-auth control proofs verified over HTTP, selective
+disclosure with the hash named on the wire, capability + time attenuation across
+delegation chains, atomic replay defence within an instance, RepID predicates
+carrying evidence quality publicly. STUB/BLOCKED: Poseidon2 (parameters
+requested, placeholder **throws** rather than guessing), cross-instance replay
+(migration written, unapplied), ERC-8004 DID↔agentId (claimed, never proven).
+
+**Three defects found in my own tests**, all by mutation testing rather than
+review: a lifted-counter-signature test that only tested nonce uniqueness; three
+delegation tests that edited grants after signing and so never reached the rule
+they named; and a toy fixture that embedded the secret in its own output, which
+would have made a leak assertion pass vacuously.
+
+**One overclaim retracted.** "No Claude session can build Rust in this
+ecosystem" — measured one environment, generalised to all. The other lane built
+it. Corrected to name this container.
+
+**BLOCKED_FOR_SEAN.**
+1. Rotate the leaked deployer (#73) — runbook `scripts/rotate-erc8004-deployer.mjs`,
+   dry-run default. Verified **not yet exploited** on-chain 2026-08-14.
+2. `static.crates.io` on the proxy allow-list (#75) — unblocks agent-side and CI
+   verification of circuits. Not a global blocker; a dev machine builds today.
+3. Poseidon2 parameters from the repid-engine lane —
+   `docs/POSEIDON2-PARAMETER-REQUEST.md`.
+4. `ControlProof` → `VaultPermission` wiring (LESSONS A11). Recommend shadow
+   mode: verify, log agreement/disagreement, change nothing.
+
+**Next 3 commands.**
+```
+npm run check                    # exit 0
+node scripts/check-identity.mjs  # expect 104, VERIFIED
+npm run test:e2e                 # expect 26 VERIFIED, 0 FAILED, core 10/10
+```
