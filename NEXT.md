@@ -53,6 +53,22 @@ written; the Poseidon2 scheme deliberately throws until the other lane supplies
 field, width, rounds, constants, matrices, absorption order and test vectors.
 See `docs/POSEIDON2-PARAMETER-REQUEST.md`. **This is the top open item.**
 
+**4c. Dual-auth memory access — PRIMITIVE BUILT, not wired** 
+(`lib/trustshell/identity/memory-authz.ts`). `MemoryRecall` decides how to
+retrieve and never asks whether the caller may; memory has no access control at
+all today. `authorizeMemoryAccess` answers "may this caller touch this
+namespace?" using the same attenuation logic that guards payments and vaults.
+
+Deliberately **not** wired into a live memory path: adding enforcement to a
+surface that has none breaks every existing caller at once. Wiring is a decided
+change, like the vault gate — and it should probably go through the same shadow
+step.
+
+Capability shape is `memory:<operation>:<namespace>`. Note `memory:*` grants
+**delete**; anyone meaning "all reads" must write `memory:read:*`. A test
+asserts that, because the over-broad grant works perfectly until the day an
+agent deletes something.
+
 **5. Selective-disclosure claim vocabulary.**
 `disclosure.ts` accepts arbitrary keys. A fixed vocabulary
 (`controller`, `capabilities`, `repId`, `issuedAt`, `exp`, `aud`) makes

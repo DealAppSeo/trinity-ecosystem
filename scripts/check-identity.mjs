@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat, memAuthz;
 try {
   execFileSync(
     localTsc(),
@@ -42,6 +42,7 @@ try {
       'lib/trustshell/identity/repid-predicate.ts',
       'lib/trustshell/identity/nullifier.ts',
       'lib/trustshell/identity/caveat.ts',
+      'lib/trustshell/identity/memory-authz.ts',
       '--outDir', outDir,
       // Pin the root so output layout does not move when a module gains an
       // import from outside identity/ — repid-predicate.ts imports
@@ -68,6 +69,7 @@ try {
   repidPredicate = await import(pathToFileURL(join(base, 'repid-predicate.js')).href);
   nullifier = await import(pathToFileURL(join(base, 'nullifier.js')).href);
   caveat = await import(pathToFileURL(join(base, 'caveat.js')).href);
+  memAuthz = await import(pathToFileURL(join(base, 'memory-authz.js')).href);
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -1488,6 +1490,146 @@ await check('a WELL-SIGNED loosened link FAILS at verification', async () => {
   const v = await delegation.verifyDelegationChain(rogue, { audience: AUD, seenNonces: new Set() });
   assert.equal(v.valid, false, 'a well-signed loosening verified');
   assert.ok(v.links.some((l) => /loosens caveats/.test(l.detail)), JSON.stringify(v.links));
+});
+
+// --- dual-auth memory access ------------------------------------------------
+
+const memProof = async (capabilities) => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities, ttlSeconds: 300,
+  });
+  return { human, agent, proof };
+};
+const memCtx = () => ({ audience: AUD, seenNonces: new Set() });
+
+await check('a matching grant permits the operation', async () => {
+  const { proof } = await memProof(['memory:read:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'GRANTED', r.reason);
+  assert.equal(memAuthz.memoryAccessPermitted(r), true);
+});
+
+await check('NO PROOF IS DENIED, not NOT_CHECKED (fails closed)', async () => {
+  const r = await memAuthz.authorizeMemoryAccess(
+    undefined, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'DENIED', 'an absent proof was reported as unchecked');
+  assert.equal(memAuthz.memoryAccessPermitted(r), false);
+});
+
+await check('A READ GRANT NEVER PERMITS WRITE', async () => {
+  // Reading is recoverable; writing is not. Memory poisoning is a live attack
+  // on exactly this surface, so the convenience of "it can already see it" is
+  // refused.
+  const { proof } = await memProof(['memory:read:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'write', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'DENIED', 'a read grant authorized a write');
+  assert.equal(r.grantedTo, undefined, 'a denial still named a grantee');
+});
+
+await check('a write grant does not permit read either — they are separate', async () => {
+  const { proof } = await memProof(['memory:write:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'DENIED');
+});
+
+await check('CROSS-NAMESPACE READ IS DENIED', async () => {
+  // The case that matters in a shared mesh: one agent reading another's memory.
+  const { proof } = await memProof(['memory:read:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/NEXUS' }, memCtx());
+  assert.equal(r.outcome, 'DENIED', "an agent read another agent's namespace");
+});
+
+await check('a namespace wildcard covers namespaces but not operations', async () => {
+  const { proof } = await memProof(['memory:read:*']);
+  const ok = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/ANYONE' }, memCtx());
+  assert.equal(ok.outcome, 'GRANTED', ok.reason);
+  const no = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'write', namespace: 'agent/ANYONE' }, memCtx());
+  assert.equal(no.outcome, 'DENIED', 'memory:read:* authorized a write');
+});
+
+await check('`memory:*` GRANTS DELETE — the documented trap', async () => {
+  // Reads as "memory access", grants destruction. Asserted so the hazard is
+  // observable rather than a comment nobody runs.
+  const { proof } = await memProof(['memory:*']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'delete', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'GRANTED',
+    'memory:* did not grant delete — if this changed, update the docs that warn about it');
+});
+
+await check('an expired proof is DENIED', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  const t0 = new Date('2026-08-14T00:00:00Z');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['memory:read:agent/TORCH'],
+    ttlSeconds: 60, now: t0,
+  });
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' },
+    { audience: AUD, seenNonces: new Set(), now: new Date('2026-08-14T01:00:00Z') });
+  assert.equal(r.outcome, 'DENIED');
+});
+
+await check('a proof for another audience is DENIED', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  // Deliberately NOT AUD. The first draft used 'trinity:pay', which IS AUD in
+  // this suite, so the proof matched and the test asserted the opposite of what
+  // it claimed. A fixture that accidentally satisfies the condition it means to
+  // violate is a test that cannot fail.
+  assert.notEqual(AUD, 'trinity:vault', 'pick an audience that is not AUD');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: 'trinity:vault',
+    capabilities: ['memory:read:agent/TORCH'], ttlSeconds: 300,
+  });
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'DENIED', 'a proof minted elsewhere opened memory');
+});
+
+await check('a DELEGATED sub-agent inherits narrowed memory access', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD,
+    capabilities: ['memory:read:*', 'memory:write:agent/SUPERVISOR'], ttlSeconds: 3600,
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: ['memory:read:agent/TORCH'], ttlSeconds: 300,
+  });
+  const ok = await memAuthz.authorizeMemoryAccess(
+    link, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(ok.outcome, 'GRANTED', ok.reason);
+  assert.equal(ok.grantedTo, worker.did, 'the grantee should be the delegate, not the supervisor');
+
+  // The worker did NOT receive the supervisor's write capability.
+  const no = await memAuthz.authorizeMemoryAccess(
+    link, { operation: 'write', namespace: 'agent/SUPERVISOR' }, memCtx());
+  assert.equal(no.outcome, 'DENIED', 'a sub-agent inherited a capability it was not delegated');
+});
+
+await check('a missing audience is NOT_CHECKED and still not permissive', async () => {
+  const { proof } = await memProof(['memory:read:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' }, {});
+  assert.equal(r.outcome, 'NOT_CHECKED');
+  assert.equal(memAuthz.memoryAccessPermitted(r), false, 'NOT_CHECKED was treated as permission');
+});
+
+await check('a namespace containing ":" is refused at construction', () => {
+  assert.throws(() => memAuthz.memoryCapability('read', 'agent:TORCH'), /capability separator/);
+  assert.throws(() => memAuthz.memoryCapability('read', '  '), /namespace is required/);
 });
 
 rmSync(outDir, { recursive: true, force: true });
