@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore;
 try {
   execFileSync(
     localTsc(),
@@ -37,6 +37,7 @@ try {
       'lib/trustshell/identity/proof-provider.ts',
       'lib/trustshell/identity/control-proof.ts',
       'lib/trustshell/identity/capability.ts',
+      'lib/trustshell/identity/nonce-store.ts',
       '--outDir', outDir,
       '--module', 'commonjs',
       '--target', 'es2022',
@@ -56,6 +57,7 @@ try {
   proofProvider = await import(pathToFileURL(join(base, 'proof-provider.js')).href);
   controlProof = await import(pathToFileURL(join(base, 'control-proof.js')).href);
   capability = await import(pathToFileURL(join(base, 'capability.js')).href);
+  nonceStore = await import(pathToFileURL(join(base, 'nonce-store.js')).href);
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -675,6 +677,129 @@ await check('the proof provider declares itself non-zero-knowledge and named', (
   const p = new proofProvider.WebCryptoProofProvider();
   assert.equal(p.isZeroKnowledge, false);
   assert.equal(p.name, 'webcrypto-commitment');
+});
+
+// --- nonce store / replay defence -------------------------------------------
+
+await check('a nonce can be consumed exactly once', async () => {
+  const store = new nonceStore.InMemoryNonceStore();
+  const exp = new Date(Date.now() + 60_000);
+  assert.equal(await store.consume('n1', 'trinity:pay', exp), true);
+  assert.equal(await store.consume('n1', 'trinity:pay', exp), false);
+});
+
+await check('nonces are scoped per audience', async () => {
+  const store = new nonceStore.InMemoryNonceStore();
+  const exp = new Date(Date.now() + 60_000);
+  assert.equal(await store.consume('n1', 'trinity:pay', exp), true);
+  assert.equal(await store.consume('n1', 'trinity:vault', exp), true,
+    'the same nonce under a different audience must be independent');
+});
+
+await check('expired nonces are pruned rather than accumulating', async () => {
+  const store = new nonceStore.InMemoryNonceStore();
+  await store.consume('old', 'a', new Date(Date.now() - 1000));
+  await store.consume('new', 'a', new Date(Date.now() + 60_000));
+  assert.equal(store.size, 1, 'expired nonce was retained');
+});
+
+await check('THE STORE HAS NO has(): the racy pattern is not offered', () => {
+  const store = new nonceStore.InMemoryNonceStore();
+  assert.equal(typeof store.has, 'undefined',
+    'a read-only check exists, which invites check-then-record and loses the race');
+});
+
+await check('A REPLAYED PROOF FAILS against the nonce store', async () => {
+  const { human, agent } = await mkPrincipals();
+  const store = new nonceStore.InMemoryNonceStore();
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay'], ttlSeconds: 3600,
+  });
+  const first = await controlProof.verifyControlProof(proof, { audience: AUD, nonceStore: store });
+  assert.equal(first.valid, true, JSON.stringify(first.checks, null, 2));
+  assert.equal(first.checks.replay.outcome, 'VERIFIED');
+
+  const second = await controlProof.verifyControlProof(proof, { audience: AUD, nonceStore: store });
+  assert.equal(second.valid, false, 'a replayed proof verified a second time');
+  assert.equal(second.checks.replay.outcome, 'FAILED');
+});
+
+await check('AN INVALID PROOF CANNOT BURN A VALID NONCE', async () => {
+  // Otherwise anyone who learns a nonce can deny service to its real holder by
+  // presenting a broken proof carrying it — the holder's genuine proof then
+  // reads as a replay.
+  const { human, agent } = await mkPrincipals();
+  const store = new nonceStore.InMemoryNonceStore();
+  const real = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay'], ttlSeconds: 3600,
+  });
+
+  const forged = JSON.parse(JSON.stringify(real));
+  forged.humanSignature = await identity.signAs(
+    await identity.createHumanSSID(), controlProof.grantPayload(forged.grant)
+  );
+  const attack = await controlProof.verifyControlProof(forged, { audience: AUD, nonceStore: store });
+  assert.equal(attack.valid, false);
+  assert.equal(attack.checks.replay.outcome, 'NOT_CHECKED',
+    'a failing proof consumed the nonce');
+  assert.equal(store.size, 0, 'the nonce was burned by an invalid proof');
+
+  // The real holder is unaffected.
+  const legit = await controlProof.verifyControlProof(real, { audience: AUD, nonceStore: store });
+  assert.equal(legit.valid, true, 'the genuine proof was denied after a forgery attempt');
+});
+
+await check('a wrong-audience proof does not burn its nonce either', async () => {
+  const { human, agent } = await mkPrincipals();
+  const store = new nonceStore.InMemoryNonceStore();
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: 'trinity:pay', capabilities: ['pay'], ttlSeconds: 3600,
+  });
+  const v = await controlProof.verifyControlProof(proof, {
+    audience: 'trinity:vault', nonceStore: store,
+  });
+  assert.equal(v.valid, false);
+  assert.equal(store.size, 0, 'a misdirected proof burned its nonce');
+});
+
+await check('SupabaseNonceStore fails CLOSED when the table is missing', async () => {
+  const store = new nonceStore.SupabaseNonceStore(() => ({
+    from: () => ({ insert: async () => ({ error: { code: '42P01', message: 'relation does not exist' } }) }),
+  }));
+  await assert.rejects(
+    store.consume('n', 'a', new Date()),
+    /refusing to assume this proof is unspent/,
+    'an unavailable nonce store returned "unspent" instead of throwing'
+  );
+});
+
+await check('SupabaseNonceStore reads 23505 as a replay, not an error', async () => {
+  const store = new nonceStore.SupabaseNonceStore(() => ({
+    from: () => ({ insert: async () => ({ error: { code: '23505', message: 'duplicate key' } }) }),
+  }));
+  assert.equal(await store.consume('n', 'a', new Date()), false);
+});
+
+await check('no raw control bytes in identity source (wire format must be readable)', () => {
+  // A literal control byte in a template literal is invisible in review, makes
+  // the file read as binary to grep, and — the real cost — makes the wire
+  // format impossible to read off the source. This suite shipped exactly that
+  // bug: the Merkle leaf separator was a NUL that looked like a space, so the
+  // interop spec handed to another implementer was wrong. Escapes only.
+  const files = [
+    'did.ts', 'disclosure.ts', 'identity.ts',
+    'capability.ts', 'proof-provider.ts', 'control-proof.ts', 'nonce-store.ts',
+  ];
+  for (const f of files) {
+    const buf = readFileSync(`lib/trustshell/identity/${f}`);
+    for (const b of buf) {
+      const isAllowedWhitespace = b === 0x09 || b === 0x0a || b === 0x0d;
+      assert.ok(
+        b >= 0x20 || isAllowedWhitespace,
+        `${f} contains a raw control byte 0x${b.toString(16).padStart(2, '0')} — write it as an escape`
+      );
+    }
+  }
 });
 
 rmSync(outDir, { recursive: true, force: true });

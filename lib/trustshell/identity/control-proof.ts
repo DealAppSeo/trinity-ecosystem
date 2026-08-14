@@ -38,6 +38,7 @@ import { verifyAs, type AgentIdentity, type HumanSSID } from './identity';
 import { signAs } from './identity';
 import { verifyDisclosure, type Disclosure } from './disclosure';
 import { excess } from './capability';
+import type { NonceStore } from './nonce-store';
 import type { IProofProvider, PredicateStatement, ProofResult } from './proof-provider';
 
 /** What the human is authorizing. Deliberately explicit — no implicit powers. */
@@ -75,7 +76,15 @@ export interface VerificationContext {
   /** This verifier's own identifier. Must equal the grant's audience. */
   audience: string;
   now?: Date;
-  /** Spent nonces. Replay defence is stateful and belongs to the verifier. */
+  /**
+   * Durable, atomic replay defence. Preferred over `seenNonces` — it is the
+   * only option that is correct across instances.
+   */
+  nonceStore?: NonceStore;
+  /**
+   * Caller-managed spent set. Single-process only; the caller adds the nonce
+   * after a successful verification. Ignored when `nonceStore` is supplied.
+   */
   seenNonces?: Set<string>;
   /** Required capabilities. Missing ones FAIL rather than warn. */
   requiredCapabilities?: string[];
@@ -267,17 +276,49 @@ export async function verifyControlProof(
   }
 
   // --- replay ---
-  if (!opts?.seenNonces) {
+  //
+  // ORDERING MATTERS. The nonce is claimed only after the cryptographic checks
+  // pass. Consuming it first would let anyone burn a legitimate nonce by
+  // presenting a proof with a valid nonce and a broken signature — denying
+  // service to the real holder, whose proof then reads as a replay. So an
+  // invalid proof never spends anything.
+  const cryptoOk =
+    checks.audience.outcome === 'VERIFIED' &&
+    checks.humanAuthorization.outcome === 'VERIFIED' &&
+    checks.agentPossession.outcome === 'VERIFIED' &&
+    checks.validityWindow.outcome === 'VERIFIED';
+
+  if (!cryptoOk) {
     checks.replay = {
       outcome: 'NOT_CHECKED',
       detail:
-        'no seenNonces set supplied. Replay defence needs state the verifier keeps; ' +
-        'this proof could be presented again and would verify identically.',
+        'core checks did not pass, so the nonce was deliberately not consumed — ' +
+        'an invalid proof must not be able to burn a valid nonce.',
     };
-  } else if (opts.seenNonces.has(proof.grant.nonce)) {
-    checks.replay = { outcome: 'FAILED', detail: `nonce ${proof.grant.nonce} already spent` };
+  } else if (opts?.nonceStore) {
+    // Atomic claim. See nonce-store.ts: there is no has()-then-add() path.
+    const first = await opts.nonceStore.consume(
+      proof.grant.nonce,
+      proof.grant.audience,
+      new Date(proof.grant.expiresAt)
+    );
+    checks.replay = first
+      ? { outcome: 'VERIFIED', detail: `nonce ${proof.grant.nonce} claimed atomically` }
+      : { outcome: 'FAILED', detail: `nonce ${proof.grant.nonce} already spent` };
+  } else if (opts?.seenNonces) {
+    // Caller-managed set. Fine for a single process; it is the caller's job to
+    // add the nonce after a successful verification.
+    checks.replay = opts.seenNonces.has(proof.grant.nonce)
+      ? { outcome: 'FAILED', detail: `nonce ${proof.grant.nonce} already spent` }
+      : { outcome: 'VERIFIED', detail: `nonce ${proof.grant.nonce} unseen` };
   } else {
-    checks.replay = { outcome: 'VERIFIED', detail: `nonce ${proof.grant.nonce} unseen` };
+    checks.replay = {
+      outcome: 'NOT_CHECKED',
+      detail:
+        'no nonceStore or seenNonces supplied. Replay defence needs state the ' +
+        'verifier keeps; this proof could be presented again and would verify ' +
+        'identically.',
+    };
   }
 
   // --- capabilities ---
