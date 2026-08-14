@@ -8,6 +8,8 @@ import {
   ZKPAttestationService, RepIDCalculator
 } from '@/lib/trustshell';
 import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
+import { EarnedMetricsRepository } from '@/lib/trustshell/EarnedMetricsRepo';
+import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
 
 export async function POST(req: NextRequest) {
   const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();
@@ -19,6 +21,7 @@ export async function POST(req: NextRequest) {
   const fireblocks = new FireblocksPreAuth();
   const zkp        = new ZKPAttestationService();
   const calc       = new RepIDCalculator();
+  const earnedMetrics = new EarnedMetricsRepository();
 
   try {
     // Step 1: KYA Validation
@@ -34,15 +37,26 @@ export async function POST(req: NextRequest) {
     }
 
     // Addendum 2: Real-time Institutional RepID Calculation
+    //
+    // These four inputs were literals — bftAccuracy 94, veritasCatchRate 97,
+    // x402SuccessRate 100, latencyMs 180 — on the live payment path. The
+    // calculator's maths and weights were real and it did not matter: constant
+    // inputs produce a constant score, so RepID could not move with behaviour.
+    //
+    // They are now measured from recorded outcomes, decayed and shrunk (see
+    // lib/trustshell/EarnedMetrics.ts). Two of the four come back `unmeasured`
+    // because the underlying data does not exist — no table records BFT results
+    // or per-agent latency — and unmeasured scores zero rather than being
+    // assumed. Real scores are therefore markedly lower than the fabricated ones
+    // they replace. That is the correction, not a regression: the old number was
+    // never earned. `evidence` in the response says exactly what was measured.
     const institution = req.nextUrl.searchParams.get('institution') || 'default';
+    const earned = await earnedMetrics.load(agentName);
     const repidResult = await calc.calculate(
       agentName,
       {
-        bftAccuracy:      94,
-        veritasCatchRate: 97,
-        x402SuccessRate:  100,
-        latencyMs:        180,
-        humanCustody:     kyaResult.humanCustodyBound,
+        ...toScoringInputs(earned.metrics),
+        humanCustody: kyaResult.humanCustodyBound,
       },
       institution
     );
@@ -173,6 +187,21 @@ export async function POST(req: NextRequest) {
         simulated: execution.simulated,
         confirmed: execution.confirmed,
         error:     execution.error,
+      },
+      // What the RepID in this receipt was actually computed from. A score is
+      // only as good as its evidence, so the evidence ships with it rather than
+      // living in a log the caller never sees.
+      repid: {
+        score: repidResult.repidScore,
+        tier:  repidResult.repidTier,
+        resolvedAgent: earned.resolvedAgent,
+        fullyMeasured: earned.evidence.fullyMeasured,
+        measured:      earned.evidence.measured,
+        insufficient:  earned.evidence.insufficient,
+        unmeasured:    earned.evidence.unmeasured,
+        weakestConfidence: earned.evidence.weakestConfidence,
+        observationsTruncated: earned.truncated,
+        detail: earned.evidence.detail,
       },
       bft: {
         evaluated: bftProof.evaluated,

@@ -37,6 +37,29 @@ export type {
   ParsedTranscript,
   ParseOptions,
 } from './TranscriptParser';
+export {
+  RECENCY_HALF_LIFE_DAYS as EARNED_RECENCY_HALF_LIFE_DAYS,
+  PRIOR_STRENGTH,
+  PRIOR_VALUE,
+  MIN_EFFECTIVE_N,
+  measureRate,
+  measureLatencyMs,
+  unmeasured,
+  toScoringInputs,
+  describeEvidence,
+} from './EarnedMetrics';
+export type {
+  Observation,
+  MetricState,
+  MeasuredMetric,
+  MeasureOptions,
+  EarnedMetricSet,
+  ScoringInputs,
+  EvidenceReport,
+} from './EarnedMetrics';
+export { EarnedMetricsRepository, OBSERVATION_WINDOW_DAYS, MAX_OBSERVATIONS } from './EarnedMetricsRepo';
+export type { EarnedMetricsLoad } from './EarnedMetricsRepo';
+
 // MemoryRecall was written, tested (44 assertions) and then never exported, so
 // the only thing in the repo that could import it was its own check script. A
 // module absent from the barrel is unreachable to every consumer that imports
