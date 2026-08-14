@@ -254,10 +254,47 @@ being faked:
 - per-agent latency does not exist: `hal_classifications` has 147k latency
   samples but no `agent_id`; `repid_score_events` has no latency column.
 
-This is why Reputation scores 5 and not higher. **The next highest-leverage move
-in this subsystem is a data-capture problem, not a scoring one:** until BFT
-outcomes and per-agent latency are recorded, 50% of RepID's weight can only ever
-resolve to zero.
+## 6c. BFT + latency capture (landed)
+
+Both signals now resolve to **measurable but sparse** rather than absent, which
+matters because sparsity resolves with volume and absence does not.
+
+**BFT needed no new plumbing.** `pay/route` already calls `bft.authorize` then
+`bft.enqueue`, and `app/api/trustrails/bft/process` already drains the queue,
+runs the three-provider panel and writes the verdict back. The table is empty
+because the payment path has run ~12 times ever — not because anything is
+disconnected. The observation feed now exposes those verdicts, counting only rows
+the worker actually evaluated: a queued-but-unevaluated row is a pending
+question, and counting it either way would invent a verdict.
+
+**Latency now comes from `llm_call_log`** (486,280 rows carrying `agent_id`,
+`latency_ms`, `status`). Real measured values, live: trinity-orch **256 ms**,
+trinity-veritas 698 ms, trinity-w3c 713 ms, trinity-hdm **933 ms**, fleet mean
+**705 ms** — against the **180 ms** that used to be asserted, so the old constant
+was roughly 4x optimistic. Effect: trinity-orch 2960 → **3180**, trinity-w3c
+2823 → 3017, trinity-hdm 2711 → 2894.
+
+### The real blocker is attribution, not volume
+
+| Defect | Measured |
+|---|---|
+| `llm_call_log.agent_id` populated | **209 of 486,280 rows (0.04%)** |
+| `repid_score_events.llm_call_id` resolving to `llm_call_log` | **15 of 147,617** |
+
+Both tables span the identical window (2026-05-07 → 2026-08-13) and both are
+large, so the second is a genuine **dangling reference between two writers**, not
+pruning. Setting `agent_id` at the write site would make **486k existing samples
+attributable retroactively** — the cheapest large win available in this
+subsystem. That write site is in `repid-engine`, so it is out of this repo's
+reach: logged as task **#74**.
+
+Because a thin signal and a broken pipeline read identically at a call site,
+every unmeasured metric now carries the systemic reason next to the per-agent
+one — the difference between "this agent is quiet" and "go fix the writer".
+
+This is why Reputation scores 5 and not higher. **The remaining work is data
+capture, not scoring:** the scoring path is correct and coverage improves
+automatically the moment attribution is fixed, with no further change here.
 
 ## 7. Verification record
 
@@ -275,6 +312,10 @@ resolve to zero.
 | RepID differs per agent post-Sprint 2 | **VERIFIED** | computed over the same view the route reads |
 | x402 status vs is_simulated disagree | **VERIFIED** | 403 `settled` vs 289 `is_simulated` |
 | BFT tables hold zero rows | **VERIFIED** | `pg_stat_user_tables` on both |
+| Latency measured per agent (256-933ms) | **VERIFIED** | computed from `llm_call_log` over the observation view |
+| `llm_call_log.agent_id` on 209/486,280 | **VERIFIED** | direct count |
+| `llm_call_id` dangling (15/147,617) | **VERIFIED** | tested both candidate keys, identical date windows |
+| BFT scoring path against real data | **NOT CHECKED** | zero evaluated rows exist; exercised by unit tests only |
 | Sprint 2 route invoked end-to-end | **NOT CHECKED** | no running server + keys in this container; the effect was computed from the view the route reads, not an HTTP call |
 | zkp-postcard crate compiles | **NOT CHECKED** | no Rust toolchain run this session |
 | Whether repid-engine HAL is healthy | **NOT CHECKED** | different repo, Railway proxy-denied |
