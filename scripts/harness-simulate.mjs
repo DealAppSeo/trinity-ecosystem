@@ -46,6 +46,17 @@ const HARDNESS_W = arg('hardness', 0);
 // Restore the pre-2026-08-14 cold-start rule: a flat 0.5 trust weight for any
 // cold expert, discarding whatever evidence it has already produced.
 const COLD_MIDPOINT = argv.includes('--cold-start-midpoint');
+// ESCALATION-SIGNAL ABLATION. Replaces the margin/earned/confidence decision
+// with a coin flip at this rate, keeping every other mechanism identical.
+//
+// It exists to answer the question that has to come BEFORE tuning `marginFloor`:
+// does the signal discriminate at all? A threshold is only worth choosing if
+// the thing it thresholds beats picking tasks at random for the same spend.
+// Note the signals `EscalationPolicy` reads — topEarned, runnerUpEarned,
+// topConfidence — are all properties of the EXPERTS. None of them can see the
+// task, so there is a real prior that they cannot predict which task is hard.
+// -1 disables the ablation and uses the real policy.
+const ESCALATE_RANDOM = arg('escalate-random', -1);
 
 
 const { load } = compileHarness();
@@ -346,6 +357,7 @@ function runHarness(seed, panel = null) {
   const panelPolicy =
     panel && panel.adaptive ? new AdaptivePanelPolicy(agreement, panel.adaptive) : null;
   const escalation = panel ? new EscalationPolicy(clock, panel.escalateCfg ?? {}) : null;
+  const escalateRng = new SeededRng(seed ^ 0xe5ca1a);
 
   // Earned reputation, learned from observed outcomes. Confidence-weighted:
   // an expert's score is shrunk toward the neutral prior in proportion to how
@@ -425,7 +437,10 @@ function runHarness(seed, panel = null) {
         // whose experts fail together needs the second gate; no amount of
         // per-task uncertainty makes a panel useful there.
         const worthIt = panelPolicy === null ? { panel: true } : panelPolicy.decide();
-        if (dec.escalate && worthIt.panel && members.length >= 2) {
+        // Ablation seam: same budget, no signal. Drawn from a dedicated stream
+        // so switching it on cannot shift any other random draw in the run.
+        const wantsPanel = ESCALATE_RANDOM >= 0 ? escalateRng.next() < ESCALATE_RANDOM : dec.escalate;
+        if (wantsPanel && worthIt.panel && members.length >= 2) {
           const proposals = [];
           let slowest = 0;
           for (const id of members) {
@@ -650,7 +665,7 @@ const { m: harness, ledger, breakers, capacity, timeouts } = runHarness(SEED);
 // Third arm: same harness, plus escalation-gated plurality aggregation. Built
 // because the ceiling analysis at the bottom showed top-1 has ~2pp left and
 // aggregation is the only mechanism that can cross the single-expert bound.
-const PANEL_CFG = { panelSize: PANEL_SIZE, escalateCfg: { marginFloor: 2000 } };
+const PANEL_CFG = { panelSize: PANEL_SIZE, escalateCfg: { marginFloor: arg('margin-floor', 2000) } };
 const { m: panelArm, agreement: panelAgreement } = runHarness(SEED, PANEL_CFG);
 // Fourth arm: the panel, gated on whether panels have measurably paid here.
 const ADAPTIVE_CFG = {

@@ -2838,3 +2838,97 @@ worse.
   agent quality relative to incumbents* in the real fleet. That is in principle
   answerable from `agent_repid` history and was **not** attempted here; every
   real-data retraction in this repo came from assuming the shape of that data.
+
+---
+
+## 2026-08-14 — Sprint Z: the `marginFloor` retune
+
+Brief was "get the `marginFloor` retune" — the last item on the OPEN list that
+was not owned by Sean. Reproduce with the two seams added to the simulator this
+sprint:
+
+```bash
+node scripts/harness-simulate.mjs --margin-floor N          # sweep the floor
+node scripts/harness-simulate.mjs --margin-floor N --escalate-random R
+```
+
+### First: the parameter has no production caller
+
+`grep` for `new EscalationPolicy` returns the simulator, the experiment script,
+and `escalate.ts`'s own test file. **Nothing in `lib/` or `app/` imports
+`escalate.ts` at all**, and the module's own default is `marginFloor: 0`, i.e.
+**disabled**. The 2000 everyone has been discussing exists on exactly one line —
+`scripts/harness-simulate.mjs`, in `PANEL_CFG`.
+
+So there is no shipped 2000 to retune. This is a simulator constant governing
+which tasks the panel arm escalates, and its blast radius is the published panel
+figures, not production behaviour. That had to be established before tuning it;
+it changes what the answer is *for*.
+
+### Second: does the signal discriminate at all?
+
+A threshold is only worth choosing if the thing it thresholds beats picking at
+random for the same spend. There was a real prior that it would not:
+`EscalationPolicy` reads `topEarned`, `runnerUpEarned` and `topConfidence` —
+**all three are properties of the EXPERTS**. None of them can see the task, so
+none can predict which task is hard.
+
+`--escalate-random R` replaces the decision with a coin flip at rate R, keeping
+every other mechanism identical and drawing from a dedicated stream so no other
+random draw shifts. Matched on escalation rate, 20 paired seeds:
+
+| operating point | margin | random | calls (matched) | paired delta |
+|---|---|---|---|---|
+| floor 1000, rate 0.541 | 95.36% | 94.81% | 2.10 vs 2.08 | **+0.55pp** ± 0.29, t = 3.78, 18/20 |
+| floor 2000, rate 0.883 | 96.46% | 96.19% | 2.77 vs 2.77 | +0.27pp ± 0.26, t = 2.06, 13/20 |
+
+**The signal is real but its value is concentrated at low escalation rates.** At
+2000 the floor escalates 89% of tasks — nearly always-panel — so there is almost
+no selection left to do, and the signal is barely distinguishable from a coin
+flip. The prior was half right: the signal cannot see the task, but it does
+track how well-informed the ledger currently is, which predicts top-1 error.
+
+### The frontier, 10 seeds, panel of 3
+
+| floor | escal % | quality | calls | p99 ms | vs top-1 quality | vs top-1 p99 | pp per extra call |
+|---|---|---|---|---|---|---|---|
+| 0 | 0.0% | 92.20% | 1.02 | 181 | — | — | — |
+| 250 | 28.5% | 94.00% | 1.58 | 209 | +1.80pp | +16% | **3.20** |
+| 500 | 35.2% | 94.29% | 1.71 | 210 | +2.09pp | +16% | 3.01 |
+| 750 | 45.5% | 94.92% | 1.92 | 212 | +2.72pp | +17% | 3.02 |
+| **1000** | 54.2% | 95.31% | 2.09 | **214** | +3.11pp | **+18%** | 2.90 |
+| 1500 | 72.8% | 95.86% | 2.47 | 258 | +3.66pp | +42% | 2.52 |
+| **2000** *(current)* | 89.3% | 96.50% | 2.79 | **317** | +4.30pp | **+75%** | 2.43 |
+| 3000 | 99.1% | 97.01% | 2.98 | 306 | +4.81pp | +69% | 2.45 |
+
+**The p99 knee is between 1000 and 1500.** Up to 1000 the tail barely moves
+(+16–18%); past it the tail jumps to +42% and then +75%. Marginal efficiency
+declines monotonically across the whole range, from 3.20 pp per extra call at
+250 to 2.43 at 2000.
+
+### The answer
+
+**~1000, on the cost axis this repo already uses.** It captures **3.11pp of the
+4.81pp** available (65%) for **+18% p99** instead of 2000's **+75%**, and it is
+the operating point where the margin signal is worth having (+0.55pp over
+random, t = 3.78) rather than marginal (+0.27pp, t = 2.06). Sprint P rejected
+panel-size 4 at +1.25pp for +298% p99; by that same exchange rate 2000 is not a
+defensible point on this curve.
+
+**The constant was NOT changed, deliberately.** Every published panel figure —
+Sprint P's "99.23% of the omniscient panel-of-3 bound", the "+4.70pp crosses the
+single-expert ceiling" headline, the panel entries in `PRIOR-WORK-INDEX.md` — was
+measured with the panel arm at floor 2000. Moving it re-bases all of them, and
+re-basing other sprints' CLOSED results as a side effect of a tuning exercise is
+not a tuning exercise. Adopting 1000 means re-measuring those entries first; the
+frontier above is what makes that a decision rather than a guess.
+
+### NOT CHECKED
+
+- Simulator evidence. The real-data figure in the index (~91% of cron-only pairs
+  under 2000) is consistent with the 89.3% escalation rate measured here, but it
+  carries the unaligned-time caveat from Sprint U and was not re-derived.
+- The frontier is measured at `--hardness 0`, the published world, where every
+  task is equally hard. A world with shared task difficulty is exactly where a
+  task-blind signal should do worst, and that was not swept.
+- No production caller exists, so none of this is validated against one.
