@@ -48,6 +48,25 @@ already been wrong once — see LESSONS A4.
 | `aitrinitysymphony.com` (apex) | **Vercel** — 200, redirects to `www` |
 | `www.aitrinitysymphony.com` | **Vercel** (`x-vercel-id`) |
 | `*.vercel.app` for this repo | Vercel project `ai-trinity-symphony-landing` (`prj_EtbAAh789ySdcT0AZc8cgZNui3lt`) |
+| `trustrails.dev`, `www.trustrails.dev` | Vercel project **`trustrails`** (`prj_y0aIbpcHHJfGd8TcruunVxVYmLVI`) — **NOT `trustrails-dev`** |
+| `hyperdag.org` | Vercel project **`hyperdag-trust`** — **NOT `hyperdag-org`** |
+
+**Two projects here are named after a domain they do not serve, and both have
+already cost a wrong finding** [VERIFIED 2026-08-15 against the Vercel API]:
+
+- `trustrails-dev` (`prj_F2jvc7BuDydh0R30GJjw3sZhbxIZ`) serves **no custom
+  domain** — only `*.vercel.app`. The live `trustrails.dev` is the `trustrails`
+  project. **Both are fed by the same repo**, `DealAppSeo/trustrails-dev`, so a
+  single push builds both, and they differ only in environment variables. That is
+  why `trustrails-dev` sat in state ERROR for a whole session while `trustrails`
+  built fine **on the identical commit** — and why "the trustrails-dev project is
+  broken" does not mean the live site is.
+- `hyperdag-org` serves no custom domain either; its ERROR deploy and
+  `repid-engine` build metadata were read as a fault on the live `hyperdag.org`.
+  That produced a published finding that had to be retracted.
+
+**Before concluding anything about a live domain from a Vercel project, check the
+project's `domains` array.** Matching the name is not evidence.
 
 The same Next app runs in **both places with separate environment variables.** A
 200 from the custom domain says nothing about the Vercel deployment, and vice
