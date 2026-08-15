@@ -15,21 +15,25 @@ lane table written out so it can be pasted.
 
 ## The roster
 
-| tag | what it is | how it is run today |
-|---|---|---|
-| **CC**, CC1, CC2 | Claude Code | multiple instances, this repo |
-| **XC**, XC1 | Grok Code / xAI Code (chat + terminal) | terminal, lighter |
-| **GA**, GA1 | Gemini in Antigravity | terminal — the IDE surface is heavy |
-| **T12** | *see the note below* | — |
+**Two different kinds of agent, on two different clocks.** Conflating them is
+the first mistake to avoid.
 
-**T12 — stated assumption.** The roster was given as CC, XC, GA and T12, and the
-first three were identified by vendor. T12 was not. Rather than block, its lane
-below is defined **by function, not by vendor**: T12 is the independent verifier,
-and its prompt assumes nothing about which model runs it. If T12 is in fact a
-fourth builder, swap it onto a builder lane and leave the verifier lane
-unassigned — but do not leave the verifier lane *unrun*. It is the one that keeps
-the other three honest, and this repo's entire failure log is about systems
-reporting success they had not earned.
+| tag | what it is | clock |
+|---|---|---|
+| **CC**, CC1, CC2 | Claude Code | **build time** — writes code, opens PRs |
+| **XC**, XC1 | Grok Code / xAI Code (chat + terminal) | **build time** |
+| **GA**, GA1 | Gemini in Antigravity | **build time** — terminal; the IDE surface is heavy |
+| **T12** | Trinity12 — the orchestration fleet on Railway | **run time** — 12 services that *are* the product |
+
+T12 is not a fourth developer. It is nine agent services under three managers
+(Alpha: `trinity-torch`, `trinity-veritas`, `trinity-gcm`; BETA: `trinity-chesed`,
+`trinity-mel`, `trinity-apm`; GAMMA: `trinity-sophia`, `trinity-nexus`,
+`trinity-hdm`) plus three orchestration services (`trinity-orch`, `trinity-w3c`,
+`trinity-shofet`). CC, XC and GA change T12's code. T12 runs.
+
+So the lane table below assigns **build-time** territory to CC, XC and GA, and
+the verify lane rotates among them. T12 gets its own section, because runtime
+verification is a different problem with a different failure mode.
 
 ---
 
@@ -45,7 +49,11 @@ line rather than reaching across.
 | **Kernel** | CC | `lib/trustshell/**`, `scripts/harness-*`, `scripts/check-*`, `docs/*SPEC*.md`, `docs/TRUST-HARNESS.md` | `app/**`, `package.json` deps |
 | **Surface** | XC | `app/**`, `components/**`, site content, staleness/freshness jobs | `lib/trustshell/**` |
 | **Supply** | GA | `package.json`, `package-lock.json`, `.github/workflows/**`, `Dockerfile*`, `SECURITY.md`, `.github/dependabot.yml` | `lib/**`, `app/**` |
-| **Verify** | T12 | `docs/SPRINT-LOG.md` verdict lines, `LESSONS.md`, new `scripts/*-test.mjs` **only when reproducing a defect** | any file another lane is mid-sprint on |
+| **Verify** | rotates: whichever of CC/XC/GA did **not** author the sprint | `docs/SPRINT-LOG.md` verdict lines, `LESSONS.md`, new `scripts/*-test.mjs` **only when reproducing a defect** | any file another lane is mid-sprint on |
+
+The verify lane has no permanent owner on purpose: its only requirement is that
+the agent running it did not write the thing it is checking. Rotating it costs
+nothing and removes the one bias that matters.
 
 Two paths are **shared and therefore append-only**: `docs/PRIOR-WORK-INDEX.md`
 and `docs/SPRINT-LOG.md`. Add your entry at the end of the relevant section;
@@ -200,11 +208,11 @@ Tag pushes are irreversible and a version can never be reused. Those are
 owner-gated without exception.
 ```
 
-## T12 — the verify lane
+## Verify — rotating build-time lane
 
-**Standing brief:** *try to falsify what the other three just claimed.* This
-lane produces no features. Its output is either a confirmation with the command
-that produced it, or a defect with a reproduction.
+**Standing brief:** *try to falsify what the other lane just claimed.* This lane
+produces no features. Its output is either a confirmation with the command that
+produced it, or a defect with a reproduction.
 
 ```
 LANE: verify. Paths: docs/SPRINT-LOG.md verdict lines, LESSONS.md, and new
@@ -233,6 +241,141 @@ Loop, one item per pass:
 
 You may not fix what you find outside a reproduction test. Finding it and
 handing it back is the whole job; fixing it puts you in someone else's lane.
+```
+
+---
+
+## T12 — runtime verification
+
+Observed 2026-08-15 from the Railway project view and UptimeRobot. Re-check
+before relying on any of it.
+
+### Monitoring is not verification
+
+UptimeRobot reports **13 up, 4 paused, 100% uptime, 0 incidents**. In the same
+window, Railway shows **`repid-decay-weekly` offline**. Both are true, because
+they answer different questions:
+
+- **Liveness**: did the service respond? UptimeRobot answers this well.
+- **Verification**: did the thing it exists to produce actually get produced?
+  Nothing answers this today.
+
+A weekly job's failure mode is *silence*, and silence returns 200 from anything
+that is still listening. `EarnedMetrics` decay is **time-dependent** — a score
+changes with no new events (`NEXT.md` §4d) — so a decay job that has not run
+leaves every score stale-high, and no dashboard goes red. That is the same
+defect shape as the rest of this repo's failure log: a system reporting success
+it has not earned.
+
+**`repid-decay-weekly` is therefore the first verifier target,** not because it
+is the most broken but because it is the clearest example of a claim whose
+absence is invisible.
+
+### Raven and Atlas as verifiers — yes, with three corrections
+
+Putting the verifiers on Supabase edge functions while the fleet runs on Railway
+is the right instinct and the right cost shape. Verification is low-frequency
+and small-payload; per-invocation billing fits it, and an always-on container
+per verifier would be the expensive mistake. Three things have to be true first.
+
+**1. Name the independence honestly — it is partial.** Raven and Atlas have
+independent *compute* (different provider, different network, different deploy
+pipeline). They share *data*: the same Supabase Postgres the fleet writes to. So
+they survive a Railway outage, a bad Railway deploy, and a runaway fleet
+service. They do **not** survive a Supabase outage, a bad RLS migration, or a
+schema change — those take out the substrate and the observer together. Write
+that down next to the design, because a redundancy claim that is wrong about its
+own failure domain is worse than none.
+
+**2. The verifiers must be monitored more strictly than what they verify.**
+`atlas-constitutional-decisions`, `raven-constitutional-decisions` and
+`update-signals` have been **paused for roughly six weeks** and nothing
+surfaced it. A verifier that can be silently off is worse than no verifier,
+because the dashboard reads green either way. Un-pausing is not step one. Step
+one is a **heartbeat the verifier writes itself**: a row per run, with a
+timestamp; a missing row for N periods is an incident. Liveness of a verifier
+must be measured by its *output*, never by its HTTP status.
+
+**3. Their source is not in this repo.** `supabase/functions/` holds only
+`agent-tools` and `embed-memory-backfill`. Three functions are deployed with no
+source under version control here — they cannot be reviewed, gated by CI, or
+rebuilt if lost. Fix that before giving them a verification role, or the
+verifier becomes the least trustworthy component in the system.
+
+### Do not build a two-of-two quorum
+
+With two verifiers the tempting design is a vote, and both readings are bad:
+2-of-2 means either verifier can halt the fleet by failing, and 1-of-2 means
+either can wave through a bad claim. Neither is what redundancy is for.
+
+**Have both write verdicts independently, and treat disagreement as the alarm.**
+That is already the pattern in `lib/trustshell/CustodyShadow.ts`, which observes
+and changes nothing, and whose `not_comparable` reading is the *measurement*
+rather than a fault. Agreement is cheap information; disagreement is the
+expensive, valuable information, and escalating it to a human is correct.
+
+### Bound the healing authority
+
+Self-healing needs a **bounded** action, or the healer becomes the outage. The
+split that holds:
+
+| a verifier may | a verifier may not |
+|---|---|
+| write a verdict | restart, redeploy or scale anything |
+| write a heartbeat | mutate the data it verifies |
+| trip a pause flag the fleet reads | un-trip its own pause flag |
+
+Restart authority also destroys the property being bought: a verifier that can
+change what it observes is no longer independent of it.
+
+### Antifragile is a feedback claim, not a redundancy claim
+
+Redundancy buys **availability**. Getting *better* from stress is a different
+mechanism: the failure has to be recorded and fed back into a decision. This
+system is one link short of having that, and the link is already specified —
+`lib/trustshell/reputation-transition.ts` defines a committed-history contract
+and **has no producer** (`NEXT.md`, `docs/AGENT-LOOP-SCOPE.md`).
+
+A verifier verdict per run is exactly that producer. Wiring it closes the chain
+the whole product is premised on:
+
+```
+  outcome ──► verified verdict ──► committed event ──► read-time score ──► routing weight
+                                   ^^^^^^^^^^^^^^^
+                                   the link that is missing today
+```
+
+Until that is wired, two verifiers are redundancy and nothing more — which is
+worth having, but should not be described as self-learning.
+
+### Loop prompt
+
+```
+LANE: runtime (T12). Surfaces: Railway fleet, Supabase edge verifiers,
+UptimeRobot. This lane observes and reports; it does not deploy.
+
+Loop, one item per pass:
+
+1. Pick one service that is supposed to PRODUCE something on a schedule. Find
+   its most recent output row and its timestamp. Not its HTTP status — its
+   output.
+2. Classify it in three states: PRODUCING / NOT CHECKED / STALE. "Responds to
+   health checks" is NOT CHECKED, not PRODUCING.
+3. If STALE, report how long, and what downstream number is wrong as a result.
+   A stale job matters only through the number it corrupts; name that number.
+4. Confirm the verifier that should have caught this has a heartbeat of its own.
+   If it does not, that is the higher-priority defect — file it first.
+5. Never restart, redeploy or scale as part of this loop. Write the verdict and
+   hand off.
+
+Standing state to re-check each pass (observed 2026-08-15, verify before use):
+  - repid-decay-weekly: OFFLINE. Decay is time-dependent, so scores are
+    stale-high while it is down.
+  - atlas/raven-constitutional-decisions, update-signals: PAUSED ~6 weeks,
+    unnoticed. No source in this repo.
+  - py-brain: 30 warnings. Flowise: 4. Neither triaged.
+  - UptimeRobot: 17/50 monitors, 4 paused. A paused monitor contributing to a
+    100% uptime figure is the dash that means "we did not look."
 ```
 
 ---
