@@ -156,11 +156,28 @@ family, `email_captures`, `referrals`, `trinity_leads`, `trinity_access_requests
 and user-driven tables like `notifications`, `repid_votes`, `trinity_bids`,
 `trinity_chat_messages`. Public forms need them.
 
-**Coverage gap, stated because it shaped the rule:** `trustmarket` is private and
-access was never granted; `aitrinitysymphony-landing` was not cloned. Neither was
-scanned for client writers. That is exactly why Phase B required a table to be
-*unambiguously internal* as well as writer-free — "no writer found" is not "no
-writer exists".
+**Coverage gap — `trustmarket` half CLOSED 2026-08-15.** Access was granted and
+the repo scanned. Result is clean and unambiguous: **it has no Supabase writers at
+all.** No `@supabase/supabase-js` dependency, no `createClient`, no reference to
+any of the 57 tables. Its only two "supabase" mentions are a boolean health flag
+(`lib/status.ts`) and the string that renders it (`LiveProof.tsx`). The single
+`.from(` in the repo is `Array.from()`. So Phase B could not have broken anything
+there — the caution was right to have, and it cost nothing.
+
+`aitrinitysymphony-landing` remains **NOT SCANNED** (3 files, static, per §7).
+
+Three further items closed by the same access, each previously NOT CHECKED:
+
+| `trustmarket` | measured 2026-08-15 |
+|---|---|
+| secret scan | **1 finding, 0 usable** — a legacy `anon` JWT in `public/coming-soon.html`. Public by design *and* inert, since legacy JWTs are disabled project-wide |
+| CI | **none** — no `.github/workflows` |
+| `/api/version` | **absent** — only `leaderboard` and `services` routes exist |
+| default branch | `feat/sandbox-mvp-phase-a`, confirming §1 |
+
+**The 17 tables that keep anon INSERT are therefore now justified by evidence
+rather than by uncertainty.** They are genuine public-form targets in
+`trustrails-dev`, not tables left open because a repo could not be read.
 
 *Counts at closure were 141,164 and 161,457 — exact `count(*)`. The 139,659 and
 155,428 quoted earlier in this document's first draft were `reltuples` planner
