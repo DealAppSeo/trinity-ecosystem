@@ -97,6 +97,96 @@ reason is stronger than it knew: the corpus is not merely unlabelled, it is
 **closed and unrepresentative of the current system**, which currently produces
 about one event a day.
 
+### 3a. What actually stopped — ANSWERED 2026-08-15
+
+**It was never a HAL failure. The whole Trinity task pipeline stopped, and HAL
+volume is downstream of it.** `trinity_tasks` tracks the HAL curve exactly:
+
+```
+            trinity_tasks/day   HAL events/day
+  07-15          6,972              2,689
+  07-16          2,847              1,707     ← degradation starts
+  07-17          1,615              1,360
+  07-18              4                  2     ← stop
+  … 08-15            1                  1
+```
+
+Nothing HAL-specific is required to explain any of it. Asking "what killed HAL
+volume" presupposed a HAL-shaped cause; the discriminator was one query against
+a table upstream of HAL.
+
+**The timeline, to the minute.**
+
+| when (UTC) | what |
+|---|---|
+| 07-16 ~05:00 | throughput halves — ~110/hr to ~60/hr. `peer_verify` HAL events fall 1,547 → 579 → 298 while `drill` and `operational` hold steady, so this is a partial fleet degradation, not a global one |
+| 07-17 22:03:50 | last task escalation — task 434972, by `trinity-apm`. Normal work, **no error logged** |
+| 07-17 22:05:52 | last HAL score event, idempotency key `trinity_task_bridge_434975` |
+| 07-17 ~22:18 | agents stop heartbeating |
+| 07-17 22:28 | first `survivor_alert`: *"trinity-gcm is DOWN — Time Down: 10 minutes"* |
+| 07-18 09:15 | first post-cliff HAL event, key `…434976` — **the counter did not skip** |
+| **now** | still down. Latest alert **2026-08-15 18:17**, *"Time Down: 41518 minutes"* (28.8 days), **9,280 alerts in the last 7 days** |
+
+**The mechanism is Railway, and the alert names its own remedy:**
+
+> 🚨 SURVIVOR ALERT: trinity-orch is DOWN · 🔗 Railway Dashboard ·
+> 🛠️ **Action: Manual redeploy required. Autonomous redeploy disabled.**
+
+The fleet has been asking for a manual redeploy every three minutes for 29 days.
+The surviving agents' monitoring loop outlived their work loop, which is why
+`trinity_agent_logs` **doubled** at the cliff (221 → 1,312/day) — that is not
+more work, it is one alert repeating. `substance_gate_degraded` (1,044 → 0),
+`task_escalated` (507 → 0) and `substance_gate_shadow_reject` (192 → 0) all went
+to zero on the same day `survivor_alert` went 67 → 5,316. **~38,000 log rows of a
+fleet telling itself it is dead**, and the retention job (`jobid 6`) has been
+dutifully pruning around it.
+
+**The 1–2 events/day since are one pg_cron job.** `e2e_smoke_nightly`
+(`jobid 8`, `15 9 * * *`) — which is why every surviving HAL event lands at
+09:15–09:17 UTC. HAL is not limping; it is switched off and being pinged once a
+night by a smoke test.
+
+**Four candidates ruled out, each by evidence rather than by argument:**
+
+- **pg_cron** — no job stopped on 07-17/18. Jobs 9–13 have run continuously since
+  07-12 (826 runs, latest today). The one disabled `*/25` job,
+  `auto-healer-v2-recurring`, last ran **2026-05-20** — two months early, so it
+  is not the cause and would have been a tempting one.
+- **The database** — the idempotency counter is continuous across the gap
+  (`…434975` → `…434976`). The queue was not drained or reset; it stopped being
+  fed.
+- **`global_pause`** — currently `false`. See the caveat below.
+- **An application crash** — no error row, no failure status, work stopped
+  mid-stream. `trinity_tasks.failed` has no row newer than 07-18. That shape is a
+  process stopped from outside, not one that fell over.
+
+**The five agents named in the alerts are not the trigger.** `trinity-gcm`,
+`trinity-orch` and `trinity-w3c` have been flapping since **2026-05-14**,
+`trinity-torch` since 06-16, `trinity-veritas` since 06-20 — all while HAL ran at
+2,650/day. They are what the survivors alert *about*, and reading them as the
+cause would date the outage two months early.
+
+**One inconsistency, flagged not resolved.** `agent_preflight_control` reads
+`global_pause = false` with `updated_at = 2026-07-22 20:32`, but its own
+`pause_reason` says *"Cleared 2026-08-13"*. Both cannot be true: either the
+clearing statement did not touch `updated_at`, or the text is wrong. So **the
+pause history cannot be dated from this row**, and whether `global_pause` was
+set at any point between 07-17 and 08-13 is **NOT CHECKED**. It is not holding
+the fleet down *now*, which is what matters for the restart.
+
+**NOT CHECKED, and it is the last question:** *why* Railway stopped the
+containers — crash, OOM, failed deploy, billing, or a manual stop. No Railway
+credential or MCP surface is reachable from an agent session, and the alert
+links a dashboard rather than a state. **Everything up to the Railway boundary is
+established; the far side of it needs the dashboard.**
+
+**Consequence for the HAL work:** the collapse is an **operational outage, not a
+model or quality regression**. No HAL threshold, voter or corpus change is
+implicated, and none would fix it. The standing "diagnose HAL volume before
+further HAL tuning" item is discharged — what it needs is a redeploy, and that
+is Sean's, since the fleet's own remedy line says autonomous redeploy is
+disabled.
+
 ---
 
 ## 4. The most consequential risk flag: two vocabularies, one name
