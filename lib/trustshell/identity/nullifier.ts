@@ -4,54 +4,68 @@
 //
 // THIS FILE OWNS THE SHAPE. It does not own the hash. The Plonky3 circuit lives
 // in the lane with a working cargo toolchain; this side defines exactly what
-// that circuit must prove, so both implementations are writing against one
-// written contract instead of two compatible-looking guesses.
+// that circuit must prove, so both implementations write against one written
+// contract instead of two compatible-looking guesses.
+//
+// ── CORRECTED 2026-08-14: the commitment is PRIVATE ──────────────────────────
+//
+// The first version of this contract listed `commitment` as a public input and
+// described the result as unlinkable. That was wrong, and the error is worth
+// recording because it is the single most common way this construction is
+// mis-specified.
+//
+// A commitment is stable by design — it is the long-lived identifier for a
+// holder. Publish it alongside every nullifier and every presentation carries
+// the same value, so all of a holder's actions link together trivially.
+// Scope-varying nullifiers give unlinkability ACROSS SCOPES; they do nothing
+// when a stable identifier travels beside them. That is pseudonymity wearing
+// unlinkability's name.
+//
+// Semaphore gets the real property from the part the first draft omitted: the
+// holder proves MEMBERSHIP of their commitment in a public group, without
+// revealing which member they are. The commitment moves to the witness; a group
+// root becomes the public anchor.
 //
 // WHAT THE CIRCUIT PROVES
 //
-//   public:  commitment, nullifier, domain, scope
-//   private: secret
+//   public:  groupRoot, nullifier, domain, scope, tagCommit, tagNullifier
+//   private: secret, commitment, membership path
 //
-//   commitment = H(tagCommit    ‖ secret)
-//   nullifier  = H(tagNullifier ‖ secret ‖ domain ‖ scope)
+//   commitment == H(tagCommit    ‖ secret)
+//   nullifier  == H(tagNullifier ‖ secret ‖ domain ‖ scope)
+//   MerkleVerify(commitment, path) == groupRoot
 //
-// A verifier learns that ONE secret produced both values, without learning the
-// secret. Different (domain, scope) pairs yield unlinkable nullifiers, so a
-// commitment can be published once and used across contexts without becoming a
-// correlation handle.
+// A verifier learns: someone in this group, who knows the secret behind their
+// commitment, produced this nullifier for this (domain, scope). It does not
+// learn which member — that is the whole point.
 //
-// WHY THIS SITS ALONGSIDE ControlProof RATHER THAN REPLACING IT.
-// They answer different questions and neither subsumes the other:
+// ── THE CAVEAT THAT MUST TRAVEL WITH THE CLAIM ───────────────────────────────
 //
-//   ControlProof  — WHO authorized WHAT, legibly. Revocable, auditable,
-//                   capability-attenuated, expires. A human can read it.
-//   this binding  — that the presenter privately CONTROLS the identity, without
-//                   revealing which identity it is.
+// UNLINKABILITY IS BOUNDED BY THE GROUP SIZE. A root over one commitment proves
+// membership in a set of one, which identifies the holder exactly. A root over
+// five identifies them to within five. The construction is sound at any size and
+// the PRIVACY is not — so any system reporting "unlinkable" must also report the
+// anonymity set it achieved. `GroupSizeWarning` below exists so that number is
+// carried rather than assumed.
 //
-// A signed grant cannot be unlinkable: the signature names the signer. A
-// nullifier cannot express "may spend up to X USDC until Tuesday". Keeping both
-// is the design, not indecision.
+// ── TWO LEVELS OF ASSURANCE, NEVER CONFLATED ─────────────────────────────────
 //
-// TWO LEVELS OF ASSURANCE, NEVER CONFLATED:
+//   recomputed — the verifier holds the secret and recomputes everything. Real
+//                evidence, but the secret is disclosed, so it works only where
+//                the verifier is already trusted with it. Honest-prover binding.
+//   proven     — a circuit checked the relations with the secret hidden. The
+//                actual identity proof, and it needs the Plonky3 side.
 //
-//   recomputed  — the verifier holds the secret and recomputes both values.
-//                 Real evidence, but the secret is disclosed, so it only works
-//                 where the verifier is already trusted with it. This is
-//                 "honest-prover binding".
-//   proven      — a circuit checked the relations with the secret hidden. This
-//                 is the actual identity proof, and it needs the Plonky3 side.
-//
-// `BindingVerification.provenWithoutSecret` is the bit that separates them, and
-// it is false for every scheme in this file today.
+// `BindingVerification.provenWithoutSecret` separates them, and is false for
+// every scheme in this file today.
 
 /**
  * Identifies a parameter set, not just a hash family.
  *
  * "poseidon2" alone is not enough to interoperate: field, width, round counts,
- * S-box degree, round constants and the MDS/internal matrix all change the
- * output. Two implementations both correctly named "poseidon2" will disagree.
- * The tag therefore names a SET, and an unknown one is refused rather than
- * approximated.
+ * S-box degree, round constants and the matrices all change the output. Two
+ * implementations both correctly named "poseidon2" will disagree. An unknown
+ * set is refused rather than approximated.
  */
 export type BindingScheme = 'poseidon2-v1-PENDING-PARAMETERS';
 
@@ -61,11 +75,19 @@ export const BINDING_TAGS = {
   nullifier: 'zkrepid:nullifier:v1',
 } as const;
 
+/** One sibling on the path from a leaf to the group root. */
+export interface MembershipStep {
+  hash: string;
+  /** True when the sibling is the LEFT node at this level. */
+  left: boolean;
+}
+
 export interface BindingStatement {
   scheme: BindingScheme;
-  /** What the verifier is allowed to learn. */
+  /** What the verifier is allowed to learn. Note: no commitment here. */
   publicInputs: {
-    commitment: string;
+    /** Anchor for membership. Must be a root the verifier independently trusts. */
+    groupRoot: string;
     nullifier: string;
     /** Application/domain separator for this authorization context. */
     domain: string;
@@ -74,48 +96,33 @@ export interface BindingStatement {
     tagCommit: string;
     tagNullifier: string;
   };
-  /** Never serialized into anything a verifier receives. */
-  privateWitness: { secret: string };
+  /**
+   * Never serialized into anything a verifier receives.
+   *
+   * `commitment` lives here, not in publicInputs — see the correction note at
+   * the top of this file.
+   */
+  privateWitness: {
+    secret: string;
+    commitment: string;
+    membership: MembershipStep[];
+  };
 }
 
-/**
- * The scheme interface. One implementation per parameter set.
- *
- * `parametersKnown` exists so a caller can branch on availability rather than
- * discovering it by catching an exception — the same reason `IProofProvider`
- * exposes `isZeroKnowledge` instead of leaving privacy implicit.
- */
 export interface IBindingScheme {
   readonly scheme: BindingScheme;
   readonly parametersKnown: boolean;
   commit(secret: string): Promise<string>;
   nullify(secret: string, domain: string, scope: string): Promise<string>;
-}
-
-/**
- * Placeholder for Poseidon2 that REFUSES TO COMPUTE.
- *
- * This is the whole point of it. An implementation with invented parameters
- * would produce plausible field elements, pass its own round-trip tests, and
- * agree with no other implementation on earth — and nothing downstream would
- * notice until two systems compared roots in production. That failure is
- * expensive and silent, so this class throws instead, naming exactly what is
- * missing.
- *
- * It is the same discipline as `proven: false` on ZKPAttestation: a component
- * that cannot do the job says so rather than emitting something shaped like an
- * answer.
- */
-export class PendingPoseidon2Scheme implements IBindingScheme {
-  readonly scheme: BindingScheme = 'poseidon2-v1-PENDING-PARAMETERS';
-  readonly parametersKnown = false;
-
-  async commit(): Promise<string> {
-    throw new Error(MISSING_PARAMETERS);
-  }
-  async nullify(): Promise<string> {
-    throw new Error(MISSING_PARAMETERS);
-  }
+  /**
+   * Internal node hash for the membership tree.
+   *
+   * Part of the scheme rather than a separate utility because the tree must be
+   * built with the SAME parameter set as the commitments — a Merkle tree over
+   * Poseidon2 leaves hashed with SHA-256 nodes is two hash functions in one
+   * circuit and roughly doubles the constraint cost for no benefit.
+   */
+  hashPair(left: string, right: string): Promise<string>;
 }
 
 export const MISSING_PARAMETERS =
@@ -127,28 +134,144 @@ export const MISSING_PARAMETERS =
   'absorption order and padding, and at least 3 input/output test vectors. ' +
   'See docs/POSEIDON2-PARAMETER-REQUEST.md.';
 
-/** Build the statement. Requires a scheme that can actually compute. */
+/**
+ * Placeholder for Poseidon2 that REFUSES TO COMPUTE.
+ *
+ * An implementation with invented parameters would produce plausible field
+ * elements, pass its own round-trip tests, and agree with no other
+ * implementation on earth — and nothing downstream would notice until two
+ * systems compared a root in production. This throws instead, naming what is
+ * missing. Same discipline as `proven: false` on ZKPAttestation.
+ */
+export class PendingPoseidon2Scheme implements IBindingScheme {
+  readonly scheme: BindingScheme = 'poseidon2-v1-PENDING-PARAMETERS';
+  readonly parametersKnown = false;
+
+  async commit(): Promise<string> {
+    throw new Error(MISSING_PARAMETERS);
+  }
+  async nullify(): Promise<string> {
+    throw new Error(MISSING_PARAMETERS);
+  }
+  async hashPair(): Promise<string> {
+    throw new Error(MISSING_PARAMETERS);
+  }
+}
+
+/**
+ * Anonymity set reporting.
+ *
+ * Returned alongside verification so a caller cannot state "unlinkable" without
+ * also having the number that qualifies it.
+ */
+export interface GroupSizeWarning {
+  size: number;
+  adequate: boolean;
+  note: string;
+}
+
+/** Below this, the group is small enough that membership is close to naming. */
+export const MIN_MEANINGFUL_GROUP = 2;
+
+export function describeAnonymitySet(size: number): GroupSizeWarning {
+  if (size <= 1) {
+    return {
+      size,
+      adequate: false,
+      note:
+        'a group of one proves membership in a set of one, which identifies the ' +
+        'holder exactly. The construction is sound; the privacy is absent. Do not ' +
+        'describe this as unlinkable.',
+    };
+  }
+  if (size < 8) {
+    return {
+      size,
+      adequate: false,
+      note:
+        `a group of ${size} narrows the holder to one of ${size}. Sound, but the ` +
+        `anonymity set must be reported with any privacy claim.`,
+    };
+  }
+  return {
+    size,
+    adequate: true,
+    note: `holder is one of ${size}; report this number with any unlinkability claim`,
+  };
+}
+
+/**
+ * Build a membership tree over a group's commitments.
+ *
+ * Odd nodes are carried up unchanged rather than duplicated — duplicating the
+ * last node lets two different groups share a root.
+ */
+export async function buildGroup(
+  commitments: string[],
+  scheme: IBindingScheme
+): Promise<{ root: string; pathFor: (commitment: string) => MembershipStep[] }> {
+  if (commitments.length === 0) throw new Error('a group needs at least one commitment');
+
+  const levels: string[][] = [[...commitments]];
+  while (levels[levels.length - 1].length > 1) {
+    const cur = levels[levels.length - 1];
+    const next: string[] = [];
+    for (let i = 0; i < cur.length; i += 2) {
+      next.push(i + 1 < cur.length ? await scheme.hashPair(cur[i], cur[i + 1]) : cur[i]);
+    }
+    levels.push(next);
+  }
+
+  return {
+    root: levels[levels.length - 1][0],
+    pathFor(commitment: string): MembershipStep[] {
+      let idx = levels[0].indexOf(commitment);
+      if (idx === -1) throw new Error('commitment is not in this group');
+      const path: MembershipStep[] = [];
+      for (let l = 0; l < levels.length - 1; l++) {
+        const isRight = idx % 2 === 1;
+        const sib = isRight ? idx - 1 : idx + 1;
+        if (sib < levels[l].length) path.push({ hash: levels[l][sib], left: isRight });
+        idx = Math.floor(idx / 2);
+      }
+      return path;
+    },
+  };
+}
+
 export async function buildBindingStatement(input: {
   secret: string;
   domain: string;
   scope: string;
+  groupRoot: string;
+  membership: MembershipStep[];
   scheme: IBindingScheme;
 }): Promise<BindingStatement> {
   if (!input.secret) throw new Error('secret is required');
   if (!input.domain) throw new Error('domain is required — it separates authorization contexts');
   if (!input.scope) throw new Error('scope is required — it is what makes nullifiers unlinkable');
+  if (!input.groupRoot) {
+    throw new Error(
+      'groupRoot is required. Without a membership anchor the commitment would have ' +
+        'to be public, and a public commitment is linkable across every presentation.'
+    );
+  }
 
   return {
     scheme: input.scheme.scheme,
     publicInputs: {
-      commitment: await input.scheme.commit(input.secret),
+      groupRoot: input.groupRoot,
       nullifier: await input.scheme.nullify(input.secret, input.domain, input.scope),
       domain: input.domain,
       scope: input.scope,
       tagCommit: BINDING_TAGS.commit,
       tagNullifier: BINDING_TAGS.nullifier,
     },
-    privateWitness: { secret: input.secret },
+    privateWitness: {
+      secret: input.secret,
+      commitment: await input.scheme.commit(input.secret),
+      membership: input.membership,
+    },
   };
 }
 
@@ -158,19 +281,20 @@ export interface BindingVerification {
    * FALSE whenever the check required the secret.
    *
    * Gate on this, never on `valid`. A recomputation is real evidence that one
-   * secret produced both values — but the verifier had to be handed the secret
-   * to get it, so it proves nothing to anyone who should not see it.
+   * secret produced both values and sits in the group — but the verifier had to
+   * be handed the secret and the commitment to get it, so it proves nothing to
+   * anyone who should not see them.
    */
   provenWithoutSecret: boolean;
   reason: string;
 }
 
 /**
- * Recompute both relations from the witness.
+ * Recompute every relation from the witness, including membership.
  *
- * Honest-prover binding: available today, and genuinely useful where the
- * verifier legitimately holds the secret. It is NOT the identity proof, and
- * the return type refuses to let a caller pretend otherwise.
+ * Honest-prover binding: useful where the verifier legitimately holds the
+ * secret. NOT the identity proof, and the return type refuses to let a caller
+ * pretend otherwise.
  */
 export async function verifyBindingByRecomputation(
   statement: BindingStatement,
@@ -185,55 +309,97 @@ export async function verifyBindingByRecomputation(
   }
 
   const commitment = await scheme.commit(statement.privateWitness.secret);
+  if (commitment !== statement.privateWitness.commitment) {
+    return { valid: false, provenWithoutSecret: false, reason: 'commitment does not reopen' };
+  }
+
   const nullifier = await scheme.nullify(
     statement.privateWitness.secret,
     statement.publicInputs.domain,
     statement.publicInputs.scope
   );
-
-  if (commitment !== statement.publicInputs.commitment) {
-    return { valid: false, provenWithoutSecret: false, reason: 'commitment does not reopen' };
-  }
   if (nullifier !== statement.publicInputs.nullifier) {
     return { valid: false, provenWithoutSecret: false, reason: 'nullifier does not reopen' };
+  }
+
+  // Membership, walked from the RECOMPUTED commitment rather than the witness
+  // one.
+  //
+  // In this recomputation path that choice is redundant: the reopen check above
+  // already forces the two equal, so a mutation swapping them survives the test
+  // suite. Verified, and documented rather than deleted — because the property
+  // is NOT redundant in the circuit, where there is no separate "reopen" step
+  // and the membership constraint may be wired to an unconstrained witness
+  // value. That is `mustAlsoHold[1]`, and it is the borrowed-member attack:
+  // prove membership of a commitment that IS in the group while nullifying with
+  // a different secret. Keeping the two consistent here means the reference
+  // implementation and the circuit express the same intent.
+  let node = commitment;
+  for (const step of statement.privateWitness.membership) {
+    node = step.left
+      ? await scheme.hashPair(step.hash, node)
+      : await scheme.hashPair(node, step.hash);
+  }
+  if (node !== statement.publicInputs.groupRoot) {
+    return {
+      valid: false,
+      provenWithoutSecret: false,
+      reason: 'commitment is not a member of the group named by groupRoot',
+    };
   }
 
   return {
     valid: true,
     provenWithoutSecret: false,
     reason:
-      'both relations recomputed from the witness. This required the secret, so ' +
-      'it is honest-prover binding, not a zero-knowledge identity proof — the ' +
-      'circuit is what removes the secret from the verifier.',
+      'commitment reopens, nullifier reopens, and membership verifies against the ' +
+      'group root. This required the secret, so it is honest-prover binding, not a ' +
+      'zero-knowledge identity proof — the circuit is what removes the secret from ' +
+      'the verifier.',
   };
 }
 
 /**
  * The exact obligations the Plonky3 circuit must discharge.
  *
- * Written as data rather than prose so both lanes can assert against the same
- * list, and so a circuit that silently drops one is detectable.
+ * Data rather than prose so both lanes assert against the same list, and so a
+ * circuit that silently drops one is detectable.
  */
 export const CIRCUIT_CONTRACT = {
-  version: 'zkrepid-binding-v1',
-  publicInputs: ['commitment', 'nullifier', 'domain', 'scope', 'tagCommit', 'tagNullifier'],
-  privateWitness: ['secret'],
+  version: 'zkrepid-binding-v2',
+  publicInputs: ['groupRoot', 'nullifier', 'domain', 'scope', 'tagCommit', 'tagNullifier'],
+  privateWitness: ['secret', 'commitment', 'membership'],
   relations: [
     'commitment == H(tagCommit || secret)',
     'nullifier  == H(tagNullifier || secret || domain || scope)',
+    'MerkleVerify(commitment, membership) == groupRoot',
   ],
   /**
-   * Properties a reviewer should check the circuit actually has, not just that
-   * it produces a proof. Each is a way the circuit can be "working" and wrong.
+   * Ways a circuit can produce a valid proof and still be wrong. Each is a
+   * distinct failure, and each has been the published bug in some real system.
    */
   mustAlsoHold: [
-    'the same secret is used in BOTH relations — two independent secrets would ' +
-      'satisfy each relation separately and prove nothing about their linkage',
-    'domain and scope are PUBLIC inputs, not witness — as witness, a prover ' +
-      'could choose them after seeing the challenge and forge unlinkability',
-    'the tags are distinct and constrained, so a commitment cannot be replayed ' +
-      'as a nullifier for some (domain, scope)',
-    'the absorption order is fixed and constrained, not merely conventional — ' +
-      'a permuted order is a different function that still verifies internally',
+    'the same secret is used in BOTH the commitment and nullifier relations — two ' +
+      'independent secrets satisfy each separately and prove nothing about linkage',
+    'the membership proof is over the COMMITMENT THE CIRCUIT COMPUTED, not an ' +
+      'independent witness value — otherwise a prover shows membership of someone ' +
+      "else's commitment while nullifying with their own secret",
+    'domain and scope are PUBLIC inputs, not witness — as witness, a prover could ' +
+      'choose them after seeing the challenge and forge unlinkability',
+    'the tags are distinct and constrained, so a commitment cannot be replayed as a ' +
+      'nullifier for some (domain, scope)',
+    'the absorption order is fixed and constrained, not merely conventional — a ' +
+      'permuted order is a different function that still verifies internally',
+    'groupRoot is a root the VERIFIER independently trusts. A prover-supplied root ' +
+      'over a tree of their own construction proves membership of a group they ' +
+      'invented, which is no membership at all',
   ],
+  /**
+   * Not a soundness property — a privacy one, and it cannot be fixed in the
+   * circuit. Stated here so it travels with the contract.
+   */
+  privacyCaveat:
+    'unlinkability is bounded by the group size. A root over one commitment ' +
+    'identifies the holder exactly. Report the anonymity set with any privacy ' +
+    'claim — see describeAnonymitySet().',
 } as const;

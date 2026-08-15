@@ -555,7 +555,211 @@ something reopenable. That path is built (`lib/trustshell/identity/`) and not ye
 wired — deliberately, because changing a live authorization gate is a
 Sean-gated decision, not a sprint convenience.
 
-## A12 — an incremental build cache manufacturing compile errors that cannot exist (2026-08-14)
+---
+
+## A12 — the whole dashboard died because two components agreed on a name (2026-08-14)
+
+**Found by the browser, not by any gate.** `npm run check` was green, `tsc
+--noEmit` clean, `next build` succeeded, CI green, both surfaces serving the
+right commit. `/dashboard` was replaced end to end by "Something failed to
+load", and none of the above could see it, because the throw happens in the
+browser after hydration.
+
+```
+Error: cannot add `postgres_changes` callbacks for
+       realtime:public:agent_kya_registry after `subscribe()`.
+```
+
+`SystemTrustScore` and `AgentRepIDGrid` both watch `agent_kya_registry`, and
+both named their channel after the table: `.channel('public:agent_kya_registry')`.
+A supabase-js channel topic is an **identity**, not a description. The second
+component to mount bound `.on()` to a channel already past `subscribe()`,
+supabase-js threw, the throw escaped the `useEffect`, and the error boundary
+took the **entire page** — trust score, receipt feed, risk controls, all of it —
+not just the component that made the mistake.
+
+**Why it reads as correct.** `public:<table>` is the exact string the Supabase
+realtime docs use in their examples, so both authors independently wrote the
+idiomatic thing. The convention is only wrong at the second call site, and
+nothing at the first one hints that a second exists. Fix: one topic per
+subscriber (`system-trust:…`, `repid-grid:…`), not one per table.
+
+**The blast radius is the real lesson.** An unhandled throw inside one
+component's effect is not scoped to that component. Three healthy components
+were dark because a fourth mis-named a string, and the page said nothing about
+which one.
+
+**What this cost, and what it did not.** It cost nothing to find once a browser
+was pointed at a production build of the merged commit — it was the first thing
+the browser said. It had been invisible to five green gates. That asymmetry is
+the argument for `npm run setup:browser` existing at all: this class of defect
+is only observable by rendering the page, and this repo had no way to render a
+page until 2026-08-14.
+
+**Two things the same pass surfaced, not fixed here:**
+
+- `app/login/page.tsx:135–158` — the Email and Password `<label>`s carry no
+  `htmlFor` and the inputs no `id`, so the accessibility tree shows two
+  `textbox [required]` with **no accessible name**. Visually labelled,
+  programmatically not. The a11y snapshot showed this without being asked.
+- `SystemTrustScore.load()` does `setData(await res.json())` with no `res.ok`
+  check. On a 500 the JSON parse throws and the component sits on "Loading trust
+  score..." forever, reporting nothing. Production returns 200 so it is latent,
+  but it is the house defect again: a failure that renders as a pending state.
+
+---
+
+## A13 — a witness field that nothing constrained, and a "canonical" encoding that was a concatenation (2026-08-14)
+
+**[VERIFIED] — both found while writing assertions for
+`reputation-transition.ts`, before either had shipped.**
+
+Two bugs in one file, and neither was visible by reading it. Both were in code I
+had written an hour earlier and described in its own header as correct.
+
+**1. `frontier` was declared in the witness and constrained by nothing.** The
+`TransitionStatement` type listed a `frontier: MembershipStep[]`, the contract
+listed it under `privateWitness`, and the verifier never read it. A prover could
+supply anything. It was left over from a balanced-tree design that a chain
+replaced — the field survived the redesign because a type declaration does not
+have to be used to compile.
+
+Reading the file finds nothing: it looks like a field that is *for* something.
+The generic form is now a test that mutates **every field the contract
+declares** — public inputs and witness alike — and requires each mutation to
+fail verification. A field nothing constrains is now a failing test, not a code
+review that has to notice an absence.
+
+**2. The event encoding joined its fields with the empty string.** The doc
+comment above it said "canonically encoded field by field". It was a
+concatenation, and concatenation collides: `{value: 1, observedAt: '2026…'}` and
+`{value: 12, observedAt: '026…'}` produce the identical string. One commitment,
+two reopenings, and "which event was committed" has two answers — in an
+append-only history, permanently.
+
+A separator only helps if the separator cannot appear in a field, so a field
+containing U+001F is now **refused rather than escaped**. An escaping rule is a
+second thing both lanes have to implement identically, which is a second place
+to disagree.
+
+**And the writing-it-down failure, again.** The separator landed in the source
+as a raw control byte rather than as a six-character escape sequence — exactly
+the mistake logged for `disclosure.ts` and `nonce-store.ts`, in a file whose
+comment warns about it, three lines above the bug. It happened a second time in
+the test file. Both were caught by a byte scan, not by reading, because a raw
+control byte is invisible in every diff and every review. **Assume it happened;
+scan the bytes.**
+
+### Two mutants survived a suite that had just gone green
+
+Nineteen mutations, seventeen killed. The survivors were the whole value of the
+run:
+
+- **A commutative node hash survived everything.** The multi-event order test
+  compares chains whose *inner* roots already differ, so it stays sensitive even
+  when a single append is order-blind. But `H(prev, event) == H(event, prev)`
+  means "root R extended by event E" is indistinguishable from the reverse, and
+  an attacker picks which value was the history. The property has to be asserted
+  at the single-append level, where it is actually visible.
+
+- **The borrowed-member attack needed a COMPOUND mutation to expose.** Deleting
+  the appender's reopen check survived on its own; walking membership from the
+  witness commitment survived on its own; together they let an outsider append
+  using a genuine member's public commitment and path while nullifying with
+  their own secret. Group leaves are public by construction — that is what makes
+  a root shareable — so the secret is the only thing standing between an
+  outsider and a write.
+
+**The rule.** Single-mutation testing finds single points of failure. Two checks
+that each make the other redundant are invisible to it, and "each one is
+individually redundant" is exactly the argument that deletes both. When a
+comment says a check is redundant *here* but load-bearing *in the circuit* —
+which is now written in two files — mutate the pair, not the parts.
+
+---
+
+---
+
+## A14 — an optional callback that is never absent, and a replay defence that recorded nothing (2026-08-14)
+
+**[VERIFIED] — both found by tests while building `loop-authorizer.ts`, the
+adapter binding the agent loop to `ControlProof`. Neither was visible by
+reading.**
+
+### 1. `valueOf` is on `Object.prototype`, so the option was never optional
+
+The adapter took an optional callback for extracting the value an action moves,
+so the `maxValue` caveat could be applied:
+
+```ts
+export interface ControlProofAuthorizerInput {
+  valueOf?: (call: ToolCall) => { asset: string; amount: number } | undefined;
+}
+// ...
+value: args.valueOf?.(request.call),
+```
+
+A caller who omits it gets `Object.prototype.valueOf` — **a function**, which
+`?.` therefore calls, and which returns the container object. So `ctx.value`
+became a truthy object with `asset: undefined`, `evaluateCaveats` skipped its
+`if (!ctx.value)` NOT_CHECKED branch, and every call was refused with *"cap is
+denominated in USDC but the action moves undefined"*.
+
+The failure direction was safe here — it denied rather than allowed — but that
+is luck, not design. The same shape with an allowlist-shaped default would have
+failed open.
+
+**The rule.** An optional property named after anything on `Object.prototype` is
+never absent: `valueOf`, `toString`, `constructor`, `hasOwnProperty`,
+`isPrototypeOf`, `propertyIsEnumerable`, `toLocaleString`. `?.` does not protect
+you, because the property genuinely resolves — up the prototype chain. Rename
+it. A `Object.hasOwn` guard also works and leaves the trap set for the next
+person.
+
+Worth noting what did NOT catch it: `strict` TypeScript compiled it without a
+murmur, because the inherited member satisfies no type check that was being
+made, and the *shape* of the failure — a denial — looked like ordinary
+authorization behaviour.
+
+### 2. `seenNonces` was read and never written, so replay defence prevented nothing
+
+`verifyControlProof` says so in its own doc comment — *"Caller-managed spent
+set. Single-process only; **the caller adds the nonce after a successful
+verification**"* — and the adapter passed the set in, got `replay: VERIFIED`
+back, and walked away without adding anything.
+
+Every session therefore verified. A proof could be replayed into unlimited
+concurrent sessions, and the check reported VERIFIED each time. This is the
+`custodian_zkp_proof` shape from A11 exactly: a control that reads as enforced,
+returns the outcome that means "enforced", and enforces nothing.
+
+It was caught by an assertion on the *side effect* rather than the verdict —
+`assert.equal(seen.size, 1)` — not by any assertion about what the verifier
+returned. **When a check's correctness depends on the caller completing it,
+assert on the state the caller was supposed to change.** A verdict of VERIFIED
+is what the broken version produced.
+
+The related mutation is worth recording because it survived the first pass: a
+delegated chain has a nonce per link, and the replay check runs against the
+ROOT. Recording the leaf's nonce is a no-op for a direct grant, where leaf and
+root are the same object, so **only a delegation fixture separates them**. A
+test that covers just the simple shape leaves the whole chain replayable.
+
+### And the boundary, again
+
+`>=` versus `>` at exactly `expiresAt` survived a test that checked one second
+past expiry. `verifyControlProof` uses `now >= expiresAt`, so `>` would make the
+two authorization paths disagree for exactly one millisecond. A one-instant
+disagreement between two paths that both claim to enforce the same grant is only
+ever found in production. **Test the instant, not a point safely past it** —
+this is the third time that lesson has been paid for here, after the `maxValue`
+cap and the rate limiter.
+
+---
+
+---
+
+## A15 — an incremental build cache manufacturing compile errors that cannot exist (2026-08-14)
 
 `npx tsc --noEmit` reported **4 errors** locally: a `Set<string>` iteration
 wanting `--downlevelIteration`, and three BigInt literals wanting a target of
