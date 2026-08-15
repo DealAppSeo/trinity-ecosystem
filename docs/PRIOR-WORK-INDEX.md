@@ -56,6 +56,8 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Poseidon2 parameters, the circuit contract, and why we do not implement it | `docs/POSEIDON2-PARAMETER-REQUEST.md` | choosing a parameter set independently |
 | The paste-ready Poseidon2 request to send the other lane | `docs/POSEIDON2-HANDOVER-MESSAGE.md` | rewriting the ask from scratch |
 | Agent execution loop: what is already built, what is wiring, what is new | `docs/AGENT-LOOP-SCOPE.md` | re-surveying the harness modules yourself |
+| Which agent works which lane, the paths each owns, and the report block they all emit | `docs/AGENT-LOOP-PROMPTS.md` | inventing a lane split per session |
+| **Why `npm audit fix --force` must never be run here**, which advisories have no upstream fix at any version, and the version floors that make it mechanical | `scripts/check-deps.mjs` — run `npm run check:deps`; incident in `LESSONS.md` A16 | re-deriving it from `npm audit`'s printed output, which does not show the direction of a proposed change |
 | Browser automation for agents: install, Chrome resolution, and what `doctor` gets wrong | `docs/AGENT-BROWSER.md` | the upstream README, which documents none of it |
 | Dual-view (`/live`) plan: lane split, frozen event contract, what is and is not on the critical path | `docs/DUAL-VIEW-LAUNCH-PLAN.md` | the source Grok/XAI conversation, whose disk inventory was taken against a different repo — see its §1 |
 | What the harness caught and missed on a real session, and why 10 sessions is unmet | `docs/TRUSTSHELL-M6-DOGFOOD.md` | re-running the harness and assuming silence means clean |

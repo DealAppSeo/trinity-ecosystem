@@ -4,7 +4,8 @@
  * Extracted (not refactored) from BFTEngine.ts — that engine compares the
  * providers' self-reported belief scores; this module compares their
  * natural-language answers via embedding cosine similarity. Different shape,
- * different patent application (factual cross-check on textual answers).
+ * different question: a factual cross-check on textual answers rather than on
+ * asserted confidence.
  *
  * BFTEngine.ts is intentionally untouched — it has 1 caller (Next.js
  * /api/trust/bft route) that depends on its existing JSON contract.

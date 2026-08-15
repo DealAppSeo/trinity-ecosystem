@@ -98,8 +98,14 @@ jobs:
   mutate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # v7, not v4, deliberately — PRs #39 and #40 bump the `check` job's pins
+      # from v4 and are open right now. A new job landing on v4 would reintroduce
+      # exactly what they remove, dependabot would reopen them, and while both
+      # versions coexisted in this file each `uses: actions/checkout@v4` line
+      # would be an ambiguous target for their one-line diff. v4 also emits the
+      # Node-20 deprecation warning already visible in this workflow's logs.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
