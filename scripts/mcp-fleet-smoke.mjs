@@ -46,14 +46,26 @@ writeFileSync(
       noEmit: false,
       incremental: false,
       declaration: false,
-      // rootDir keeps the emitted layout flat (jsonrpc.js next to fleet.js)
-      // so the specifier rewrite below stays a one-liner.
-      rootDir: join(process.cwd(), 'lib/mcp'),
+      // rootDir is `lib`, not `lib/mcp`, and that is deliberate. client.ts
+      // imports the loop's ToolDispatcher types from lib/trustshell/harness/,
+      // so a rootDir of lib/mcp fails with TS6059 — and the version of this
+      // that "works" is worse: whenever tsc CAN infer a wider common root it
+      // silently relocates every emitted file, so the load paths below move
+      // without any error. That relocation has now bitten this repo three
+      // times (check-identity.mjs twice, here once). Pinning it means the
+      // layout is stated rather than inferred: outDir/mcp/*.js.
+      rootDir: join(process.cwd(), 'lib'),
       lib: ['esnext'],
       jsx: undefined,
       plugins: undefined,
     },
-    include: [join(process.cwd(), 'lib/mcp/**/*.ts')],
+    include: [
+      join(process.cwd(), 'lib/mcp/**/*.ts'),
+      // Pulled in by client.ts. Named explicitly so a future move produces a
+      // missing-file error rather than a silent layout change.
+      join(process.cwd(), 'lib/trustshell/harness/loop.ts'),
+      join(process.cwd(), 'lib/trustshell/harness/types.ts'),
+    ],
   })
 );
 
@@ -68,8 +80,9 @@ try {
   process.exit(1);
 }
 
-for (const file of readdirSync(outDir).filter((f) => f.endsWith('.js'))) {
-  const path = join(outDir, file);
+const mcpOut = join(outDir, 'mcp');
+for (const file of readdirSync(mcpOut).filter((f) => f.endsWith('.js'))) {
+  const path = join(mcpOut, file);
   writeFileSync(
     path,
     readFileSync(path, 'utf8').replace(/(['"])@\/lib\/mcp\/([a-z]+)\1/g, "'./$2.js'")
@@ -82,10 +95,10 @@ for (const file of readdirSync(outDir).filter((f) => f.endsWith('.js'))) {
 }
 
 const { handleRpc, negotiateProtocolVersion, PREFERRED_PROTOCOL_VERSION } = await import(
-  pathToFileURL(join(outDir, 'server.js')).href
+  pathToFileURL(join(mcpOut, 'server.js')).href
 );
 const { deriveNodeView, LIVE_WINDOW_MINUTES } = await import(
-  pathToFileURL(join(outDir, 'fleet.js')).href
+  pathToFileURL(join(mcpOut, 'fleet.js')).href
 );
 
 // ── harness ──────────────────────────────────────────────────────────────────

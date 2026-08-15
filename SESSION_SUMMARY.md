@@ -955,3 +955,43 @@ npm run check                    # exit 0
 node scripts/check-identity.mjs  # expect 104, VERIFIED
 npm run test:e2e                 # expect 26 VERIFIED, 0 FAILED, core 10/10
 ```
+
+### 2026-08-14 — post-merge cycle (PRs #27, #28)
+
+`main` now carries the full identity layer (PR #25, then #27). Work since:
+
+**#28 (open):** `CustodyShadow` — observes the vault custody gate and changes
+nothing, with three mutation-tested properties: never alters the decision, never
+throws into the caller, and expects to be uninformative at first (early
+observations are almost all `not_comparable`, which is the measurement, not a
+failure). `memory-authz.ts` — dual-auth memory access, read never implies write,
+fails closed; **not wired** into any live memory path. `harness-bundle.ts` — the
+portable harness, whose parts are signed together so they cannot be spliced
+between bundles. Plus a harness verify route and 4 E2E steps.
+
+**Numbers.** `check:identity` **143**. E2E **33 VERIFIED / 4 NOT CHECKED / 0
+FAILED**, core 10/10. Gate exit 0 throughout.
+
+**REAL vs STUB.** REAL: everything above, exercised over real HTTP.
+STUB/BLOCKED: Poseidon2 (placeholder throws), cross-instance replay (migration
+unapplied), ERC-8004 binding (claimed, never proven), and three surfaces built
+but deliberately NOT wired — memory enforcement, the vault cutover, and skill
+attestation (bundles pin hashes; they cannot prove the host runs that content).
+
+**Mutation testing found five tests passing for the wrong reason** across the
+session: a counter-signature test that only tested nonce uniqueness; three
+delegation tests that edited grants after signing; a toy fixture embedding the
+secret in its own output; a `maxValue` boundary never exercised at the cap; and
+an audience fixture minted with the audience it meant to differ from.
+
+**BLOCKED_FOR_SEAN.** Unchanged: rotate the deployer (#73), send the Poseidon2
+handover (`docs/POSEIDON2-HANDOVER-MESSAGE.md`), `static.crates.io` (#75, low),
+and the vault cutover decision — which now has `SHADOW_ANALYSIS_SQL` to decide
+against rather than a guess.
+
+**Next 3 commands.**
+```
+npm run check                    # exit 0
+node scripts/check-identity.mjs  # expect 143, VERIFIED
+npm run test:e2e                 # expect 33 VERIFIED, 0 FAILED, core 10/10
+```
