@@ -926,3 +926,51 @@ promoted.
 stop resolving it and change the shape that produces it. And when a runner
 starts discovering its own work, the first thing to test is what it does having
 discovered nothing.
+
+---
+
+## A18 — three commits with no gate, on a PR whose checks looked green (2026-08-15)
+
+**[VERIFIED by observation; mechanism is documented GitHub behaviour, not
+measured here.]**
+
+Three consecutive pushes to PR #36 — `38d1544`, `0300ff9`, `666a0ba` — produced
+**no `check` workflow run at all.** Not queued, not failed. No run existed. The
+next push, `f69b654`, produced one **two seconds** after the push.
+
+The difference between them: the first three landed while the PR had **merge
+conflicts with `main`**; `f69b654` was the merge that resolved them.
+
+**Why this is the house defect and not a CI curiosity.** The PR page did not
+say "no checks ran". It showed the checks that *do* run on a conflicted PR —
+Vercel's deployment status and its preview-comments check — both green. A
+reviewer glancing at it sees a PR with passing checks. So did the author. Three
+commits carrying an authorization port, a signing module and a verdict pipeline
+sat with **`npm run check` never having executed against them in CI**, behind a
+green tick that was describing something else entirely.
+
+The local run was green, which is what made it comfortable. A local green and a
+CI green are different facts, and this is exactly the gap the three-outcome rule
+exists to keep open: the honest status of those three commits was NOT CHECKED,
+and nothing on the page said so.
+
+**The mechanism.** `pull_request`-triggered workflows run against
+`refs/pull/N/merge` — the *merge* of head into base, not the head commit. GitHub
+cannot construct that ref for a PR it cannot merge, so the event produces no
+run. This is documented behaviour and it is not a bug; the defect is that
+nothing surfaces it as an absence.
+
+**What was NOT established.** PR #38 was also conflicted at the time of writing
+and *does* show a passing `check` run — which looks like a counter-example and
+is not one. That run is from 06:22 UTC, when `main` was still `3c70330`; the
+conflict arrived with `b7c7177`/`849e181` at 07:04–07:32 UTC, and #38 has not
+been pushed to since. There has been no event to suppress. So #38 neither
+confirms nor refutes this, and it is recorded here as untested rather than as
+supporting evidence.
+
+**The rule.** *A conflicted PR is NOT CHECKED, whatever its checks say.*
+Before reading a PR's status, confirm it is mergeable — `git merge-tree
+--write-tree origin/main HEAD` answers it locally in one command, and
+`grep -c CONFLICT` on that output does **not**, because SQL `ON CONFLICT` and
+prose both match. Merge `main` in before trusting a green tick, and treat
+"no run exists" as a distinct outcome from "the run passed".
