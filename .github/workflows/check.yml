@@ -74,9 +74,67 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
 
+      # The history scan is O(commits reachable from any ref) — `fetch-depth: 0`
+      # above means every branch, not just this one — and it re-derived the same
+      # answer from scratch on every run. Measured 2026-08-15: 7m28s of a 9m19s
+      # job, 80% of the wall clock, inside a step that by design cannot fail it.
+      #
+      # History is append-only: a commit already searched under the same rules
+      # cannot produce a different result later. The state file carries those
+      # per-commit results across runs so only NEW commits are searched. A cache
+      # miss is a full scan — the old behaviour — and the scanner discards the
+      # state outright if its own source changed, so an edited pattern is never
+      # applied to just the new commits.
+      #
+      # restore/save as an explicit pair rather than actions/cache, because this
+      # step runs under `if: always()` and the save has to happen on a failed job
+      # too; otherwise a red run throws the work away and the next one pays full
+      # price. Caches saved on main are readable from every PR, so a PR restores
+      # main's state and searches only its own commits.
+      # The save key is unique per run *attempt*, so a save can never collide
+      # with an existing key. That matters because the alternative — letting a
+      # duplicate-key save fail and adding continue-on-error — is a step allowed
+      # to fail silently, which TF-08 rejects by name. The exact `key` here
+      # therefore never hits; the prefix in restore-keys is what restores the
+      # most recent state.
+      # On a pull request, scan only the commits the PR itself adds. Measured
+      # 2026-08-15: the full graph is 652 commits and 423 of them (65%) are
+      # reachable only from four abandoned branches this change has nothing to do
+      # with. Bounded work whatever the cache holds, which is the point — the
+      # cached full scan below is fast when warm and 7+ minutes when cold, and a
+      # PR should not be where that bill lands.
+      #
+      # A range rather than skipping the PR path entirely: a credential added in
+      # one commit of a PR and deleted in a later one is in that PR's history but
+      # NOT in its working tree, so the working-tree scan in `npm run check` would
+      # not see it and a skip would let it through to main unremarked. The scan
+      # prints the range it covered, because "0 usable in history" over four
+      # commits is a different claim from the same words over the whole graph.
+      - name: report credentials added by this PR
+        if: always() && github.event_name == 'pull_request'
+        run: node scripts/scan-secrets.mjs --history --since ${{ github.event.pull_request.base.sha }} || true
+
+      # On main, the whole graph — the authoritative answer, reusing per-commit
+      # results across runs so it is paid for once per new commit rather than
+      # once per run.
+      - name: restore history scan state
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/cache/restore@v4
+        with:
+          path: .secret-history-state.json
+          key: secret-history-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: secret-history-
+
       # History hits cannot be removed by a commit, so this never fails the run —
       # it reports credentials that need rotating. Failing here would make the
       # job permanently red and therefore ignored.
       - name: report credentials in git history
-        if: always()
-        run: node scripts/scan-secrets.mjs --history || true
+        if: always() && github.event_name != 'pull_request'
+        run: node scripts/scan-secrets.mjs --history --state .secret-history-state.json || true
+
+      - name: save history scan state
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        with:
+          path: .secret-history-state.json
+          key: secret-history-${{ github.run_id }}-${{ github.run_attempt }}

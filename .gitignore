@@ -89,3 +89,9 @@ headroom.db
 # `git add -A` after a tsc run that lacked --noEmit.
 lib/**/*.js
 !lib/**/*.config.js
+
+# scan-secrets.mjs --state cache: per-commit history results, carried between CI
+# runs so the scan searches only new commits. Holds fingerprints (truncated
+# prefixes), never a whole credential — but it is machine state, not source, and
+# leaving it untracked would put it in the scanner's own working-tree pass.
+.secret-history-state.json
