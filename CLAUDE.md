@@ -163,6 +163,15 @@ role.** Not a replacement for it. `sb_secret_…` resolves to `service_role` the
 same way. If this comes up again, run the call rather than re-deriving it —
 that is what the function is for.
 
+**That `curl` does not run from an agent session** — `$SUPABASE_URL` is
+`qnnpjhlxljtqyigedwkb.supabase.co`, which the sandbox proxy denies (403 to
+CONNECT, verified 2026-08-15). A failure there says nothing about the key. The
+Supabase MCP tools reach the database, but calling `whoami()` through them
+**answers a different question**: the reply describes the role *that* connection
+resolved to, not the role of the key you are asking about — the key under test
+never leaves your hands. To resolve a specific key you need the PostgREST path
+above, from somewhere the proxy does not block.
+
 **SETTLED 2026-08-12 — do not re-open.** The legacy `anon` and `service_role`
 JWTs are **disabled**; the dashboard shows a *"Re-enable JWT-based API keys"*
 button, which only appears when they are off. A copy of the legacy
