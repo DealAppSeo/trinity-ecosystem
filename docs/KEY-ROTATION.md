@@ -214,6 +214,25 @@ laptop, in a shell where you exported the key yourself.
 
 ## The runbook
 
+**0. Retrieve the leaked key — on your machine, in one shell.** It is still in
+git history at `scripts/register-agents-erc8004.js:9`, in commits **`3359cb1`**
+and **`5523937`** (`d77cc87` removed it from the tree). Read it straight into the
+environment variable so it never lands in a file, a scrollback buffer, or your
+shell history:
+
+```bash
+# note the leading space — keeps it out of ~/.bash_history on most shells
+ export TRINITY_COMPROMISED_KEY=$(git show 3359cb1:scripts/register-agents-erc8004.js \
+   | sed -n '9p' | sed -E "s/.*['\"](0x[0-9a-fA-F]{64})['\"].*/\1/")
+
+# confirm it loaded WITHOUT printing it
+[ ${#TRINITY_COMPROMISED_KEY} -eq 66 ] && echo "key loaded, 66 chars" || echo "EXTRACTION FAILED"
+```
+
+If the length check fails, open the line and copy the value by hand rather than
+guessing at the regex — a truncated key derives a different address, and the
+`--expect-from` guard in step 2 will abort on it, which is the intended outcome.
+
 **1. Generate the fresh signer.** Keep it off this repo.
 
 ```bash
