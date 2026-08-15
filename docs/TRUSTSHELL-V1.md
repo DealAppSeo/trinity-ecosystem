@@ -1,12 +1,15 @@
 # TrustShell v1 — specification
 
-**Status:** spec, with M1–M5 built. §10 is the ledger — M1 (transcript parser),
-M2 (session receipt), M3 (independent offline verification), M4 (T0/T1 claim
-checking) and M5 (`trustshell init`) are done and proven; **M6, the dogfood, is
-not started and is the one that matters.** §3 and §4.2 carry corrections the M1
-build forced on the spec that specified them; §4.1 and §12 carry M2's; §8 and §10
-carry M3's; §4.3.1 carries M4's measurement; §9 and §12 Q3 carry M5's. §12 Q1,
-Q2 and Q3 are **decided**, not open.
+**Status:** spec, with M1–M6 built or run. §10 is the ledger. **M6's verdict is
+the one to read first: on the only real session available the harness caught
+zero of the six defects that session actually contained** — see
+`docs/TRUSTSHELL-M6-DOGFOOD.md`. Its "10 real sessions" criterion is **unmet**;
+one exists here.
+
+§3 and §4.2 carry corrections the M1 build forced on the spec that specified
+them; §4.1 and §12 carry M2's; §8 and §10 carry M3's; §4.3.1 carries M4's
+measurement; §9 and §12 Q3 carry M5's. §12 Q1, Q2 and Q3 are **decided**, not
+open.
 **Date:** 2026-08-12, revised 2026-08-15
 
 Every milestone built so far has falsified something this document asserted.
@@ -499,7 +502,7 @@ with `--uninstall`.
 | M3 | Independent offline verification | **DONE 2026-08-15, against a corrected target.** `scripts/trustshell-verify-receipt.mjs` — zero TrustShell imports, zero dependencies; canonical JSON, base58, base32, did:key decode, Ed25519 verify and the marker rule all re-implemented. 60 assertions in `scripts/check-receipt-verifier.mjs`, run as a **subprocess** so it cannot share module state. Twelve tamper mutations detected; a differential over twelve awkward canonicalisation shapes and six marker branches agrees with the builder on every one. Four mutations of the verifier caught, each compiled. **`@hyperdag/proof-verifier` cannot do this — see below.** |
 | M4 | T0 + T1 claim checking | **DONE 2026-08-15.** `lib/trustshell/receipt/claims.ts`, 35 assertions in `scripts/check-claims.mjs`, `--claims` on the CLI. Catches the 2026-08-12 `scan-secrets` entry (reconstructed from LESSONS, not recovered): `git grep` exited 128, the agent reported *"No credential-shaped strings found"*, T1 contradicts it. FPR measured and published in §4.3.1 — **2 findings, 2 false positives, 0% precision on the first draft**; 0 raised after tightening, on a sample of **one session**. Parser bumped to 1.1.0 to expose claim spans. Five mutations caught — one survived first and exposed a **vacuous invariant**. |
 | M5 | `trustshell init` | **DONE 2026-08-15, scope corrected.** `scripts/trustshell-init.mjs`, 46 assertions in `scripts/check-init.mjs`. Detects project and user settings, installs a `Stop` hook, dry run by default, backs up, idempotent, preserves foreign hooks, refuses malformed JSON, `--uninstall` restores. **End-to-end VERIFIED:** installed into a settings.json, invoked the hook exactly as Claude Code would (`CLAUDE_TRANSCRIPT_PATH` set), and a receipt with claim checking landed in SQLite — `ts_4x5bpkzlrf7eweti`, marker NOT CHECKED, hook exit 0. §7.3's crash-swallowing is asserted by **running** a failing command through the wrapper, not by reading it. Five mutations caught. **MCP tools deliberately not built** — §12 Q3 decided, see §9. **NOT CHECKED: never run against a live Claude Code session**, because that mutates the running environment; verified against real settings files instead. |
-| M6 | Dogfood | Run against 10 real sessions from this repo; publish what it found **and what it missed** |
+| M6 | Dogfood | **RUN 2026-08-15, criterion PARTIALLY UNMET.** `docs/TRUSTSHELL-M6-DOGFOOD.md`, reproducible via `scripts/trustshell-dogfood.mjs`. **1 real session exists in this container, not 10** — stated, not papered over. On it the harness raised **zero** findings, and all six failed/denied calls were audited by hand to confirm the zero is a true negative rather than a dead check. The session contains **six documented defects and the harness would have caught none of them**: five involve a tool call that exited 0, which is the A6 class and T2 by construction. **Recall 0/6.** The shapes T0/T1 detect occurred zero times in 205 tool calls; the shape they cannot detect occurred six times. That is a prioritisation signal for T2, not a bug. |
 
 M6 is the deliverable that matters. "We ran it on our own agent and here is what
 it caught" is a stronger demo than any dashboard.

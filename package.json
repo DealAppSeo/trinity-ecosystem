@@ -47,7 +47,8 @@
     "trustshell:verify": "node scripts/trustshell-verify-receipt.mjs",
     "check:claims": "node scripts/check-claims.mjs",
     "check:init": "node scripts/check-init.mjs",
-    "trustshell:init": "node scripts/trustshell-init.mjs"
+    "trustshell:init": "node scripts/trustshell-init.mjs",
+    "trustshell:dogfood": "node scripts/trustshell-dogfood.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "latest",
