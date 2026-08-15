@@ -97,8 +97,28 @@ jobs:
       # to fail silently, which TF-08 rejects by name. The exact `key` here
       # therefore never hits; the prefix in restore-keys is what restores the
       # most recent state.
+      # On a pull request, scan only the commits the PR itself adds. Measured
+      # 2026-08-15: the full graph is 652 commits and 423 of them (65%) are
+      # reachable only from four abandoned branches this change has nothing to do
+      # with. Bounded work whatever the cache holds, which is the point — the
+      # cached full scan below is fast when warm and 7+ minutes when cold, and a
+      # PR should not be where that bill lands.
+      #
+      # A range rather than skipping the PR path entirely: a credential added in
+      # one commit of a PR and deleted in a later one is in that PR's history but
+      # NOT in its working tree, so the working-tree scan in `npm run check` would
+      # not see it and a skip would let it through to main unremarked. The scan
+      # prints the range it covered, because "0 usable in history" over four
+      # commits is a different claim from the same words over the whole graph.
+      - name: report credentials added by this PR
+        if: always() && github.event_name == 'pull_request'
+        run: node scripts/scan-secrets.mjs --history --since ${{ github.event.pull_request.base.sha }} || true
+
+      # On main, the whole graph — the authoritative answer, reusing per-commit
+      # results across runs so it is paid for once per new commit rather than
+      # once per run.
       - name: restore history scan state
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         uses: actions/cache/restore@v4
         with:
           path: .secret-history-state.json
@@ -109,11 +129,11 @@ jobs:
       # it reports credentials that need rotating. Failing here would make the
       # job permanently red and therefore ignored.
       - name: report credentials in git history
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         run: node scripts/scan-secrets.mjs --history --state .secret-history-state.json || true
 
       - name: save history scan state
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         uses: actions/cache/save@v4
         with:
           path: .secret-history-state.json

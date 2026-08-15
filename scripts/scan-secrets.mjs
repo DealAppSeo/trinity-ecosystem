@@ -8,6 +8,7 @@
 //   node scripts/scan-secrets.mjs --history          # + every commit reachable from any ref
 //   node scripts/scan-secrets.mjs --root ../other    # scan a DIFFERENT repository
 //   node scripts/scan-secrets.mjs --history --state .cache.json   # reuse prior commit results
+//   node scripts/scan-secrets.mjs --history --since origin/main   # only commits in this range
 //
 // An unrecognised flag is a hard error. It used to be ignored: `--root` was not
 // implemented, and passing it scanned the current directory instead and reported
@@ -34,12 +35,13 @@ import { join } from 'node:path';
 // Argument parsing rejects what it does not understand. The previous version
 // asked only `argv.includes('--history')`, which means every other token — a
 // typo, a flag from a newer version, `--root` — was accepted and ignored.
-const { HISTORY, ROOT, STATE } = parseArgs(process.argv.slice(2));
+const { HISTORY, ROOT, STATE, SINCE } = parseArgs(process.argv.slice(2));
 
 function parseArgs(argv) {
   let history = false;
   let root = null;
   let state = null;
+  let since = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--history') {
@@ -56,18 +58,30 @@ function parseArgs(argv) {
     } else if (arg.startsWith('--state=')) {
       state = arg.slice('--state='.length);
       if (!state) fail('--state= requires a path argument');
+    } else if (arg === '--since') {
+      since = argv[++i];
+      if (!since || since.startsWith('--')) fail('--since requires a revision argument');
+    } else if (arg.startsWith('--since=')) {
+      since = arg.slice('--since='.length);
+      if (!since) fail('--since= requires a revision argument');
     } else {
       fail(`unrecognised argument "${arg}"`);
     }
   }
   if (state && !history) fail('--state only has meaning with --history');
-  return { HISTORY: history, ROOT: root, STATE: state };
+  if (since && !history) fail('--since only has meaning with --history');
+  // The state file is rewritten from the set of commits scanned, which prunes
+  // anything absent. Combining the two would therefore shrink a full-graph cache
+  // down to whatever narrow range this run happened to look at, and every later
+  // run would silently rescan from nearly nothing while reporting a cache hit.
+  if (since && state) fail('--since cannot be combined with --state: it would prune the cache to the range');
+  return { HISTORY: history, ROOT: root, STATE: state, SINCE: since };
 }
 
 function fail(message) {
   console.error(
     `scan-secrets: ${message}\n\n` +
-      `usage: node scripts/scan-secrets.mjs [--history] [--root <path>] [--state <path>]\n\n` +
+      `usage: node scripts/scan-secrets.mjs [--history] [--root <path>] [--state <path>] [--since <rev>]\n\n` +
       `Refusing to run rather than scan a target you did not ask for.`
   );
   process.exit(2);
@@ -358,8 +372,39 @@ function saveState(path, reachable, byCommit) {
   }
 }
 
+// What the "usable in history" count actually covers. A range scan answers a
+// narrower question than a full one and the summary has to say which: "0 usable
+// in history" over three commits reads exactly like "0 usable in history" over
+// the whole graph, and only one of them means the history is clean.
+let historyScope = ' (history not scanned — pass --history)';
+
 if (HISTORY) {
-  const commits = git(['rev-list', '--all']).split('\n').filter(Boolean);
+  // `--all` is every commit reachable from any ref — on a CI checkout with
+  // fetch-depth: 0 that is every branch in the repo, so the cost tracks the whole
+  // repo's commit count rather than this change's. `--since` narrows it to a
+  // range, which is what the pull_request path wants: the commits under review
+  // are the PR's own, and a cold full scan there is unbounded work for an answer
+  // the main-branch run already produces.
+  // Resolve --since before using it. Left to `rev-list`, an unresolvable
+  // revision throws a raw stack trace and exits 1 — the same code as "usable
+  // credential in the working tree" — and under the `|| true` this step runs
+  // with in CI that renders as a scan that found nothing rather than a scan that
+  // never ran. Exit 2 instead: refusing to run, distinct from every finding code.
+  if (SINCE) {
+    const resolved = git(['rev-parse', '--verify', '--quiet', `${SINCE}^{commit}`], {
+      allowNoMatch: true,
+    }).trim();
+    if (!resolved) fail(`--since revision "${SINCE}" does not resolve to a commit in this repository`);
+  }
+
+  const commits = (
+    SINCE ? git(['rev-list', `${SINCE}..HEAD`]) : git(['rev-list', '--all'])
+  )
+    .split('\n')
+    .filter(Boolean);
+  historyScope = SINCE
+    ? ` (history: ${commits.length} commit(s) since ${SINCE} — NOT the full graph)`
+    : '';
 
   // Findings per commit, for every commit reachable right now: reused where the
   // state file has them, freshly scanned where it does not. History is
@@ -369,6 +414,7 @@ if (HISTORY) {
   const toScan = commits.filter((c) => !byCommit.has(c));
   process.stderr.write(
     `scanning ${commits.length} commits` +
+      (SINCE ? ` since ${SINCE}` : '') +
       (STATE ? ` (${commits.length - toScan.length} reused, ${toScan.length} new)` : '') +
       '…\n'
   );
@@ -441,7 +487,10 @@ const historyRisk = findings.filter(
 );
 
 if (findings.length === 0) {
-  console.log('No credential-shaped strings found.');
+  // Qualified only in range mode: a clean sweep of three commits is not the same
+  // statement as a clean sweep of the graph, and this line is the one someone
+  // quotes. Full-graph and working-tree-only output is unchanged.
+  console.log(`No credential-shaped strings found.${SINCE ? historyScope : ''}`);
   process.exit(0);
 }
 
@@ -462,7 +511,7 @@ for (const f of findings) {
 
 console.log(
   `\n${findings.length} finding(s): ${workingTreeRisk.length} usable in working tree, ` +
-    `${historyRisk.length} usable in history${HISTORY ? '' : ' (history not scanned — pass --history)'}.`
+    `${historyRisk.length} usable in history${historyScope}.`
 );
 
 if (historyRisk.length > 0) {
