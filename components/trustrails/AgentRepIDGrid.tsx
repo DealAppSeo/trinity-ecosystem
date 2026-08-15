@@ -39,8 +39,18 @@ export function AgentRepIDGrid() {
     };
     load();
 
+    // Channel topic must be UNIQUE PER COMPONENT, not per table. SystemTrustScore
+    // watches the same table; when both used the topic 'public:agent_kya_registry'
+    // the second component to mount bound `.on()` to a channel already past
+    // `subscribe()`, and supabase-js threw
+    //   "cannot add `postgres_changes` callbacks for
+    //    realtime:public:agent_kya_registry after `subscribe()`"
+    // The throw escaped this effect and the error boundary replaced the WHOLE
+    // dashboard with "Something failed to load" — not just this grid. Naming the
+    // topic after the table reads like the right convention and is the trap:
+    // the topic is a channel identity, so two subscribers need two topics.
     const sub = supabase
-      .channel('public:agent_kya_registry')
+      .channel('repid-grid:agent_kya_registry')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'agent_kya_registry' }, () => {
         load();
       })

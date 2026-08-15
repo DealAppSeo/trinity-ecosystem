@@ -18,9 +18,11 @@ export function SystemTrustScore() {
   useEffect(() => {
     const supabase = getSupabaseBrowser();
     load();
-    // Real-time: refresh when any agent RepID changes
+    // Real-time: refresh when any agent RepID changes.
+    // Topic is unique to this component — AgentRepIDGrid watches the same table
+    // and a shared topic makes the second mount throw. See the note there.
     const sub = supabase
-      .channel('public:agent_kya_registry')
+      .channel('system-trust:agent_kya_registry')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'agent_kya_registry' }, () => {
         load();
       })
