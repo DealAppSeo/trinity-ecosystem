@@ -53,6 +53,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Poseidon2 parameters, the circuit contract, and why we do not implement it | `docs/POSEIDON2-PARAMETER-REQUEST.md` | choosing a parameter set independently |
 | The paste-ready Poseidon2 request to send the other lane | `docs/POSEIDON2-HANDOVER-MESSAGE.md` | rewriting the ask from scratch |
 | Browser automation for agents: install, Chrome resolution, and what `doctor` gets wrong | `docs/AGENT-BROWSER.md` | the upstream README, which documents none of it |
+| Dual-view (`/live`) plan: lane split, frozen event contract, what is and is not on the critical path | `docs/DUAL-VIEW-LAUNCH-PLAN.md` | the source Grok/XAI conversation, whose disk inventory was taken against a different repo — see its §1 |
 
 ---
 
