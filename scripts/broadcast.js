@@ -6,6 +6,7 @@
  * Usage: node scripts/broadcast.js
  */
 const { ethers } = require('ethers');
+const { assertNotCompromised } = require('./lib/compromised-signer.cjs');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const fs = require('fs');
@@ -53,6 +54,10 @@ async function main() {
   const privateKey = DEPLOYER_KEY.startsWith('0x') ? DEPLOYER_KEY : '0x' + DEPLOYER_KEY;
   const provider = new ethers.JsonRpcProvider(BASE_SEPOLIA_RPC_URL);
   const wallet = new ethers.Wallet(privateKey, provider);
+  // DEPLOYER_KEY above falls back to TRINITY_DEPLOYER, so the primary variable
+  // being rotated is not sufficient evidence that the old key is gone. Check
+  // what was actually derived.
+  assertNotCompromised(wallet.address, 'broadcast');
   const contract = new ethers.Contract(VAL_REGISTRY, VALIDATION_REGISTRY_ABI, wallet);
 
   console.log('Deployer:', wallet.address);
