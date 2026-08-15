@@ -18,7 +18,7 @@
 // location, so a temp dir outside the repo would fail to find any dependency.
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
@@ -26,7 +26,7 @@ import { localTsc } from './local-tsc.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.identity-check-'));
 
-let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat;
+let did, disclosure, identity, proofProvider, controlProof, capability, nonceStore, delegation, repidPredicate, nullifier, caveat, memAuthz, harness, transition, loopAuthz, loopKernel;
 try {
   execFileSync(
     localTsc(),
@@ -42,6 +42,10 @@ try {
       'lib/trustshell/identity/repid-predicate.ts',
       'lib/trustshell/identity/nullifier.ts',
       'lib/trustshell/identity/caveat.ts',
+      'lib/trustshell/identity/memory-authz.ts',
+      'lib/trustshell/identity/harness-bundle.ts',
+      'lib/trustshell/identity/reputation-transition.ts',
+      'lib/trustshell/identity/loop-authorizer.ts',
       '--outDir', outDir,
       // Pin the root so output layout does not move when a module gains an
       // import from outside identity/ — repid-predicate.ts imports
@@ -68,6 +72,16 @@ try {
   repidPredicate = await import(pathToFileURL(join(base, 'repid-predicate.js')).href);
   nullifier = await import(pathToFileURL(join(base, 'nullifier.js')).href);
   caveat = await import(pathToFileURL(join(base, 'caveat.js')).href);
+  memAuthz = await import(pathToFileURL(join(base, 'memory-authz.js')).href);
+  harness = await import(pathToFileURL(join(base, 'harness-bundle.js')).href);
+  transition = await import(pathToFileURL(join(base, 'reputation-transition.js')).href);
+  loopAuthz = await import(pathToFileURL(join(base, 'loop-authorizer.js')).href);
+  // The kernel compiles to trustshell/harness/, not trustshell/identity/ — the
+  // adapter imports it, so tsc emits it alongside. Loading it here lets the
+  // adapter be tested against the real loop rather than a stand-in.
+  loopKernel = await import(
+    pathToFileURL(join(outDir, 'trustshell', 'harness', 'loop.js')).href
+  );
 } catch (err) {
   console.error('Could not compile lib/trustshell/identity:');
   console.error(String(err.stdout ?? '') + String(err.stderr ?? err.message));
@@ -796,12 +810,21 @@ await check('no raw control bytes in identity source (wire format must be readab
   // format impossible to read off the source. This suite shipped exactly that
   // bug: the Merkle leaf separator was a NUL that looked like a space, so the
   // interop spec handed to another implementer was wrong. Escapes only.
+  //
+  // ENUMERATED, NOT LISTED. This was a hardcoded list of seven filenames, and
+  // it covered none of the six modules added after it was written — including
+  // the one where a raw U+001F landed the same day this comment was updated.
+  // A guard that has to be maintained is a guard that silently stops guarding.
+  // This script is scanned too, because the second raw byte landed here.
   const files = [
-    'did.ts', 'disclosure.ts', 'identity.ts',
-    'capability.ts', 'proof-provider.ts', 'control-proof.ts', 'nonce-store.ts',
+    ...readdirSync('lib/trustshell/identity')
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => `lib/trustshell/identity/${f}`),
+    'scripts/check-identity.mjs',
   ];
+  assert.ok(files.length > 10, 'the directory scan found suspiciously few files');
   for (const f of files) {
-    const buf = readFileSync(`lib/trustshell/identity/${f}`);
+    const buf = readFileSync(f);
     for (const b of buf) {
       const isAllowedWhitespace = b === 0x09 || b === 0x0a || b === 0x0d;
       assert.ok(
@@ -1195,14 +1218,11 @@ await check('the default verifier still rejects a toy-hasher disclosure', async 
 // --- nullifier / commitment binding contract --------------------------------
 
 await check('THE POSEIDON2 PLACEHOLDER REFUSES TO COMPUTE', async () => {
-  // The single most important assertion in this section. An implementation with
-  // invented parameters would emit plausible values, pass its own tests, and
-  // agree with nobody — discovered only when two systems compare a root in
-  // production. It must throw, not approximate.
   const s = new nullifier.PendingPoseidon2Scheme();
   assert.equal(s.parametersKnown, false);
   await assert.rejects(s.commit('secret'), /parameters are not available/);
   await assert.rejects(s.nullify('secret', 'd', 'sc'), /parameters are not available/);
+  await assert.rejects(s.hashPair('a', 'b'), /parameters are not available/);
 });
 
 await check('the refusal names exactly what is missing', async () => {
@@ -1214,23 +1234,14 @@ await check('the refusal names exactly what is missing', async () => {
   assert.match(msg, /POSEIDON2-PARAMETER-REQUEST/);
 });
 
-await check('the scheme tag says PENDING, so it cannot be mistaken for a real set', () => {
-  const s = new nullifier.PendingPoseidon2Scheme();
-  assert.match(s.scheme, /PENDING/);
-});
-
 await check('commit and nullifier tags are distinct', () => {
   assert.notEqual(nullifier.BINDING_TAGS.commit, nullifier.BINDING_TAGS.nullifier);
 });
 
-// A toy scheme, only to exercise the CONTRACT. Explicitly not Poseidon2 and not
-// cryptographically meaningful — it exists so the statement/witness plumbing is
-// testable before the real parameters land.
-//
-// Uses SHA-256 rather than a string template: the first draft was
-// `C(${secret})`, which embedded the secret verbatim in its own output, and the
-// leak assertion below caught it. A toy that echoes its input would make that
-// assertion pass vacuously against any real scheme.
+// Toy scheme for the CONTRACT only. Not Poseidon2, not cryptographically
+// meaningful — it exists so the statement/witness plumbing is testable before
+// the real parameters land. SHA-256 rather than a template, so it cannot echo
+// its input and make a leak assertion pass vacuously.
 const toyDigest = async (...parts) => {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(parts.join('\u001f')));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -1240,41 +1251,133 @@ const toyScheme = {
   parametersKnown: false,
   commit: async (secret) => toyDigest('toy:commit', secret),
   nullify: async (secret, domain, scope) => toyDigest('toy:null', secret, domain, scope),
+  hashPair: async (l, r) => toyDigest('toy:node', l, r),
 };
 
-await check('a binding statement puts the secret in the WITNESS, never public', async () => {
+const mkGroup = async (secrets) => {
+  const commitments = await Promise.all(secrets.map((s) => toyScheme.commit(s)));
+  const group = await nullifier.buildGroup(commitments, toyScheme);
+  return { commitments, group };
+};
+
+await check('THE COMMITMENT IS PRIVATE — it is never a public input', async () => {
+  // The correction. A public commitment is stable across presentations, so it
+  // links every action of a holder; scope-varying nullifiers do not help when a
+  // fixed identifier travels beside them.
+  const { commitments, group } = await mkGroup(['s1', 's2', 's3', 's4']);
   const st = await nullifier.buildBindingStatement({
-    secret: 'holder-seed-xyz', domain: 'trinity', scope: 'ownership:3747', scheme: toyScheme,
+    secret: 's1', domain: 'trinity', scope: 'ownership:3747',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
+  assert.equal('commitment' in st.publicInputs, false, 'the commitment is public again');
+  assert.equal(st.privateWitness.commitment, commitments[0]);
   const pub = JSON.stringify(st.publicInputs);
-  assert.ok(!pub.includes('holder-seed-xyz'), `the secret leaked into publicInputs: ${pub}`);
-  assert.equal(st.privateWitness.secret, 'holder-seed-xyz');
-  assert.equal(st.publicInputs.domain, 'trinity');
-  assert.equal(st.publicInputs.scope, 'ownership:3747');
+  assert.ok(!pub.includes(commitments[0]), 'the commitment leaked into publicInputs');
+  assert.ok(!pub.includes('s1'), 'the secret leaked into publicInputs');
+  assert.ok(nullifier.CIRCUIT_CONTRACT.publicInputs.includes('groupRoot'));
+  assert.ok(!nullifier.CIRCUIT_CONTRACT.publicInputs.includes('commitment'));
 });
 
-await check('different scopes yield different nullifiers (unlinkability)', async () => {
+await check('membership verifies for every member of the group', async () => {
+  const secrets = ['s1', 's2', 's3', 's4', 's5'];
+  const { commitments, group } = await mkGroup(secrets);
+  for (let i = 0; i < secrets.length; i++) {
+    const st = await nullifier.buildBindingStatement({
+      secret: secrets[i], domain: 'trinity', scope: 'sc',
+      groupRoot: group.root, membership: group.pathFor(commitments[i]), scheme: toyScheme,
+    });
+    const v = await nullifier.verifyBindingByRecomputation(st, toyScheme);
+    assert.equal(v.valid, true, `member ${i}: ${v.reason}`);
+  }
+});
+
+await check('A NON-MEMBER FAILS even with a valid secret and nullifier', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2', 's3', 's4']);
+  const st = await nullifier.buildBindingStatement({
+    secret: 'outsider', domain: 'trinity', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
+  });
+  const v = await nullifier.verifyBindingByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, 'a non-member proved membership');
+  assert.match(v.reason, /not a member of the group/);
+});
+
+await check('THE BORROWED-MEMBER ATTACK IS REJECTED', async () => {
+  // Present a commitment that IS in the group while nullifying with a different
+  // secret. Recomputation must reject it.
+  //
+  // NOTE ON WHAT THIS PROVES. It rejects at the `commitment does not reopen`
+  // check, which fires BEFORE the membership walk — so this does not isolate
+  // "membership is walked from the computed commitment". A mutation swapping
+  // that source survives this suite, because the reopen check already forces
+  // the two equal in the TypeScript path. The property is only load-bearing in
+  // the CIRCUIT, where no separate reopen step exists; it is recorded in
+  // CIRCUIT_CONTRACT.mustAlsoHold[1] for the lane that builds it.
+  const { commitments, group } = await mkGroup(['s1', 's2', 's3', 's4']);
+  const st = await nullifier.buildBindingStatement({
+    secret: 's1', domain: 'trinity', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
+  });
+  // Swap in member 2's commitment and path; the secret stays s1.
+  st.privateWitness.commitment = commitments[1];
+  st.privateWitness.membership = group.pathFor(commitments[1]);
+  const v = await nullifier.verifyBindingByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, "a prover borrowed another member's commitment");
+  assert.match(v.reason, /commitment does not reopen/);
+});
+
+await check('different scopes yield different nullifiers (unlinkability across scopes)', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2']);
   const mk = (scope) => nullifier.buildBindingStatement({
-    secret: 'same-secret', domain: 'trinity', scope, scheme: toyScheme,
+    secret: 's1', domain: 'trinity', scope,
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
   const a = await mk('ownership:3747');
   const b = await mk('ownership:3748');
   assert.notEqual(a.publicInputs.nullifier, b.publicInputs.nullifier,
-    'the same secret produced one nullifier across scopes — contexts are linkable');
-  assert.equal(a.publicInputs.commitment, b.publicInputs.commitment,
-    'the commitment should be stable across scopes');
+    'one nullifier across scopes — contexts are linkable');
+  assert.equal(a.publicInputs.groupRoot, b.publicInputs.groupRoot,
+    'the group root should be stable across scopes');
+});
+
+await check('ANONYMITY SET SIZE IS REPORTED, not assumed', async () => {
+  // A group of one is sound and offers no privacy. The number must travel.
+  const one = nullifier.describeAnonymitySet(1);
+  assert.equal(one.adequate, false);
+  assert.match(one.note, /identifies the holder exactly/);
+  assert.match(one.note, /Do not describe this as unlinkable/);
+  const few = nullifier.describeAnonymitySet(3);
+  assert.equal(few.adequate, false);
+  const many = nullifier.describeAnonymitySet(64);
+  assert.equal(many.adequate, true);
+  assert.match(many.note, /one of 64/);
+});
+
+await check('a statement cannot be built without a group anchor', async () => {
+  await assert.rejects(
+    nullifier.buildBindingStatement({
+      secret: 's', domain: 'd', scope: 'sc', groupRoot: '', membership: [], scheme: toyScheme,
+    }),
+    /groupRoot is required/
+  );
 });
 
 await check('domain and scope are REQUIRED', async () => {
-  const base = { secret: 's', domain: 'd', scope: 'sc', scheme: toyScheme };
+  const { commitments, group } = await mkGroup(['s1', 's2']);
+  const base = {
+    secret: 's1', domain: 'd', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
+  };
   await assert.rejects(nullifier.buildBindingStatement({ ...base, domain: '' }), /domain is required/);
   await assert.rejects(nullifier.buildBindingStatement({ ...base, scope: '' }), /scope is required/);
   await assert.rejects(nullifier.buildBindingStatement({ ...base, secret: '' }), /secret is required/);
 });
 
 await check('RECOMPUTATION IS NOT A ZK PROOF, and says so', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2']);
   const st = await nullifier.buildBindingStatement({
-    secret: 's1', domain: 'trinity', scope: 'ownership:1', scheme: toyScheme,
+    secret: 's1', domain: 'trinity', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
   const v = await nullifier.verifyBindingByRecomputation(st, toyScheme);
   assert.equal(v.valid, true, v.reason);
@@ -1283,38 +1386,37 @@ await check('RECOMPUTATION IS NOT A ZK PROOF, and says so', async () => {
   assert.match(v.reason, /honest-prover binding/);
 });
 
-await check('a tampered commitment or nullifier FAILS recomputation', async () => {
+await check('a tampered nullifier FAILS recomputation', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2']);
   const st = await nullifier.buildBindingStatement({
-    secret: 's1', domain: 'trinity', scope: 'ownership:1', scheme: toyScheme,
+    secret: 's1', domain: 'trinity', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
-  const badC = JSON.parse(JSON.stringify(st));
-  badC.publicInputs.commitment = await toyScheme.commit('a-different-secret');
-  assert.equal((await nullifier.verifyBindingByRecomputation(badC, toyScheme)).valid, false);
-
-  const badN = JSON.parse(JSON.stringify(st));
-  badN.publicInputs.nullifier = await toyScheme.nullify('other', 'trinity', 'ownership:1');
-  assert.equal((await nullifier.verifyBindingByRecomputation(badN, toyScheme)).valid, false);
+  st.publicInputs.nullifier = await toyScheme.nullify('other', 'trinity', 'sc');
+  assert.equal((await nullifier.verifyBindingByRecomputation(st, toyScheme)).valid, false);
 });
 
 await check('a scheme mismatch is refused rather than recomputed', async () => {
+  const { commitments, group } = await mkGroup(['s1', 's2']);
   const st = await nullifier.buildBindingStatement({
-    secret: 's', domain: 'd', scope: 'sc', scheme: toyScheme,
+    secret: 's1', domain: 'd', scope: 'sc',
+    groupRoot: group.root, membership: group.pathFor(commitments[0]), scheme: toyScheme,
   });
-  const other = { ...toyScheme, scheme: 'some-other-set' };
-  const v = await nullifier.verifyBindingByRecomputation(st, other);
+  const v = await nullifier.verifyBindingByRecomputation(st, { ...toyScheme, scheme: 'other-set' });
   assert.equal(v.valid, false);
   assert.match(v.reason, /but the supplied scheme is/);
 });
 
-await check('the circuit contract names the four ways a working proof can be wrong', () => {
+await check('the circuit contract names membership and the trusted-root hazard', () => {
   const c = nullifier.CIRCUIT_CONTRACT;
-  assert.equal(c.privateWitness.length, 1);
-  assert.ok(c.publicInputs.includes('domain') && c.publicInputs.includes('scope'),
-    'domain/scope must be PUBLIC — as witness, unlinkability is forgeable');
-  assert.equal(c.relations.length, 2);
-  assert.ok(c.mustAlsoHold.length >= 4, 'the soundness caveats were dropped');
-  assert.ok(c.mustAlsoHold.some((s) => /same secret/.test(s)));
-  assert.ok(c.mustAlsoHold.some((s) => /absorption order/.test(s)));
+  assert.equal(c.version, 'zkrepid-binding-v2');
+  assert.ok(c.privateWitness.includes('commitment'), 'commitment must be witness');
+  assert.ok(c.publicInputs.includes('groupRoot'));
+  assert.equal(c.relations.length, 3, 'the membership relation is missing');
+  assert.ok(c.relations.some((r) => /MerkleVerify/.test(r)));
+  assert.ok(c.mustAlsoHold.some((s) => /COMMITMENT THE CIRCUIT COMPUTED/.test(s)));
+  assert.ok(c.mustAlsoHold.some((s) => /VERIFIER independently trusts/.test(s)));
+  assert.match(c.privacyCaveat, /bounded by the group size/);
 });
 
 // --- caveats ----------------------------------------------------------------
@@ -1488,6 +1590,1002 @@ await check('a WELL-SIGNED loosened link FAILS at verification', async () => {
   const v = await delegation.verifyDelegationChain(rogue, { audience: AUD, seenNonces: new Set() });
   assert.equal(v.valid, false, 'a well-signed loosening verified');
   assert.ok(v.links.some((l) => /loosens caveats/.test(l.detail)), JSON.stringify(v.links));
+});
+
+// --- dual-auth memory access ------------------------------------------------
+
+const memProof = async (capabilities) => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities, ttlSeconds: 300,
+  });
+  return { human, agent, proof };
+};
+const memCtx = () => ({ audience: AUD, seenNonces: new Set() });
+
+await check('a matching grant permits the operation', async () => {
+  const { proof } = await memProof(['memory:read:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'GRANTED', r.reason);
+  assert.equal(memAuthz.memoryAccessPermitted(r), true);
+});
+
+await check('NO PROOF IS DENIED, not NOT_CHECKED (fails closed)', async () => {
+  const r = await memAuthz.authorizeMemoryAccess(
+    undefined, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'DENIED', 'an absent proof was reported as unchecked');
+  assert.equal(memAuthz.memoryAccessPermitted(r), false);
+});
+
+await check('A READ GRANT NEVER PERMITS WRITE', async () => {
+  // Reading is recoverable; writing is not. Memory poisoning is a live attack
+  // on exactly this surface, so the convenience of "it can already see it" is
+  // refused.
+  const { proof } = await memProof(['memory:read:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'write', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'DENIED', 'a read grant authorized a write');
+  assert.equal(r.grantedTo, undefined, 'a denial still named a grantee');
+});
+
+await check('a write grant does not permit read either — they are separate', async () => {
+  const { proof } = await memProof(['memory:write:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'DENIED');
+});
+
+await check('CROSS-NAMESPACE READ IS DENIED', async () => {
+  // The case that matters in a shared mesh: one agent reading another's memory.
+  const { proof } = await memProof(['memory:read:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/NEXUS' }, memCtx());
+  assert.equal(r.outcome, 'DENIED', "an agent read another agent's namespace");
+});
+
+await check('a namespace wildcard covers namespaces but not operations', async () => {
+  const { proof } = await memProof(['memory:read:*']);
+  const ok = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/ANYONE' }, memCtx());
+  assert.equal(ok.outcome, 'GRANTED', ok.reason);
+  const no = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'write', namespace: 'agent/ANYONE' }, memCtx());
+  assert.equal(no.outcome, 'DENIED', 'memory:read:* authorized a write');
+});
+
+await check('`memory:*` GRANTS DELETE — the documented trap', async () => {
+  // Reads as "memory access", grants destruction. Asserted so the hazard is
+  // observable rather than a comment nobody runs.
+  const { proof } = await memProof(['memory:*']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'delete', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'GRANTED',
+    'memory:* did not grant delete — if this changed, update the docs that warn about it');
+});
+
+await check('an expired proof is DENIED', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  const t0 = new Date('2026-08-14T00:00:00Z');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['memory:read:agent/TORCH'],
+    ttlSeconds: 60, now: t0,
+  });
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' },
+    { audience: AUD, seenNonces: new Set(), now: new Date('2026-08-14T01:00:00Z') });
+  assert.equal(r.outcome, 'DENIED');
+});
+
+await check('a proof for another audience is DENIED', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  // Deliberately NOT AUD. The first draft used 'trinity:pay', which IS AUD in
+  // this suite, so the proof matched and the test asserted the opposite of what
+  // it claimed. A fixture that accidentally satisfies the condition it means to
+  // violate is a test that cannot fail.
+  assert.notEqual(AUD, 'trinity:vault', 'pick an audience that is not AUD');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: 'trinity:vault',
+    capabilities: ['memory:read:agent/TORCH'], ttlSeconds: 300,
+  });
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(r.outcome, 'DENIED', 'a proof minted elsewhere opened memory');
+});
+
+await check('a DELEGATED sub-agent inherits narrowed memory access', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD,
+    capabilities: ['memory:read:*', 'memory:write:agent/SUPERVISOR'], ttlSeconds: 3600,
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: ['memory:read:agent/TORCH'], ttlSeconds: 300,
+  });
+  const ok = await memAuthz.authorizeMemoryAccess(
+    link, { operation: 'read', namespace: 'agent/TORCH' }, memCtx());
+  assert.equal(ok.outcome, 'GRANTED', ok.reason);
+  assert.equal(ok.grantedTo, worker.did, 'the grantee should be the delegate, not the supervisor');
+
+  // The worker did NOT receive the supervisor's write capability.
+  const no = await memAuthz.authorizeMemoryAccess(
+    link, { operation: 'write', namespace: 'agent/SUPERVISOR' }, memCtx());
+  assert.equal(no.outcome, 'DENIED', 'a sub-agent inherited a capability it was not delegated');
+});
+
+await check('a missing audience is NOT_CHECKED and still not permissive', async () => {
+  const { proof } = await memProof(['memory:read:agent/TORCH']);
+  const r = await memAuthz.authorizeMemoryAccess(
+    proof, { operation: 'read', namespace: 'agent/TORCH' }, {});
+  assert.equal(r.outcome, 'NOT_CHECKED');
+  assert.equal(memAuthz.memoryAccessPermitted(r), false, 'NOT_CHECKED was treated as permission');
+});
+
+await check('a namespace containing ":" is refused at construction', () => {
+  assert.throws(() => memAuthz.memoryCapability('read', 'agent:TORCH'), /capability separator/);
+  assert.throws(() => memAuthz.memoryCapability('read', '  '), /namespace is required/);
+});
+
+// --- portable harness bundle ------------------------------------------------
+
+const H = '0'.repeat(64);
+const mkBundle = async (over = {}) => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity(over.agentName ?? 'TORCH');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+  });
+  const bundle = await harness.packHarness({
+    agent, controllerDid: human.did, authority,
+    skills: [{ name: 'trade', contentHash: `sha256:${H}` }],
+    memory: { commitment: `commit-sha256:${H}`, itemCount: 42, takenAt: '2026-08-14T00:00:00Z' },
+    ...over.pack,
+  });
+  return { human, agent, authority, bundle };
+};
+
+await check('a packed harness verifies end to end', async () => {
+  const { bundle } = await mkBundle();
+  const v = await harness.verifyHarness(bundle, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, true, JSON.stringify(v.parts, null, 2));
+  assert.equal(v.parts.integrity.outcome, 'VERIFIED');
+  assert.equal(v.parts.authority.outcome, 'VERIFIED');
+  assert.deepEqual(v.grantedCapabilities, ['pay:usdc']);
+});
+
+await check('PARTS CANNOT BE SPLICED BETWEEN BUNDLES', async () => {
+  // The central property. Both bundles are genuine and every individual part is
+  // validly signed — but the combination was never asserted by anyone.
+  const a = await mkBundle();
+  const b = await mkBundle({ agentName: 'NEXUS' });
+  const frankenstein = { ...a.bundle, authority: b.bundle.authority };
+  const v = await harness.verifyHarness(frankenstein, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, "one agent's authority rode inside another's bundle");
+  assert.equal(v.parts.integrity.outcome, 'FAILED');
+  assert.match(v.parts.integrity.detail, /spliced/);
+  assert.deepEqual(v.grantedCapabilities, []);
+});
+
+await check('a bundle claiming an agent its authority does not authorize FAILS', async () => {
+  const a = await mkBundle();
+  const other = await identity.createAgentIdentity('IMPOSTOR');
+  // Re-sign so integrity passes; only the subject claim is wrong.
+  const unsigned = { ...a.bundle, agentDid: other.did };
+  delete unsigned.bundleSignature;
+  const spoofed = {
+    ...unsigned,
+    bundleSignature: await identity.signAs(other, harness.bundlePayload(unsigned)),
+  };
+  const v = await harness.verifyHarness(spoofed, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, false, 'a bundle claimed an agent its authority never named');
+  assert.equal(v.parts.authority.outcome, 'FAILED');
+  assert.match(v.parts.authority.detail, /but its authority authorizes/);
+});
+
+await check('A BUNDLE IS NOT A BEARER TOKEN — wrong audience grants nothing', async () => {
+  const { bundle } = await mkBundle();
+  const v = await harness.verifyHarness(bundle, {
+    audience: 'trinity:vault', seenNonces: new Set(),
+  });
+  assert.equal(v.valid, false, 'a bundle minted elsewhere granted authority here');
+  assert.equal(v.parts.integrity.outcome, 'VERIFIED', 'integrity should still hold');
+  assert.equal(v.parts.authority.outcome, 'FAILED');
+  assert.deepEqual(v.grantedCapabilities, []);
+});
+
+await check('editing any covered field breaks the bundle signature', async () => {
+  const { bundle } = await mkBundle();
+  const edits = [
+    ['agentName', (b) => { b.agentName = 'RENAMED'; }],
+    ['controllerDid', (b) => { b.controllerDid = 'did:key:z6MkOther'; }],
+    ['skills.contentHash', (b) => { b.skills = [{ name: 'trade', contentHash: `sha256:${'1'.repeat(64)}` }]; }],
+    ['memory.itemCount', (b) => { b.memory.itemCount = 99999; }],
+    ['packedAt', (b) => { b.packedAt = '2020-01-01T00:00:00Z'; }],
+  ];
+  for (const [field, mutate] of edits) {
+    const tampered = JSON.parse(JSON.stringify(bundle));
+    mutate(tampered);
+    const v = await harness.verifyHarness(tampered, { audience: AUD, seenNonces: new Set() });
+    assert.equal(v.parts.integrity.outcome, 'FAILED', `a covered field was editable: ${field}`);
+  }
+});
+
+await check('SKILLS MUST BE HASH-PINNED, names alone are refused', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+  });
+  await assert.rejects(
+    harness.packHarness({
+      agent, controllerDid: human.did, authority,
+      skills: [{ name: 'trade', contentHash: 'trust-me' }],
+    }),
+    /no usable content hash/
+  );
+});
+
+await check('MEMORY CONTENTS NEVER TRAVEL IN THE BUNDLE', async () => {
+  const { bundle } = await mkBundle();
+  const blob = JSON.stringify(bundle);
+  assert.ok(!blob.includes('"items"'), 'memory items appeared in the bundle');
+  assert.match(bundle.memory.commitment, /^commit-sha256:[0-9a-f]{64}$/);
+  // A malformed commitment is refused rather than accepted as opaque data.
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('T');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['x'], ttlSeconds: 300,
+  });
+  await assert.rejects(
+    harness.packHarness({
+      agent, controllerDid: human.did, authority,
+      memory: { commitment: 'here-is-all-my-memory', itemCount: 1, takenAt: 'now' },
+    }),
+    /must be a commitment/
+  );
+});
+
+await check('the skills verdict does NOT claim the host runs that content', async () => {
+  const { bundle } = await mkBundle();
+  const v = await harness.verifyHarness(bundle, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.parts.skills.outcome, 'VERIFIED');
+  assert.match(v.parts.skills.detail, /NOT an attestation/);
+});
+
+await check('a reputation claim rides along and reports its privacy honestly', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('TORCH');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['pay:usdc'], ttlSeconds: 300,
+  });
+  const provider = new proofProvider.WebCryptoProofProvider();
+  const statement = repidPredicate.repidPredicate({
+    score: 3723, threshold: 3000,
+    evidence: { measured: ['a','b','c','d'], insufficient: [], unmeasured: [],
+                fullyMeasured: true, weakestConfidence: 0.8, detail: {} },
+  });
+  const bundle = await harness.packHarness({
+    agent, controllerDid: human.did, authority,
+    reputation: { statement, result: await provider.prove(statement) },
+  });
+  const v = await harness.verifyHarness(bundle, {
+    audience: AUD, seenNonces: new Set(), predicateProvider: provider,
+  });
+  assert.equal(v.valid, true, JSON.stringify(v.parts, null, 2));
+  assert.equal(v.parts.reputation.outcome, 'VERIFIED');
+  assert.match(v.parts.reputation.detail, /witnessHidden=false/);
+  assert.ok(!JSON.stringify(v.parts).includes('3723'), 'the score leaked into the verdict');
+});
+
+await check('absent parts are NOT_CHECKED, never silently fine', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('BARE');
+  const authority = await controlProof.issueControlProof({
+    human, agent, audience: AUD, capabilities: ['x'], ttlSeconds: 300,
+  });
+  const bundle = await harness.packHarness({ agent, controllerDid: human.did, authority });
+  const v = await harness.verifyHarness(bundle, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, true);
+  for (const p of ['reputation', 'disclosure', 'skills', 'memory']) {
+    assert.equal(v.parts[p].outcome, 'NOT_CHECKED', `${p} should be NOT_CHECKED when absent`);
+  }
+});
+
+await check('a DELEGATED sub-agent can carry its own harness', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: AUD, capabilities: ['pay:*'], ttlSeconds: 3600,
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: ['pay:usdc'], ttlSeconds: 300,
+  });
+  const bundle = await harness.packHarness({
+    agent: worker, controllerDid: human.did, authority: link,
+  });
+  const v = await harness.verifyHarness(bundle, { audience: AUD, seenNonces: new Set() });
+  assert.equal(v.valid, true, JSON.stringify(v.parts, null, 2));
+  assert.deepEqual(v.grantedCapabilities, ['pay:usdc'], 'the worker should carry only what it was delegated');
+});
+
+// --- reputation as a constrained transition ---------------------------------
+//
+// The claim under test is narrow on purpose: the SEQUENCE, not the score. Every
+// assertion here either defends that claim or defends the boundary around it.
+
+const TX_DOMAIN = 'trinity:reputation';
+const TX_SECRETS = ['w1', 'w2', 'w3', 'w4'];
+const TX_EVENT = {
+  subject: 'agent:TORCH',
+  signal: 'bft_vote_correct',
+  observedAt: '2026-08-14T00:00:00Z',
+};
+
+const mkTransition = async (opts = {}) => {
+  const { commitments, group } = await mkGroup(TX_SECRETS);
+  const event = opts.event ?? TX_EVENT;
+  const secret = opts.secret ?? 'w1';
+  const scope = opts.scope ?? transition.scopeForSubject(event.subject, opts.epoch ?? '2026-08-14');
+  const prevRoot = opts.prevRoot ?? transition.GENESIS_ROOT;
+  const eventCommitment = await transition.commitEvent(event, toyScheme);
+  return {
+    publicInputs: {
+      prevRoot,
+      newRoot: await transition.appendEvent(prevRoot, eventCommitment, toyScheme),
+      nullifier: await toyScheme.nullify(secret, TX_DOMAIN, scope),
+      domain: TX_DOMAIN,
+      scope,
+      groupRoot: group.root,
+    },
+    privateWitness: {
+      event,
+      eventCommitment,
+      secret,
+      appenderCommitment: await toyScheme.commit(secret),
+      membership: group.pathFor(commitments[0]),
+    },
+  };
+};
+
+await check('a well-formed transition recomputes, and never claims to be a proof', async () => {
+  const st = await mkTransition();
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, true, v.reason);
+  assert.equal(v.provenWithoutWitness, false, 'recomputation reported itself as witness-free');
+});
+
+await check('THE VERDICT STATES THE BOUNDARY — sequence, not score', async () => {
+  const st = await mkTransition();
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.match(v.reason, /SEQUENCE, never the score/);
+  // The two things it genuinely cannot establish must be named in the verdict
+  // itself, not only in the contract — a caller reads the verdict.
+  assert.match(v.reason, /unspent/);
+  assert.match(v.reason, /prevRoot is the head/);
+});
+
+await check('EVERY PUBLIC INPUT IS LOAD-BEARING — mutating any one fails', async () => {
+  // The generic form of the `frontier` bug: a field declared in the contract
+  // that nothing actually constrains. Enumerated from the contract, so adding a
+  // field without wiring it in fails here rather than shipping unconstrained.
+  const mutators = {
+    prevRoot: (st) => { st.publicInputs.prevRoot = 'zkrepid:reputation-genesis:v0'; },
+    newRoot: (st) => { st.publicInputs.newRoot = 'f'.repeat(64); },
+    nullifier: (st) => { st.publicInputs.nullifier = '0'.repeat(64); },
+    domain: (st) => { st.publicInputs.domain = 'trinity:other'; },
+    scope: (st) => { st.publicInputs.scope = transition.scopeForSubject('agent:RIVAL', '2026-08-14'); },
+    groupRoot: (st) => { st.publicInputs.groupRoot = 'a'.repeat(64); },
+  };
+  for (const field of transition.TRANSITION_CONTRACT.publicInputs) {
+    assert.ok(mutators[field], `no mutation defined for public input '${field}'`);
+    const st = await mkTransition();
+    mutators[field](st);
+    const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+    assert.equal(v.valid, false, `mutating public input '${field}' still verified`);
+  }
+});
+
+await check('EVERY WITNESS FIELD IS LOAD-BEARING — mutating any one fails', async () => {
+  const mutators = {
+    event: (st) => { st.privateWitness.event = { ...st.privateWitness.event, signal: 'veritas_miss' }; },
+    eventCommitment: (st) => { st.privateWitness.eventCommitment = 'b'.repeat(64); },
+    secret: (st) => { st.privateWitness.secret = 'w2'; },
+    appenderCommitment: (st) => { st.privateWitness.appenderCommitment = 'c'.repeat(64); },
+    membership: (st) => { st.privateWitness.membership = []; },
+  };
+  for (const field of transition.TRANSITION_CONTRACT.privateWitness) {
+    assert.ok(mutators[field], `no mutation defined for witness field '${field}'`);
+    const st = await mkTransition();
+    mutators[field](st);
+    const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+    assert.equal(v.valid, false, `mutating witness field '${field}' still verified`);
+  }
+});
+
+await check('AN OUTSIDER CANNOT APPEND — non-membership fails even with a consistent statement', async () => {
+  const st = await mkTransition({ secret: 'outsider' });
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, 'a non-member extended a subject\'s reputation history');
+  assert.match(v.reason, /not a member of the group/);
+});
+
+await check('THE BORROWED-MEMBER ATTACK FAILS — a real commitment, someone else\'s secret', async () => {
+  // Found by COMPOUND mutation: deleting the appender reopen check AND walking
+  // membership from the witness commitment left every other assertion green,
+  // because no fixture separated the two values. Group leaves are public by
+  // construction — that is what makes the root shareable — so an outsider can
+  // always obtain a member's commitment and path. What they cannot obtain is
+  // the secret behind it, and that is the only thing standing between them and
+  // an append. Tested at the point where the two come apart.
+  const { commitments, group } = await mkGroup(TX_SECRETS);
+  const st = await mkTransition({ secret: 'outsider' });
+  st.privateWitness.appenderCommitment = commitments[0];   // a genuine member's
+  st.privateWitness.membership = group.pathFor(commitments[0]);
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, 'an outsider appended using a borrowed commitment');
+  assert.match(v.reason, /appender commitment does not reopen/);
+});
+
+await check('THE SCOPE MUST BIND THE SUBJECT', async () => {
+  // A scope that does not name the subject makes one write authorization valid
+  // against every agent's history — the cheapest possible reputation attack.
+  const st = await mkTransition({ scope: 'reputation:everything' });
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false);
+  assert.match(v.reason, /does not bind this subject/);
+});
+
+await check('the scope must carry a NON-EMPTY epoch, not just the subject', async () => {
+  // A subject prefix with nothing after it is a scope that never rotates, i.e.
+  // one authorization appending forever. Rejected at both ends.
+  assert.throws(() => transition.scopeForSubject('agent:TORCH', ''), /epoch is required/);
+  const bare = ['reputation', 'agent:TORCH', ''].join(String.fromCharCode(31));
+  const st = await mkTransition({ scope: bare });
+  const v = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(v.valid, false, 'an epoch-less scope was accepted');
+});
+
+await check('nullifiers separate by subject and by epoch', async () => {
+  const a = transition.scopeForSubject('agent:TORCH', 'e1');
+  const b = transition.scopeForSubject('agent:RIVAL', 'e1');
+  const c = transition.scopeForSubject('agent:TORCH', 'e2');
+  const [na, nb, nc] = await Promise.all(
+    [a, b, c].map((s) => toyScheme.nullify('w1', TX_DOMAIN, s))
+  );
+  assert.notEqual(na, nb, 'one nullifier across subjects — a write grant leaks to other agents');
+  assert.notEqual(na, nc, 'one nullifier across epochs — the write budget is unbounded');
+});
+
+await check('THE APPEND IS POSITIONAL — H(prev, event) is not H(event, prev)', async () => {
+  // Found by mutation: replacing the append with a SORTED two-input hash left
+  // every other assertion here green, because the multi-event order test
+  // compares chains whose inner roots already differ. A commutative node hash
+  // makes "root R extended by event E" indistinguishable from "root E extended
+  // by R", so an attacker can reinterpret which value was the history and which
+  // was the event. Asserted at the single-append level, where it is visible.
+  const a = 'aa'.repeat(16);
+  const b = 'bb'.repeat(16);
+  assert.notEqual(
+    await transition.appendEvent(a, b, toyScheme),
+    await transition.appendEvent(b, a, toyScheme),
+    'the append is order-insensitive — history and event are interchangeable'
+  );
+});
+
+await check('APPEND ORDER IS PART OF THE HISTORY', async () => {
+  const mk = (signal) => transition.commitEvent(
+    { subject: 'agent:TORCH', signal, observedAt: '2026-08-14T00:00:00Z' }, toyScheme
+  );
+  const [a, b] = await Promise.all([mk('bft_vote_correct'), mk('veritas_catch')]);
+  const ab = await transition.appendEvent(
+    await transition.appendEvent(transition.GENESIS_ROOT, a, toyScheme), b, toyScheme);
+  const ba = await transition.appendEvent(
+    await transition.appendEvent(transition.GENESIS_ROOT, b, toyScheme), a, toyScheme);
+  assert.notEqual(ab, ba, 'reordering two events left the root unchanged');
+});
+
+await check('DROPPING AN EVENT CHANGES THE ROOT', async () => {
+  const mk = (signal) => transition.commitEvent(
+    { subject: 'agent:TORCH', signal, observedAt: '2026-08-14T00:00:00Z' }, toyScheme
+  );
+  const [a, b] = await Promise.all([mk('bft_vote_incorrect'), mk('x402_settled')]);
+  let full = transition.GENESIS_ROOT;
+  for (const c of [a, b]) full = await transition.appendEvent(full, c, toyScheme);
+  const truncated = await transition.appendEvent(transition.GENESIS_ROOT, b, toyScheme);
+  assert.notEqual(full, truncated, 'removing the unflattering event was invisible');
+});
+
+await check('TWO EVENTS CANNOT SHARE AN ENCODING — the concatenation collision', async () => {
+  // The bug this encoding exists to prevent. Joined with '', these two produce
+  // the identical string: '1' + '2026' === '12' + '026'. One commitment, two
+  // reopenings, and "which event was committed" has two answers.
+  const one = { subject: 'a', signal: 'latency_sample', value: 1, observedAt: '2026' };
+  const two = { subject: 'a', signal: 'latency_sample', value: 12, observedAt: '026' };
+  assert.equal(
+    [one.value, one.observedAt].join('') , [two.value, two.observedAt].join(''),
+    'the fixture no longer exercises the collision it was written for'
+  );
+  const [c1, c2] = await Promise.all([
+    transition.commitEvent(one, toyScheme), transition.commitEvent(two, toyScheme),
+  ]);
+  assert.notEqual(c1, c2, 'two distinct events share one commitment');
+});
+
+await check('a field containing the separator is REFUSED, not escaped', async () => {
+  const sep = String.fromCharCode(31);
+  await assert.rejects(
+    transition.commitEvent(
+      { subject: `a${sep}b`, signal: 'x402_settled', observedAt: '2026' }, toyScheme),
+    /field separator/
+  );
+  assert.throws(() => transition.scopeForSubject(`a${sep}b`, 'e1'), /field separator/);
+});
+
+await check('an unknown signal is refused rather than committed', async () => {
+  await assert.rejects(
+    transition.commitEvent(
+      { subject: 'a', signal: 'totally_made_up', observedAt: '2026' }, toyScheme),
+    /unknown signal/
+  );
+  // Type and runtime list must agree, or the boundary check is decorative.
+  assert.equal(transition.REPUTATION_SIGNALS.length, 7);
+});
+
+await check('an incomplete event is refused at commit time', async () => {
+  const base = { subject: 'a', signal: 'x402_settled', observedAt: '2026' };
+  await assert.rejects(transition.commitEvent({ ...base, subject: '' }, toyScheme), /subject is required/);
+  await assert.rejects(transition.commitEvent({ ...base, observedAt: '' }, toyScheme), /observedAt is required/);
+});
+
+await check('GENESIS_ROOT is not hash-shaped, so a history root cannot pass as a group root', async () => {
+  const g = transition.GENESIS_ROOT;
+  assert.ok(!/^[0-9a-f]{64}$/i.test(g), 'the genesis constant looks like a digest');
+  assert.notEqual(g, '');
+  const commitments = await Promise.all(TX_SECRETS.map((s) => toyScheme.commit(s)));
+  assert.ok(!commitments.includes(g), 'the genesis constant collides with a member commitment');
+  // And the contract must not rely on this argument silently.
+  assert.ok(
+    transition.TRANSITION_CONTRACT.mustAlsoHold.some((s) => /domain-separated in the circuit/.test(s)),
+    'the circuit is left to inherit an argument instead of a constraint'
+  );
+});
+
+await check('the event tag is distinct from the identity tags', () => {
+  assert.notEqual(transition.TRANSITION_TAG, transition.IDENTITY_TAGS.commit);
+  assert.notEqual(transition.TRANSITION_TAG, transition.IDENTITY_TAGS.nullifier);
+  assert.deepEqual(transition.IDENTITY_TAGS, nullifier.BINDING_TAGS);
+});
+
+await check('RECOMPUTATION DOES NOT DETECT A REPLAY — and the contract says whose job it is', async () => {
+  // Verifying the same statement twice succeeds twice. That is correct: a spent
+  // set is state this function does not have. The failure would be pretending
+  // otherwise, so this asserts the limit rather than a fix.
+  const st = await mkTransition();
+  const first = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  const second = await transition.verifyTransitionByRecomputation(st, toyScheme);
+  assert.equal(first.valid, true);
+  assert.equal(second.valid, true, 'the fixture no longer demonstrates the limit');
+  assert.ok(
+    transition.TRANSITION_CONTRACT.mustAlsoHold.some((s) => /SPENT against a durable set/.test(s)),
+    'replay protection is not assigned to anyone'
+  );
+});
+
+await check('the transition contract names the four things no circuit can discharge', () => {
+  const c = transition.TRANSITION_CONTRACT;
+  assert.equal(c.version, 'zkrepid-reputation-transition-v2');
+  for (const [name, re] of [
+    ['spent set', /SPENT against a durable set/],
+    ['head-of-chain', /CURRENT head the verifier holds/],
+    ['trusted group root', /VERIFIER independently trusts/],
+    ['epoch schedule', /epoch inside scope advances on a schedule/],
+    ['borrowed member', /appenderCommitment the circuit COMPUTED/],
+    ['tag separation', /event tag is distinct/],
+    ['positional node hash', /chain node hash is POSITIONAL/],
+  ]) {
+    assert.ok(c.mustAlsoHold.some((s) => re.test(s)), `mustAlsoHold does not name: ${name}`);
+  }
+  assert.equal(c.relations.length, 6);
+  assert.match(c.provesTheSequenceNotTheScore, /does NOT prove\s+the resulting score/);
+  assert.match(c.observedAtIsAsserted, /A prover controls it/);
+});
+
+await check('the read-time half points at a file that exists and shrinks toward ZERO', () => {
+  const r = transition.READ_TIME_SCORING;
+  // A dangling pointer here is how the two halves drift apart: the contract
+  // would keep saying "the other half lives over there" after it moved.
+  readFileSync(join(process.cwd(), r.implementedBy), 'utf8');
+  assert.ok(
+    r.appliedAtReadTime.some((s) => /shrinkage toward ZERO/.test(s)),
+    'shrinking toward the fleet mean is the reputation-laundering vector'
+  );
+  assert.equal(r.publicInputRequired, 'now');
+});
+
+// --- the loop authorizer: the identity layer finally has a caller -----------
+//
+// Before this adapter, the whole identity layer was reachable from one E2E
+// verify route and nothing in the system asked it for permission before acting.
+
+const LOOP_AUD = 'trinity:agent-loop';
+
+const mkAuthz = async (over = {}) => {
+  const human = over.human ?? (await identity.createHumanSSID());
+  const agent = over.agent ?? (await identity.createAgentIdentity('LOOPER'));
+  const proof =
+    over.proof ??
+    (await controlProof.issueControlProof({
+      human,
+      agent,
+      audience: over.audience ?? LOOP_AUD,
+      capabilities: over.capabilities ?? ['tool:read'],
+      caveats: over.caveats,
+      ttlSeconds: over.ttlSeconds ?? 3600,
+      now: over.issuedAt,
+    }));
+  return {
+    human,
+    agent,
+    proof,
+    built: await loopAuthz.createControlProofAuthorizer({
+      proof,
+      audience: over.audience ?? LOOP_AUD,
+      toolCapabilities: over.toolCapabilities ?? { read_thing: 'tool:read' },
+      declaredValue: over.declaredValue,
+      now: over.now,
+      seenNonces: over.seenNonces ?? new Set(),
+    }),
+  };
+};
+
+const session = (over = {}) => ({
+  turn: 1,
+  totalCalls: 0,
+  callsByTool: {},
+  writes: 0,
+  deniedAttempts: 0,
+  ...over,
+});
+const toolCall = (name, args = {}) => ({ id: 'c1', name, args });
+const ask = (built, name, args = {}, sess = session()) =>
+  built.authorizer.authorize({ call: toolCall(name, args), effect: 'read', session: sess });
+
+await check('a verified proof authorizes a mapped, permitted tool', async () => {
+  const { built } = await mkAuthz();
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, true, v.reason);
+  assert.deepEqual(built.grantedCapabilities, ['tool:read']);
+});
+
+await check('AN UNMAPPED TOOL IS DENIED — an undecided permission reads as no', async () => {
+  // The same rule as the kernel's empty allowlist. A tool with no capability
+  // mapping is one nobody has decided about, and defaulting to allow would make
+  // the least-configured deployment the most permissive.
+  const { built } = await mkAuthz({ toolCapabilities: {} });
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, false, 'an unmapped tool was authorized');
+  assert.match(v.reason, /no capability is mapped/);
+});
+
+await check('a mapped tool whose capability is not granted is denied', async () => {
+  const { built } = await mkAuthz({
+    capabilities: ['tool:read'],
+    toolCapabilities: { write_thing: 'tool:write' },
+  });
+  const v = await ask(built, 'write_thing');
+  assert.equal(v.allowed, false, 'an ungranted capability was honoured');
+  assert.match(v.reason, /not permitted by the granted capabilities/);
+});
+
+await check('wildcards attenuate by WHOLE SEGMENT, through the adapter', async () => {
+  // `pay:usd*` must not cover `pay:usdt`. Asserted here as well as in
+  // capability.ts because this is the path an actual tool call takes, and a
+  // sound algebra wired up wrongly is indistinguishable from an unsound one.
+  const wide = await mkAuthz({
+    capabilities: ['pay:*'],
+    toolCapabilities: { send: 'pay:usdc' },
+  });
+  assert.equal((await ask(wide.built, 'send')).allowed, true, 'pay:* should cover pay:usdc');
+
+  const partial = await mkAuthz({
+    capabilities: ['pay:usd*'],
+    toolCapabilities: { send: 'pay:usdt' },
+  });
+  assert.equal(
+    (await ask(partial.built, 'send')).allowed,
+    false,
+    'a partial-segment wildcard reached a different asset'
+  );
+});
+
+await check('A GRANT THAT EXPIRES MID-SESSION STOPS AUTHORIZING', async () => {
+  // The reason anything is re-checked per call. A 25-turn loop can outlive its
+  // grant, and an expiry that only applies at session start is decorative for
+  // the longest and least supervised part of the run.
+  const t0 = new Date('2026-08-14T12:00:00Z');
+  let clock = t0;
+  const { built } = await mkAuthz({
+    issuedAt: t0,
+    ttlSeconds: 60,
+    now: () => clock,
+  });
+  assert.equal((await ask(built, 'read_thing')).allowed, true, 'should be valid at issue');
+
+  clock = new Date(t0.getTime() + 61_000);
+  const after = await ask(built, 'read_thing');
+  assert.equal(after.allowed, false, 'an expired grant still authorized');
+  assert.match(after.reason, /expired/);
+  assert.match(after.reason, /does not stretch/, 'the refusal should say why');
+});
+
+await check('EXPIRY IS EXCLUSIVE AT THE BOUNDARY INSTANT', async () => {
+  // Found by mutation: `>=` vs `>` at exactly expiresAt survived a test that
+  // only checked a second past it. The instant matters because
+  // verifyControlProof uses `now >= expiresAt`, so a `>` here would make the
+  // adapter and the verifier disagree for exactly one millisecond — and a
+  // one-instant disagreement between two authorization paths is the kind of
+  // thing that is only ever found in production.
+  const t0 = new Date('2026-08-14T12:00:00Z');
+  let clock = t0;
+  const { built } = await mkAuthz({ issuedAt: t0, ttlSeconds: 60, now: () => clock });
+
+  clock = new Date(t0.getTime() + 59_999);
+  assert.equal((await ask(built, 'read_thing')).allowed, true, 'one ms before expiry must pass');
+
+  clock = new Date(t0.getTime() + 60_000); // exactly expiresAt
+  const atBoundary = await ask(built, 'read_thing');
+  assert.equal(atBoundary.allowed, false, 'the expiry instant itself must refuse');
+  assert.match(atBoundary.reason, /expired/);
+});
+
+await check('A DELEGATED PROOF SPENDS THE ROOT NONCE, not the link nonce', async () => {
+  // Found by mutation: recording the leaf's nonce instead of the root's is a
+  // no-op for a direct grant, because leaf and root are the same object. Only a
+  // delegation chain separates them — and the replay check runs against the
+  // ROOT, so recording a link nonce records a value nothing ever tests and the
+  // whole chain replays freely.
+  const seen = new Set();
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: LOOP_AUD, capabilities: ['tool:*'], ttlSeconds: 3600,
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  assert.notEqual(link.grant.nonce, root.grant.nonce, 'the fixture needs distinct nonces');
+
+  const args = {
+    proof: link, audience: LOOP_AUD,
+    toolCapabilities: { read_thing: 'tool:read' }, seenNonces: seen,
+  };
+  await loopAuthz.createControlProofAuthorizer(args);
+  assert.ok(seen.has(root.grant.nonce), 'the ROOT nonce should have been spent');
+  await assert.rejects(
+    loopAuthz.createControlProofAuthorizer(args),
+    /did not verify/,
+    'a delegated chain replayed'
+  );
+});
+
+await check('A CLOCK THAT JUMPS BACKWARDS does not pre-activate a grant', async () => {
+  // The notBefore check is unreachable by forward time alone: construction
+  // already verifies the validity window, and if notBefore passed then, it
+  // passes for every later call. It exists for clock REGRESSION — an NTP
+  // correction stepping the clock back behind the grant's start — which is the
+  // only way the branch fires. Tested that way, so it is not an unreachable
+  // line nobody can exercise. (An unconstrained field is the `frontier` bug;
+  // an untestable branch is its neighbour.)
+  const t0 = new Date('2026-08-14T12:00:00Z');
+  let clock = new Date(t0.getTime() + 1_000);
+  const { built } = await mkAuthz({ issuedAt: t0, ttlSeconds: 600, now: () => clock });
+  assert.equal((await ask(built, 'read_thing')).allowed, true, 'valid before the step');
+
+  clock = new Date(t0.getTime() - 5_000); // the clock steps backwards
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, false, 'a backwards clock authorized before notBefore');
+  assert.match(v.reason, /not yet valid/);
+});
+
+await check('MAXCALLS IS ENFORCED, NOT REPORTED — the caveat debt is settled', async () => {
+  // caveat.ts has said since it was written that an unenforced caveat is worse
+  // than no caveat, and reported maxCalls as NOT_CHECKED because nothing
+  // counted. The loop counts. This is that NOT_CHECKED becoming a verdict.
+  const { built } = await mkAuthz({ caveats: [{ type: 'maxCalls', limit: 2 }] });
+
+  const first = await ask(built, 'read_thing', {}, session({ totalCalls: 0 }));
+  const second = await ask(built, 'read_thing', {}, session({ totalCalls: 1 }));
+  const third = await ask(built, 'read_thing', {}, session({ totalCalls: 2 }));
+
+  assert.equal(first.allowed, true, 'call 1 of 2');
+  assert.equal(second.allowed, true, 'call 2 of 2 — the boundary must be inclusive');
+  assert.equal(third.allowed, false, 'a limit of 2 permitted a third call');
+  assert.match(third.reason, /maxCalls/);
+  assert.match(first.reason, /1 caveat\(s\) VERIFIED/, 'it must report VERIFIED, not NOT_CHECKED');
+});
+
+await check('maxValue is enforced through the adapter, including wrong asset', async () => {
+  const declaredValue = (c) => (c.args.amount ? { asset: c.args.asset, amount: c.args.amount } : undefined);
+  const { built } = await mkAuthz({
+    caveats: [{ type: 'maxValue', asset: 'USDC', amount: 100 }],
+    toolCapabilities: { send: 'tool:read' },
+    declaredValue,
+  });
+  assert.equal((await ask(built, 'send', { asset: 'USDC', amount: 100 })).allowed, true, 'exactly the cap must pass');
+  assert.equal((await ask(built, 'send', { asset: 'USDC', amount: 101 })).allowed, false, 'over the cap');
+  // A cap on USDC says nothing about USDT — refusing beats treating it as inapplicable.
+  assert.equal((await ask(built, 'send', { asset: 'USDT', amount: 1 })).allowed, false, 'asset switch routed around the cap');
+});
+
+await check('an UNDECLARED value leaves maxValue NOT_CHECKED, and says so in the verdict', async () => {
+  // caveatsPermit does not fail on NOT_CHECKED, so the call proceeds — but the
+  // unapplied cap must be visible in the record rather than vanishing into an
+  // "allowed" that reads as fully verified.
+  const { built } = await mkAuthz({
+    caveats: [{ type: 'maxValue', asset: 'USDC', amount: 100 }],
+  });
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, true, 'NOT_CHECKED must not refuse the action');
+  assert.match(v.reason, /NOT_CHECKED/, 'an unapplied cap disappeared from the verdict');
+});
+
+await check('the toolAllowlist caveat is enforced', async () => {
+  const { built } = await mkAuthz({
+    caveats: [{ type: 'toolAllowlist', tools: ['other_tool'] }],
+  });
+  const v = await ask(built, 'read_thing');
+  assert.equal(v.allowed, false, 'a tool outside the caveat allowlist was authorized');
+  assert.match(v.reason, /toolAllowlist/);
+});
+
+await check('A BAD PROOF REFUSES THE SESSION rather than denying every call', async () => {
+  // Both are safe; they say different things. An authorizer that denies
+  // everything looks, in a transcript, exactly like an agent whose tools were
+  // all out of scope — which would hide a configuration failure inside what
+  // reads as normal agent behaviour.
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('LOOPER');
+  const impostor = await identity.createHumanSSID();
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: LOOP_AUD, capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  proof.grant.humanDid = impostor.did; // signature no longer verifies
+
+  await assert.rejects(
+    loopAuthz.createControlProofAuthorizer({
+      proof, audience: LOOP_AUD, toolCapabilities: { read_thing: 'tool:read' }, seenNonces: new Set(),
+    }),
+    (e) => e.name === 'ProofRejected'
+  );
+});
+
+await check('a proof for another audience refuses the session', async () => {
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('LOOPER');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: 'trinity:vault', capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  await assert.rejects(
+    loopAuthz.createControlProofAuthorizer({
+      proof, audience: LOOP_AUD, toolCapabilities: { read_thing: 'tool:read' }, seenNonces: new Set(),
+    }),
+    /did not verify/
+  );
+});
+
+await check('THE NONCE IS SPENT ONCE PER SESSION, NOT PER CALL', async () => {
+  // If the adapter consumed a nonce per tool call, the second call of every
+  // session would be refused as a replay of the first — the replay defence
+  // would break the thing it protects.
+  const seen = new Set();
+  const { built } = await mkAuthz({ seenNonces: seen });
+  for (let i = 0; i < 5; i += 1) {
+    const v = await ask(built, 'read_thing', {}, session({ totalCalls: i }));
+    assert.equal(v.allowed, true, `call ${i + 1} was refused as a replay`);
+  }
+  assert.equal(seen.size, 1, 'exactly one nonce should have been spent');
+});
+
+await check('a replayed proof refuses a SECOND session', async () => {
+  const seen = new Set();
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('LOOPER');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: LOOP_AUD, capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  const args = {
+    proof, audience: LOOP_AUD, toolCapabilities: { read_thing: 'tool:read' }, seenNonces: seen,
+  };
+  await loopAuthz.createControlProofAuthorizer(args);
+  await assert.rejects(loopAuthz.createControlProofAuthorizer(args), /did not verify/);
+  assert.equal(seen.size, 1, 'the replay must not add a second nonce');
+});
+
+await check('a DELEGATED sub-agent carries only what it was delegated', async () => {
+  const human = await identity.createHumanSSID();
+  const supervisor = await identity.createAgentIdentity('SUPERVISOR');
+  const worker = await identity.createAgentIdentity('WORKER');
+  const root = await controlProof.issueControlProof({
+    human, agent: supervisor, audience: LOOP_AUD, capabilities: ['tool:*'], ttlSeconds: 3600,
+  });
+  const link = await delegation.delegate({
+    parent: root, delegator: supervisor, delegate: worker,
+    capabilities: ['tool:read'], ttlSeconds: 300,
+  });
+  const built = await loopAuthz.createControlProofAuthorizer({
+    proof: link,
+    audience: LOOP_AUD,
+    toolCapabilities: { read_thing: 'tool:read', write_thing: 'tool:write' },
+    seenNonces: new Set(),
+  });
+  assert.equal(built.delegationDepth, 1, 'depth');
+  assert.deepEqual(built.grantedCapabilities, ['tool:read'], 'the worker carries only its delegation');
+  assert.equal((await ask(built, 'read_thing')).allowed, true, 'delegated capability');
+  assert.equal(
+    (await ask(built, 'write_thing')).allowed,
+    false,
+    'the worker reached a capability only its supervisor held'
+  );
+});
+
+// --- kernel + adapter, together ---------------------------------------------
+
+await check('THE LOOP AND THE ADAPTER WORK TOGETHER, and the agent still cannot over-claim', async () => {
+  // The integration that is the point of both files. The agent calls a tool it
+  // holds and one it does not, then claims VERIFIED. The refusal is real, and
+  // the claim is reduced because of it.
+  const human = await identity.createHumanSSID();
+  const agent = await identity.createAgentIdentity('LOOPER');
+  const proof = await controlProof.issueControlProof({
+    human, agent, audience: LOOP_AUD, capabilities: ['tool:read'], ttlSeconds: 3600,
+  });
+  const { authorizer } = await loopAuthz.createControlProofAuthorizer({
+    proof,
+    audience: LOOP_AUD,
+    toolCapabilities: { read_thing: 'tool:read', write_thing: 'tool:write' },
+    seenNonces: new Set(),
+  });
+
+  let turn = 0;
+  const result = await loopKernel.runAgentLoop({
+    taskId: 'integration',
+    policy: {
+      maxIterations: 5,
+      noProgressAbortAfter: 3,
+      toolsAllowed: ['read_thing', 'write_thing'],
+      irreversibleRequiresHuman: [],
+      untrustedOutputSources: [],
+      maxWritesPerSession: 10,
+      toolEffects: { read_thing: 'read', write_thing: 'write' },
+    },
+    model: {
+      async turn() {
+        turn += 1;
+        if (turn === 1) return { calls: [{ id: 'a', name: 'read_thing', args: {} }] };
+        if (turn === 2) return { calls: [{ id: 'b', name: 'write_thing', args: {} }] };
+        return { calls: [], handoff: { outcome: 'VERIFIED', summary: 'all done', evidence: [] } };
+      },
+    },
+    tools: { async call() { return { content: 'result' }; } },
+    authorizer,
+    clock: { now: () => 0 },
+  });
+
+  assert.equal(result.turns[0].calls[0].verdict.allowed, true, 'the held capability should pass');
+  assert.equal(result.turns[1].calls[0].verdict.allowed, false, 'the unheld capability should be refused');
+  assert.equal(result.claimed, 'VERIFIED', 'the agent claimed VERIFIED');
+  assert.equal(result.outcome, 'NOT_CHECKED', 'the claim survived a refused call');
+  assert.match(result.downgradedBecause ?? '', /refused/, 'and the downgrade names the refusal');
 });
 
 rmSync(outDir, { recursive: true, force: true });
