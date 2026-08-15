@@ -49,6 +49,7 @@
     "check:contracted-evaluator": "node scripts/contracted-evaluator-test.mjs",
     "check:outcome-reputation": "node scripts/outcome-reputation-test.mjs",
     "check:auditor-grant": "node scripts/auditor-grant-test.mjs",
+    "check:bft-judge": "node scripts/bft-judge-test.mjs",
     "check:dual-view": "node scripts/check-dual-view-contract.mjs",
     "check:receipt": "node scripts/check-receipt.mjs",
     "trustshell:receipt": "node scripts/trustshell-receipt.mjs",
