@@ -62,9 +62,15 @@ are **publicly reachable**, and they are the only way to observe the Vercel
 deployment when the Vercel API is unavailable — which is exactly the situation
 that surfaced them.
 
+**Publicly reachable is not the same as reachable from here.** All three custom
+domains are proxy-denied to `curl` and to the browser tool from an agent session;
+`pg_net` reaches them. See *Network, in cloud/remote sessions* below before
+concluding a domain is down.
+
 Vercel `ssoProtection` is `all_except_custom_domains`, so every `.vercel.app` URL
 302s to `vercel.com/sso-api`. You cannot fetch a preview URL from an agent
-session. The custom domains above are exempt, which is why they work.
+session. The custom domains above are exempt from **SSO** — that is why `pg_net`
+gets a 200 from them and never from a preview URL. It is not proxy exemption.
 
 ### Knowing WHICH COMMIT a surface is running
 
@@ -140,9 +146,29 @@ CONNECT). This is not an auth failure — do not rotate a credential over it:
 
 - `repid-engine-production.up.railway.app`
 - `qnnpjhlxljtqyigedwkb.supabase.co`
+- `app.aitrinitysymphony.com` — verified 2026-08-15
+- `www.aitrinitysymphony.com` — verified 2026-08-15
 
 The Supabase **MCP tools work** (different path), so SQL queries succeed while
 direct PostgREST calls fail. The npm registry and GitHub are reachable.
+
+**The last two are denied to `curl` and to the browser tool, but reachable via
+`pg_net`** — those are different egress paths, and only `pg_net` leaves Supabase
+infrastructure. The browser fails as `net::ERR_TUNNEL_CONNECTION_FAILED`, which
+looks like a site outage and is not one; `curl` gives the usual
+`CONNECT tunnel failed, response 403`. Until 2026-08-15 this section listed only
+the first two hosts while the topology section called the custom domains
+reachable, so a denial on `www` read as "the deploy is down."
+
+This is why **no agent session can observe these pages after hydration.** `pg_net`
+returns the SSR HTML and any static asset, so "which commit, which surface" and
+"is this string in the shipped bundle" are answerable; anything that only appears
+once React mounts is **NOT CHECKABLE from here** — say so rather than inferring it
+from healthy-looking SSR HTML, which renders identically whether or not a
+client-side effect throws.
+
+The apex `aitrinitysymphony.com` was **NOT CHECKED** against the proxy — do not
+assume it matches `www` either way.
 
 When a request 403s, run `curl -sS "$HTTPS_PROXY/__agentproxy/status"` and look at
 `recentRelayFailures` before drawing any conclusion.
