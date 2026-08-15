@@ -623,19 +623,44 @@ a caveat as provisional until the caveat is paid.
 
 ## Not yet built
 
-- **Sub-task routing granularity.** Routing is per task; the brief calls for
-  sub-step and tool-call granularity. Highest-value remaining item by impact,
-  but it reshapes the task model and `router.ts` rather than adding to them —
-  **judged architecturally significant on 2026-08-13 and left for Sean**, not
-  skipped.
-- **Cold experts and early traffic — largely fixed, not fully.** At
-  `confidenceK` 50 this was severe: across the first 60% of a run both `rookie`
-  and a newly added expert took **0 calls**, so no newcomer could build trust
-  inside a run at all. At 20, `rookie` takes 737 of 2000 calls and ends second
-  in the pool. What has NOT been re-measured is whether a newcomer added
-  mid-run can now earn trust — the hang-under-trust scenario still warm-starts
-  its veteran, and that warm start has not been retested against the new
-  default.
+- **Sub-task routing granularity — PRICED 2026-08-14, and the cost claim above
+  was half wrong.** `npm run sim:subtask`. The impact is real and is the largest
+  remaining prize: **+3.11pp** at specialisation spread 0.10 and **+10.57pp** at
+  0.20 over 24 seeds, against the +1.64pp bar Sprint V declined for per-domain.
+  But it does **not** reshape `router.ts`: `route()` is a pure function of its
+  arguments, so it can be called per sub-step today, and `ReputationLedger` keys
+  on an opaque string, so `record('agent::step', ok)` is already legal. Only the
+  call-site keying changes; `supabase-reputation-store.ts` (primary key
+  `agent_name`) is the one thing that must change to persist per-step scores.
+  **Still not built**, because the prize depends on the fleet's actual
+  specialisation spread and that is unmeasurable while `repid_score_events` has
+  no task key. See Sprint Z4.
+- **Cold experts and early traffic — MEASURED 2026-08-14, and the answer was
+  not the one expected.** At `confidenceK` 50 this was severe: across the first
+  60% of a run both `rookie` and a newly added expert took **0 calls**. At 20,
+  `rookie` takes 737 of 2000 calls and ends second in the pool.
+
+  The open half — *can a newcomer added mid-run earn trust?* — is now answered
+  by `npm run sim:newcomer`. **Yes, in 95% of 40 seeds**, refuting a closed-form
+  prediction that it could not. The prediction assumed an incumbent's earned
+  score sits at its true quality; under winner-take-all the leader's EWMA
+  random-walks instead, so the 6775 bps graduation ceiling is real but does not
+  bind. A late arrival pays a **lag**, not a lock-out — and that lag was
+  **re-priced in Sprint Y and is nearly spent**. The 4.82pp first published here
+  is **RETRACTED**: it was measured ranking by the point estimate rather than the
+  `upperConfidenceBound` the simulator ships. Post-join the real gap is
+  **0.45pp**, of which **0.18pp** is irreducible regret, leaving **0.27pp ±
+  0.15pp**. `npm run sim:adoption` has the three levers tried against it and why
+  none shipped.
+
+  Looking for the lock-out found a different defect, which is now **fixed**: the
+  router scored any cold expert at a flat 0.5, discarding all ~20 outcomes an
+  expert produces before graduating. `ExpertProfile.observations` now separates
+  *no* evidence from *thin* evidence. Worth **+0.85pp of the omniscient top-1
+  bound** across 24 paired seeds (t = 2.92) — about a third of the remaining
+  top-1 prize — with **no** effect on the panel arm. Sprint X in
+  `SPRINT-LOG.md` has the four-world A/B and why this is not the planted-gem
+  artefact that once fooled the `confidenceK` sweep.
 - **Cancellation — accounted for, still not performed.** `TimeoutPolicy` reports
   expiry; it still cannot cancel the underlying call, because it holds no handle
   on the transport. What changed in Sprint K is that abandonment is no longer
