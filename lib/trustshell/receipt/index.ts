@@ -26,3 +26,17 @@ export {
   type ReceiptCheck,
 } from './sign';
 export { parsePorcelainZ, parseLogNameOnly } from './git';
+export {
+  checkClaims,
+  checkT0,
+  checkT1,
+  extractToolMentions,
+  stripCodeBlocks,
+  sentences,
+  linkEvidence,
+  BUILTIN_TOOLS,
+  CLAIM_RULES_VERSION,
+  EXCERPT_MAX,
+  type ClaimsResult,
+  type ToolMention,
+} from './claims';

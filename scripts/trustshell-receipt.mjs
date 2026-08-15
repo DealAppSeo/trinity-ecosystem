@@ -33,11 +33,12 @@ const positional = argv.filter((a, i) => !a.startsWith('--') && !['--store'].inc
 
 if (positional.length !== 1 || flag('--help')) {
   console.error(
-    'usage: trustshell-receipt <session.jsonl> [--sign] [--store <db>] [--git-reconcile] [--json]\n' +
+    'usage: trustshell-receipt <session.jsonl> [--sign] [--store <db>] [--git-reconcile] [--claims] [--json]\n' +
       '\n' +
       '  --sign            self-attest with TRUSTSHELL_SIGNING_KEY (bs58 Ed25519 seed)\n' +
       '  --store <db>      persist to a local SQLite file\n' +
       '  --git-reconcile   compare files the transcript claims were written against git diff\n' +
+      '  --claims          run T0 + T1 claim checking (T2 is not implemented)\n' +
       '  --json            print the receipt instead of the marker line\n'
   );
   process.exit(flag('--help') ? 0 : 2);
@@ -187,6 +188,8 @@ if (flag('--git-reconcile')) {
 const ruleset = {
   ...receiptLib.M2_RULESET,
   gitReconcile: flag('--git-reconcile') && gitChangedFiles !== undefined,
+  claimsT0: flag('--claims'),
+  claimsT1: flag('--claims'),
 };
 
 let receipt = await receiptLib.buildReceipt(parsed, {

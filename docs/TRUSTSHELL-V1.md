@@ -1,13 +1,14 @@
 # TrustShell v1 — specification
 
-**Status:** spec, with M1, M2 and M3 built. §10 is the ledger — M1 (transcript
-parser), M2 (session receipt) and M3 (independent offline verification) are done
-and proven; M4–M6 are not started. §3 and §4.2 carry corrections the M1 build
-forced on the spec that specified them; §4.1 and §12 carry M2's; §8 and §10
-carry M3's. §12 Q1 and Q2 are **decided**, not open.
+**Status:** spec, with M1–M4 built. §10 is the ledger — M1 (transcript parser),
+M2 (session receipt), M3 (independent offline verification) and M4 (T0/T1 claim
+checking) are done and proven; M5 and M6 are not started. §3 and §4.2 carry
+corrections the M1 build forced on the spec that specified them; §4.1 and §12
+carry M2's; §8 and §10 carry M3's; §4.3.1 carries M4's measurement. §12 Q1 and
+Q2 are **decided**, not open.
 **Date:** 2026-08-12, revised 2026-08-15
 
-All three milestones built so far falsified something this document asserted.
+Every milestone built so far has falsified something this document asserted.
 That is the document working, not failing — but it means the unbuilt half should
 be read as a plan, not a description.
 
@@ -235,6 +236,63 @@ panel of independent judges given *distinct lenses* (does the evidence exist; do
 it say what is claimed; would it reproduce), not N identical refuters — diversity
 catches failure modes redundancy cannot.
 
+### 4.3.1 Measured false-positive rate — M4, 2026-08-15
+
+§11 names T1 false positives as the way this feature dies, and requires
+measurement before shipping. Here is the measurement, including the part that
+does not flatter it.
+
+**Sample: one session.** `n=1`, 618 lines, 48 assistant text spans, 158 tool
+calls, one agent, one model, one repo. That is every real transcript present in
+the container. It is far too small to generalise from, and the numbers below
+should be read as "this did not cry wolf once" rather than as a rate. Widening
+the sample is the single cheapest thing that would improve this tier, and it is
+M6's job.
+
+| pass | contradictions raised | true | false | precision |
+| :-- | --: | --: | --: | :-- |
+| first draft | 2 | 0 | **2** | **0%** |
+| after tightening | **0** | 0 | 0 | undefined (no positives) |
+
+Both original findings were hand-labelled and both were wrong:
+
+1. *"CI is healthy — `b53ae9c` went fully green"* was linked to a failed `Bash`
+   call it had nothing to do with. The claim's evidence came from a different
+   tool entirely.
+2. *"[VERIFIED this session]"* was scored as a success assertion. `VERIFIED` is
+   this repo's **epistemic tag**, not a claim about the adjacent call.
+
+Three rule changes followed, each now a regression fixture in
+`scripts/check-claims.mjs`:
+
+- `clean`, `green` and `verified` were removed from the success vocabulary.
+  Words carrying a house meaning cannot be scored as assertions about adjacent
+  evidence.
+- Linking narrowed from *any failed call in the window* to **the immediately
+  preceding call**. A span typically follows several calls, and asserting
+  success about one while an unrelated other failed is ordinary correct
+  reporting — that was the structural cause of both false positives.
+- **T1 no longer emits `backed` at all.** It can refute; it cannot confirm. The
+  five `backed` verdicts the first draft produced were all long summary messages
+  sitting after an unrelated call that happened to succeed. Proximity to a green
+  tool does not establish that a sentence is supported by it, and scoring it so
+  would let a receipt reach VERIFIED on adjacency alone.
+
+**T0's rate is not measured, because T0 had nothing to find.** Across those 48
+spans there were **zero** `mcp__*__*` identifiers and **zero** backticked
+built-in tool names. [VERIFIED — independent grep of the assistant text blocks.]
+T0 fires correctly on synthetic input, so it is not dead; but its trigger shape —
+a tool identifier named in user-facing prose — appears to be **rare in real
+output**, which caps how much it can ever contribute. Its precision is `0/0`,
+undefined, and reporting it as 0% would be the two-outcome collapse again.
+
+**What the tiers catch, after all of that:** an agent asserting mechanical
+success (`exit 0`, `passed`, `no X found`) over an immediately preceding call
+that errored or was denied, and an agent claiming to have run a tool with no
+invocation anywhere in the session. **What they do not catch:** a fabricated
+outcome of a call that genuinely ran and genuinely succeeded — LESSONS A6 — which
+is T2 by construction and is counted as unchecked.
+
 **v1 ships T0 and T1 only.** T2 is specified here so the receipt schema has room
 for it, and gated behind a flag until its false-positive rate is measured on
 real sessions. Shipping a hallucination detector that cries wolf would destroy
@@ -408,7 +466,7 @@ mechanical, not clever, and it is the whole first-run experience.
 | M1 | Transcript parser | **DONE 2026-08-13.** `lib/trustshell/TranscriptParser.ts`, 42 assertions in `scripts/check-transcript-parser.mjs`, CLI `scripts/trustshell-parse.mjs`. Reproduces §3 on the live session; **0 phantom results**; 0 malformed lines; 0 unrecognised record types; 0 new `tsc` errors. Corrections it forced are folded into §3 and §4.2 above. |
 | M2 | Actions + spend receipt | **DONE 2026-08-15.** `lib/trustshell/receipt/` (types, canonical, build, sign, git, store-sqlite), 89 assertions in `scripts/check-receipt.mjs`, CLI `scripts/trustshell-receipt.mjs`. `audit_hash` stable across re-runs [VERIFIED on a live 294-line session: identical hash twice, `ts_…` id derived from it]. Storage and custody decided — see §12. Nine tamper mutations detected; four mutations of the checker itself caught, each compiled. **The receipt reads `NOT CHECKED`, and §12.5 explains why that is the correct output rather than a shortfall.** |
 | M3 | Independent offline verification | **DONE 2026-08-15, against a corrected target.** `scripts/trustshell-verify-receipt.mjs` — zero TrustShell imports, zero dependencies; canonical JSON, base58, base32, did:key decode, Ed25519 verify and the marker rule all re-implemented. 60 assertions in `scripts/check-receipt-verifier.mjs`, run as a **subprocess** so it cannot share module state. Twelve tamper mutations detected; a differential over twelve awkward canonicalisation shapes and six marker branches agrees with the builder on every one. Four mutations of the verifier caught, each compiled. **`@hyperdag/proof-verifier` cannot do this — see below.** |
-| M4 | T0 + T1 claim checking | Catches ≥1 real `LESSONS.md` entry; false-positive rate measured and published |
+| M4 | T0 + T1 claim checking | **DONE 2026-08-15.** `lib/trustshell/receipt/claims.ts`, 35 assertions in `scripts/check-claims.mjs`, `--claims` on the CLI. Catches the 2026-08-12 `scan-secrets` entry (reconstructed from LESSONS, not recovered): `git grep` exited 128, the agent reported *"No credential-shaped strings found"*, T1 contradicts it. FPR measured and published in §4.3.1 — **2 findings, 2 false positives, 0% precision on the first draft**; 0 raised after tightening, on a sample of **one session**. Parser bumped to 1.1.0 to expose claim spans. Five mutations caught — one survived first and exposed a **vacuous invariant**. |
 | M5 | `trustshell init` + MCP tools | `npx trustshell init` → working in Claude Code, receipt visible in-session |
 | M6 | Dogfood | Run against 10 real sessions from this repo; publish what it found **and what it missed** |
 

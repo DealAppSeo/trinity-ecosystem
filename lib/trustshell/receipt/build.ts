@@ -7,6 +7,7 @@
 
 import type { ParsedTranscript, ToolOutcome } from '../TranscriptParser';
 import { canonicalJson, receiptIdFromAuditHash, sha256Hex } from './canonical';
+import { checkClaims } from './claims';
 import {
   AUDIT_DOMAIN,
   M2_RULESET,
@@ -157,12 +158,21 @@ function spendFrom(parsed: ParsedTranscript, opts: BuildOptions): SpendBlock {
 }
 
 /**
- * M2 ships no claim checking, so every field here is zero and the marker logic
- * above turns that into NOT_CHECKED rather than VERIFIED. When M4 lands, this
- * is the only function that changes.
+ * M4. When no tier is enabled this returns all zeros, and `markerFor` turns that
+ * into NOT_CHECKED rather than VERIFIED — see TRUSTSHELL-V1 §12.5.
  */
-function claimsFrom(): ClaimsBlock {
-  return { total: 0, verified: 0, unchecked: 0, failed: 0, findings: [] };
+function claimsFrom(parsed: ParsedTranscript, ruleset: Ruleset): ClaimsBlock {
+  const r = checkClaims(parsed, { t0: ruleset.claimsT0, t1: ruleset.claimsT1 });
+  return {
+    total: r.total,
+    verified: r.verified,
+    unchecked: r.unchecked,
+    failed: r.failed,
+    // Sorted so the receipt hash does not depend on rule execution order.
+    findings: [...r.findings].sort((a, b) =>
+      `${a.tier}${a.evidenceRef}${a.claimSpan}`.localeCompare(`${b.tier}${b.evidenceRef}${b.claimSpan}`)
+    ),
+  };
 }
 
 export async function buildReceipt(
@@ -190,7 +200,7 @@ export async function buildReceipt(
 
     actions: actionsFrom(parsed, withRuleset),
     spend: spendFrom(parsed, withRuleset),
-    claims: claimsFrom(),
+    claims: claimsFrom(parsed, ruleset),
 
     internalErrors: [...(opts.internalErrors ?? [])].sort(),
   };
