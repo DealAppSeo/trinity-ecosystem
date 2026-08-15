@@ -54,15 +54,29 @@ them and treat a mismatch as this lane's bug.
 Encoded as data in `lib/trustshell/identity/nullifier.ts` (`CIRCUIT_CONTRACT`)
 so both sides can assert against one list rather than two readings of prose.
 
+**CORRECTED 2026-08-14 — the commitment is PRIVATE.** The first version of this
+contract made `commitment` a public input and called the result unlinkable. That
+was wrong: a commitment is stable by design, so publishing it beside every
+nullifier links all of a holder's presentations. Scope-varying nullifiers give
+unlinkability *across scopes*; they do nothing when a fixed identifier travels
+alongside. The holder now proves Merkle **membership** in a public group instead,
+as Semaphore does.
+
 ```
-public:  commitment, nullifier, domain, scope, tagCommit, tagNullifier
-private: secret
+public:  groupRoot, nullifier, domain, scope, tagCommit, tagNullifier
+private: secret, commitment, membership path
 
 commitment == H(tagCommit    ‖ secret)
 nullifier  == H(tagNullifier ‖ secret ‖ domain ‖ scope)
+MerkleVerify(commitment, membership) == groupRoot
 ```
 
-### Four properties a working proof can still lack
+The membership tree must use the **same parameter set** as the commitments — a
+tree of Poseidon2 leaves with SHA-256 internal nodes is two hash functions in one
+circuit for no benefit. `IBindingScheme` therefore carries `hashPair` alongside
+`commit`/`nullify`.
+
+### Six properties a working proof can still lack
 
 A circuit can produce a valid proof and be wrong in each of these ways. Worth
 checking explicitly rather than inferring from "it verifies":
@@ -76,6 +90,21 @@ checking explicitly rather than inferring from "it verifies":
    replayed as a nullifier for some `(domain, scope)`.
 4. **Absorption order is constrained, not merely conventional.** A permuted
    order is a different function that verifies fine against itself.
+5. **Membership is proven over the commitment the circuit COMPUTED**, not an
+   independent witness value. Otherwise a prover shows membership of someone
+   else's commitment while nullifying with their own secret — the borrowed-member
+   attack.
+6. **`groupRoot` is a root the verifier independently trusts.** A prover-supplied
+   root over a tree of their own construction proves membership of a group they
+   invented, which is no membership at all.
+
+### And one property no circuit can supply
+
+**Unlinkability is bounded by the group size.** A root over one commitment
+identifies the holder exactly; a root over five narrows them to five. The
+construction is sound at any size and the privacy is not. Any system reporting
+"unlinkable" must report the anonymity set alongside it — `describeAnonymitySet()`
+exists so the number travels rather than being assumed.
 
 ---
 

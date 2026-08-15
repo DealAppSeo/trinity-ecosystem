@@ -52,6 +52,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Ten-subsystem health scores against executed evidence, 2026-08-14 | `docs/ECOSYSTEM-HEALTH-2026-08-14.md` | re-scoring the subsystems yourself |
 | Poseidon2 parameters, the circuit contract, and why we do not implement it | `docs/POSEIDON2-PARAMETER-REQUEST.md` | choosing a parameter set independently |
 | The paste-ready Poseidon2 request to send the other lane | `docs/POSEIDON2-HANDOVER-MESSAGE.md` | rewriting the ask from scratch |
+| Agent execution loop: what is already built, what is wiring, what is new | `docs/AGENT-LOOP-SCOPE.md` | re-surveying the harness modules yourself |
 | Browser automation for agents: install, Chrome resolution, and what `doctor` gets wrong | `docs/AGENT-BROWSER.md` | the upstream README, which documents none of it |
 
 ---
@@ -72,6 +73,8 @@ unless the underlying world changed.
 | **Slot abandonment accounting** | Built, measured **zero** throughput delta, kept on correctness grounds only. | Sprint K |
 | **Per-domain reputation** | Priced at **+1.64pp** volume-weighted. **Not worth** rekeying `ReputationLedger`. Cheap alternative: stop ranking the 3 `peer_verify` agents against the other 9. | Sprint V |
 | **`hal_quorum_receipts` / `hal_quorum_validator_votes` migration** | **Declined deliberately.** No writer for those tables exists in this repo; the schema would have been invented. | Sprint K |
+| **Whether reputation decay can go in the circuit** | **No, and it is forced rather than chosen.** Decay is time-dependent: a score changes with **no new events**, so there is no leaf at the moment of decay for a circuit to constrain. In-circuit decay needs a trusted clock inside the proof — a separate, genuinely hard problem. The transition circuit proves the SEQUENCE; decay and shrinkage stay at read time in `EarnedMetrics`. | `STATUS.md` § Reputation as a constrained transition; `TRANSITION_CONTRACT.provesTheSequenceNotTheScore` |
+| **Whether a public commitment beside a nullifier is unlinkable** | **No — that is pseudonymity.** A commitment is stable by design, so publishing it beside every nullifier links all of a holder's presentations. Scope-varying nullifiers give unlinkability *across scopes* only. Fixed by moving the commitment to the witness and proving Merkle membership against a public group root, as Semaphore does. **Unlinkability is then bounded by the group size** and that number must be reported with any privacy claim. | `CIRCUIT_CONTRACT` v2, `describeAnonymitySet()`, LESSONS A13 |
 
 ## OPEN — and who owns it
 

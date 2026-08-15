@@ -28,6 +28,8 @@ const MODULES = [
   'capability.ts',
   'nonce-store.ts',
   'delegation.ts',
+  'harness-bundle.ts',
+  'caveat.ts',
 ];
 
 /**

@@ -48,10 +48,51 @@ from a thin one; the score stays in `privateWitness`. A non-positive threshold
 is refused, because an unevidenced agent scores exactly 0 and would clear it.
 
 **4b. Nullifier ↔ commitment contract — DONE, blocked on parameters**
-(`nullifier.ts`). The statement/witness shape and `CIRCUIT_CONTRACT` are
-written; the Poseidon2 scheme deliberately throws until the other lane supplies
-field, width, rounds, constants, matrices, absorption order and test vectors.
-See `docs/POSEIDON2-PARAMETER-REQUEST.md`. **This is the top open item.**
+(`nullifier.ts`, `CIRCUIT_CONTRACT` v2). The statement/witness shape is written;
+the Poseidon2 scheme deliberately throws until the other lane supplies field,
+width, rounds, constants, matrices, absorption order and test vectors. See
+`docs/POSEIDON2-PARAMETER-REQUEST.md`. **This is the top open item.**
+
+Corrected 2026-08-14: the commitment is **witness**, not a public input, and the
+holder proves Merkle membership against a public `groupRoot`. A stable public
+commitment beside every nullifier links every presentation — the first draft was
+pseudonymous and described as unlinkable.
+
+**4d. Reputation transition contract — DONE, blocked on the same parameters**
+(`reputation-transition.ts`, `TRANSITION_CONTRACT` v2). Reputation moves only by
+a constrained append to a committed history: `newRoot = H(prevRoot ‖
+eventCommitment)`, with the appender proving membership of the group authorized
+to write that subject's history, and a nullifier scoped to `subject ‖ epoch` so
+the write budget is explicit.
+
+**The circuit proves the sequence, never the score.** Decay and empirical-Bayes
+shrinkage are time-dependent — a score changes with no new events, so there is
+no leaf to constrain at the moment of decay — and stay at read time in
+`EarnedMetrics` with the clock as a public input. `observedAt` is asserted by
+whoever appended the event and is not constrained by anything.
+
+Four obligations are the verifier's and no circuit discharges them: spend the
+nullifier against a durable set; check `prevRoot` is the head *you* hold; trust
+`groupRoot` independently; control the epoch schedule. They are listed in
+`TRANSITION_CONTRACT.mustAlsoHold` so the next lane inherits the list rather
+than the assumption. **Nothing writes to this history yet** — wiring a producer
+is a separate, decided change, like the vault gate.
+
+**4c. Dual-auth memory access — PRIMITIVE BUILT, not wired** 
+(`lib/trustshell/identity/memory-authz.ts`). `MemoryRecall` decides how to
+retrieve and never asks whether the caller may; memory has no access control at
+all today. `authorizeMemoryAccess` answers "may this caller touch this
+namespace?" using the same attenuation logic that guards payments and vaults.
+
+Deliberately **not** wired into a live memory path: adding enforcement to a
+surface that has none breaks every existing caller at once. Wiring is a decided
+change, like the vault gate — and it should probably go through the same shadow
+step.
+
+Capability shape is `memory:<operation>:<namespace>`. Note `memory:*` grants
+**delete**; anyone meaning "all reads" must write `memory:read:*`. A test
+asserts that, because the over-broad grant works perfectly until the day an
+agent deletes something.
 
 **5. Selective-disclosure claim vocabulary.**
 `disclosure.ts` accepts arbitrary keys. A fixed vocabulary
@@ -97,14 +138,23 @@ signed grant is worse than no caveat, because it reads as a control.
    change on this branch with no executed evidence behind it.
 
 3. **Poseidon2 parameters from the repid-engine lane** — hand over
-   `docs/POSEIDON2-PARAMETER-REQUEST.md`. Blocks the real binding scheme; the
-   contract and tests are already written against it.
+   `docs/POSEIDON2-HANDOVER-MESSAGE.md` (paste-ready; full detail in
+   `docs/POSEIDON2-PARAMETER-REQUEST.md`). Blocks **two** circuits now — the
+   binding contract and the reputation transition — and both are written and
+   tested against it. Test vectors are the acceptance criterion; a mismatch is
+   this lane's bug.
 
-4. **Decide the `ControlProof` → `VaultPermission` wiring** (LESSONS A11).
-   Recommended: shadow mode — verify the proof, log agreement/disagreement
-   against the existing `human_custody_verified` boolean, change no behaviour.
-   That measures the migration before committing to it; if the two ever
-   disagree you learn it from a log rather than from a locked-out agent.
+4. **`ControlProof` → `VaultPermission`: SHADOW MODE BUILT, awaiting data.**
+   `lib/trustshell/CustodyShadow.ts` observes at the custody gate and changes
+   nothing. Run `SHADOW_ANALYSIS_SQL` after it has been live a while.
+
+   **Read `not_comparable` first.** Nothing presents a ControlProof to the vault
+   path yet, so early observations will be almost entirely that. It is the
+   measurement — it says adoption is zero — not a sign the two approaches agree.
+
+   The cutover decision needs `shadow_looser` to be zero or fully understood:
+   that is the direction where switching GRANTS access the live gate currently
+   refuses. `shadow_stricter` only tightens, which is recoverable.
 
 5. **PR #25** is open; #24 is merged.
 

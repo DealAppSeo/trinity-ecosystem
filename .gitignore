@@ -72,7 +72,17 @@ headroom.db
 # temp compile dir for check:identity
 .identity-check-*/
 
+# temp compile dir for check:custody-shadow
+.custody-shadow-check-*/
+
 # agent-browser runtime output (screenshots, HAR, traces, video). Derived
 # artefacts of a dev tool; the daemon writes here because ./agent-browser.json
 # sets screenshotDir. Machine-local config lives in ~/.agent-browser/, not here.
 .agent-browser/
+
+# Compiled output emitted next to TypeScript sources. lib/ is source-only: every
+# check script compiles to a temp dir. A stale .js beside its .ts drifts from
+# source silently and some resolvers prefer it. Committed once in e44c9f0 by a
+# `git add -A` after a tsc run that lacked --noEmit.
+lib/**/*.js
+!lib/**/*.config.js

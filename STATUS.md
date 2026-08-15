@@ -55,6 +55,12 @@ and it is isolated behind one interface.
 | `delegation.ts` | sub-agent chains — capability, audience **and time** attenuate per link |
 | `repid-predicate.ts` | measured RepID → predicate; evidence quality is public, score is not |
 | `nullifier.ts` | the circuit contract — statement/witness, and a placeholder that refuses |
+| `memory-authz.ts` | dual-auth memory access — read never implies write; fails closed |
+| `harness-bundle.ts` | the portable harness — parts signed together so they cannot be spliced |
+| `reputation-transition.ts` | reputation as a constrained append, not a mutable column — proves the sequence, never the score |
+| `harness/loop.ts` | the agent execution kernel — an agent cannot certify above what the harness observed |
+| `loop-authorizer.ts` | binds the loop to `ControlProof` — the first thing that asks this layer for permission |
+| `lib/mcp/client.ts` | the loop's tool surface — "unreachable" and "failed" never collapse |
 
 ---
 
@@ -212,6 +218,31 @@ something makes it prove which.
 
 ---
 
+## Custody shadow mode (LESSONS A11)
+
+`VaultPermission.ts:48` denies vault access on
+`agent_kya_registry.human_custody_verified` — `true` for five agents while
+`custodian_zkp_proof` is NULL in all twelve rows. A live authorization decision
+resting on an assertion nobody can re-check.
+
+`CustodyShadow` now watches that gate and **changes nothing**. Three properties,
+each mutation-tested:
+
+1. **Never alters the decision.** The legacy verdict is what the caller acts on.
+2. **Never throws into the caller.** An observability path that can break vault
+   access is worse than no observability — a malformed proof, a missing table
+   and a throwing client are all contained and recorded as `error`.
+3. **Expects to be uninformative at first, and says so.** Nothing presents a
+   proof yet, so early observations are almost all `not_comparable`. Reading
+   that as agreement would be this repo's own defect one layer up, so the
+   recorded detail states explicitly that it is *not* agreement.
+
+`shadow_looser` (legacy denies, proof allows) is reported separately from
+`shadow_stricter` rather than averaged into a disagreement rate: only one of
+those directions grants access the live gate refuses.
+
+---
+
 ## Credential rotation
 
 `scripts/rotate-erc8004-deployer.mjs` moves the ERC-8004 identities off the
@@ -249,19 +280,37 @@ needed, with test vectors as the acceptance criterion.
 
 ### The contract this lane owns
 
+**Corrected 2026-08-14 — the commitment is PRIVATE.** The first version of this
+contract made `commitment` a public input and called the result unlinkable. That
+was wrong. A commitment is stable by design, so publishing it beside every
+nullifier links all of a holder's presentations: scope-varying nullifiers give
+unlinkability *across scopes* and do nothing when a fixed identifier travels
+alongside. That is pseudonymity wearing unlinkability's name. The holder now
+proves Merkle **membership** in a public group, as Semaphore does.
+
 ```
-public:  commitment, nullifier, domain, scope, tagCommit, tagNullifier
-private: secret
+public:  groupRoot, nullifier, domain, scope, tagCommit, tagNullifier
+private: secret, commitment, membership path
+
          commitment == H(tagCommit    ‖ secret)
          nullifier  == H(tagNullifier ‖ secret ‖ domain ‖ scope)
+         MerkleVerify(commitment, membership) == groupRoot
 ```
 
-`CIRCUIT_CONTRACT` exports this as data, plus four ways a circuit can produce a
-valid proof and still be wrong: two independent secrets satisfying each relation
-separately; `domain`/`scope` as witness rather than public (a prover then picks
-them after seeing the challenge and unlinkability is forgeable); unconstrained
-tags letting a commitment replay as a nullifier; and an absorption order that is
-conventional rather than constrained.
+`CIRCUIT_CONTRACT` (version `zkrepid-binding-v2`) exports this as data, plus six
+ways a circuit can produce a valid proof and still be wrong: two independent
+secrets satisfying each relation separately; `domain`/`scope` as witness rather
+than public (a prover then picks them after seeing the challenge and
+unlinkability is forgeable); unconstrained tags letting a commitment replay as a
+nullifier; an absorption order that is conventional rather than constrained;
+membership proven over an independent witness value rather than the commitment
+the circuit computed (the borrowed-member attack); and a prover-supplied
+`groupRoot`, which proves membership of a group they invented.
+
+**And one property no circuit can supply: unlinkability is bounded by the group
+size.** A root over one commitment identifies the holder exactly.
+`describeAnonymitySet()` exists so that number travels with the claim rather
+than being assumed.
 
 ### Two levels of assurance, never conflated
 
@@ -280,6 +329,124 @@ identity proof, and the type will not let a caller blur it.
 | unlinkable | **no** — the signature names the signer | **yes**, per `(domain, scope)` |
 
 Neither subsumes the other, and that is the design rather than indecision.
+
+---
+
+## Reputation as a constrained transition
+
+`reputation-transition.ts`. The defect this targets is the one that produced
+LESSONS A11 and the retracted RepID figures alike: a value that can be *written*
+rather than *earned*. `human_custody_verified` is `true` for five agents with
+nothing behind it. If a score can only move through a transition a circuit
+constrains, forging it means forging history.
+
+### The boundary, which is forced rather than chosen
+
+```
+IN circuit      each event is well-formed, appended by a member of the group
+                authorized to write THIS subject's history, and chained onto the
+                previous root — nothing inserted, reordered, or removed.
+OUT of circuit  the score: EarnedMetrics' 30-day decay and empirical-Bayes
+                shrinkage, applied at READ time with the current clock as input.
+```
+
+Decay is time-dependent — a score changes with **no new events**, so there is no
+leaf at the moment of decay for a circuit to constrain. In-circuit decay needs a
+trusted clock inside the proof, which is a genuinely hard and separate problem.
+
+So the honest claim is *"these events happened, in this order, appended by
+authorized members, and none were inserted or removed"* — **not** "the score is
+3723". The score is a pure function of a proven sequence plus a public
+timestamp: strictly stronger than a number in a table, and weaker than a proven
+score, which nobody has. `TRANSITION_CONTRACT.provesTheSequenceNotTheScore`
+carries that sentence as data so it cannot be lost between the two lanes.
+
+```
+public:  prevRoot, newRoot, nullifier, domain, scope, groupRoot
+private: event, eventCommitment, secret, appenderCommitment, membership
+
+  eventCommitment    == H(TRANSITION_TAG ‖ subject ‖ signal ‖ value ‖ observedAt)
+  appenderCommitment == H(tagCommit ‖ secret)
+  nullifier          == H(tagNullifier ‖ secret ‖ domain ‖ scope)
+  MerkleVerify(appenderCommitment, membership) == groupRoot
+  newRoot            == H(prevRoot ‖ eventCommitment)
+  scope              == "reputation" ‖ subject ‖ epoch
+```
+
+**The scope binds the subject and an epoch, and both are load-bearing.** Without
+the subject, one write authorization is valid against *every* agent's history —
+a member granted the right to record TORCH's outcomes could spend it against a
+competitor. Without an epoch, a nullifier authorizes unbounded appends, which is
+the exact state append-only history exists to prevent. `scopeForSubject()`
+refuses an empty epoch rather than defaulting to one, because the granularity
+*is* the write budget.
+
+**`observedAt` is asserted, not proven.** A prover controls it. Read-time decay
+therefore rests on an assertion until a trusted time source exists, and
+`TRANSITION_CONTRACT.observedAtIsAsserted` says so rather than leaving it to be
+discovered.
+
+Four obligations are the **verifier's**, and no circuit can discharge them: the
+nullifier must be spent against a durable set; `prevRoot` must be the head the
+verifier holds (a prover supplying an old root forks the history and both
+branches verify); `groupRoot` must be independently trusted; and the epoch must
+advance on a schedule the verifier controls.
+
+### What mutation testing found here
+
+Nineteen mutations, seventeen killed on the first pass. The two survivors were
+both worth the run:
+
+- **A sorted (commutative) node hash survived** every assertion, because the
+  multi-event order test compares chains whose inner roots already differ. A
+  commutative node hash makes "root R extended by event E" indistinguishable
+  from the reverse. Now asserted at the single-append level, where it is visible.
+- **The borrowed-member attack survived as a compound mutation** — deleting the
+  appender reopen check *and* walking membership from the witness commitment.
+  Group leaves are public by construction, so an outsider can always obtain a
+  member's commitment and path; the secret is the only thing between them and an
+  append. Now has its own fixture.
+
+Two bugs were found before testing, by writing the assertions: `frontier` was
+declared in the witness and constrained by nothing (the generic form is now a
+test that mutates *every* field the contract declares), and the event encoding
+joined its fields with `''`, so `{value: 1, observedAt: '2026…'}` and
+`{value: 12, observedAt: '026…'}` produced one commitment with two reopenings.
+
+---
+
+## The portable harness (Priority 5)
+
+`harness-bundle.ts` is what an agent carries between hosts: identity, authority,
+reputation, disclosure, hash-pinned skills, and a memory *commitment*.
+
+No-lock-in is not satisfied by "our format is open". It is satisfied when a
+receiving host can verify everything the bundle asserts with no network, no
+registry, and no cooperation from the issuer. Every part is checkable from the
+bundle plus the receiver's own clock.
+
+**The property that matters most: parts cannot be spliced between bundles.**
+Each part is individually verifiable, which is exactly why the bundle needs its
+own signature over all of them together. Without it, anyone could take agent A's
+authority and agent B's reputation — both genuinely signed — and assemble a
+harness claiming a score that agent never earned. Every part verifying is not
+the same as the bundle being coherent, and that gap is where this kind of format
+usually fails.
+
+**A bundle is not a bearer token.** Verifying it establishes what the agent IS,
+not what it may do here: the embedded ControlProof is audience-bound, so
+presenting a bundle to a service it was not minted for verifies identity and
+grants nothing.
+
+Two things it deliberately does not claim:
+
+- **Skills are pinned, not attested.** The bundle carries content hashes and
+  says so — it cannot prove the host will *run* that content. The receiver must
+  compare each hash against what it loads.
+- **Memory travels as a commitment, never contents.** A portable bundle
+  carrying memory data is a data-exfiltration shape wearing a portability
+  costume. A malformed commitment is refused at pack time rather than accepted
+  as opaque bytes.
 
 ---
 

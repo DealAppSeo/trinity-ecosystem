@@ -76,11 +76,21 @@ export interface ComplianceReceipt {
   createdAt:          string;
 }
 
+import type { ControlProof } from './identity/control-proof';
+import type { DelegatedControlProof } from './identity/delegation';
+
 export interface VaultAccessRequest {
   vaultId:     string;
   agentName:   string;
   action:      'deposit' | 'withdraw' | 'rebalance';
   amountUSDC:  number;
+  /**
+   * Optional dual-auth proof. SHADOW MODE ONLY — it is observed and recorded,
+   * and does NOT affect whether access is granted. The live gate remains
+   * `agent_kya_registry.human_custody_verified`. See CustodyShadow.ts and
+   * LESSONS A11.
+   */
+  controlProof?: ControlProof | DelegatedControlProof;
 }
 
 export interface VaultAccessResult {
