@@ -295,6 +295,42 @@ contract-level splice. The test now exists and the mutant dies — **the survivo
 was a missing test, not a redundant condition**, and it was only distinguishable
 by constructing the case.
 
+## 5.6 EXPERIMENT 3 — envelope → handoff. **CHECKED, NO DEFECT.**
+
+Recorded because a negative result stops the next person re-running it.
+
+The question: a third party holds a `TrustEnvelope`; a handoff reader needs
+`Map<verdictHash, {verdict, contract}>`. Two modules both in the business of
+hashing verdicts is exactly where the "two canonical encodings that drift"
+hazard lives — and drift here would be silent, since a lookup miss caps every
+checkpoint to `evidence_not_supplied`, making an honest handoff read as
+unverifiable rather than as broken.
+
+**It composes.** Run end to end — real contract → real evaluator → real verdict →
+`packEnvelope` → `verifyEnvelope` → handoff citing it:
+
+```
+envelope verifies      : VERIFIED  evidenceMatches=true  authority=unverified
+handoff from envelope  : VERIFIED  checkpoint=VERIFIED   cap=(none)
+```
+
+**The reason is structural, not luck:** `verdict-envelope` *imports*
+`evidenceDigest` from `contracted-evaluator` rather than copying it, and computes
+no verdict hash of its own — the verdict hash has exactly one implementation, in
+`work-contract`. The hazard was designed out before it could happen.
+
+**No suite added.** A passing composition with a single hash implementation and
+existing `check:spine-e2e` coverage does not need a third guard; adding one would
+be suite bloat asserting what the import graph already forces. Recorded here
+instead, with the caveat that this becomes worth a suite the moment anything
+computes a verdict hash a second time.
+
+**One harness error worth naming**, because it looked briefly like a finding:
+the first run threw `Cannot read properties of undefined (reading 'scores')` —
+`packEnvelope` is `async` and the `await` was missing. A crash in a harness is
+not evidence about the code under test. Same rule as the mutation runner's
+`NO SUMMARY` state.
+
 ## 6. Logged, not built
 
 - **Surfacing referrals through `ContractedEvaluation`.** Today a referral is
