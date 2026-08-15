@@ -17,11 +17,11 @@
 --
 -- The CHECK constraint is what makes this a migration rather than a code
 -- change: `repid_score_events_event_type_check` enumerates 36 permitted
--- literals, and an INSERT of anything else fails. That is not hypothetical —
--- it is why the peer-verify writer has produced **zero rows**: no `PEER_VERIFY`
--- literal appears in the list. A writer whose event type is not in the CHECK
--- does not write, and the failure is a constraint violation at insert time
--- rather than anything visible in a dashboard.
+-- literals, and an INSERT of anything else fails. That is not hypothetical — it
+-- is ONE OF TWO reasons the peer-verify writer has produced **zero rows** (the
+-- other is below, and this migration does not fix it). A writer whose event type
+-- is not in the CHECK does not write, and the failure is a constraint violation
+-- at insert time rather than anything visible in a dashboard.
 --
 -- WHAT THIS DELIBERATELY DOES NOT DO.
 --
@@ -35,19 +35,45 @@
 --     proposal to award more than +1 for verified work is a NEW policy and must
 --     be argued on its own evidence, not smuggled in as "matching HAL".
 --
---   * It does NOT add a `PEER_VERIFY*` literal. That would fix the dead
---     peer-verify writer in the same statement, which is tempting and is why it
---     is called out here — but the exact literal that writer emits lives in
---     `DealAppSeo/repid-engine`, which is not in this session's scope. Adding a
---     guessed literal would leave the writer just as dead while making the
---     constraint look repaired. **Confirm the string from the writer, then add
---     it in a follow-up.**
---
 --   * It does NOT touch `ReputationSignal` in
 --     `lib/trustshell/identity/reputation-transition.ts`. That is a different
 --     vocabulary — 7 snake_case values, zero overlap with this one — and it is
 --     consumed by the other lane's circuit. Growing it is a cross-lane
 --     decision, not a migration.
+--
+--   * It DOES now add the two `PEER_VERIFY_*` literals — but read the next
+--     section before believing that revives anything.
+--
+-- THE PEER-VERIFY LITERALS, AND WHY THE CHECK IS ONLY HALF THE FIX.
+--
+-- An earlier draft of this migration refused to guess the literals. They are no
+-- longer guessed: `repid-engine@0b4b391` `src/services/peer-verify-score.ts`
+-- emits **`PEER_VERIFY_VERIFIED`** and **`PEER_VERIFY_DISPUTED`**, and its own
+-- header documents TWO independent, unconditional failures — not one:
+--
+--   1. **23514**, the CHECK violation. Neither literal is among the 36. THIS
+--      MIGRATION FIXES THIS ONE.
+--   2. **42P10**, `ON CONFLICT (idempotency_key)` resolves no arbiter. There is
+--      no plain unique constraint on that column — only two PARTIAL unique
+--      indexes, and a partial index can arbitrate only when the statement
+--      repeats its predicate. **THIS MIGRATION DOES NOT FIX THAT**, and 42P10
+--      aborts the statement before the row is built.
+--
+-- Both partial indexes were confirmed on the live database 2026-08-15:
+--
+--      uq_score_events_idempotency_key              WHERE idempotency_key IS NOT NULL
+--      repid_score_events_idempotency_peer_verify_uq WHERE idempotency_key LIKE 'peer_verify:%'
+--
+-- **So applying this migration does NOT revive the peer-verify writer.** It
+-- removes one of two blockers. The other is a one-line change in repid-engine —
+-- `ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL`, repeating
+-- the predicate so the partial index can arbitrate — and it is that repo's to
+-- make. Adding a plain unique constraint here would work too and is deliberately
+-- NOT done: it would duplicate an existing index to paper over a caller's SQL.
+--
+-- This is recorded at length because "one DDL, two fixes" was written in the
+-- sprint plan before the writer had been read, and a widened CHECK that leaves
+-- a writer just as dead is exactly the kind of repair that looks complete.
 --
 -- WHAT STILL BLOCKS AN ACTUAL ROW, after this is applied.
 --
@@ -104,7 +130,15 @@ alter table public.repid_score_events
     -- A verdict an outside observation later contradicted — the checker
     -- passed work that was not good. This is the one that makes the verifier
     -- seat accountable rather than merely present.
-    'VERIFY_FALSE_PASS'
+    'VERIFY_FALSE_PASS',
+
+    -- ── the dead peer-verify writer's literals ────────────────────────────
+    -- Read from repid-engine@0b4b391 src/services/peer-verify-score.ts, not
+    -- guessed. Adding them clears error 23514 and NOT error 42P10; see the
+    -- header. The writer stays dead until its ON CONFLICT repeats the partial
+    -- index predicate.
+    'PEER_VERIFY_VERIFIED',
+    'PEER_VERIFY_DISPUTED'
   ]));
 
 comment on constraint repid_score_events_event_type_check

@@ -275,7 +275,7 @@ Each of these has already cost a sprint or a retraction.
 | # | ask | unblocks |
 |---|---|---|
 | **1** | **Railway redeploy of the Trinity fleet.** Down 29 days; the fleet's own alert says *"Manual redeploy required. Autonomous redeploy disabled."* | W0, and every live measurement in W3/W4 |
-| **2** | **Apply `supabase/migrations/20260815190000_work_seat_event_types.sql`** — widens the `event_type` CHECK for `WORK_*`/`VERIFY_*`. Written, unapplied, inert on its own (widens a CHECK, writes no rows) | W2. **It does NOT fix peer-verify** — that literal lives in repid-engine and was not guessed; confirm the string, then add it in a follow-up |
+| **2** | **Apply `supabase/migrations/20260815190000_work_seat_event_types.sql`** — widens the `event_type` CHECK for `WORK_*`/`VERIFY_*`. Written, unapplied, inert on its own (widens a CHECK, writes no rows) | W2. **The peer-verify literals are now in it** (`PEER_VERIFY_VERIFIED`/`PEER_VERIFY_DISPUTED`, read from `repid-engine@0b4b391`) — **but it still does not revive that writer**: a second, independent failure (**42P10**, `ON CONFLICT` resolving no arbiter against two PARTIAL unique indexes) needs a one-line change in repid-engine. "One DDL, two fixes" was wrong twice over |
 | **2b** | **A DID → `repid_agents.id` mapping.** `agent_id` is a uuid FK; a verdict names a DID; `identity_claims` and `sandbox_repid_credentials` are both empty | any row at all. Without it W2 cannot name the agent a verdict is about |
 | 3 | Decision: does the XAI lane accept a doer leaf in `ReputationSignal`? | the circuit half, W4+ |
 
