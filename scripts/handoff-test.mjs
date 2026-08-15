@@ -257,7 +257,78 @@ await check('A VERDICT THAT DOES NOT VERIFY AS VERIFIED CANNOT BACK A CLAIM', as
     evidence: new Map([[failed.verdictHash, { verdict: failed.verdict, contract: failed.contract }]]),
   });
   eq(r.checkpoints[0].effective, 'FAILED', 'evidence that says FAILED must not read as VERIFIED');
-  eq(r.checkpoints[0].capReason, 'evidence_invalid', 'reason');
+  // WAS `evidence_invalid` UNTIL 2026-08-15, and the comment above was already
+  // the argument against it: "citing evidence against itself" is not the same
+  // fact as "the citation is broken". Measured, they were indistinguishable —
+  // same cap reason AND same effective outcome, no field separating them. The
+  // comment described the distinction; the assertion asserted its opposite.
+  eq(r.checkpoints[0].capReason, 'contradicted_by_evidence', 'reason');
+  match(r.checkpoints[0].detail, /overclaim, not a gap/, 'and the detail must name it as one');
+});
+
+await check('EVIDENCE THAT IS ACTUALLY BROKEN READS DIFFERENTLY FROM AN OVERCLAIM', async () => {
+  // This path had NO coverage before 2026-08-15. The single assertion naming
+  // `evidence_invalid` was on the test above, which supplies a genuine,
+  // correctly-bound verdict — so the broken-citation branch was never exercised
+  // and the label was being proven by the wrong case.
+  const failed = await evidenceFor('task-1', { outcome: 'FAILED', score: 0.1 });
+  const tampered = structuredClone(good.verdict);
+  tampered.signature = tampered.signature.slice(0, -2) + (tampered.signature.endsWith('A') ? 'B' : 'A');
+  const r = await verifyHandoff({
+    handoff: await sign({
+      checkpoints: [{
+        id: 'cp1', statement: 'x', outcome: 'VERIFIED',
+        verdictHash: good.verdictHash, contractHash: good.contractHash,
+        checkerDid: checker.did, detail: 'cites a tampered verdict',
+      }],
+    }),
+    evidence: new Map([[good.verdictHash, { verdict: tampered, contract: good.contract }]]),
+  });
+  eq(r.checkpoints[0].effective, 'FAILED', 'a broken citation cannot back a claim either');
+  eq(r.checkpoints[0].capReason, 'evidence_invalid',
+    'A CORRUPT CITATION MAY BE TRANSPORT OR A BUG; AN OVERCLAIM IS THE AGENT CONTRADICTING ITSELF');
+  // The two must not be reported the same way. Asserted as a comparison rather
+  // than two literals, so the property survives a rename of either constant.
+  if (r.checkpoints[0].capReason === 'contradicted_by_evidence') {
+    throw new Error('broken evidence must not be reported as an overclaim');
+  }
+  eq(failed.contract.taskId, 'task-1', 'fixture sanity: the task must match, or wrong_task would mask this');
+});
+
+await check('A VERDICT NOT BOUND TO THE SUPPLIED CONTRACT IS BROKEN EVIDENCE, NOT AN OVERCLAIM', async () => {
+  // Found by mutation: dropping `boundToContract` from the soundness test
+  // survived every assertion. It is reachable, and it is a contract-level
+  // splice — a genuinely signed verdict answering contract A, presented against
+  // contract B. Same taskId, so `wrong_task` does not fire; same verdict hash,
+  // so `hash_mismatch` does not either. Only `boundToContract` separates it.
+  //
+  // It must read as evidence_invalid: the agent's citation does not hang
+  // together, which is a different accusation from claiming the opposite of
+  // sound evidence.
+  const unsignedB = {
+    version: CONTRACT_DOMAIN, taskId: 'task-1', deliverable: 'a DIFFERENT thing',
+    criteria: [{ id: 'c1', statement: 'it works', minScore: 0.9 }],
+    doerDid: agent.did, checkerDid: checker.did, proposedAt: '2026-08-15T00:00:00.000Z',
+  };
+  const { doerSignature } = await proposeContract({ unsigned: unsignedB, doerKey: agent.privateKey });
+  const contractB = await countersignContract({ unsigned: unsignedB, doerSignature, checkerKey: checker.privateKey });
+  const { contractHash: hashB } = await verifyContract(contractB);
+  if (hashB === good.contractHash) throw new Error('fixture is not distinct: both contracts hash the same');
+
+  const r = await verifyHandoff({
+    handoff: await sign({
+      checkpoints: [{
+        id: 'cp1', statement: 'x', outcome: 'VERIFIED',
+        verdictHash: good.verdictHash, contractHash: good.contractHash,
+        checkerDid: checker.did, detail: 'verdict for contract A, contract B supplied',
+      }],
+    }),
+    // The verdict is genuine and unmodified; only the contract it is checked
+    // against is the wrong one.
+    evidence: new Map([[good.verdictHash, { verdict: good.verdict, contract: contractB }]]),
+  });
+  eq(r.checkpoints[0].capReason, 'evidence_invalid',
+    'AN UNBOUND VERDICT IS A BROKEN CITATION, whatever its signature says');
 });
 
 await check('a padded checker DID does not escape the self-certification check', async () => {

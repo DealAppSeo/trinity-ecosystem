@@ -215,7 +215,87 @@ The task asked for help-or-hinder, so both directions were checked:
   and no human seat. The system now correctly declines to fabricate an answer;
   who picks it up is unbuilt.
 
-## 5. Logged, not built
+## 5. EXPERIMENT 2 — the same lens, pointed at `handoff.ts`
+
+The §1 defect generalises: **where two components exchange a value from a small
+enumeration, check that they mean the same thing by each case.** Applied to the
+other freshly-merged module, it found a second instance in under an hour — this
+time inside one file rather than between two.
+
+### 5.1 The candidate
+
+`CheckpointCapReason` documents `evidence_invalid` as *"The supplied verdict does
+not verify."* But `verifyCheckpoint` returns it for **two different facts**:
+
+- the citation is **broken** — bad signature, or not bound to its contract
+- the citation is **sound and says FAILED** — the agent claimed VERIFIED against
+  evidence in its own hands that says otherwise
+
+Only the second is misconduct, and it is the sharpest possible instance of the
+transitive claim inflation the file's header says it exists to close.
+
+### 5.2 Result — CONFIRMED, and worse than hypothesised
+
+Run against **real artifacts from the real pipeline** — real contract, real
+`createContractedEvaluator`, real signed verdict — not hand-built fixtures:
+
+| case | verdict verifies as | claimed → effective | `capReason` |
+|---|---|---|---|
+| **A** valid evidence saying FAILED (overclaim) | FAILED, signature genuine | VERIFIED → FAILED | `evidence_invalid` |
+| **B** tampered signature | — | VERIFIED → FAILED | `evidence_invalid` |
+| **C** control, valid and VERIFIED | VERIFIED | VERIFIED → VERIFIED | *(none)* |
+
+**The cap reason AND the effective outcome were identical.** No field separated
+them at all — a reader triaging capped checkpoints could not distinguish a
+transport corruption from an agent caught contradicting its own evidence.
+
+### 5.3 The tell: the file already had the rule, applied to one branch
+
+`wrong_task` is FAILED rather than NOT_CHECKED, and the header says exactly why:
+
+> *That is not a gap in the evidence; it is evidence of a mismatch.*
+
+That is the same argument, already written, already agreed. It had been applied
+to the splice case and not to this one. **Same shape as LESSONS A19** — a
+documented rule enforced in one place out of two.
+
+**And the test said so too.** The existing assertion's own comment reads *"citing
+evidence against itself, which is worse than citing none"* — then asserted
+`evidence_invalid`, the code meaning the opposite. The author of the other lane
+saw the distinction and had no vocabulary to express it.
+
+### 5.4 The fix, and the coverage hole it exposed
+
+`verifyVerdict` **already returns** `signatureValid` and `boundToContract`;
+`verifyCheckpoint` was collapsing them. Added `contradicted_by_evidence`,
+selected on `signatureValid && boundToContract`. It is a verification **output**,
+never part of `handoffPayload` — **no signed byte moves.**
+
+Then the sharper finding: **`evidence_invalid` had no test coverage at all.** The
+single assertion naming it was the one on case A — so the label was being proven
+by the wrong case, and the genuinely-broken-citation branch had never been
+exercised. Two tests added, not one.
+
+### 5.5 Verification
+
+**25 assertions (was 23), 4/4 mutants killed, 0 uncompilable.**
+
+| mutant | result |
+|---|---|
+| always `evidence_invalid` *(= the pre-fix code)* | **KILLED** |
+| always `contradicted_by_evidence` | **KILLED** — 2 assertions |
+| soundness ignores `boundToContract` | **KILLED** *(survived at first — see below)* |
+| soundness ignores `signatureValid` | **KILLED** |
+
+The `boundToContract` mutant **survived the first run**, and the honest reading
+was that the conjunct might be dead code. It is not: a genuinely signed verdict
+answering contract A, presented against contract B with the same `taskId`, passes
+`wrong_task` and `hash_mismatch` and is separated *only* by that field. A
+contract-level splice. The test now exists and the mutant dies — **the survivor
+was a missing test, not a redundant condition**, and it was only distinguishable
+by constructing the case.
+
+## 6. Logged, not built
 
 - **Surfacing referrals through `ContractedEvaluation`.** Today a referral is
   visible in `decisions` and in the opinion, but the evaluator flattens it to

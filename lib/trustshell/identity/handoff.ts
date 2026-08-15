@@ -225,8 +225,25 @@ export type CheckpointCapReason =
   | 'no_evidence_cited'
   /** Cited a verdict the reader was not given. Honest handoffs land here. */
   | 'evidence_not_supplied'
-  /** The supplied verdict does not verify. */
+  /** The supplied verdict is broken — bad signature, or not bound to its contract. */
   | 'evidence_invalid'
+  /**
+   * The supplied verdict is SOUND and it says the work did not pass.
+   *
+   * Split out from `evidence_invalid` 2026-08-15 after measuring that the two
+   * were indistinguishable: same cap reason AND same effective outcome, so no
+   * field separated them. They are not the same fact. A corrupt citation may be
+   * transport or a bug. **A sound verdict from an independent checker saying
+   * FAILED, handed off as a VERIFIED checkpoint, is the agent contradicting
+   * evidence in its own hands** — the sharpest instance of the transitive claim
+   * inflation this file's header says it exists to close, and the one a reader
+   * most needs to see.
+   *
+   * This applies the rule the file already states for `wrong_task`: *not a gap
+   * in the evidence, but evidence of a mismatch.* The rule was written and then
+   * applied in one branch out of two.
+   */
+  | 'contradicted_by_evidence'
   /** The verdict's contract names a different task. A splice. */
   | 'wrong_task'
   /** The cited hashes do not match the supplied evidence. */
@@ -462,11 +479,20 @@ async function verifyCheckpoint(
   }
 
   if (verification.outcome !== 'VERIFIED') {
+    // THE CITATION IS SOUND, SO WHAT IT SAYS IS THE AGENT'S OWN EVIDENCE.
+    // `signatureValid` and `boundToContract` were already computed and already
+    // returned; collapsing them into one cap reason threw away the only thing
+    // that separates a broken citation from an overclaim.
+    const sound = verification.signatureValid && verification.boundToContract;
     return {
       ...base,
       effective: weaker('VERIFIED', verification.outcome),
-      capReason: 'evidence_invalid',
-      detail: `the cited verdict does not verify as VERIFIED: ${verification.detail}`,
+      capReason: sound ? 'contradicted_by_evidence' : 'evidence_invalid',
+      detail: sound
+        ? `the cited verdict is sound and reports ${verification.outcome}: ${verification.detail}. ` +
+          'The checkpoint claimed VERIFIED against evidence the agent was holding that says ' +
+          'otherwise — this is an overclaim, not a gap.'
+        : `the cited verdict does not verify as VERIFIED: ${verification.detail}`,
     };
   }
 
