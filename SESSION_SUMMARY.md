@@ -148,10 +148,22 @@ carries all four corrections in place:
 2. **§8's `@hyperdag/proof-verifier` cannot verify a receipt.** It is a Plonky3
    STARK verifier for `{agent_id, repid_score, threshold, tier}`. Handed a receipt
    it returns `deser: io error`. [VERIFIED — installed and invoked.]
+
+   [PROBED 2026-08-15: `@hyperdag/proof-verifier@0.2.0` — installed and invoked.
+   Plonky3 STARK verifier; public statement is `{agent_id, repid_score, threshold,
+   tier}`. Handed anything else it returns `verify failed: deser: io error`. It
+   cannot verify a session receipt.]
 3. **§9's package table was wrong twice.** `@hyperdag/trustshell@1.3.0` is the
    HAL/RepID SDK against a live backend — zero occurrences of `transcript`,
    `audit_hash`, `session_receipt` in `dist/`. Its `verify` command already means
    something else, so the spec's `trustshell verify <session>` would collide.
+
+   [PROBED 2026-08-15: `@hyperdag/trustshell@1.3.0` and `@hyperdag/trustshell-mcp@1.0.0`
+   — installed and inspected. Both are the HAL/RepID SDK against a live backend.
+   Searching the published `dist/` of both for `transcript`, `audit_hash` and
+   `session_receipt` returns zero occurrences of any of the three. `trustshell`
+   already ships a `verify` that means something incompatible, so the CLI name the
+   spec proposed would have collided. Neither is the receipt library §9 described.]
 4. **§4.3's T1 cried wolf.** See the measurement below.
 
 **§12 Q1, Q2 and Q3 are now decided** (local SQLite; per-developer key;

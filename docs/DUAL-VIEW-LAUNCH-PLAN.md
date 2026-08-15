@@ -116,6 +116,13 @@ edges. If the two views would render the same node set, we built the wrong one.
 
 ## 3. Hard parts first — the honest critical path
 
+[PROBED 2026-08-15: `@hyperdag/proof-verifier@0.2.0` — installed and invoked. A Plonky3 STARK verifier; public statement `{agent_id, repid_score, threshold, tier}`. Handed anything else it returns `verify failed: deser: io error`. It cannot verify a session receipt.]
+
+[PROBED 2026-08-15: `@hyperdag/trustshell@1.3.0` — installed from npm. HAL cross-LLM verification, portable RepID, A2A service purchase, against a LIVE BACKEND. CLI: `verify | repid | proof | badge | version`. **Zero** occurrences of `transcript`, `audit_hash` or `session_receipt` in `dist/`. Its `verify` already means "verify an LLM output".]
+
+[PROBED 2026-08-15: `@hyperdag/trustshell-mcp@1.0.0` — installed from npm. Registers `verify_output`, `get_repid`, `present_proof`, `verify_proof`, `buy_service`, `list_services`. Same product as `@hyperdag/trustshell`; zero transcript/receipt content in `dist/`.]
+
+
 The instruction was to build the hard parts first and bridge the wiring gaps.
 Ranked by *how much downstream work it unblocks* × *how impossible it is to
 fake*:

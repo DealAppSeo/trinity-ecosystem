@@ -3,6 +3,13 @@
 
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import type { ComplianceReceipt, KYAComplianceResult, BFTConsensusProof } from './types';
+import {
+  halReceiptAuditPreimage,
+  halReceiptRow,
+  type HalClassificationInput,
+} from './hal-receipt';
+
+export { halReceiptAuditPreimage, halReceiptRow, type HalClassificationInput };
 
 export class ComplianceReceiptGenerator {
   private get supabase() { return getSupabaseAdmin(); }
@@ -115,6 +122,58 @@ export class ComplianceReceiptGenerator {
     }
 
     return receipt;
+  }
+
+  /**
+   * Mint a receipt for a HAL classification.
+   *
+   * WHY THIS EXISTS. Until 2026-08-15 this table was payment-shaped at the
+   * constraint level — `payment_amount_usdc` and `recipient_address` were NOT
+   * NULL — so the only event that could mint a receipt was a payment. HAL
+   * classifications, the largest real signal in the system (147,703 rows), had
+   * nowhere to be recorded. The migration added a `receipt_kind` discriminator;
+   * this is the writer for the new kind.
+   *
+   * WHAT IT DELIBERATELY DOES NOT CLAIM. A HAL classification is not a payment
+   * and not an authorisation, so:
+   *
+   *   - `bft_passed` is NULL, not false. The panel did not vote on this. Three
+   *     outcomes, never two — and every one of the 12 pre-existing rows had to
+   *     be retracted precisely because a placeholder recorded a pass for a vote
+   *     that never happened.
+   *   - `kya_verified` is false. No KYA check runs on this path; recording true
+   *     would assert a check nobody performed.
+   *   - payment fields stay NULL. The shape constraint enforces this, so a
+   *     future edit that sets them fails loudly at the database rather than
+   *     producing a receipt claiming a transfer of nothing.
+   *
+   * IDEMPOTENT. A partial unique index on `hal_classification_id` makes a repeat
+   * mint fail rather than duplicate. Replay over a historical corpus is a job
+   * that gets interrupted and resumed; without that, a second pass silently
+   * doubles the corpus and every rate computed from it is wrong.
+   */
+  async generateForHalClassification(
+    c: HalClassificationInput
+  ): Promise<{ receiptId: string; auditHash: string }> {
+    const receiptId = crypto.randomUUID();
+    const auditHash = await this.sha256(halReceiptAuditPreimage(c, receiptId));
+
+    const { error } = await this.supabase
+      .from('kya_compliance_receipts')
+      .insert(halReceiptRow(c, receiptId, auditHash));
+
+    // Idempotent by construction: a partial unique index on
+    // hal_classification_id makes a repeat mint fail rather than duplicate.
+    // Replay over a 147,703-row corpus gets interrupted and resumed; without
+    // that index a second pass silently doubles the corpus and every rate
+    // computed from it is wrong. The caller distinguishes the duplicate case.
+    if (error) {
+      throw new Error(
+        `HAL receipt for classification ${c.id} was NOT persisted: ${error.message}`
+      );
+    }
+
+    return { receiptId, auditHash };
   }
 
   private async sha256(data: string): Promise<string> {

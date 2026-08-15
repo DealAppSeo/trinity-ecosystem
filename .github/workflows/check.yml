@@ -138,3 +138,41 @@ jobs:
         with:
           path: .secret-history-state.json
           key: secret-history-${{ github.run_id }}-${{ github.run_attempt }}
+
+  # A SEPARATE JOB, deliberately.
+  #
+  # `mutate` breaks each invariant on purpose and requires the suite that claims
+  # to protect it to go red. It re-runs a suite per mutation, so folding it into
+  # `check` above would add minutes to the gate everyone waits on. Run in
+  # parallel, it costs nothing anybody notices.
+  #
+  # WHY IT IS A GATE AND NOT A REPORT. A surviving mutation means an assertion
+  # is missing, or is asserted over a situation no fixture reaches. The second
+  # kind is invisible from a green run — this repo shipped one on 2026-08-15,
+  # inside the suite for the tool built to catch exactly that class. A report
+  # nobody reads would not have caught it; a red build does.
+  #
+  # No `continue-on-error` and no `|| true`: this job is allowed to fail the run.
+  mutate:
+    runs-on: ubuntu-latest
+    steps:
+      # v7, not v4, deliberately — PRs #39 and #40 bump the `check` job's pins
+      # from v4 and are open right now. A new job landing on v4 would reintroduce
+      # exactly what they remove, dependabot would reopen them, and while both
+      # versions coexisted in this file each `uses: actions/checkout@v4` line
+      # would be an ambiguous target for their one-line diff. v4 also emits the
+      # Node-20 deprecation warning already visible in this workflow's logs.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      # The runner restores every mutated file in a `finally`, on any signal, and
+      # verifies the restore byte-for-byte. `git diff --exit-code` afterwards is
+      # the independent check on that claim — a mutation run that leaves the tree
+      # dirty has corrupted the thing it was measuring.
+      - name: mutation gate
+        run: npm run mutate
+      - name: sources restored
+        run: git diff --exit-code

@@ -60,7 +60,10 @@
     "check:custody-shadow": "node scripts/check-custody-shadow.mjs",
     "check:deps": "node scripts/check-deps.mjs",
     "check:types": "tsc --noEmit",
-    "check:runner": "node scripts/check-runner-test.mjs"
+    "check:runner": "node scripts/check-runner-test.mjs",
+    "check:probes": "node scripts/check-probes-selftest.mjs && node scripts/check-probes.mjs",
+    "mutate": "node scripts/mutate.mjs",
+    "check:hal-receipt": "node scripts/check-hal-receipt.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

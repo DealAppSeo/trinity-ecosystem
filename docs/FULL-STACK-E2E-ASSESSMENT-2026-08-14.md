@@ -202,6 +202,12 @@ Serves a 126,125-byte Next.js app, 200, from Vercel. The `trustshell` repo is re
 work: 130 files, `@hyperdag/trustshell@1.3.0`, a `publish-sdk.yml` workflow, 6 test
 files.
 
+[PROBED 2026-08-15: `@hyperdag/trustshell@1.3.0` — installed and inspected. It is
+the HAL/RepID SDK against a live backend, not a receipt library: searching its
+published `dist/` for `transcript`, `audit_hash` and `session_receipt` returns zero
+occurrences of any of the three. Named here only as evidence that the `trustshell`
+repo ships a real package; nothing in this document depends on what it does.]
+
 But `/api/version` **404s** — so *which commit is live cannot be determined from
 outside*. Same for `repid.dev`, `trustrails.dev`, `hyperdag.org`, `trustchat.dev`
 and `aisocialmirror.com`: **6 of the 7 surfaces have no deploy-provenance endpoint
