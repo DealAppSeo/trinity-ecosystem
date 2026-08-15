@@ -16,9 +16,17 @@ headed *"Honest inventory [disk, this pass]"*. **That inventory was not taken
 against this repository.** Absent here: `dual-auth-gate.ts`, `src/trust-identity/`,
 `/start`, `/run/[agentId]`, `controller-pwa`, `/api/v1/hitl`, `email-otp.ts`,
 `agent-naming.ts`, `task-lineage.ts`, `graph-rag/*`, `DESIGN_PRINCIPLES.md`. The
-app has **three** routes (`/`, `/login`, `/dashboard`). We are on **Next 14.2 /
+app has **three** routes (`/`, `/login`, `/dashboard`). We were on **Next 14.2 /
 React 18.3**, not Next 16 / React 19. [VERIFIED 2026-08-15 — `find` + `grep -ril`
 over the tree excluding `node_modules`/`.git`/`.next`, plus `package.json`.]
+
+> **SUPERSEDED 2026-08-15, later the same day.** The stack is now **Next 16.3.1 /
+> React 19** — `b7c7177`, PR #43. The upgrade was forced by security, not by the
+> dual-view plan: 21 Next CVEs are fixed in no release earlier than 16.3.1, so
+> every 14.x and 15.x is inside the vulnerable range. **The "stack pinned to
+> React 18" line below is therefore out of date** — anything the UI lane deferred
+> *because* of React 18 is worth re-opening, and any React-19-only API is now
+> available. The route count is unchanged.
 
 Presumably they are in `repid-engine`, which that session had in its workspace.
 **NOT CHECKED** — see access above. PRIOR-WORK-INDEX rule 2 applied to a file
@@ -1075,4 +1083,93 @@ against rather than a guess.
 npm run check                    # exit 0
 node scripts/check-identity.mjs  # expect 143, VERIFIED
 npm run test:e2e                 # expect 33 VERIFIED, 0 FAILED, core 10/10
+```
+
+---
+
+# SESSION SUMMARY — 2026-08-15, second session (claude-opus-5, cloud/scheduled)
+
+Surface = **cloud/scheduled** (Claude Code Remote, ephemeral container).
+Access = GitHub **yes** (MCP), Supabase **yes** (MCP only — direct PostgREST is
+proxy-denied), Railway **no**, cross-repo (`repid-engine`, `hyperdag`,
+`trustchat`) **no**.
+
+Branch `claude/e2e-mvp-packaging-plttzn`. **Both PRs merged: #37, #43.**
+
+## Landed
+
+**`3c70330` — PR #37.** Thirteen `"latest"` specifiers pinned to the lockfile
+versions (three of them sign or transmit credentials); grouped Dependabot so
+patches arrive as one weekly PR and majors separately. `SECURITY.md` added,
+stating scope honestly rather than favourably. All patent language removed at
+the owner's instruction — a stray `tmp-hyperdag-readme.md` carried both the
+patent text and every working-tree secret-scan finding, so deleting it took the
+scan to clean. `docs/AGENT-LOOP-PROMPTS.md`: build-time lanes split by file path
+so concurrent agents never write the same file, verify lane rotating to whoever
+did not author the sprint, plus a runtime section for T12.
+
+**`b7c7177` — PR #43.** npm advisories **12 → 9 total, 12 → 6 production-only**.
+Next **14.2.35 → 16.3.1** with React 19 (21 CVEs, fixed in no earlier release),
+Turbopack config migrated. `agent0-sdk` moved to devDependencies — one operator
+script imports it, never app code. `scripts/check-deps.mjs` added to
+`npm run check`. Lint restored: it had **never run** (eslint floated to 10, which
+`eslint-plugin-react` supports at no version; ESLint 10 also ignores
+`.eslintrc.json` outright, so the project linted zero rules and exited 0).
+
+## REAL vs STUB
+
+**REAL, executed this session:** `npm run check` exit 0 on merged `main` from a
+clean `npm ci`; `tsc --noEmit` 0 errors; `next build` 0 (local + CI + Vercel
+preview); `test:e2e` 33 VERIFIED / 4 NOT CHECKED / 0 FAILED, core 10/10;
+`check:trust` 9 ENFORCED; `check:deps` 5 VERIFIED, mutation-tested with 4 mutants
+all killed (floating specifier, `next` reverted to 14.2.35, the exact
+`@solana/web3.js` → 0.0.3 downgrade, and an unreadable lockfile which must report
+NOT CHECKED rather than pass).
+
+**NOT CHECKED:** every deployed surface. Two majors of Next shipped with no
+post-deploy observation — `app.aitrinitysymphony.com` and `www` are proxy-denied
+from an agent session. `GET /api/version` answers "which commit, which surface"
+via `pg_net` and is the cheapest confirmation. Also NOT CHECKED: the live
+Supabase schema (e2e ran against the stub), cross-instance nonce replay, BFT
+consensus, Solana broadcast.
+
+**Refused, with reasons recorded:** `npm audit fix --force`. On this tree it
+proposes `@solana/web3.js` 1.98.4 → **0.0.3**, `@solana/spl-token` 0.4.15 →
+0.1.8, `agent0-sdk` 1.7.1 → 1.5.3 — all three already the latest published, so
+the resolver walks backwards past the advisory database. The count would read
+zero over six-year-old code on the live payment path. `LESSONS.md` **A16**.
+
+## BLOCKED_FOR_SEAN
+
+1. **Rotate the leaked EVM deployer key** (`0xdf6b…271d`, ERC-8004 ids
+   3747/3748/3750). Runbook `docs/KEY-ROTATION.md`, script
+   `scripts/rotate-erc8004-deployer.mjs` (dry-run default, `--confirm-to`
+   required, gas sufficiency verified). Deliberately not executed here: running
+   it would pull a live private key into a context that keeps a transcript.
+2. **`repid-decay-weekly` is OFFLINE on Railway.** RepID decay is time-dependent,
+   so scores are **stale-high** right now and no dashboard shows it — UptimeRobot
+   reads 100% uptime because liveness is not production. Needs Railway access.
+3. **Atlas / Raven / `update-signals` edge functions paused ~6 weeks**, unnoticed,
+   and their source is **not in this repo** (`supabase/functions/` holds only
+   `agent-tools` and `embed-memory-backfill`). Fix the source gap before giving
+   them a verification role.
+4. **Cross-repo, needs `add_repo`:** patent text in `repid-engine`'s GitHub
+   description; hyperdag.org Brier table weekly auto-scan; trustchat.dev
+   leaderboard staleness (likely one source of truth, two readers);
+   aitrinitysymphony.com → hyperdag.org redirect.
+5. **Two React lint errors** (`SystemTrustScore:20`, `InstitutionalControls:123`,
+   `react-hooks/set-state-in-effect`). Not fixed here on purpose: no agent
+   session can observe these components after hydration, so the change cannot be
+   verified. Surface lane owns them. `npm run lint` exits 1 on exactly these two.
+6. Unchanged from before: Poseidon2 parameters, `static.crates.io` allow-list,
+   the phase-2 RLS migration ordering, `BASE_SEPOLIA_PRIVATE_KEY` baked into
+   `repid-engine`'s image layers.
+
+## Next 3 commands
+
+```bash
+npm run check                       # expect exit 0
+npm run check:deps                  # expect 5 VERIFIED — read BEFORE any audit fix
+# then, from somewhere pg_net can reach, confirm the Next 16 deploy actually landed:
+#   select net.http_get(url := 'https://www.aitrinitysymphony.com/api/version');
 ```
