@@ -71,6 +71,7 @@ headroom.db
 
 # temp compile dir for check:identity
 .identity-check-*/
+.work-contract-check-*/
 
 # temp compile dir for check:custody-shadow
 .custody-shadow-check-*/

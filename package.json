@@ -45,6 +45,7 @@
     "experiment": "node scripts/harness-experiment.mjs",
     "repid:replay": "node scripts/repid-replay.mjs",
     "check:identity": "node scripts/check-identity.mjs",
+    "check:work-contract": "node scripts/work-contract-test.mjs",
     "check:trust": "node scripts/check-trust-foundation.mjs",
     "check:custody-shadow": "node scripts/check-custody-shadow.mjs",
     "check:types": "tsc --noEmit",
