@@ -17,6 +17,27 @@
 //     FAILED at any tier is FINAL.
 //     VERIFIED and NOT_CHECKED escalate to the next tier.
 //
+// ── AND ONE MORE, ADDED AFTER MEASURING ──────────────────────────────────────
+//
+//     A tier that REFERS TO A HUMAN is FINAL too.
+//
+// That rule is not a refinement of taste. It closes a measured defect
+// (`scripts/panel-tier-test.mjs`, 2026-08-15): `bft-judge` returns NOT_CHECKED
+// for a fired Pythagorean veto, meaning "the panel's unanimity is itself the
+// warning sign — escalate to a human". This module read that same NOT_CHECKED
+// as "escalate to the next tier", asked a single model, and got VERIFIED. The
+// panel's strongest warning became a pass, and every signature still verified.
+//
+// The two readings are not reconcilable by ordering the tiers correctly. They
+// were reconcilable ONLY while the panel happened to be last, which is a
+// property of a config file, not of the code. So the judge now says which it
+// meant (`JudgeOpinion.referToHuman`) and staging stops when it hears it.
+//
+// A referral is not overridable by a later tier BECAUSE the later tier is
+// another model, and "ask another model" is precisely what the referring judge
+// said was insufficient. Escalating past a referral is the same move as
+// escalating past a FAILED — shopping — with a politer name.
+//
 // A cheap tier that says FAILED has found a concrete defect — the suite is red,
 // the file is missing, the policy is violated. Escalating that to a more
 // expensive judge is shopping for a better answer, and a system that re-asks
@@ -62,6 +83,15 @@ export interface TierDecision {
   outcome: Outcome;
   /** Tiers consulted before this one, in order. Empty when the first tier decided. */
   escalatedPast: readonly string[];
+  /**
+   * Whether this decision is waiting on a human rather than on a judge.
+   *
+   * ALWAYS PRESENT, never optional. A referral rate that has to be inferred
+   * from a missing key cannot be counted, and an absent key reads as `false` to
+   * every consumer that does not know better — which is how a referral gets
+   * lost a second time, in the measurement instead of the routing.
+   */
+  referredToHuman: boolean;
 }
 
 export interface StagedJudge {
@@ -126,6 +156,11 @@ export function createStagedJudge(input: { tiers: readonly JudgeTier[] }): Stage
                 decidedBy: tier.name,
                 outcome,
                 escalatedPast: [...escalatedPast],
+                // An outage is not a referral. Nobody judged this and asked for
+                // a human; the providers were down. Recording it as a referral
+                // would inflate the referral rate with infrastructure noise and
+                // hide the one number this field exists to make countable.
+                referredToHuman: false,
               });
               return {
                 outcome,
@@ -138,16 +173,37 @@ export function createStagedJudge(input: { tiers: readonly JudgeTier[] }): Stage
 
           last = opinion;
 
-          // THE ASYMMETRY. A concrete defect ends it; anything else escalates.
-          if (opinion.outcome === 'FAILED' || isLast) {
+          const referred = opinion.referToHuman === true;
+
+          // A TIER THAT BOTH CERTIFIED AND REFERRED HAS NOT CERTIFIED. The two
+          // halves contradict, and the resolution is always the weaker one — a
+          // judge unsure enough to want a human is not a judge whose pass
+          // should stand. Weakening here rather than refusing keeps an
+          // incoherent judge from taking the run down, which would let a buggy
+          // adapter condemn work it never assessed.
+          const outcome: Outcome =
+            referred && opinion.outcome === 'VERIFIED' ? 'NOT_CHECKED' : opinion.outcome;
+
+          // THE ASYMMETRY. A concrete defect ends it, a referral ends it, and
+          // anything else escalates.
+          if (outcome === 'FAILED' || referred || isLast) {
             decisions.push({
               criterionId: request.criterion.id,
               decidedBy: tier.name,
-              outcome: opinion.outcome,
+              outcome,
               escalatedPast: [...escalatedPast],
+              referredToHuman: referred,
             });
             const prefix = notes.length > 0 ? `${notes.join('; ')}; ` : '';
-            return { ...opinion, detail: `${prefix}[${tier.name}] ${opinion.detail}` };
+            const contradiction =
+              referred && opinion.outcome === 'VERIFIED'
+                ? ' — this tier certified AND asked for a human, which is not a certification'
+                : '';
+            return {
+              ...opinion,
+              outcome,
+              detail: `${prefix}[${tier.name}] ${opinion.detail}${contradiction}`,
+            };
           }
 
           notes.push(`${tier.name} said ${opinion.outcome} and could not certify alone`);

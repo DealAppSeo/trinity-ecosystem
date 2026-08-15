@@ -89,6 +89,26 @@ export interface JudgeOpinion {
    * one, which is exactly backwards.
    */
   disagreement?: number;
+  /**
+   * TRUE means "a human must look at this", as distinct from "I could not
+   * decide". Both are NOT_CHECKED; only one is resolvable by asking another
+   * model.
+   *
+   * WHY THIS EXISTS. Measured 2026-08-15, `scripts/panel-tier-test.mjs`: a
+   * `bft-judge` whose Pythagorean veto had fired returned NOT_CHECKED meaning
+   * human escalation, and `createStagedJudge` — which reads NOT_CHECKED as
+   * "escalate to the next tier" — consulted the next model, which said
+   * VERIFIED. The panel's finding that the unanimity was itself the warning
+   * sign became a pass. One value carried two meanings and the weaker one won.
+   *
+   * DELIBERATELY NOT AN `Outcome`. Three outcomes are the signed vocabulary and
+   * a fourth would be a cross-lane interop change. This is a ROUTING hint on an
+   * internal port: it never reaches `contractPayload`, `issueVerdict`, or any
+   * signed byte. A referral tells you who should decide next, not what was
+   * found — a verdict that conflated the two would be asserting a finding it
+   * does not have.
+   */
+  referToHuman?: boolean;
   detail: string;
 }
 

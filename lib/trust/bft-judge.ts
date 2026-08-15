@@ -119,6 +119,12 @@ export function createBftJudge(panel: VotingPanel, options: BftJudgeOptions = {}
           outcome: 'NOT_CHECKED',
           score,
           disagreement,
+          // MEASURED, NOT ASSUMED. Without this flag a staged judge read this
+          // NOT_CHECKED as "ask the next tier" and a single model turned the
+          // veto into a VERIFIED (scripts/panel-tier-test.mjs). The panel's
+          // whole claim is that more model opinions are the problem here, so
+          // routing it to one more model inverts the finding.
+          referToHuman: true,
           detail:
             `the Pythagorean comma veto fired (gap ${result.comma_gap.toFixed(3)}): the panel's ` +
             'three model families agreed too closely and too confidently, which it reads as ' +
@@ -132,6 +138,9 @@ export function createBftJudge(panel: VotingPanel, options: BftJudgeOptions = {}
           outcome: 'NOT_CHECKED',
           score,
           disagreement,
+          // The engine's field is literally named `hitl_required`. Dropping it
+          // at this boundary was the loss; carrying it is the whole fix.
+          referToHuman: true,
           detail:
             'the panel referred this to a human rather than deciding it, so nothing was ' +
             `established (score ${score.toFixed(3)} against threshold ${result.threshold})`,
@@ -142,6 +151,12 @@ export function createBftJudge(panel: VotingPanel, options: BftJudgeOptions = {}
         if (truncated) {
           // A confident answer over a partial record is the defect this repo is
           // built around, wearing a context window.
+          //
+          // NO `referToHuman` HERE, AND THAT IS DELIBERATE. This is the one
+          // NOT_CHECKED a later tier genuinely CAN settle: a judge with a
+          // larger window reads the whole record and answers properly. Flagging
+          // it would send resolvable work to a human, which costs the referral
+          // signal its meaning.
           return {
             outcome: 'NOT_CHECKED',
             score,

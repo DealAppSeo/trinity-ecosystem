@@ -1034,3 +1034,56 @@ whose mutation never applied because bash had mangled the anchor. Both looked
 exactly like the result being sought. **A non-zero exit is not automatically the
 failure you were looking for**, and a mutation harness must prove the mutation
 landed before it reports on what the mutation did.
+
+## A20 — two correct components, one value, two meanings (2026-08-15)
+
+`bft-judge.ts` and `staged-judge.ts` were built in separate lanes. Both were
+unit-tested, both mutation-tested, both correct. Their composition was wrong, and
+neither suite could see it.
+
+The shared value is `Outcome.NOT_CHECKED`, and each lane gave it a meaning:
+
+- `bft-judge` returns it for a fired Pythagorean veto, meaning **"the panel's
+  unanimity is itself the warning sign — a HUMAN must look"**.
+- `staged-judge` reads it as **"this tier could not decide — ASK THE NEXT
+  TIER"**.
+
+Both readings are defensible in isolation. Composed, the second silently consumes
+the first: measured on the first run, a vetoing panel placed anywhere but **last**
+had its referral escalated to a single model, which said VERIFIED. Every unit test
+stayed green. Every signature in the chain verified. The verdict was wrong and
+nothing in the system said so.
+
+**It was worse than losing a signal — it inverted one.** The panel's entire claim
+is that *more model agreement is the problem here*. The staged judge's repair was
+to ask one more model. The remedy was the disease.
+
+**Why no unit suite could have caught it.** Each unit is self-consistent under its
+own reading. A suite written from inside one lane asserts that lane's meaning and
+passes. **The bug lives in the gap between two vocabularies, and a gap has no
+owner** — the same shape as `repid_score_events.event_type` versus
+`ReputationSignal`, and the same shape as the two Vercel projects named after
+domains they do not serve. This repo keeps producing it.
+
+**The rule.** *When two components exchange a value from a small enumeration,
+write a suite that belongs to neither and run it before trusting the composition.*
+The question it must ask is not "does each side handle every case" — both did —
+but **"does each side mean the same thing by each case".**
+
+**The fix that was rejected, and why it matters more than the one built.** The
+zero-code option was to document the ordering constraint: *put the panel last*.
+That is not a fix. It leaves a **config file** standing between a vetoed run and
+a false pass, and tier order is data — a correctness property that holds for one
+ordering is not a property. The built fix makes the judge state which
+`NOT_CHECKED` it meant (`referToHuman`), so position stops mattering; one
+assertion now pins the whole thing, checking that a vetoing panel yields the same
+outcome at every position.
+
+**And the part that is easy to get wrong in the other direction.** Not every
+`NOT_CHECKED` is a referral. `bft-judge`'s truncated-evidence case is genuinely
+resolvable by a judge with a bigger window, so it deliberately does **not** set
+the flag, and an outage is recorded as `referredToHuman: false` — counting
+provider downtime as human referrals would bury the referral rate in
+infrastructure noise. **A signal that fires for everything measures nothing.**
+Both omissions are asserted, not assumed: `check:panel-tier` fails if truncation
+or an outage ever claims a referral.
