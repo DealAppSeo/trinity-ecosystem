@@ -59,7 +59,8 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Browser automation for agents: install, Chrome resolution, and what `doctor` gets wrong | `docs/AGENT-BROWSER.md` | the upstream README, which documents none of it |
 | Dual-view (`/live`) plan: lane split, frozen event contract, what is and is not on the critical path | `docs/DUAL-VIEW-LAUNCH-PLAN.md` | the source Grok/XAI conversation, whose disk inventory was taken against a different repo — see its §1 |
 | What the harness caught and missed on a real session, and why 10 sessions is unmet | `docs/TRUSTSHELL-M6-DOGFOOD.md` | re-running the harness and assuming silence means clean |
-| **Which invariants are actually protected, and which only look protected.** 21 curated mutations, each naming the property it breaks; four outcomes (CAUGHT / SURVIVED / INVALID / DRIFT) because a non-compiling mutant is not evidence | `scripts/mutations.mjs` — run `npm run mutate` | a green test suite, which cannot distinguish a real assertion from one asserted over an unreachable branch |
+| **Which invariants are actually protected, and which only look protected.** 26 curated mutations, each naming the property it breaks; four outcomes (CAUGHT / SURVIVED / INVALID / DRIFT) because a non-compiling mutant is not evidence | `scripts/mutations.mjs` — run `npm run mutate` | a green test suite, which cannot distinguish a real assertion from one asserted over an unreachable branch |
+| **What an external package actually does, as opposed to what a spec remembers.** A doc may not name a versioned package it does not install without a dated `[PROBED …]` line in the same file. Declared dependencies are exempt — their version is checkable from the lockfile | `scripts/check-probes.mjs` — run `npm run check:probes`; the probe lines themselves live beside the claims they support | a README, a package name that reads like what you want, or a spec written before the package was |
 
 ---
 
@@ -137,6 +138,14 @@ correction.
 | anon write exposure is "**latent, not currently being exploited**" | the four tables looked at held 0 rows; the population holds ~**324k** — `trinity_artifacts` (155,428) and `trinity_agent_logs` (139,659) are anon-writable | a live **integrity** exposure; "not being exploited" was never measured |
 | hyperdag.org serves **28,908 bytes matching no commit** | compared a Postgres `length()` **character** count against `wc -c` **bytes** — the same file, two units, 185 multi-byte UTF-8 chars apart | live and repo `index.html` are **md5-identical** (`ff2ef682…`); the site is reproducible |
 | hyperdag.org's newest prod deploy is **ERROR, built from `repid-engine`** | true of the project `hyperdag-org`, which serves **no custom domain**; the assessment picked the project whose *name* matched the domain | the serving project is `hyperdag-trust`; its prod deploy is **READY** at `fbf8253` = main HEAD |
+| TRUSTSHELL-V1 §8: `@hyperdag/proof-verifier` **verifies a session receipt offline** | never installed. It is a Plonky3 STARK verifier over `{agent_id, repid_score, threshold, tier}`; handed a receipt it returns `deser: io error` | receipts are verified by `scripts/trustshell-verify-receipt.mjs`, written for the purpose |
+| TRUSTSHELL-V1 §9: `@hyperdag/trustshell` and `-mcp` are the **receipt core — "the vehicle already exists"** | never installed. Both are the HAL/RepID SDK against a live backend — zero occurrences of `transcript`, `audit_hash` or `session_receipt` in either `dist/`. `trustshell verify` already means something incompatible, so the proposed CLI would have **collided** | the receipt core is `lib/trustshell/receipt/`; the CLI name is still undecided — see TRUSTSHELL-V1 §12 |
+
+The last two rows are prose, not figures, so `check:prior-work`'s literal-string
+matcher cannot hold them. **`npm run check:probes` is what holds them**: a doc may
+not name a package this repo does not install without a dated `[PROBED …]` line in
+the same file. Both were one `npm install` away from being known, three milestones
+running.
 
 ---
 

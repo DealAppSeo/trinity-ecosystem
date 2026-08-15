@@ -12,7 +12,7 @@
     "check:legacy-key": "node scripts/check-legacy-key.mjs",
     "check:mcp-fleet": "node scripts/mcp-fleet-smoke.mjs",
     "check:mcp-client": "node scripts/mcp-client-test.mjs",
-    "check": "npm run check:secrets && npm run check:auth && npm run check:harness && npm run check:transcript && npm run check:memory && npm run check:mcp-fleet && npm run check:mcp-client && npm run check:harness-portable && npm run check:harness-routing && npm run check:harness-consensus && npm run check:harness-agreement && npm run check:harness-loop && npm run check:prior-work && npm run check:earned && npm run check:zkp && npm run check:identity && npm run check:custody-shadow && npm run check:e2e-harness && npm run check:dual-view && npm run check:receipt && npm run check:receipt-verifier && npm run check:claims && npm run check:init && npm run check:trust && npx tsc --noEmit",
+    "check": "npm run check:secrets && npm run check:auth && npm run check:harness && npm run check:transcript && npm run check:memory && npm run check:mcp-fleet && npm run check:mcp-client && npm run check:harness-portable && npm run check:harness-routing && npm run check:harness-consensus && npm run check:harness-agreement && npm run check:harness-loop && npm run check:prior-work && npm run check:earned && npm run check:zkp && npm run check:identity && npm run check:custody-shadow && npm run check:e2e-harness && npm run check:dual-view && npm run check:receipt && npm run check:receipt-verifier && npm run check:claims && npm run check:init && npm run check:trust && npm run check:probes && npx tsc --noEmit",
     "north": "node scripts/north-star.mjs",
     "graph": "graphify update .",
     "graph:ecosystem": "bash scripts/graph-ecosystem.sh",
@@ -56,7 +56,8 @@
     "trustshell:dogfood": "node scripts/trustshell-dogfood.mjs",
     "check:trust": "node scripts/check-trust-foundation.mjs",
     "check:custody-shadow": "node scripts/check-custody-shadow.mjs",
-    "mutate": "node scripts/mutate.mjs"
+    "mutate": "node scripts/mutate.mjs",
+    "check:probes": "node scripts/check-probes-selftest.mjs && node scripts/check-probes.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "latest",

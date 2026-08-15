@@ -303,6 +303,71 @@ export const MUTATIONS = [
     find: "  if (!flag('--apply')) {",
     replace: '  if (false) {',
   },
+
+  // -------------------------------------------------------------------------
+  // scripts/check-probes.mjs — the gate that needs a gate
+  //
+  // A checker is the easiest place for this repo's defining failure to hide,
+  // because a checker that never fires and a checker with nothing to find print
+  // the same line. check-probes-selftest.mjs runs the real scanner over
+  // synthetic corpora with known answers; these mutations are what make that
+  // self-test's green mean something.
+  // -------------------------------------------------------------------------
+  {
+    id: 'probes-dep-exemption-swallows-everything',
+    suite: 'check:probes',
+    file: 'scripts/check-probes.mjs',
+    protects:
+      'only DECLARED dependencies are exempt — the exemption is the whole boundary ' +
+      'of this gate, and one widened to everything would report VERIFIED over a ' +
+      'corpus it never looked at',
+    find: '    if (deps.has(name)) {',
+    replace: '    if (true) {',
+  },
+  {
+    id: 'probes-any-probe-covers-any-package',
+    suite: 'check:probes',
+    file: 'scripts/check-probes.mjs',
+    protects:
+      'a probe only covers the package it NAMES — otherwise one probe line ' +
+      'anywhere in a file launders every unprobed reference in it, which is the ' +
+      'exact shape of the three specs this gate exists to have caught',
+    find: 'const covered = fileProbes.find((p) => p.text.includes(name) || p.text.includes(bare));',
+    replace: 'const covered = fileProbes[0];',
+  },
+  {
+    id: 'probes-undated-probe-accepted',
+    suite: 'check:probes',
+    file: 'scripts/check-probes.mjs',
+    protects:
+      'a probe carries a date — the word PROBED alone is an assertion, and this ' +
+      'gate exists precisely because assertions about external artifacts go stale ' +
+      'silently',
+    find: "const PROBE = /\\[PROBED\\s+(\\d{4}-\\d{2}-\\d{2})\\s*:/i;",
+    replace: "const PROBE = /\\[PROBED()/i;",
+  },
+  {
+    id: 'probes-allowlist-ignored',
+    suite: 'check:probes',
+    file: 'scripts/check-probes.mjs',
+    protects:
+      'the ALLOW map actually skips the file it names — an allowlist that silently ' +
+      'stopped applying would turn a documented exception into a mystery failure',
+    find: '  if (ALLOW.has(rel)) continue;',
+    replace: '  if (false) continue;',
+  },
+  {
+    id: 'probes-stale-becomes-fatal',
+    suite: 'check:probes',
+    file: 'scripts/check-probes.mjs',
+    protects:
+      'age alone never fails the build — a document recording a historical ' +
+      'measurement must not rot just because time passed, or every old doc becomes ' +
+      'a build break and the gate gets routed around',
+    find: '      if (age > staleDays) stale.push({ file: rel, ref, date: covered.date, age });',
+    replace:
+      '      if (age > staleDays) violations.push({ file: rel, line: 0, ref, name });',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
