@@ -19,7 +19,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # scan-secrets.mjs --history walks every commit reachable from any ref.
           # A shallow clone would make it report a clean history it never read.
