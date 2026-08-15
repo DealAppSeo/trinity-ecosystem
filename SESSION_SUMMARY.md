@@ -1,3 +1,157 @@
+# SESSION SUMMARY — 2026-08-15 (claude-opus-5, cloud/scheduled)
+
+Surface = **cloud/scheduled** (Claude Code Remote, ephemeral container).
+Access = GitHub **yes** (MCP), Supabase **yes** (MCP), Railway **no**,
+`DealAppSeo/repid-engine` **no** (`add_repo` approval never arrived).
+
+Preflight: `v_agent_preflight` → **verdict=GO, global_pause=false**, 18 open Sean
+gates. No tasks claimed; all work was directly user-requested.
+
+Branch `claude/trustshell-launch-flywheel-6r4zt0`, **PR #33** (draft, open).
+
+## The correction that reshaped the work
+
+The dual-view scope in the source Grok/XAI conversation was built on a table
+headed *"Honest inventory [disk, this pass]"*. **That inventory was not taken
+against this repository.** Absent here: `dual-auth-gate.ts`, `src/trust-identity/`,
+`/start`, `/run/[agentId]`, `controller-pwa`, `/api/v1/hitl`, `email-otp.ts`,
+`agent-naming.ts`, `task-lineage.ts`, `graph-rag/*`, `DESIGN_PRINCIPLES.md`. The
+app has **three** routes (`/`, `/login`, `/dashboard`). We are on **Next 14.2 /
+React 18.3**, not Next 16 / React 19. [VERIFIED 2026-08-15 — `find` + `grep -ril`
+over the tree excluding `node_modules`/`.git`/`.next`, plus `package.json`.]
+
+Presumably they are in `repid-engine`, which that session had in its workspace.
+**NOT CHECKED** — see access above. PRIOR-WORK-INDEX rule 2 applied to a file
+listing instead of a dataset.
+
+**The consequence is favourable.** This repo already holds a real
+offline-verifiable gate (`ControlProof` + `app/api/trustshell/control-proof/verify`,
+five tamper classes rejected) and a real twelve-agent swarm with honest liveness
+(`v_fleet_truth`: 3 live, 12 reachable, 9 probe-only). So the MVP dual-view can
+be built end to end **inside this repo with no cross-repo dependency**, if the
+graph is sourced from `v_fleet_truth` + `ControlProof` rather than HITL. HITL
+becomes another adapter behind the same contract later, not a rewrite.
+
+## Landed
+
+**`b53ae9c` — dual-view plan + the frozen event contract.**
+`docs/DUAL-VIEW-LAUNCH-PLAN.md`: inventory correction, competitor read,
+hard-parts-first ordering, four lanes with **file-level ownership so no two
+touch the same path**, MVP/v1/v2, stack pinned to React 18.
+`lib/dual-view/contract.ts` + `fixtures.ts` + `scripts/check-dual-view-contract.mjs`
+(**85 assertions**, in `npm run check`). Zero imports, so the UI lane builds
+against six deterministic fixtures with no backend, DB or network.
+
+Two choices that carry weight: `reason` and `evidence` are **required** fields
+(a node rendering green without carrying what made it green reproduces the house
+defect in the surface built to be screenshotted), and `stale` is a first-class
+status so 9 probe-only agents cannot render as running — that would undo
+changelog #134 in the UI layer. `swarm_12` holds the measured distribution and
+the check asserts it, so drift to all-green fails the build.
+
+**`2f87a0d` — TrustShell M2, the session receipt.** `lib/trustshell/receipt/`
+(types, canonical, build, sign, git, store-sqlite), **89 assertions**, CLI
+`scripts/trustshell-receipt.mjs`. `TRUSTSHELL-V1.md` §12 Q1/Q2 **decided by
+Sean**: local SQLite first (built-in `node:sqlite`, no new dependency),
+per-developer local key.
+
+`audit_hash` is stable across re-runs [VERIFIED on a live 294-line session:
+identical hash twice, `receiptId` derived from it].
+
+**The marker is the substance.** Claim checking is M4, so every claim count is
+zero and a naive "nothing failed" test renders `VERIFIED  0 claims · 0 backed` —
+§1's defect reproduced inside the product built to catch it, and the **fourth**
+instance of the shape in this repo. `markerFor` returns NOT_CHECKED
+unconditionally while no claim tier is enabled; an internal error forces the
+same; `checkReceipt` takes the **floor** of its parts, so a perfect signature
+over unchecked data is still NOT CHECKED.
+
+Self-attestation is labelled in the data: `attestation.kind` is
+`self`/`org`/`unsigned`, and `verifyReceiptSignature` returns
+`independentlyAttested` separately from `outcome`. The CLI **refuses to generate
+a signing key** — one invented on first run looks like provenance and carries
+none. `identity/did.ts` gained `keyPairFromSeed` for durable custody.
+
+## Two bugs dogfooding found that reading would not have
+
+1. **§4.1 specified the wrong git question, and the CLI implemented it
+   faithfully.** `git diff --name-only HEAD` lists unstaged edits to *tracked*
+   files, so reconciliation reported **13 mismatches out of 15** — every one a
+   file genuinely written and then committed or newly created. A false
+   accusation from the check whose only job is catching a false claim. Corrected
+   to the union of working tree (incl. untracked) and commits since session
+   start; NOT CHECKED when the start is unknown. **0 mismatches** after the fix.
+   Spec bullet corrected in place, as §3 and §4.2 carry M1's corrections.
+2. **`.trim()` on git porcelain output.** An unstaged modification leads with a
+   SPACE, so trimming shifted the first record by one and returned one path
+   missing its first character — a single false mismatch indistinguishable from
+   a real finding. Extracted to `receipt/git.ts` with assertions, including one
+   that fails if trimmed input ever parses cleanly.
+
+Also caught by its own round-trip test: removing a finished node orphaned its
+receipt card in the dual-view feed, and the first draft called that an integrity
+violation — which would have made the feed delete its own history. Dangling
+`nodeId` is now a violation only on **gated** items.
+
+And: `Array.prototype.with` typechecks under `lib: esnext` but is ES2023 and
+absent on Node 18. The type checker could not see it.
+
+## Gate
+
+`npm run check` **exit 0, 612 assertions** (438 → 523 → 612), `tsc --noEmit`
+**0 errors**, `next build` clean, `check:prior-work` 16/16 docs indexed.
+
+**Mutation-tested, each caught, each compiled.** Contract: all-green fixtures,
+dropped `reason` requirement, edges surviving node removal. Receipt: dropped
+confabulation guard (reproduces `✓ VERIFIED 0 claims · 0 backed` verbatim),
+skipped core-hash recomputation, unsorted canonical keys, ceiling instead of
+floor. Plus nine tamper mutations across every hashed field.
+
+## REAL vs STUB
+
+**REAL:** the dual-view contract, validator and fixtures; receipt build, canonical
+hashing, signing, verification, porcelain parsing, SQLite store; `keyPairFromSeed`.
+
+**NOT BUILT:** M3 (`proof-verifier` accepting a receipt) — **no third party has
+verified one yet**, so the launch claim is *offline-verifiable signature*, not
+*independently attested*. M4 claim checking. M5 `trustshell init`. The entire
+`/live` UI. No adapter yet maps `v_fleet_truth` → `PaiEvent`.
+
+**NOT CHECKED:** everything about `repid-engine`; store availability on a runtime
+without `node:sqlite` (degrades to NOT CHECKED by design).
+
+## BLOCKED_FOR_SEAN
+
+1. **`add_repo` approval for `DealAppSeo/repid-engine`** — so the §1 inventory is
+   checked rather than assumed, and the HITL adapter can be scoped.
+2. **Board exception** — confirm `/live` is a route on Shell and Market, not a
+   thirteenth vertical.
+3. Carried forward, unchanged: rotate the Base Sepolia deployer key (#73, owns
+   ERC-8004 ids 3747/3748/3750 — do not cite them as provenance);
+   `static.crates.io` on the proxy allow-list (#75); `repid_config` `anon` read
+   policy + live `enterprise_api_key`; Poseidon2 parameter handover;
+   `20260813210000_agent_repid_earned_observations.sql` written and unapplied;
+   task key on `repid_score_events`.
+
+## Steer for the parallel RepID/HAL lane
+
+`PRIOR-WORK-INDEX` closes routing (97.9% of bound), panel membership (99.23%)
+and panel size (3). **Do not retune them.** The open problem is data capture:
+`bftAccuracy` carries RepID's heaviest weight — **0.40** — with zero rows in both
+BFT tables, and no table records per-agent latency. That is 50% of the weight
+that can only resolve to zero regardless of tuning. See plan §9.
+
+## Next 3 commands
+
+```sh
+npm run check                                   # exit 0, 612 assertions
+node scripts/trustshell-receipt.mjs <session.jsonl> --git-reconcile
+# M3: make @hyperdag/proof-verifier@0.2.0 accept a SessionReceipt.
+# It is what turns a self-attested receipt into something a stranger can check.
+```
+
+---
+
 # SESSION SUMMARY — 2026-08-14 (claude-opus-5, cloud/scheduled)
 
 Surface = **cloud/scheduled** (Claude Code Remote, ephemeral container).
