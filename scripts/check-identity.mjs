@@ -2586,6 +2586,7 @@ await check('THE LOOP AND THE ADAPTER WORK TOGETHER, and the agent still cannot 
   assert.equal(result.claimed, 'VERIFIED', 'the agent claimed VERIFIED');
   assert.equal(result.outcome, 'NOT_CHECKED', 'the claim survived a refused call');
   assert.match(result.downgradedBecause ?? '', /refused/, 'and the downgrade names the refusal');
+});
 
 // --- seed import (per-developer key custody, TRUSTSHELL-V1 §12 Q2) ----------
 //
