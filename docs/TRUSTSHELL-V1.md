@@ -1,10 +1,15 @@
 # TrustShell v1 — specification
 
-**Status:** spec, with M1 and M2 built. §10 is the ledger — M1 (transcript
-parser) and M2 (session receipt) are done and proven; M3–M6 are not started.
-§3 and §4.2 carry corrections the M1 build forced on the spec that specified
-them; §4.1 and §12 carry M2's. §12 Q1 and Q2 are **decided**, not open.
+**Status:** spec, with M1, M2 and M3 built. §10 is the ledger — M1 (transcript
+parser), M2 (session receipt) and M3 (independent offline verification) are done
+and proven; M4–M6 are not started. §3 and §4.2 carry corrections the M1 build
+forced on the spec that specified them; §4.1 and §12 carry M2's; §8 and §10
+carry M3's. §12 Q1 and Q2 are **decided**, not open.
 **Date:** 2026-08-12, revised 2026-08-15
+
+All three milestones built so far falsified something this document asserted.
+That is the document working, not failing — but it means the unbuilt half should
+be read as a plan, not a description.
 
 TrustShell turns an AI agent's assertions into receipts you can verify without
 trusting the agent or the vendor.
@@ -121,8 +126,8 @@ evidence behind it — with no cooperation from the agent.
                     │  session receipt (signed)    │
                     └──────┬────────────────┬──────┘
                            ▼                ▼
-                    MCP tools / CLI    proof-verifier
-                    (query surface)    (anyone, offline)
+                    MCP tools / CLI    verify-receipt
+                    (query surface)    (anyone, offline, no deps)
 ```
 
 **Ingest modes.** Batch (`Stop` hook, or `trustshell verify <session>`) for v1.
@@ -326,12 +331,47 @@ Precise, so "observe" cannot drift:
 
 ## 8. Independent verification
 
-The receipt is worthless if only TrustShell can check it. Two already-built
-pieces close this:
+The receipt is worthless if only TrustShell can check it.
 
-- **`@hyperdag/proof-verifier@0.2.0`** (published) — verifies a receipt offline
-  from `transcript_sha256` + `audit_hash` + `signature`, with no network and no
-  TrustShell install.
+**Corrected 2026-08-15, by the M3 build.** This section claimed
+`@hyperdag/proof-verifier@0.2.0` *"verifies a receipt offline from
+`transcript_sha256` + `audit_hash` + `signature`"*. **It does not, and it
+cannot.** Measured against the published package: it is a **Plonky3 STARK
+verifier** whose public statement is `{agent_id, repid_score, threshold, tier}`.
+It deserializes STARK proof bytes and checks a 16-bit range argument, pinned to
+one Plonky3 revision. Handed anything else it returns
+`verify failed: deser: io error`. [VERIFIED — installed from npm and invoked.]
+
+It has no concept of a session receipt. Teaching it one means a Rust/WASM
+rebuild — blocked in agent containers by task #75 — plus an irreversible npm
+publish, which is Sean's call. The spec named a mechanism without checking it,
+the same class of error as §4.1's git bullet.
+
+What actually closes §8:
+
+- **`scripts/trustshell-verify-receipt.mjs`** — verifies a receipt offline from
+  `transcript_sha256` + `audit_hash` + `signature`, with no network, no
+  dependencies and **no TrustShell imports**. Independence is the whole point: a
+  verifier that calls the builder's `canonicalJson` agrees by construction and
+  proves nothing, so canonical JSON, base58, base32, the did:key decode and the
+  marker rule are all re-implemented from the spec. Two implementations agreeing
+  is evidence; one agreeing with itself is a tautology.
+
+  **What a pass means.** The bytes are internally consistent, the receipt
+  commits to the exact transcript supplied, the signature is good, and the
+  marker matches the data rather than being asserted.
+
+  **What it does not mean.** The *counts* are not re-derived — that needs a
+  second `TranscriptParser`, which does not exist. What pins them instead is the
+  pair (`transcript_sha256`, `parser_version`): anyone with the same bytes and
+  the same parser re-runs and compares. That is weaker than re-derivation and
+  the tool prints it as `NOT CHECKED` rather than omitting it. Nor is the
+  *author* independent — same repo, same hand. That is M6.
+
+  **One known limit, asserted rather than hidden:** `attestation.kind` is
+  outside the signed payload, so a `self` receipt can be relabelled `org` and
+  the signature still verifies. Only the audit hash is signed. Binding custody
+  into the signature is a schema change.
 - **`@hyperdag/trust-demo@0.1.0`** (packed, verified locally, unpublished) —
   already verifies a proof and rejects three tampers. This is the padlock's
   substance: a stranger can check the claim without trusting the issuer.
@@ -345,7 +385,8 @@ decision. It is not on the v1 critical path, but it is the best demo asset here.
 | :-- | :-- | :-- |
 | `@hyperdag/trustshell` | published 1.3.0 | core: parse, check, hash, sign |
 | `@hyperdag/trustshell-mcp` | published 1.0.0 | MCP surface — the vehicle already exists |
-| `@hyperdag/proof-verifier` | published 0.2.0 | offline receipt verification |
+| `@hyperdag/proof-verifier` | published 0.2.0 | **RepID STARK proofs, not receipts** — see §8 |
+| `trustshell verify-receipt` | **new, built** | offline receipt verification, zero deps |
 | `@hyperdag/trust-demo` | packed, unpublished | tamper-rejection demo |
 | `trustshell init` | **new** | detect installed MCP clients, write config + `Stop` hook |
 
@@ -366,7 +407,7 @@ mechanical, not clever, and it is the whole first-run experience.
 | :-- | :-- | :-- |
 | M1 | Transcript parser | **DONE 2026-08-13.** `lib/trustshell/TranscriptParser.ts`, 42 assertions in `scripts/check-transcript-parser.mjs`, CLI `scripts/trustshell-parse.mjs`. Reproduces §3 on the live session; **0 phantom results**; 0 malformed lines; 0 unrecognised record types; 0 new `tsc` errors. Corrections it forced are folded into §3 and §4.2 above. |
 | M2 | Actions + spend receipt | **DONE 2026-08-15.** `lib/trustshell/receipt/` (types, canonical, build, sign, git, store-sqlite), 89 assertions in `scripts/check-receipt.mjs`, CLI `scripts/trustshell-receipt.mjs`. `audit_hash` stable across re-runs [VERIFIED on a live 294-line session: identical hash twice, `ts_…` id derived from it]. Storage and custody decided — see §12. Nine tamper mutations detected; four mutations of the checker itself caught, each compiled. **The receipt reads `NOT CHECKED`, and §12.5 explains why that is the correct output rather than a shortfall.** |
-| M3 | `proof-verifier` accepts it | Third party verifies offline; tampering with any field fails |
+| M3 | Independent offline verification | **DONE 2026-08-15, against a corrected target.** `scripts/trustshell-verify-receipt.mjs` — zero TrustShell imports, zero dependencies; canonical JSON, base58, base32, did:key decode, Ed25519 verify and the marker rule all re-implemented. 60 assertions in `scripts/check-receipt-verifier.mjs`, run as a **subprocess** so it cannot share module state. Twelve tamper mutations detected; a differential over twelve awkward canonicalisation shapes and six marker branches agrees with the builder on every one. Four mutations of the verifier caught, each compiled. **`@hyperdag/proof-verifier` cannot do this — see below.** |
 | M4 | T0 + T1 claim checking | Catches ≥1 real `LESSONS.md` entry; false-positive rate measured and published |
 | M5 | `trustshell init` + MCP tools | `npx trustshell init` → working in Claude Code, receipt visible in-session |
 | M6 | Dogfood | Run against 10 real sessions from this repo; publish what it found **and what it missed** |

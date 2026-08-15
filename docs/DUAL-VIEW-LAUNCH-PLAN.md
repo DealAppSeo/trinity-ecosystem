@@ -120,15 +120,20 @@ The instruction was to build the hard parts first and bridge the wiring gaps.
 Ranked by *how much downstream work it unblocks* × *how impossible it is to
 fake*:
 
-### H1 — The session receipt (TrustShell M2 + M3). **M2 DONE 2026-08-15; M3 open.**
+### H1 — The session receipt (TrustShell M2 + M3). **BOTH DONE 2026-08-15.**
 
-> **Updated 2026-08-15.** M2 has landed — `lib/trustshell/receipt/`, 89
-> assertions, CLI, local SQLite store, per-developer self-attestation. §12 Q1
-> and Q2 (storage, key custody) are **decided**; see `TRUSTSHELL-V1.md` §12.
-> M3 (`proof-verifier` accepts the receipt) is the next item on this lane, and
-> it is what turns a self-attested receipt into something a stranger can check.
+> **Updated 2026-08-15.** M2 landed — `lib/trustshell/receipt/`, 89 assertions,
+> CLI, local SQLite store, per-developer self-attestation; §12 Q1 and Q2 are
+> **decided**. M3 landed too, against a corrected target: `@hyperdag/proof-verifier`
+> turned out to be a **Plonky3 STARK verifier** for RepID range proofs and cannot
+> accept a receipt at all, so M3 shipped as
+> `scripts/trustshell-verify-receipt.mjs` — zero TrustShell imports, zero
+> dependencies, 60 assertions including a differential against the builder.
+> A stranger with the receipt and the transcript can now check it with no
+> TrustShell install. **M4 (claim checking) is the next item on this lane**, and
+> it is what lets a receipt ever read VERIFIED.
 > The paragraphs below describe why this ranked first and remain accurate about
-> everything M3 still blocks.
+> what M4 still blocks.
 >
 > One thing the MVP must inherit from M2: the receipt reads **NOT CHECKED**, and
 > that is correct output, not a shortfall — claim checking is M4. The dual-view's
