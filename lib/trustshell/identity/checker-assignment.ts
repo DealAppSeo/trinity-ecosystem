@@ -91,7 +91,7 @@ const TAG = {
 } as const;
 
 /** Field separator. Escape, never a raw byte — see work-contract.ts. */
-const SEP = '';
+const SEP = '\u001f';
 
 /**
  * A pool smaller than this is not an assignment, it is a named checker wearing

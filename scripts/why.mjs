@@ -23,8 +23,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
-const SEP = '';           // record separator, will not appear in a message
-const FIELD = '';
+const SEP = '\u0001';           // record separator, will not appear in a message
+const FIELD = '\u0002';
 
 function git(args) {
   try {

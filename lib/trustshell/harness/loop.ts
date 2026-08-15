@@ -557,7 +557,7 @@ function canonical(value: unknown): string {
 }
 
 function callFingerprint(call: ToolCall): string {
-  return `${call.name}${canonical(call.args)}`;
+  return `${call.name}\u001f${canonical(call.args)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1056,7 +1056,7 @@ function assessProgress(args: {
   for (const record of records) {
     if (!record.observation) continue;
     const key = callFingerprint(record.call);
-    const fingerprint = `${record.observation.outcome}${record.observation.content}`;
+    const fingerprint = `${record.observation.outcome}\u001f${record.observation.content}`;
     const previous = lastResultFor.get(key);
     lastResultFor.set(key, fingerprint);
     if (previous === undefined) {
