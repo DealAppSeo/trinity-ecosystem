@@ -30,16 +30,31 @@ The spine merged in #36/#48 is **a library with no callers**:
 
 | module | importers in `lib/` + `app/` | meaning |
 |---|---|---|
-| `contracted-evaluator.ts` | **0** | the independent judge is never constructed |
+| `contracted-evaluator.ts` | **0** | no **production** path constructs the judge — but see the correction below |
 | `auditor-grant.ts` | **0** | no read-only grant is ever minted |
 | `outcome-to-reputation.ts` | **0** (1 test) | no verdict ever becomes an event |
 | `work-contract.ts` | 5 | used by the above three, which nothing uses |
 | `supabase-reputation-store.ts` | 2 | store exists; its migration is **UNAPPLIED** |
 
 `loop.ts` accepts `evaluator?: Evaluator` and `requireIndependentEvaluation`
-defaults **on**. The port is open and correct. **Nothing plugs into it.** That
-is why "accountable verifier" is not shippable, and it is a wiring problem, not
-a design problem — which is good news, because wiring is cheap and parallelises.
+defaults **on**. The port is open and correct.
+
+> **CORRECTION 2026-08-15, on starting W1.** The first draft of this section read
+> *"nothing plugs into it"* and inferred that from the importer counts above.
+> **The inference was wrong.** `scripts/contracted-evaluator-test.mjs` calls the
+> real `runAgentLoop` with a real contracted evaluator, real keys and real
+> signatures, across two DIDs — asserting `independent === true` and, in a second
+> case, that a failing judge drives the loop to FAILED over the agent's own
+> VERIFIED claim. An importer count over `lib/` + `app/` cannot see a test, and
+> "0 importers" means *not shipped*, not *never constructed*. The W1 exit
+> criterion below was **already met before W1 started**.
+>
+> What is genuinely missing is narrower: **no production caller.** The
+> composition exists only inside a test, so shipping it means re-deriving it.
+> That is real, but it is not a reason to add a production composition root
+> today — a module with no consumer is the exact defect this table is about. The
+> production path arrives in W2/W4, when an emitter and a persisted event give it
+> something to feed.
 
 ---
 
@@ -174,7 +189,7 @@ narrative.
 | wave | closes when | measured by |
 |---|---|---|
 | W0 | `trinity_tasks` writes > 100 rows/day for 3 consecutive days | one query |
-| W1 | a loop run produces a verdict from a `contracted-evaluator` with `evaluatorDid ≠ doerDid`, in a `*-test.mjs` | `npm run check:*` exit 0 |
+| W1 | ~~a loop run produces a verdict from a `contracted-evaluator` with `evaluatorDid ≠ doerDid`, in a `*-test.mjs`~~ **MET BEFORE W1 STARTED** — see the correction in §0. Replaced by: **the port fit holds at compile time**, so drift the runtime suite cannot see is caught | `npm run check:types` exit 0, mutation-tested |
 | W2 | `WORK_VERIFIED` rows exist in shadow with `repid_delta_applied = 0` | one query |
 | W3 | every published HAL number carries `{corpus_hash, families_answered, coverage, pre/post-cliff}` | run-card present or the number is not published |
 | W4 | one receipt written end-to-end: HAL → RepID → postcard → x402, all four links dated the same day | `npm run north` shows 4 × LIVE |

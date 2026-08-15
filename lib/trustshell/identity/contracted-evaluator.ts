@@ -104,8 +104,16 @@ export interface Judge {
 // imported from it. The kernel is meant to ship as a standalone package; an
 // import here would be harmless in this direction, but it would make this file
 // the place a future reader looks to learn what the kernel requires, and the
-// two would drift. `check:types` catches a mismatch because the adapter is
-// assigned to the port in the test.
+// two would drift.
+//
+// TWO THINGS CATCH THE DRIFT, and neither alone is enough.
+// `scripts/contracted-evaluator-test.mjs` runs the real `runAgentLoop` with a
+// real evaluator, which catches every field the loop READS. It cannot catch a
+// field it does not read: a required addition to the kernel's `Evaluation` left
+// that suite at 20/20 green while this adapter no longer satisfied the port
+// [mutation-tested 2026-08-15]. `contracted-evaluator-port.ts` closes that half
+// at compile time. This comment previously credited `check:types` alone, which
+// was unearned — `tsc` reads no `.mjs`, so it never saw that test at all.
 
 export interface CriterionVerdict {
   criterionId: string;
