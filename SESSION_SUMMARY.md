@@ -245,6 +245,84 @@ heaviest weight — **0.40** — with zero rows in both BFT tables, and no table
 records per-agent latency. That is 50% of the weight that can only resolve to
 zero regardless of tuning. See `DUAL-VIEW-LAUNCH-PLAN.md` §9.
 
+---
+
+# SESSION SUMMARY — 2026-08-14 (claude-opus-5, cloud/scheduled) — full-stack E2E assessment
+
+Surface = **cloud/scheduled**. Access = GitHub **yes** (API scoped to `trinity-ecosystem`;
+other repos reached by public clone), Supabase **yes** (MCP), Vercel **yes** (MCP),
+Railway **no** (proxy-denied), outbound HTTP **yes indirectly** via `pg_net`.
+Preflight: `v_agent_preflight` → **verdict=GO, global_pause=false**. No tasks claimed;
+user-requested assessment of all six products.
+
+Branch `claude/full-stack-e2e-assessment-6rdb6o`, **PR #30** (draft).
+Full report: **`docs/FULL-STACK-E2E-ASSESSMENT-2026-08-14.md`**.
+
+## Accomplished
+
+Probed all six products end to end — surface, deployment, repo — from outside the
+container via `pg_net`. Three findings no status check surfaces:
+
+1. **The fleet control plane is anon-writable.** `LESSONS` S1 says "two tables are
+   `USING(true)` for anon". Measured: **193 anon-readable, 60 anon-writable, 15 with
+   RLS disabled entirely**, all 15 carrying anon I/U/D grants — including
+   `agent_preflight_control`, which holds `global_pause`. [VERIFIED] anon READ proven
+   end to end over real PostgREST with a **publishable key that ships in the browser
+   bundle** (4 requests, all 200). Write verified at the privilege level and
+   **deliberately not exercised** — mutating the pause switch is the fence itself.
+   Supabase advisors: **369**, incl. 59 `security_definer_view` and 15
+   `rls_disabled_in_public` at ERROR.
+
+2. **`scan-secrets.mjs` scans the wrong repo silently.** It parses only `--history`;
+   `--root` is dropped without error, so it always reads cwd. Eight repos "scanned"
+   were the same repo eight times — the output cited a file absent from every target.
+   Re-run correctly per repo: **no new credential leak.** All usable hits triaged —
+   all-zero keys, the public Hardhat account #0, `sk-abcdef…` fixtures, and the
+   settled-inert legacy anon JWT (`disabled: true` [VERIFIED]).
+
+3. ~~**The HyperDAG landing surface was reported as serving uncommitted content.**~~
+   **RETRACTED the same day.** The
+   site is healthy, current and reproducible. Two compounding errors, both mine:
+   the finding read its deployment state off **`hyperdag-org`**, a project that
+   serves **no custom domain** (the site is served by **`hyperdag-trust`**, whose
+   production deploy is **READY** at `fbf8253` = `main` HEAD); and its central
+   discrepancy compared a Postgres `length()` **character** count against `wc -c`
+   **bytes** on the same file — **md5 is identical on both sides**
+   (`ff2ef682522185a58e942b1dbd84c6d3`). Comparing derived scalars when the
+   artifacts themselves were available is the whole error; hashing both sides costs
+   one command. See the retraction in `FULL-STACK-E2E-ASSESSMENT-2026-08-14.md` §1.
+
+Also: **TrustMedical.dev is a parked domain** (registrar page, HTTPS fails both hosts)
+with **no repo and no Vercel project** [VERIFIED]. `www.trustmarket.dev` fails TLS.
+**4 of 6 surfaces have no `/api/version`** — which is why AITrinitySymphony's currency
+is provable (Vercel **and** Railway both at `3ddca6b` = `origin/main` HEAD) and
+HyperDAG's drift was invisible. repid-engine live at `c207e8c` = HEAD, Supabase +
+HashKey connected. **6 of 10 repos have no CI**; `repid` and `trustrails-dev` serve
+live domains on ~3-month-old commits.
+
+## REAL vs STUB
+
+Docs only — no code, schema or grant changed this session. Gate re-run after the edit:
+`tsc --noEmit` **0 errors**, `npm run check` **exit 0**, `npm run test:e2e`
+**29 VERIFIED / 4 NOT CHECKED / 0 FAILED, core 10/10**, `npm run build` clean.
+
+## BLOCKED_FOR_SEAN
+
+1. **Revoke anon write on the 15 RLS-disabled tables — `agent_preflight_control` first.**
+   Exact action: `revoke insert, update, delete on <15 tables> from anon;` then enable
+   RLS. Highest-value single statement in the ecosystem. Fenced here: live grant change.
+2. **`repid_config`** still anon-readable with the enterprise key — open since 08-13.
+3. Rotate the Base Sepolia deployer (#73) and `static.crates.io` allow-list (#75) — both
+   still open from prior sessions.
+4. **Approve `add_repo`** (or widen repo scope) if cross-repo CI/PR inspection is wanted;
+   `trustmarket` is private and was NOT CHECKED.
+
+## Not checked, deliberately
+
+Repo **history** (shallow `--depth 50` clones, `--history` not run), `trustmarket`
+contents, which commit the four version-less surfaces serve, Railway internals beyond
+`/health`.
+
 ## Next 3 commands
 
 ```sh
@@ -254,6 +332,9 @@ node scripts/trustshell-receipt.mjs <session.jsonl> --git-reconcile --claims
 # M6 is next and is the deliverable that matters: run against 10 real sessions,
 # publish what it caught AND what it missed. Blocker: this container holds
 # exactly ONE transcript, so M6 needs sessions from elsewhere.
+psql -c "select relname, relrowsecurity, has_table_privilege('anon',oid,'UPDATE') from pg_class where relname='agent_preflight_control';"
+npm run check && npm run test:e2e
+gh pr view 30 --repo DealAppSeo/trinity-ecosystem
 ```
 
 ---
