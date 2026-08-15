@@ -51,6 +51,7 @@
     "check:staged-judge": "node scripts/staged-judge-test.mjs",
     "check:spine-e2e": "node scripts/spine-e2e-test.mjs",
     "check:checker-assignment": "node scripts/checker-assignment-test.mjs",
+    "check:criteria-draw": "node scripts/criteria-draw-test.mjs",
     "check:raw-bytes": "node scripts/check-raw-control-bytes.mjs",
     "check:outcome-reputation": "node scripts/outcome-reputation-test.mjs",
     "check:auditor-grant": "node scripts/auditor-grant-test.mjs",

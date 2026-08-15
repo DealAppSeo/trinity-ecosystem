@@ -83,7 +83,7 @@ import type { Did } from './did';
 
 export const ASSIGNMENT_DOMAIN = 'zkrepid:checker-assignment:v1';
 
-const TAG = {
+export const TAG = {
   request: `${ASSIGNMENT_DOMAIN}:request`,
   pool: `${ASSIGNMENT_DOMAIN}:pool`,
   seed: `${ASSIGNMENT_DOMAIN}:seed`,
@@ -91,7 +91,7 @@ const TAG = {
 } as const;
 
 /** Field separator. Escape, never a raw byte — see work-contract.ts. */
-const SEP = '\u001f';
+export const SEP = '\u001f';
 
 /**
  * A pool smaller than this is not an assignment, it is a named checker wearing
@@ -132,14 +132,14 @@ export interface QualificationRequirement {
 
 // ---------------------------------------------------------------------------
 
-async function digestHex(value: string): Promise<string> {
+export async function digestHex(value: string): Promise<string> {
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(d))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
 
-function refuseSeparator(name: string, value: string): void {
+export function refuseSeparator(name: string, value: string): void {
   if (value.includes(SEP)) {
     throw new Error(
       `${name} contains the field separator (U+001F), which would let two different ` +
@@ -252,7 +252,7 @@ export async function commitPool(pool: readonly CheckerCandidate[]): Promise<str
  * The bias only becomes measurable at pool sizes we will never reach, and a
  * defence that only pays at scale is still cheaper than the day it does.
  */
-async function uniformIndex(seed: string, n: number): Promise<{ index: number; rejected: number }> {
+export async function uniformIndex(seed: string, n: number): Promise<{ index: number; rejected: number }> {
   const limit = Math.floor(0x1_0000_0000 / n) * n;
   for (let counter = 0; counter < 64; counter += 1) {
     const hex = await digestHex(`${TAG.draw}${SEP}${seed}${SEP}${counter}`);
