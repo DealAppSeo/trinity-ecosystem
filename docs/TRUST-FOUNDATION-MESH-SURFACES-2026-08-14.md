@@ -164,7 +164,39 @@ any of the 57 tables. Its only two "supabase" mentions are a boolean health flag
 `.from(` in the repo is `Array.from()`. So Phase B could not have broken anything
 there — the caution was right to have, and it cost nothing.
 
-`aitrinitysymphony-landing` remains **NOT SCANNED** (3 files, static, per §7).
+**`aitrinitysymphony-landing` scanned 2026-08-15 — and it is the most
+consequential finding in this document.**
+
+**The flagship domain's lead-capture form has been silently dropping every signup
+for 217 days.** `public.leads` holds **one row, dated 2026-01-10**. The form is
+the page's entire conversion path.
+
+It is broken twice over, independently [VERIFIED by replaying the exact live
+request]:
+
+| layer | state |
+|---|---|
+| the key hardcoded in `index.html` | a **legacy `anon` JWT**, disabled project-wide → **`401 Invalid API key`** |
+| the `leads` table | **RLS enabled with ZERO policies** → anon INSERT denied even with a valid key |
+
+Not caused by the RLS batches. `leads` was never in the 57-table anon-writable
+set — RLS-on-with-no-policies is already the locked state — so batch 4 never
+touched it. The legacy key was disabled on 2026-08-12; the lead drought predates
+that by seven months, so the RLS half is the older and primary cause.
+
+**Why nothing caught it.** The page has no CI, no `/api/version`, and the form
+swallows the failure: `catch` merely resets the button text. A visitor sees a
+button that does nothing; the operator sees a healthy 200 on the domain. This is
+the §6 gap — *checkable but not checked* — with a measurable cost attached, and
+it is the strongest argument in this document for the scheduled probe.
+
+The fix is two small changes, deliberately NOT applied here because both touch a
+live production surface: add an INSERT policy for `anon` on `leads` (it is a
+public form target, exactly like the other 17), and replace the hardcoded legacy
+JWT in `index.html` with a current `sb_publishable_…` key.
+
+Also measured: **no CI**, and the repo is 3 files (`index.html`, a LICENSE, and a
+deploy-diagnosis note).
 
 Three further items closed by the same access, each previously NOT CHECKED:
 
