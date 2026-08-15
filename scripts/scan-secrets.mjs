@@ -7,6 +7,8 @@
 //   node scripts/scan-secrets.mjs                    # working tree of the cwd repo
 //   node scripts/scan-secrets.mjs --history          # + every commit reachable from any ref
 //   node scripts/scan-secrets.mjs --root ../other    # scan a DIFFERENT repository
+//   node scripts/scan-secrets.mjs --history --state .cache.json   # reuse prior commit results
+//   node scripts/scan-secrets.mjs --history --since origin/main   # only commits in this range
 //
 // An unrecognised flag is a hard error. It used to be ignored: `--root` was not
 // implemented, and passing it scanned the current directory instead and reported
@@ -26,17 +28,20 @@
 // scan; this is that scan, kept.
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Argument parsing rejects what it does not understand. The previous version
 // asked only `argv.includes('--history')`, which means every other token — a
 // typo, a flag from a newer version, `--root` — was accepted and ignored.
-const { HISTORY, ROOT } = parseArgs(process.argv.slice(2));
+const { HISTORY, ROOT, STATE, SINCE } = parseArgs(process.argv.slice(2));
 
 function parseArgs(argv) {
   let history = false;
   let root = null;
+  let state = null;
+  let since = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--history') {
@@ -47,17 +52,36 @@ function parseArgs(argv) {
     } else if (arg.startsWith('--root=')) {
       root = arg.slice('--root='.length);
       if (!root) fail('--root= requires a path argument');
+    } else if (arg === '--state') {
+      state = argv[++i];
+      if (!state || state.startsWith('--')) fail('--state requires a path argument');
+    } else if (arg.startsWith('--state=')) {
+      state = arg.slice('--state='.length);
+      if (!state) fail('--state= requires a path argument');
+    } else if (arg === '--since') {
+      since = argv[++i];
+      if (!since || since.startsWith('--')) fail('--since requires a revision argument');
+    } else if (arg.startsWith('--since=')) {
+      since = arg.slice('--since='.length);
+      if (!since) fail('--since= requires a revision argument');
     } else {
       fail(`unrecognised argument "${arg}"`);
     }
   }
-  return { HISTORY: history, ROOT: root };
+  if (state && !history) fail('--state only has meaning with --history');
+  if (since && !history) fail('--since only has meaning with --history');
+  // The state file is rewritten from the set of commits scanned, which prunes
+  // anything absent. Combining the two would therefore shrink a full-graph cache
+  // down to whatever narrow range this run happened to look at, and every later
+  // run would silently rescan from nearly nothing while reporting a cache hit.
+  if (since && state) fail('--since cannot be combined with --state: it would prune the cache to the range');
+  return { HISTORY: history, ROOT: root, STATE: state, SINCE: since };
 }
 
 function fail(message) {
   console.error(
     `scan-secrets: ${message}\n\n` +
-      `usage: node scripts/scan-secrets.mjs [--history] [--root <path>]\n\n` +
+      `usage: node scripts/scan-secrets.mjs [--history] [--root <path>] [--state <path>] [--since <rev>]\n\n` +
       `Refusing to run rather than scan a target you did not ask for.`
   );
   process.exit(2);
@@ -284,9 +308,149 @@ for (const file of [...new Set(listed)]) {
   scanText(buf.toString('utf8'), file, findings);
 }
 
+// How many commits go into a single `git grep`. This used to spawn one git per
+// commit; at 643 reachable commits that was 7m28s of a 9m19s CI job — 80% of the
+// run, inside a step that by design cannot fail it. `git grep` accepts many
+// tree-ish arguments at once, so the same search costs a handful of processes
+// instead of one per commit. Batched rather than one giant call because both the
+// argument list and git's per-rev working set grow with the batch.
+const GREP_BATCH = 64;
+
+// Bump when the on-disk shape of the state file changes.
+const STATE_VERSION = 1;
+
+// A cached per-commit result is only reusable if the rules that produced it have
+// not changed. The key is a hash of this file, which holds every pattern and
+// every heuristic: edit any of them and the whole cache is discarded rather than
+// applying a widened rule only to commits that happen to be new. A cache that
+// outlives the rule it was built from would report a clean history it never
+// re-read under the current rules — the house defect wearing a performance hat.
+function scanRulesFingerprint() {
+  return createHash('sha256').update(readFileSync(new URL(import.meta.url))).digest('hex').slice(0, 16);
+}
+
+// Returns commit -> findings for commits whose results can be reused. Every
+// rejection path returns an empty map, which means a full scan: slower, never
+// wrong. Silence is not one of the options — each reason prints.
+function loadState(path, reachable) {
+  const known = new Map();
+  if (!path) return known;
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (err) {
+    // ENOENT is the ordinary first run, not a fault worth shouting about.
+    if (err.code !== 'ENOENT') {
+      process.stderr.write(`state file unusable (${err.message}) — scanning every commit\n`);
+    }
+    return known;
+  }
+  if (parsed?.version !== STATE_VERSION || parsed?.rules !== scanRulesFingerprint()) {
+    process.stderr.write('state file predates the current scan rules — scanning every commit\n');
+    return known;
+  }
+  // Only reuse entries for commits that are still reachable. A deleted branch
+  // has to drop out of the report, not linger because it was scanned once.
+  const live = new Set(reachable);
+  for (const [sha, hits] of Object.entries(parsed.commits ?? {})) {
+    if (live.has(sha) && Array.isArray(hits)) known.set(sha, hits);
+  }
+  return known;
+}
+
+function saveState(path, reachable, byCommit) {
+  if (!path) return;
+  // Written from `reachable`, so commits that fell out of the graph are pruned
+  // rather than accumulating forever.
+  const commits = {};
+  for (const sha of reachable) commits[sha] = byCommit.get(sha) ?? [];
+  try {
+    writeFileSync(path, JSON.stringify({ version: STATE_VERSION, rules: scanRulesFingerprint(), commits }));
+  } catch (err) {
+    // A cache that cannot be written makes the next scan slow, not wrong.
+    process.stderr.write(`could not write state file (${err.message})\n`);
+  }
+}
+
+// What the "usable in history" count actually covers. A range scan answers a
+// narrower question than a full one and the summary has to say which: "0 usable
+// in history" over three commits reads exactly like "0 usable in history" over
+// the whole graph, and only one of them means the history is clean.
+let historyScope = ' (history not scanned — pass --history)';
+
 if (HISTORY) {
-  const commits = git(['rev-list', '--all']).split('\n').filter(Boolean);
-  process.stderr.write(`scanning ${commits.length} commits…\n`);
+  // `--all` is every commit reachable from any ref — on a CI checkout with
+  // fetch-depth: 0 that is every branch in the repo, so the cost tracks the whole
+  // repo's commit count rather than this change's. `--since` narrows it to a
+  // range, which is what the pull_request path wants: the commits under review
+  // are the PR's own, and a cold full scan there is unbounded work for an answer
+  // the main-branch run already produces.
+  // Resolve --since before using it. Left to `rev-list`, an unresolvable
+  // revision throws a raw stack trace and exits 1 — the same code as "usable
+  // credential in the working tree" — and under the `|| true` this step runs
+  // with in CI that renders as a scan that found nothing rather than a scan that
+  // never ran. Exit 2 instead: refusing to run, distinct from every finding code.
+  if (SINCE) {
+    const resolved = git(['rev-parse', '--verify', '--quiet', `${SINCE}^{commit}`], {
+      allowNoMatch: true,
+    }).trim();
+    if (!resolved) fail(`--since revision "${SINCE}" does not resolve to a commit in this repository`);
+  }
+
+  const commits = (
+    SINCE ? git(['rev-list', `${SINCE}..HEAD`]) : git(['rev-list', '--all'])
+  )
+    .split('\n')
+    .filter(Boolean);
+  historyScope = SINCE
+    ? ` (history: ${commits.length} commit(s) since ${SINCE} — NOT the full graph)`
+    : '';
+
+  // Findings per commit, for every commit reachable right now: reused where the
+  // state file has them, freshly scanned where it does not. History is
+  // append-only — an existing commit's content cannot change — so a commit
+  // already searched under these same rules can never yield a different result.
+  const byCommit = loadState(STATE, commits);
+  const toScan = commits.filter((c) => !byCommit.has(c));
+  process.stderr.write(
+    `scanning ${commits.length} commits` +
+      (SINCE ? ` since ${SINCE}` : '') +
+      (STATE ? ` (${commits.length - toScan.length} reused, ${toScan.length} new)` : '') +
+      '…\n'
+  );
+
+  for (let i = 0; i < toScan.length; i += GREP_BATCH) {
+    const batch = toScan.slice(i, i + GREP_BATCH);
+    // No `-h`: it strips the `<rev>:<path>` prefix, which is the only thing
+    // saying WHICH commit a line came from — fine when the call was per-commit,
+    // fatal now that one call spans many. `-z` terminates the filename with NUL
+    // so a path containing a colon cannot be misparsed as line content.
+    //
+    // Whole matching lines, not `-o`. The assignment check above needs the text
+    // *before* the match to tell a secret key from a transaction signature, and
+    // `-o` throws that context away.
+    const out = git(['grep', '-z', '-E', GIT_GREP_ERE, ...batch, '--'], { allowNoMatch: true });
+    const lines = new Map();
+    for (const record of out.split('\n')) {
+      const nul = record.indexOf('\0');
+      if (nul === -1) continue;
+      const sha = record.slice(0, 40);
+      if (!lines.has(sha)) lines.set(sha, []);
+      lines.get(sha).push(record.slice(nul + 1));
+    }
+    // Record every commit in the batch, including the ones that matched
+    // nothing. Storing only the hits would leave clean commits looking unscanned
+    // and rescan them on every future run.
+    for (const commit of batch) {
+      const hits = [];
+      const matched = lines.get(commit);
+      if (matched?.length) scanText(matched.join('\n') + '\n', `history:${commit.slice(0, 8)}`, hits);
+      byCommit.set(commit, hits);
+    }
+  }
+
+  saveState(STATE, commits, byCommit);
+
   // Deduplicate history hits against EACH OTHER, but never against the working
   // tree. Seeding this set with the working-tree fingerprints — which is what it
   // used to do — makes a secret that is in both places report as working-tree
@@ -297,15 +461,10 @@ if (HISTORY) {
   const workingTreeByFingerprint = new Map(
     findings.filter((f) => !f.where.startsWith('history:')).map((f) => [f.fingerprint, f])
   );
+  // Walked in `rev-list` order, not scan order, so which commit gets the credit
+  // for a secret present in many does not depend on what was cached.
   for (const commit of commits) {
-    // Whole matching lines, not `-o`. The assignment check above needs the text
-    // *before* the match to tell a secret key from a transaction signature, and
-    // `-o` throws that context away.
-    const text = git(['grep', '-h', '-E', GIT_GREP_ERE, commit, '--'], { allowNoMatch: true });
-    if (!text) continue;
-    const batch = [];
-    scanText(text, `history:${commit.slice(0, 8)}`, batch);
-    for (const f of batch) {
+    for (const f of byCommit.get(commit) ?? []) {
       if (seen.has(f.fingerprint)) continue;
       seen.add(f.fingerprint);
       // Present in the working tree too: annotate that finding rather than
@@ -328,7 +487,10 @@ const historyRisk = findings.filter(
 );
 
 if (findings.length === 0) {
-  console.log('No credential-shaped strings found.');
+  // Qualified only in range mode: a clean sweep of three commits is not the same
+  // statement as a clean sweep of the graph, and this line is the one someone
+  // quotes. Full-graph and working-tree-only output is unchanged.
+  console.log(`No credential-shaped strings found.${SINCE ? historyScope : ''}`);
   process.exit(0);
 }
 
@@ -349,7 +511,7 @@ for (const f of findings) {
 
 console.log(
   `\n${findings.length} finding(s): ${workingTreeRisk.length} usable in working tree, ` +
-    `${historyRisk.length} usable in history${HISTORY ? '' : ' (history not scanned — pass --history)'}.`
+    `${historyRisk.length} usable in history${historyScope}.`
 );
 
 if (historyRisk.length > 0) {
