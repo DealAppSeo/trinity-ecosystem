@@ -47,6 +47,8 @@
     "check:identity": "node scripts/check-identity.mjs",
     "check:work-contract": "node scripts/work-contract-test.mjs",
     "check:contracted-evaluator": "node scripts/contracted-evaluator-test.mjs",
+    "check:outcome-reputation": "node scripts/outcome-reputation-test.mjs",
+    "check:auditor-grant": "node scripts/auditor-grant-test.mjs",
     "check:dual-view": "node scripts/check-dual-view-contract.mjs",
     "check:receipt": "node scripts/check-receipt.mjs",
     "trustshell:receipt": "node scripts/trustshell-receipt.mjs",
