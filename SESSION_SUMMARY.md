@@ -101,10 +101,18 @@ absent on Node 18. The type checker could not see it.
 `npm run check` **exit 0, 753 assertions** (438 → 523 → 612 → 707 → 753),
 `tsc --noEmit` **0 errors**, `next build` clean, `check:prior-work` 16/16 docs.
 
-[VERIFIED on CI, not only locally] PR #33 head `a8b3dbf`: **`check` success in
-6m00s on Node 24**, `prior-work` success, Vercel success. Every earlier `check`
-run on this branch was superseded by the next push before finishing; this is the
-first to complete end to end, and it covers M2–M5.
+[VERIFIED on CI, not only locally] **All six `check` runs on this branch
+completed `success`** — `b53ae9c`, `2f87a0d`, `e09b23e`, `452fa31`, `1518a6d`,
+`a8b3dbf` — the last in 6m00s on Node 24. `prior-work` and Vercel green on each.
+
+**Corrected.** An earlier revision of this paragraph said every run before
+`a8b3dbf` was *"superseded by the next push before finishing"*. That was wrong,
+and it was asserted three times. `get_check_runs` returns only the **head
+commit's** check runs, so after each push the previous commit's still-running job
+vanished from the response — and absence was read as cancellation. The
+authoritative view is `list_workflow_runs` filtered by branch, which shows six
+completions. Same shape as the retractions in `PRIOR-WORK-INDEX.md`: a property
+of the query mistaken for a property of the world.
 
 **Mutation-tested throughout — 21 mutations, 20 caught first time.** Contract 3,
 receipt 4 (+9 tamper), verifier 4, claims 5, init 5. The one that survived is the
@@ -187,6 +195,21 @@ integration"**, and `GH_TOKEN` does not fix it — the token lacks `actions:read
 Only the `mcp__github__*` tools can read Actions here. A Bash poll parses the 403
 as "still waiting" and times out silently, which is indistinguishable from a job
 that never finished. Cost an hour of false confidence this session.
+
+**Second trap, same family.** `get_check_runs` returns only the **head commit's**
+runs. Query it after pushing and the previous commit's in-flight job is simply
+absent — which reads as "cancelled" and is not. Use `list_workflow_runs` filtered
+by branch for run history; use `get_check_runs` only for "what is on the head
+right now".
+
+**Third: Actions can stop scheduling entirely, repo-wide, and nothing says so.**
+[VERIFIED 2026-08-15 02:16Z] The newest workflow run **anywhere in this repo** is
+`3c710af` on `main` at 01:48:37. Commits `32ec1b4` (01:58) and `d43c5ba` (02:12)
+on this branch triggered **no runs at all** — not queued, not skipped, absent —
+and so did every other branch in that window. The workflows have no path filter,
+so this is not a docs-only skip. Whatever the cause (quota, a disabled-Actions
+setting, an outage), the visible symptom is a PR that looks like it is "still
+waiting" forever. **Do not read a missing run as a pending one.**
 
 ## BLOCKED_FOR_SEAN
 
