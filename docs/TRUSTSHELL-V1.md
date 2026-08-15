@@ -1,11 +1,12 @@
 # TrustShell v1 — specification
 
-**Status:** spec, with M1–M4 built. §10 is the ledger — M1 (transcript parser),
-M2 (session receipt), M3 (independent offline verification) and M4 (T0/T1 claim
-checking) are done and proven; M5 and M6 are not started. §3 and §4.2 carry
-corrections the M1 build forced on the spec that specified them; §4.1 and §12
-carry M2's; §8 and §10 carry M3's; §4.3.1 carries M4's measurement. §12 Q1 and
-Q2 are **decided**, not open.
+**Status:** spec, with M1–M5 built. §10 is the ledger — M1 (transcript parser),
+M2 (session receipt), M3 (independent offline verification), M4 (T0/T1 claim
+checking) and M5 (`trustshell init`) are done and proven; **M6, the dogfood, is
+not started and is the one that matters.** §3 and §4.2 carry corrections the M1
+build forced on the spec that specified them; §4.1 and §12 carry M2's; §8 and §10
+carry M3's; §4.3.1 carries M4's measurement; §9 and §12 Q3 carry M5's. §12 Q1,
+Q2 and Q3 are **decided**, not open.
 **Date:** 2026-08-12, revised 2026-08-15
 
 Every milestone built so far has falsified something this document asserted.
@@ -19,7 +20,7 @@ trusting the agent or the vendor.
 
 | Question | Decision |
 | :-- | :-- |
-| Surface | Developer, via MCP server + CLI |
+| Surface | Developer, via **CLI** — MCP dropped 2026-08-15, see §12 Q3 |
 | Posture | **Observe.** Shadow mode; never blocks an agent |
 | What is verified | Agent **actions**, **spend**, and **hallucination** |
 
@@ -127,7 +128,7 @@ evidence behind it — with no cooperation from the agent.
                     │  session receipt (signed)    │
                     └──────┬────────────────┬──────┘
                            ▼                ▼
-                    MCP tools / CLI    verify-receipt
+                    CLI / Stop hook    verify-receipt
                     (query surface)    (anyone, offline, no deps)
 ```
 
@@ -441,23 +442,53 @@ decision. It is not on the v1 critical path, but it is the best demo asset here.
 
 | Package | State | v1 role |
 | :-- | :-- | :-- |
-| `@hyperdag/trustshell` | published 1.3.0 | core: parse, check, hash, sign |
-| `@hyperdag/trustshell-mcp` | published 1.0.0 | MCP surface — the vehicle already exists |
+| `@hyperdag/trustshell` | published 1.3.0 | **NOT this product** — see below |
+| `@hyperdag/trustshell-mcp` | published 1.0.0 | **NOT this product** — see below |
 | `@hyperdag/proof-verifier` | published 0.2.0 | **RepID STARK proofs, not receipts** — see §8 |
 | `trustshell verify-receipt` | **new, built** | offline receipt verification, zero deps |
 | `@hyperdag/trust-demo` | packed, unpublished | tamper-rejection demo |
 | `trustshell init` | **new** | detect installed MCP clients, write config + `Stop` hook |
 
-**MCP tools exposed** (query surface, not the observer):
-`trustshell_verify_session`, `trustshell_get_receipt`, `trustshell_list_findings`,
-`trustshell_spend_summary`.
+**Corrected 2026-08-15, by the M5 build.** The two rows above claimed the
+published packages were this product's core and its MCP vehicle. They are not.
+Measured by installing both from npm:
 
-**CLI:** `trustshell init`, `trustshell verify [session]`, `trustshell receipt <id>`,
-`trustshell watch`.
+| package | what it actually is |
+| :-- | :-- |
+| `@hyperdag/trustshell@1.3.0` | HAL cross-LLM verification, portable RepID, A2A service purchase, **against a live backend**. CLI: `verify \| repid \| proof \| badge \| version`. **Zero** occurrences of `transcript`, `audit_hash` or `session_receipt` in `dist/`. |
+| `@hyperdag/trustshell-mcp@1.0.0` | MCP tools `verify_output`, `get_repid`, `present_proof`, `verify_proof`, `buy_service`, `list_services`. Same product. Also zero. |
+
+They share a name with this harness and nothing else. Two consequences:
+
+1. **`trustshell verify <session>` would collide.** `trustshell verify` already
+   ships and means *verify an LLM output*. A second meaning for the same verb on
+   the same binary is a permanent support burden. The receipt tooling needs its
+   own name before it is ever published.
+2. **Adding receipts to that package means publishing a new version of a live
+   SDK.** Publishing is irreversible and Sean-gated, so M5 installs the local
+   tooling by absolute path instead and assumes no publish.
+
+**MCP tools exposed: none. §12 Q3 is decided — CLI and file output only.**
+Two reasons, and the second is new:
+
+- The one the spec already gave: MCP output is visible to the agent, which can
+  then talk about its own score. Keeping the marker out of the model's context
+  is the cleanest v1.
+- The MCP namespace is **occupied by a different product**. A
+  `trustshell_verify_session` tool sitting beside that package's `verify_output`
+  invites exactly the confusion — "which verify is the trustworthy one?" — that
+  the marker exists to remove.
+
+**CLI, as built:** `trustshell-init` (install/uninstall the Stop hook),
+`trustshell-receipt` (emit a receipt), `trustshell-verify-receipt` (check one,
+independently). All local scripts today.
 
 `trustshell init` is the onboarding described in the original sketch — scan the
 environment, find which MCP clients are installed, write the config. It is
-mechanical, not clever, and it is the whole first-run experience.
+mechanical, not clever, and it is the whole first-run experience. It is **dry run
+by default**, backs the file up before writing, is idempotent, preserves hooks it
+did not install, refuses to overwrite settings it cannot parse, and is reversible
+with `--uninstall`.
 
 ## 10. Milestones
 
@@ -467,7 +498,7 @@ mechanical, not clever, and it is the whole first-run experience.
 | M2 | Actions + spend receipt | **DONE 2026-08-15.** `lib/trustshell/receipt/` (types, canonical, build, sign, git, store-sqlite), 89 assertions in `scripts/check-receipt.mjs`, CLI `scripts/trustshell-receipt.mjs`. `audit_hash` stable across re-runs [VERIFIED on a live 294-line session: identical hash twice, `ts_…` id derived from it]. Storage and custody decided — see §12. Nine tamper mutations detected; four mutations of the checker itself caught, each compiled. **The receipt reads `NOT CHECKED`, and §12.5 explains why that is the correct output rather than a shortfall.** |
 | M3 | Independent offline verification | **DONE 2026-08-15, against a corrected target.** `scripts/trustshell-verify-receipt.mjs` — zero TrustShell imports, zero dependencies; canonical JSON, base58, base32, did:key decode, Ed25519 verify and the marker rule all re-implemented. 60 assertions in `scripts/check-receipt-verifier.mjs`, run as a **subprocess** so it cannot share module state. Twelve tamper mutations detected; a differential over twelve awkward canonicalisation shapes and six marker branches agrees with the builder on every one. Four mutations of the verifier caught, each compiled. **`@hyperdag/proof-verifier` cannot do this — see below.** |
 | M4 | T0 + T1 claim checking | **DONE 2026-08-15.** `lib/trustshell/receipt/claims.ts`, 35 assertions in `scripts/check-claims.mjs`, `--claims` on the CLI. Catches the 2026-08-12 `scan-secrets` entry (reconstructed from LESSONS, not recovered): `git grep` exited 128, the agent reported *"No credential-shaped strings found"*, T1 contradicts it. FPR measured and published in §4.3.1 — **2 findings, 2 false positives, 0% precision on the first draft**; 0 raised after tightening, on a sample of **one session**. Parser bumped to 1.1.0 to expose claim spans. Five mutations caught — one survived first and exposed a **vacuous invariant**. |
-| M5 | `trustshell init` + MCP tools | `npx trustshell init` → working in Claude Code, receipt visible in-session |
+| M5 | `trustshell init` | **DONE 2026-08-15, scope corrected.** `scripts/trustshell-init.mjs`, 46 assertions in `scripts/check-init.mjs`. Detects project and user settings, installs a `Stop` hook, dry run by default, backs up, idempotent, preserves foreign hooks, refuses malformed JSON, `--uninstall` restores. **End-to-end VERIFIED:** installed into a settings.json, invoked the hook exactly as Claude Code would (`CLAUDE_TRANSCRIPT_PATH` set), and a receipt with claim checking landed in SQLite — `ts_4x5bpkzlrf7eweti`, marker NOT CHECKED, hook exit 0. §7.3's crash-swallowing is asserted by **running** a failing command through the wrapper, not by reading it. Five mutations caught. **MCP tools deliberately not built** — §12 Q3 decided, see §9. **NOT CHECKED: never run against a live Claude Code session**, because that mutates the running environment; verified against real settings files instead. |
 | M6 | Dogfood | Run against 10 real sessions from this repo; publish what it found **and what it missed** |
 
 M6 is the deliverable that matters. "We ran it on our own agent and here is what
@@ -517,9 +548,11 @@ Stated up front so they can be watched:
    re-derivation path — recompute `audit_hash` from the same transcript bytes,
    no key, no trust in the signer — remains the real proof; the signature is
    convenience.
-3. **Does the marker belong in-session?** MCP tool output is visible to the
-   agent, which can then talk about its own score. Cleanest v1 is CLI/file
-   output only, out of the model's context. Recommend that.
+3. ~~**Does the marker belong in-session?**~~ — **DECIDED 2026-08-15: no.** CLI
+   and file output only. The original reason stands (MCP output is visible to the
+   agent, which can then discuss its own score), and the M5 build added a second:
+   the MCP namespace is already occupied by `@hyperdag/trustshell-mcp`, whose
+   `verify_output` tool means something else entirely. See §9.
 4. **RepID linkage** — bind a session receipt to an `agent_kya_registry` row, or
    keep developer sessions entirely separate from the agent registry? These are
    different trust domains and conflating them early would be hard to undo.

@@ -76,3 +76,6 @@ headroom.db
 # artefacts of a dev tool; the daemon writes here because ./agent-browser.json
 # sets screenshotDir. Machine-local config lives in ~/.agent-browser/, not here.
 .agent-browser/
+
+# TrustShell Stop-hook output (§7.3 — redirected so a crash cannot reach the session)
+.trustshell.log
