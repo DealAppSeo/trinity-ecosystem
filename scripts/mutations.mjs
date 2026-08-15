@@ -368,6 +368,65 @@ export const MUTATIONS = [
     replace:
       '      if (age > staleDays) violations.push({ file: rel, line: 0, ref, name });',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/hal-receipt.ts — the newest writer into the table whose
+  // every existing row had to be retracted for overclaiming.
+  // -------------------------------------------------------------------------
+  {
+    id: 'hal-receipt-bft-false-not-null',
+    suite: 'check:hal-receipt',
+    file: 'lib/trustshell/hal-receipt.ts',
+    protects:
+      'bft_passed is NULL on a HAL receipt, not false — the panel did not vote, and ' +
+      'false asserts a failed vote as confidently as true asserts a passed one. This ' +
+      'is the exact field that got all 12 pre-existing rows retracted',
+    find: '    bft_passed:   null,',
+    replace: '    bft_passed:   false,',
+  },
+  {
+    id: 'hal-receipt-claims-a-chain',
+    suite: 'check:hal-receipt',
+    file: 'lib/trustshell/hal-receipt.ts',
+    protects:
+      'a HAL receipt names no chain — the column defaults to base-sepolia, so ' +
+      'accepting the default writes a network a classification never touched',
+    find: '    on_chain_network: null,',
+    replace: "    on_chain_network: 'base-sepolia',",
+  },
+  {
+    id: 'hal-receipt-borrows-payment-status',
+    suite: 'check:hal-receipt',
+    file: 'lib/trustshell/hal-receipt.ts',
+    protects:
+      'tx_verification_status is not_applicable, so HAL receipts stay visible in a ' +
+      'group-by instead of silently joining the payment population',
+    find: "    tx_verification_status: 'not_applicable',",
+    replace: "    tx_verification_status: 'pending',",
+  },
+  {
+    id: 'hal-receipt-preimage-drops-a-field',
+    suite: 'check:hal-receipt',
+    file: 'lib/trustshell/hal-receipt.ts',
+    protects:
+      'every field is bound by the audit hash — a field dropped from the preimage ' +
+      'during a refactor leaves the receipt verifying happily while no longer ' +
+      'protecting what it appears to',
+    find: '    JSON.stringify(c.previous_entry_hash),',
+    replace: '',
+  },
+  {
+    id: 'hal-receipt-preimage-ambiguous-again',
+    suite: 'check:hal-receipt',
+    file: 'lib/trustshell/hal-receipt.ts',
+    protects:
+      'the preimage is unambiguous — raw interpolation makes an absent field ' +
+      'collide with the string "null", and a colon inside a value shift every ' +
+      'later field boundary. Both were real, and both were caught by this suite ' +
+      'on its first run',
+    find: '    JSON.stringify(c.category),',
+    replace: "    (c.category ?? 'null'),",
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
