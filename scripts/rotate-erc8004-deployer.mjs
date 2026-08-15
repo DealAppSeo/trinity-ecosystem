@@ -26,6 +26,7 @@
 //   node scripts/rotate-erc8004-deployer.mjs \
 //     --tokens 1,2,3 \
 //     --to 0xYourFreshSigner \
+//     --confirm-to 0xYourFreshSigner \
 //     --expect-from 0xTheCompromisedAddress
 //   # review the plan, then re-run with --execute
 //
@@ -68,6 +69,7 @@ const key = process.env.TRINITY_COMPROMISED_KEY;
 if (!key) die('TRINITY_COMPROMISED_KEY is not set. Export it in this shell only.');
 
 const to = arg('to');
+const confirmTo = arg('confirm-to');
 const expectFrom = arg('expect-from');
 const tokens = (arg('tokens') ?? '')
   .split(',')
@@ -75,6 +77,19 @@ const tokens = (arg('tokens') ?? '')
   .filter(Boolean);
 
 if (!to) die('--to <address> is required (the fresh signer).');
+if (!confirmTo) {
+  die(
+    '--confirm-to <address> is required, and must repeat --to exactly.\n' +
+      '  A wrong --to is the worst outcome this script can produce: a valid but\n' +
+      '  unowned destination takes the identities irrecoverably, and no check\n' +
+      '  downstream can tell that address apart from the intended one.\n' +
+      '  --expect-from makes a wrong SOURCE abort; this is the same guard for the\n' +
+      '  destination. Paste it a second time rather than editing one character.'
+  );
+}
+if (to.toLowerCase() !== confirmTo.toLowerCase()) {
+  die(`--to and --confirm-to differ:\n  --to         ${to}\n  --confirm-to ${confirmTo}`);
+}
 if (!expectFrom) die('--expect-from <address> is required. Naming the address you expect turns a wrong key into an abort instead of a transfer to nowhere.');
 if (!tokens.length) die('--tokens <id,id,...> is required. Token ids are deliberately not hardcoded here so this file does not restate which identities are affected.');
 
@@ -157,8 +172,41 @@ for (const id of tokens) {
   if (!mine) blocked = true;
 }
 
+// GAS: enough for EVERY transfer, not merely non-zero. The previous check was
+// `balance === 0n`, which one wei satisfies. Running out mid-run leaves a PARTIAL
+// rotation — some identities moved, some still on the leaked key — which is the
+// worst state to be in, because the exposure is unchanged but looks addressed.
 if (balance === 0n) {
   die('the compromised account has no gas. Fund it before rotating — a transfer cannot be signed without it.');
+}
+{
+  const transferable = tokens.length;
+  const fee = await rpc('fee data', () => provider.getFeeData());
+  const perGas = fee.maxFeePerGas ?? fee.gasPrice;
+  if (perGas == null) {
+    console.warn('\nWARNING: the RPC returned no fee data; gas sufficiency was NOT CHECKED.');
+  } else {
+    let perTransfer;
+    try {
+      perTransfer = await registry['safeTransferFrom(address,address,uint256)'].estimateGas(
+        wallet.address, to, tokens[0]
+      );
+    } catch {
+      perTransfer = 150000n; // ERC-721 safeTransferFrom is comfortably under this
+      console.warn('\nNOTE: gas estimation reverted; using a 150k fallback for the sufficiency check.');
+    }
+    // 25% headroom: base fee moves between the estimate and the last broadcast.
+    const needed = (perTransfer * perGas * BigInt(transferable) * 125n) / 100n;
+    console.log(`  gas needed   ~${ethers.formatEther(needed)} ETH for ${transferable} transfer(s), incl. 25% headroom`);
+    if (balance < needed) {
+      die(
+        `insufficient gas for all ${transferable} transfers.\n` +
+          `  have   ${ethers.formatEther(balance)} ETH\n` +
+          `  need  ~${ethers.formatEther(needed)} ETH\n` +
+          `  Fund the account first. A partial rotation leaves identities on the leaked key.`
+      );
+    }
+  }
 }
 
 if (!EXECUTE) {

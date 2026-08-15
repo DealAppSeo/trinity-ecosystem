@@ -56,6 +56,21 @@ export interface ExpertProfile {
   costHint?: number;
   /** True when the ledger has too few observations to be meaningful. */
   coldStart: boolean;
+  /**
+   * LEDGER-DERIVED. How many outcomes back `earnedScore`. Optional.
+   *
+   * ADDED 2026-08-14 because the router could not tell two different states
+   * apart and was forced to guess. `coldStart` is true both for an expert with
+   * NO evidence and for one with SOME — 19 failures in a row is still cold —
+   * and those want opposite treatment: the first must be scored at the midpoint
+   * (no evidence is not evidence of badness), the second must be allowed to
+   * rank on the evidence it has, in whichever direction it points.
+   *
+   * Omit it and the router stays conservative, never scoring a cold expert
+   * below the midpoint. Supplying it is worth roughly 0.9pp of delivered
+   * quality — see `scripts/harness-newcomer.mjs`.
+   */
+  observations?: number;
 }
 
 /** A unit of work to route. */

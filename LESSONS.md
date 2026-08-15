@@ -759,6 +759,46 @@ cap and the rate limiter.
 
 ---
 
+## A15 — an incremental build cache manufacturing compile errors that cannot exist (2026-08-14)
+
+`npx tsc --noEmit` reported **4 errors** locally: a `Set<string>` iteration
+wanting `--downlevelIteration`, and three BigInt literals wanting a target of
+ES2020 or higher. On the strength of that count a CI gate was set to a baseline
+of 4.
+
+**All four were impossible.** `tsconfig.json` sets `"target": "es2022"`, which
+supports BigInt literals and `Set` iteration outright. The contradiction was
+sitting in the error text — the errors named the very constraint the config
+already satisfied — and it was not noticed, because a count is easy to read and
+an error message is easy to skim.
+
+**Cause:** `"incremental": true` plus a stale `tsconfig.tsbuildinfo`. tsc replays
+cached diagnostics for files it considers unchanged, and those four had not been
+touched since an era when `target` was lower. `rm tsconfig.tsbuildinfo` and
+re-run: **0 errors, twice.** CI, which checks out fresh and therefore has no
+tsbuildinfo, had been reporting **0** the whole time.
+
+**What made it visible was reading the CI log, not the CI result.** The run was
+green either way — 0 passes a threshold of 4 — so the green tick carried no
+information about the disagreement. Nothing would have surfaced it except
+opening the log and comparing the printed count against the local one.
+
+**The rule.** A build cache is part of the instrument, not part of the codebase.
+When a local count and a CI count disagree, that is evidence about the local
+machine first: CI's fresh checkout is the cleaner instrument, and the local one
+has state CI does not. `CLAUDE.md` already warns that `tsconfig.tsbuildinfo` is
+a build artefact, but only about `git stash` conflicts. It can also **invent
+diagnostics**, and a wrong count published from it is indistinguishable from a
+real regression.
+
+**Generalises past tsc.** Any incremental or cached tool — `tsc --incremental`,
+`next build`'s `.next/cache`, jest's `--cache`, a bundler's cache dir — can
+report yesterday's answer about today's code with full confidence. The cheap
+habit: before quoting a number from one, clear its cache once and confirm the
+number does not move.
+
+---
+
 ## A16 — one line that five pull requests had to fight over (2026-08-15)
 
 **[VERIFIED] — five hand-resolutions of the same conflict in one night, across

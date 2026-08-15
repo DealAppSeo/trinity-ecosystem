@@ -7,18 +7,33 @@
 # not conflict, and a distinct job name means a failure here says *which* gate
 # broke without opening the log.
 #
-# WHY NOT JUST `npm run check`. On this branch it exits 1, and would have landed
-# red on day one. Its final step is `npx tsc --noEmit`, and there are 25
-# PRE-EXISTING type errors — all in `src/graphs/motor-squad-graph.ts`, a file
-# that imports a package which is not in package.json and never has been. PR #25
-# deletes it. Gating on a red command would make this workflow permanently red
-# and therefore ignored, which is the failure mode the repo's own tooling
-# argues against.
+# WHY NOT JUST `npm run check`. It exits 1 on pre-existing type errors and would
+# have landed red on day one. Gating on a red command makes a workflow
+# permanently red and therefore ignored, which is the failure mode the repo's
+# own tooling argues against.
 #
-# So tsc is gated on the REGRESSION instead of on zero: the repo's documented
-# convention is "compare against 25". That catches new errors on the first push
-# that introduces one, while staying green against a backlog this branch did
-# not create and must not silently adopt.
+# tsc was therefore gated on a THRESHOLD rather than on zero, so a backlog this
+# branch did not create could not make the gate permanently red. That backlog is
+# gone and the threshold is now 0, so it is a plain regression gate again.
+#
+# BASELINE IS NOW 0, i.e. this is a real gate again. Two corrections got it here
+# on 2026-08-14 and the second is worth reading before touching the number.
+#
+# The original 25 were all in `src/graphs/motor-squad-graph.ts`, which PR #25
+# deleted. Leaving the threshold at 25 after that would have let 25 new errors
+# land without the gate saying a word.
+#
+# It was then set to 4, because `npx tsc --noEmit` reported 4 locally. THAT WAS
+# A CONTAMINATED MEASUREMENT. `tsconfig.json` sets `incremental: true`, and a
+# stale `tsconfig.tsbuildinfo` replays cached diagnostics for files that have
+# not changed — in this case four errors from an era when `target` was lower
+# than `es2022` (BigInt literals in `lib/trusttrader/trade_pipeline.ts`, a `Set`
+# iteration in `lib/trust/cross-llm-verifier.ts`). Under the current `es2022`
+# target none of them can occur. Deleting the file and re-running gives 0, twice.
+# CI, which checks out fresh and therefore has no tsbuildinfo, said 0 all along.
+#
+# So: a CI run disagreeing with your local count is evidence about YOUR machine
+# first. Delete `tsconfig.tsbuildinfo` and re-run before adjusting anything here.
 
 name: prior-work
 
@@ -62,18 +77,47 @@ jobs:
           npm run check:harness-agreement
           npm run check:mcp-fleet
 
-      # Threshold, not zero. See the header: 25 is the documented baseline and
-      # every one of them predates this branch. `|| true` on the count keeps the
-      # pipeline from dying on grep's exit-1-when-no-match, which would report
-      # zero errors as a failure.
-      - name: tsc must not exceed the 25-error baseline
+      # Not a test suite — an analysis. It is here because its section 2 exits 1
+      # when the ledger's constants drift away from the closed-form model the
+      # analysis is written on. Without that, changing `confidenceK` or `alpha`
+      # would leave a document full of numbers describing a harness that no
+      # longer exists, and nothing would say so.
+      #
+      # Its verdict is echoed rather than sent to /dev/null. A step whose only
+      # evidence is a green tick is the shape this repo keeps getting burned by,
+      # and the tail costs twelve lines.
+      - name: newcomer analysis (its own model must still match the ledger)
+        run: |
+          npm run sim:newcomer > /tmp/newcomer.log
+          tail -12 /tmp/newcomer.log
+
+      # Same reasoning. Two invariants that break only if the MEASUREMENT breaks:
+      # nothing may outscore the oracle (which would mean the common-random-
+      # numbers wiring is wrong), and Sprint X's cold-start fix must still be an
+      # improvement (which would mean a CLOSED entry has gone stale). ~3s.
+      - name: adoption analysis (oracle dominance, Sprint X non-regression)
+        run: |
+          npm run sim:adoption > /tmp/adoption.log
+          tail -20 /tmp/adoption.log
+
+      # Same pattern again. Its invariant is a BIAS check: at zero specialisation
+      # per-step routing has nothing to find, so the two arms must tie. A model
+      # that favours the proposal there would inflate every number it reports.
+      - name: sub-task analysis (must not favour its own proposal)
+        run: |
+          npm run sim:subtask > /tmp/subtask.log
+          tail -22 /tmp/subtask.log
+
+      # `|| true` on the count keeps the pipeline from dying on grep's
+      # exit-1-when-no-match, which would report zero errors as a failure — the
+      # one case that must read as success. On failure the errors are printed,
+      # so the log says WHICH ones without a second run.
+      - name: tsc must be clean (baseline 0)
         run: |
           COUNT=$(npx tsc --noEmit 2>&1 | grep -cE "error TS" || true)
-          echo "tsc --noEmit: $COUNT errors (baseline 25)"
-          if [ "$COUNT" -gt 25 ]; then
-            echo "::error::tsc regressed: $COUNT errors, baseline is 25"
+          echo "tsc --noEmit: $COUNT errors (baseline 0)"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::error::tsc regressed: $COUNT errors, baseline is 0"
+            npx tsc --noEmit 2>&1 | grep -E "error TS" || true
             exit 1
-          fi
-          if [ "$COUNT" -lt 25 ]; then
-            echo "::notice::tsc improved to $COUNT. Lower the baseline in this workflow so it cannot silently drift back."
           fi

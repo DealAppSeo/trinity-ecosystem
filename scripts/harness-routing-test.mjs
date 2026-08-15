@@ -414,6 +414,70 @@ check('cold-start experts are scored at the midpoint, not zero', () => {
   eq(d.scores[0].trustWeight, 0.5, 'no evidence is not evidence of badness');
 });
 
+// ── cold-start weighting, changed 2026-08-14 ────────────────────────────────
+//
+// `coldStart` covers two opposite situations and the router used to score both
+// at a flat 0.5: an expert with NO evidence, and one with real-but-thin
+// evidence. The second is the common case — an expert produces up to 20
+// outcomes before it graduates, and every one of them was being discarded.
+// `observations` is what lets the router tell them apart.
+
+check('a cold expert WITH failing evidence ranks BELOW the midpoint', () => {
+  const { router } = harness({ explorationRate: 0 });
+  const d = router.route({ id: 't1', requires: ['hal'] }, [
+    expert('failing', { earnedScore: 3000, coldStart: true, observations: 12 }),
+  ]);
+  eq(d.scores[0].trustWeight, 0.3, 'thin evidence still points somewhere; do not launder it to 0.5');
+});
+
+check('a cold expert WITH succeeding evidence ranks ABOVE the midpoint', () => {
+  const { router } = harness({ explorationRate: 0 });
+  const d = router.route({ id: 't1', requires: ['hal'] }, [
+    expert('rising', { earnedScore: 7000, coldStart: true, observations: 12 }),
+  ]);
+  eq(d.scores[0].trustWeight, 0.7, 'a newcomer earning its place must be allowed to show it');
+});
+
+check('observations: 0 is treated as NO evidence and floors at the midpoint', () => {
+  const { router } = harness({ explorationRate: 0 });
+  const d = router.route({ id: 't1', requires: ['hal'] }, [
+    expert('fresh', { earnedScore: 0, coldStart: true, observations: 0 }),
+  ]);
+  eq(d.scores[0].trustWeight, 0.5, 'zero observations cannot justify a below-midpoint score');
+});
+
+check('an omitted observations count is treated conservatively, never below 0.5', () => {
+  // A caller on the old profile shape supplies no count. The router cannot tell
+  // "no evidence" from "bad evidence", so it must not assume the harmful one.
+  const { router } = harness({ explorationRate: 0 });
+  const d = router.route({ id: 't1', requires: ['hal'] }, [
+    expert('legacy', { earnedScore: 1000, coldStart: true }),
+  ]);
+  eq(d.scores[0].trustWeight, 0.5, 'unknown evidence must not be scored as bad evidence');
+});
+
+check("coldStartWeighting: 'midpoint' restores the pre-2026-08-14 behaviour exactly", () => {
+  // The ablation seam the A/B depends on. If this drifts, every before/after
+  // number measured against it becomes a comparison with something else.
+  const { router } = harness({ explorationRate: 0, coldStartWeighting: 'midpoint' });
+  for (const earnedScore of [0, 3000, 7000, BPS_MAX]) {
+    const d = router.route({ id: 't1', requires: ['hal'] }, [
+      expert('cold', { earnedScore, coldStart: true, observations: 12 }),
+    ]);
+    eq(d.scores[0].trustWeight, 0.5, `flat 0.5 regardless of evidence (earned ${earnedScore})`);
+  }
+});
+
+check('a WARM expert is unaffected by the observations field', () => {
+  const { router } = harness({ explorationRate: 0 });
+  const withCount = router.route({ id: 't1', requires: ['hal'] }, [
+    expert('warm', { earnedScore: 2000, observations: 900 }),
+  ]);
+  const without = router.route({ id: 't2', requires: ['hal'] }, [expert('warm', { earnedScore: 2000 })]);
+  eq(withCount.scores[0].trustWeight, 0.2, 'warm experts rank on earned score, as before');
+  eq(without.scores[0].trustWeight, 0.2, 'and identically when the count is absent');
+});
+
 check('the trust floor never excludes a cold-start expert', () => {
   const { router } = harness({ explorationRate: 0, trustFloor: 5000 });
   const d = router.route({ id: 't1', requires: ['hal'] }, [expert('new', { earnedScore: 0, coldStart: true })]);

@@ -72,6 +72,15 @@ const RETRACTED = [
     truth: 'same contamination as the drift figure',
   },
   {
+    id: 'adoption-482',
+    pattern: /4\.82\s*pp|94\.77\s*%\s*of\s*the\s*omniscient/i,
+    claim: 'the newcomer adoption lag is 4.82pp, the largest unclaimed prize',
+    truth:
+      'measured on the point-estimate ranking, not the upperConfidenceBound the simulator ships. ' +
+      'Real post-join gap after Sprint X is 0.45pp, of which 0.18pp is irreducible regret; ' +
+      'the attackable residual is 0.27pp. See scripts/harness-adoption.mjs',
+  },
+  {
     id: 'cron-667',
     pattern: /best\s+(on\s+)?cron[^.]{0,40}66\.7|66\.7\s*%[^.]{0,40}\bcron\b/i,
     claim: '32e0e809 is the best cron performer at 66.7%',
@@ -106,6 +115,9 @@ const ALLOWED = new Set([
   'docs/PRIOR-WORK-INDEX.md',
   'scripts/repid-replay.mjs',
   'scripts/check-prior-work.mjs',
+  // Records the 4.82pp retraction and reproduces the measurement that caused
+  // it, so it necessarily names the number.
+  'scripts/harness-adoption.mjs',
   // Records the 137/4 figures in order to retract them, in the same document
   // that first published them.
   'docs/FULL-STACK-E2E-ASSESSMENT-2026-08-14.md',
