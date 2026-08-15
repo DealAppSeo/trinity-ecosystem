@@ -2625,6 +2625,48 @@ await check('both signing scripts actually call the guard', async () => {
   }
 });
 
+// --- seed import (per-developer key custody, TRUSTSHELL-V1 §12 Q2) ----------
+//
+// Receipts are self-attested by a per-developer key, so the same identity has to
+// survive a restart. That means importing a stored seed, and the import has to
+// land on exactly the identity the seed came from — a near-miss here produces a
+// working signature under the WRONG did, which verifies against nothing and
+// looks like a key-management problem rather than a bug.
+
+await check('keyPairFromSeed reconstructs the identity the seed came from', async () => {
+  const bs58 = (await import('bs58')).default;
+  const kp = await did.generateExportableKeyPair();
+  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey));
+  const seed = bs58.encode(pkcs8.slice(-32));
+
+  const restored = await did.keyPairFromSeed(seed);
+  assert.equal(restored.did, kp.did, 'restored a different identity');
+
+  // The restored private key must produce signatures the ORIGINAL did verifies.
+  // Comparing dids alone would pass even if the private half were wrong.
+  const sig = await did.sign(restored.privateKey, 'receipt-audit-hash');
+  assert.equal(await did.verify(kp.did, 'receipt-audit-hash', sig), true);
+
+  const again = await did.keyPairFromSeed(seed);
+  assert.equal(again.did, restored.did, 'seed import is not deterministic');
+});
+
+await check('keyPairFromSeed rejects the 64-byte "private key" mistake', async () => {
+  const bs58 = (await import('bs58')).default;
+  await assert.rejects(() => did.keyPairFromSeed(bs58.encode(new Uint8Array(64))), /32 bytes/);
+  await assert.rejects(() => did.keyPairFromSeed(bs58.encode(new Uint8Array(31))), /32 bytes/);
+  await assert.rejects(() => did.keyPairFromSeed('not base58 0OIl'), /base58/);
+});
+
+await check('two different seeds give two different identities', async () => {
+  const bs58 = (await import('bs58')).default;
+  const a = await did.keyPairFromSeed(bs58.encode(crypto.getRandomValues(new Uint8Array(32))));
+  const b = await did.keyPairFromSeed(bs58.encode(crypto.getRandomValues(new Uint8Array(32))));
+  assert.notEqual(a.did, b.did);
+  const sig = await did.sign(a.privateKey, 'x');
+  assert.equal(await did.verify(b.did, 'x', sig), false, "one seed's signature verified under another");
+});
+
 rmSync(outDir, { recursive: true, force: true });
 
 if (failed === 0) {

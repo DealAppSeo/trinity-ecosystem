@@ -1,3 +1,260 @@
+# SESSION SUMMARY — 2026-08-15 (claude-opus-5, cloud/scheduled)
+
+Surface = **cloud/scheduled** (Claude Code Remote, ephemeral container).
+Access = GitHub **yes** (MCP), Supabase **yes** (MCP), Railway **no**,
+`DealAppSeo/repid-engine` **no** (`add_repo` approval never arrived).
+
+Preflight: `v_agent_preflight` → **verdict=GO, global_pause=false**, 18 open Sean
+gates. No tasks claimed; all work was directly user-requested.
+
+Branch `claude/trustshell-launch-flywheel-6r4zt0`, **PR #33** (draft, open).
+
+## The correction that reshaped the work
+
+The dual-view scope in the source Grok/XAI conversation was built on a table
+headed *"Honest inventory [disk, this pass]"*. **That inventory was not taken
+against this repository.** Absent here: `dual-auth-gate.ts`, `src/trust-identity/`,
+`/start`, `/run/[agentId]`, `controller-pwa`, `/api/v1/hitl`, `email-otp.ts`,
+`agent-naming.ts`, `task-lineage.ts`, `graph-rag/*`, `DESIGN_PRINCIPLES.md`. The
+app has **three** routes (`/`, `/login`, `/dashboard`). We were on **Next 14.2 /
+React 18.3**, not Next 16 / React 19. [VERIFIED 2026-08-15 — `find` + `grep -ril`
+over the tree excluding `node_modules`/`.git`/`.next`, plus `package.json`.]
+
+> **SUPERSEDED 2026-08-15, later the same day.** The stack is now **Next 16.3.1 /
+> React 19** — `b7c7177`, PR #43. The upgrade was forced by security, not by the
+> dual-view plan: 21 Next CVEs are fixed in no release earlier than 16.3.1, so
+> every 14.x and 15.x is inside the vulnerable range. **The "stack pinned to
+> React 18" line below is therefore out of date** — anything the UI lane deferred
+> *because* of React 18 is worth re-opening, and any React-19-only API is now
+> available. The route count is unchanged.
+
+Presumably they are in `repid-engine`, which that session had in its workspace.
+**NOT CHECKED** — see access above. PRIOR-WORK-INDEX rule 2 applied to a file
+listing instead of a dataset.
+
+**The consequence is favourable.** This repo already holds a real
+offline-verifiable gate (`ControlProof` + `app/api/trustshell/control-proof/verify`,
+five tamper classes rejected) and a real twelve-agent swarm with honest liveness
+(`v_fleet_truth`: 3 live, 12 reachable, 9 probe-only). So the MVP dual-view can
+be built end to end **inside this repo with no cross-repo dependency**, if the
+graph is sourced from `v_fleet_truth` + `ControlProof` rather than HITL. HITL
+becomes another adapter behind the same contract later, not a rewrite.
+
+## Landed
+
+**`b53ae9c` — dual-view plan + the frozen event contract.**
+`docs/DUAL-VIEW-LAUNCH-PLAN.md`: inventory correction, competitor read,
+hard-parts-first ordering, four lanes with **file-level ownership so no two
+touch the same path**, MVP/v1/v2, stack pinned to React 18.
+`lib/dual-view/contract.ts` + `fixtures.ts` + `scripts/check-dual-view-contract.mjs`
+(**85 assertions**, in `npm run check`). Zero imports, so the UI lane builds
+against six deterministic fixtures with no backend, DB or network.
+
+Two choices that carry weight: `reason` and `evidence` are **required** fields
+(a node rendering green without carrying what made it green reproduces the house
+defect in the surface built to be screenshotted), and `stale` is a first-class
+status so 9 probe-only agents cannot render as running — that would undo
+changelog #134 in the UI layer. `swarm_12` holds the measured distribution and
+the check asserts it, so drift to all-green fails the build.
+
+**`2f87a0d` — TrustShell M2, the session receipt.** `lib/trustshell/receipt/`
+(types, canonical, build, sign, git, store-sqlite), **89 assertions**, CLI
+`scripts/trustshell-receipt.mjs`. `TRUSTSHELL-V1.md` §12 Q1/Q2 **decided by
+Sean**: local SQLite first (built-in `node:sqlite`, no new dependency),
+per-developer local key.
+
+`audit_hash` is stable across re-runs [VERIFIED on a live 294-line session:
+identical hash twice, `receiptId` derived from it].
+
+**The marker is the substance.** Claim checking is M4, so every claim count is
+zero and a naive "nothing failed" test renders `VERIFIED  0 claims · 0 backed` —
+§1's defect reproduced inside the product built to catch it, and the **fourth**
+instance of the shape in this repo. `markerFor` returns NOT_CHECKED
+unconditionally while no claim tier is enabled; an internal error forces the
+same; `checkReceipt` takes the **floor** of its parts, so a perfect signature
+over unchecked data is still NOT CHECKED.
+
+Self-attestation is labelled in the data: `attestation.kind` is
+`self`/`org`/`unsigned`, and `verifyReceiptSignature` returns
+`independentlyAttested` separately from `outcome`. The CLI **refuses to generate
+a signing key** — one invented on first run looks like provenance and carries
+none. `identity/did.ts` gained `keyPairFromSeed` for durable custody.
+
+## Two bugs dogfooding found that reading would not have
+
+1. **§4.1 specified the wrong git question, and the CLI implemented it
+   faithfully.** `git diff --name-only HEAD` lists unstaged edits to *tracked*
+   files, so reconciliation reported **13 mismatches out of 15** — every one a
+   file genuinely written and then committed or newly created. A false
+   accusation from the check whose only job is catching a false claim. Corrected
+   to the union of working tree (incl. untracked) and commits since session
+   start; NOT CHECKED when the start is unknown. **0 mismatches** after the fix.
+   Spec bullet corrected in place, as §3 and §4.2 carry M1's corrections.
+2. **`.trim()` on git porcelain output.** An unstaged modification leads with a
+   SPACE, so trimming shifted the first record by one and returned one path
+   missing its first character — a single false mismatch indistinguishable from
+   a real finding. Extracted to `receipt/git.ts` with assertions, including one
+   that fails if trimmed input ever parses cleanly.
+
+Also caught by its own round-trip test: removing a finished node orphaned its
+receipt card in the dual-view feed, and the first draft called that an integrity
+violation — which would have made the feed delete its own history. Dangling
+`nodeId` is now a violation only on **gated** items.
+
+And: `Array.prototype.with` typechecks under `lib: esnext` but is ES2023 and
+absent on Node 18. The type checker could not see it.
+
+## Gate — CI-confirmed
+
+`npm run check` **exit 0, 753 assertions** (438 → 523 → 612 → 707 → 753),
+`tsc --noEmit` **0 errors**, `next build` clean, `check:prior-work` 16/16 docs.
+
+[VERIFIED on CI, not only locally] **All six `check` runs on this branch
+completed `success`** — `b53ae9c`, `2f87a0d`, `e09b23e`, `452fa31`, `1518a6d`,
+`a8b3dbf` — the last in 6m00s on Node 24. `prior-work` and Vercel green on each.
+
+**Corrected.** An earlier revision of this paragraph said every run before
+`a8b3dbf` was *"superseded by the next push before finishing"*. That was wrong,
+and it was asserted three times. `get_check_runs` returns only the **head
+commit's** check runs, so after each push the previous commit's still-running job
+vanished from the response — and absence was read as cancellation. The
+authoritative view is `list_workflow_runs` filtered by branch, which shows six
+completions. Same shape as the retractions in `PRIOR-WORK-INDEX.md`: a property
+of the query mistaken for a property of the world.
+
+**Mutation-tested throughout — 21 mutations, 20 caught first time.** Contract 3,
+receipt 4 (+9 tamper), verifier 4, claims 5, init 5. The one that survived is the
+most useful result in the session: restoring `T1/backed` passed all 32 claim
+assertions, because the invariant asserting it never happens used a fixture where
+the branch was never reached. **An invariant asserted over a situation that never
+arises is a comment, not a test.**
+
+## TrustShell M2–M5, all landed this session
+
+| # | What | Assertions |
+|---|---|---|
+| M2 `2f87a0d` | Session receipt — canonical hashing, stable `audit_hash`, Ed25519 self-attestation, local SQLite | 89 |
+| M3 `452fa31` | Independent offline verifier — zero TrustShell imports, zero deps | 60 |
+| M4 `1518a6d` | T0/T1 claim checking + published FPR | 35 |
+| M5 `a8b3dbf` | `trustshell init` — Stop hook, dry-run default, reversible | 46 |
+
+**Every one falsified something `TRUSTSHELL-V1.md` asserted**, and the spec now
+carries all four corrections in place:
+
+1. **§4.1 named the wrong git question.** `git diff --name-only HEAD` reported
+   13 mismatches out of 15 on a real session — every one a file genuinely written
+   then committed or newly created. Corrected to working tree ∪ commits-since-start;
+   0 mismatches after.
+2. **§8's `@hyperdag/proof-verifier` cannot verify a receipt.** It is a Plonky3
+   STARK verifier for `{agent_id, repid_score, threshold, tier}`. Handed a receipt
+   it returns `deser: io error`. [VERIFIED — installed and invoked.]
+3. **§9's package table was wrong twice.** `@hyperdag/trustshell@1.3.0` is the
+   HAL/RepID SDK against a live backend — zero occurrences of `transcript`,
+   `audit_hash`, `session_receipt` in `dist/`. Its `verify` command already means
+   something else, so the spec's `trustshell verify <session>` would collide.
+4. **§4.3's T1 cried wolf.** See the measurement below.
+
+**§12 Q1, Q2 and Q3 are now decided** (local SQLite; per-developer key;
+no MCP tools).
+
+## The M4 measurement, and why it is the honest part
+
+Sample: **one session** — every real transcript in this container. Too small to
+generalise from, and §4.3.1 says so instead of quoting a rate as if it held.
+
+| pass | raised | true | false | precision |
+|---|--:|--:|--:|---|
+| first draft | 2 | 0 | **2** | **0%** |
+| after tightening | 0 | 0 | 0 | undefined |
+
+Both were hand-labelled and both wrong: a claim linked to an unrelated failed
+call, and `[VERIFIED]` — this repo's epistemic tag — scored as a success
+assertion. Three rule changes followed, each now a regression fixture. The
+largest: **T1 no longer emits `backed`.** It can refute; it cannot confirm.
+Scoring adjacency as support would let a receipt reach VERIFIED on proximity
+alone.
+
+**T0's rate is `0/0`, undefined** — zero `mcp__` ids and zero backticked built-in
+names across all 48 spans. It fires on synthetic input, so it is not dead, but
+its trigger shape looks rare in real output. Reporting that as 0% would be the
+two-outcome collapse again.
+
+## REAL vs STUB
+
+**REAL:** dual-view contract/validator/fixtures; receipt build, canonical
+hashing, signing, verification, porcelain parsing, SQLite store; independent
+verifier; T0/T1 claim checking; `trustshell init` end-to-end (hook fired as
+Claude Code would, receipt landed in SQLite, exit 0); `keyPairFromSeed`.
+
+**NOT BUILT:** **M6 — the dogfood, and the spec calls it the deliverable that
+matters.** The entire `/live` UI. No adapter yet maps `v_fleet_truth` → `PaiEvent`.
+
+**NOT CHECKED:** `repid-engine` (no `add_repo` approval) — every §1 claim about it
+is ASSUMED; `trustshell init` against a *live* Claude Code session, since that
+mutates the running environment; store availability without `node:sqlite`.
+
+**Honest launch claim:** offline-verifiable signature and an independent
+re-derivation path — **not** independent attestation, and **not** zero-knowledge.
+
+## Note for whoever runs CI checks next
+
+`curl` to the GitHub Actions API returns **403 "Resource not accessible by
+integration"**, and `GH_TOKEN` does not fix it — the token lacks `actions:read`.
+Only the `mcp__github__*` tools can read Actions here. A Bash poll parses the 403
+as "still waiting" and times out silently, which is indistinguishable from a job
+that never finished. Cost an hour of false confidence this session.
+
+**Second trap, same family.** `get_check_runs` returns only the **head commit's**
+runs. Query it after pushing and the previous commit's in-flight job is simply
+absent — which reads as "cancelled" and is not. Use `list_workflow_runs` filtered
+by branch for run history; use `get_check_runs` only for "what is on the head
+right now".
+
+**Third: Actions can stop scheduling entirely, repo-wide, and nothing says so.**
+[VERIFIED 2026-08-15 02:16Z] The newest workflow run **anywhere in this repo** is
+`3c710af` on `main` at 01:48:37. Commits `32ec1b4` (01:58) and `d43c5ba` (02:12)
+on this branch triggered **no runs at all** — not queued, not skipped, absent —
+and so did every other branch in that window. The workflows have no path filter,
+so this is not a docs-only skip. Whatever the cause (quota, a disabled-Actions
+setting, an outage), the visible symptom is a PR that looks like it is "still
+waiting" forever. **Do not read a missing run as a pending one.**
+
+## BLOCKED_FOR_SEAN
+
+1. **`add_repo` approval for `DealAppSeo/repid-engine`** — so the §1 inventory in
+   `docs/DUAL-VIEW-LAUNCH-PLAN.md` is checked rather than assumed, and the HITL
+   adapter can be scoped.
+2. **Real transcripts for M6.** This container holds exactly **one**. Ten sessions
+   is the acceptance criterion, and it is also the only thing that would make the
+   M4 false-positive number worth quoting.
+3. **Board exception** — confirm `/live` is a route on TrustShell and TrustMarket,
+   not a thirteenth vertical, so the freeze holds.
+4. **Publishing the receipt tooling** — it needs a name that does not collide with
+   the shipped `@hyperdag/trustshell`, whose `verify` already means something else.
+   A publish is irreversible and is not an agent's call.
+5. **Installing the Stop hook live in this environment** — `trustshell init` is
+   built, tested and reversible, but applying it mutates the running session's
+   config, so it has not been applied.
+6. Carried forward, unchanged: rotate the Base Sepolia deployer key (#73 — owns
+   ERC-8004 ids 3747/3748/3750; do not cite them as provenance);
+   `static.crates.io` on the proxy allow-list (#75); `repid_config` `anon` read
+   policy + live `enterprise_api_key`; Poseidon2 parameter handover;
+   `20260813210000_agent_repid_earned_observations.sql` written and unapplied;
+   task key on `repid_score_events`.
+
+## Steer for the parallel RepID/HAL lane
+
+`docs/PRIOR-WORK-INDEX.md` closes routing (**97.9%** of bound), panel membership
+(**99.23%**) and panel size (**3**, settled). **Do not retune them** — it returns
+approximately nothing and this repo has paid for that lesson once.
+
+The open problem is **data capture, not scoring**: `bftAccuracy` carries RepID's
+heaviest weight — **0.40** — with zero rows in both BFT tables, and no table
+records per-agent latency. That is 50% of the weight that can only resolve to
+zero regardless of tuning. See `DUAL-VIEW-LAUNCH-PLAN.md` §9.
+
+---
+
 # SESSION SUMMARY — 2026-08-14 (claude-opus-5, cloud/scheduled) — full-stack E2E assessment
 
 Surface = **cloud/scheduled**. Access = GitHub **yes** (API scoped to `trinity-ecosystem`;
@@ -77,6 +334,12 @@ contents, which commit the four version-less surfaces serve, Railway internals b
 ## Next 3 commands
 
 ```sh
+npm run check                                   # exit 0, 753 assertions
+node scripts/trustshell-init.mjs                # dry run — shows the Stop hook
+node scripts/trustshell-receipt.mjs <session.jsonl> --git-reconcile --claims
+# M6 is next and is the deliverable that matters: run against 10 real sessions,
+# publish what it caught AND what it missed. Blocker: this container holds
+# exactly ONE transcript, so M6 needs sessions from elsewhere.
 psql -c "select relname, relrowsecurity, has_table_privilege('anon',oid,'UPDATE') from pg_class where relname='agent_preflight_control';"
 npm run check && npm run test:e2e
 gh pr view 30 --repo DealAppSeo/trinity-ecosystem
@@ -820,4 +1083,108 @@ against rather than a guess.
 npm run check                    # exit 0
 node scripts/check-identity.mjs  # expect 143, VERIFIED
 npm run test:e2e                 # expect 33 VERIFIED, 0 FAILED, core 10/10
+```
+
+---
+
+# SESSION SUMMARY — 2026-08-15, second session (claude-opus-5, cloud/scheduled)
+
+Surface = **cloud/scheduled** (Claude Code Remote, ephemeral container).
+Access = GitHub **yes** (MCP), Supabase **yes** (MCP only — direct PostgREST is
+proxy-denied), Railway **no**, cross-repo (`repid-engine`, `hyperdag`,
+`trustchat`) **no**.
+
+Branch `claude/e2e-mvp-packaging-plttzn`. **Both PRs merged: #37, #43.**
+
+## Landed
+
+**`3c70330` — PR #37.** Thirteen `"latest"` specifiers pinned to the lockfile
+versions (three of them sign or transmit credentials); grouped Dependabot so
+patches arrive as one weekly PR and majors separately. `SECURITY.md` added,
+stating scope honestly rather than favourably. All patent language removed at
+the owner's instruction — a stray `tmp-hyperdag-readme.md` carried both the
+patent text and every working-tree secret-scan finding, so deleting it took the
+scan to clean. `docs/AGENT-LOOP-PROMPTS.md`: build-time lanes split by file path
+so concurrent agents never write the same file, verify lane rotating to whoever
+did not author the sprint, plus a runtime section for T12.
+
+**`b7c7177` — PR #43.** npm advisories **12 → 9 total, 12 → 6 production-only**.
+Next **14.2.35 → 16.3.1** with React 19 (21 CVEs, fixed in no earlier release),
+Turbopack config migrated. `agent0-sdk` moved to devDependencies — one operator
+script imports it, never app code. `scripts/check-deps.mjs` added to
+`npm run check`. Lint restored: it had **never run** (eslint floated to 10, which
+`eslint-plugin-react` supports at no version; ESLint 10 also ignores
+`.eslintrc.json` outright, so the project linted zero rules and exited 0).
+
+## REAL vs STUB
+
+**REAL, executed this session:** `npm run check` exit 0 on merged `main` from a
+clean `npm ci`; `tsc --noEmit` 0 errors; `next build` 0 (local + CI + Vercel
+preview); `test:e2e` 33 VERIFIED / 4 NOT CHECKED / 0 FAILED, core 10/10;
+`check:trust` 9 ENFORCED; `check:deps` 5 VERIFIED, mutation-tested with 4 mutants
+all killed (floating specifier, `next` reverted to 14.2.35, the exact
+`@solana/web3.js` → 0.0.3 downgrade, and an unreadable lockfile which must report
+NOT CHECKED rather than pass).
+
+**The Next 16 deploy — VERIFIED 2026-08-15 07:07Z, via `pg_net`.** Both surfaces
+are serving the upgrade, and both answered 200:
+
+| surface | platform | commit | `/` or `/dashboard` |
+|---|---|---|---|
+| `www.aitrinitysymphony.com` | vercel (iad1) | **b7c7177** | 200, 25,263 B, RSC payload present |
+| `app.aitrinitysymphony.com` | railway (us-east4) | **b7c7177** | 200, 18,260 B, RSC payload present |
+
+Neither body carried an error-page marker. So two majors of Next landed on both
+platforms, and server rendering works on the new stack. This was written as NOT
+CHECKED an hour earlier and then measured — the measurement is cheap and there
+was no reason to ship the caveat instead.
+
+**Still NOT CHECKED — do not read the above as more than it is.** SSR HTML
+renders identically whether or not a client effect throws, so nothing here
+proves post-hydration behaviour under React 19, and no agent session can observe
+it. The two `set-state-in-effect` findings live exactly there. Also NOT CHECKED:
+the live Supabase schema (e2e ran against the stub), cross-instance nonce replay,
+BFT consensus, Solana broadcast.
+
+**Refused, with reasons recorded:** `npm audit fix --force`. On this tree it
+proposes `@solana/web3.js` 1.98.4 → **0.0.3**, `@solana/spl-token` 0.4.15 →
+0.1.8, `agent0-sdk` 1.7.1 → 1.5.3 — all three already the latest published, so
+the resolver walks backwards past the advisory database. The count would read
+zero over six-year-old code on the live payment path. `LESSONS.md` **A16**.
+
+## BLOCKED_FOR_SEAN
+
+1. **Rotate the leaked EVM deployer key** (`0xdf6b…271d`, ERC-8004 ids
+   3747/3748/3750). Runbook `docs/KEY-ROTATION.md`, script
+   `scripts/rotate-erc8004-deployer.mjs` (dry-run default, `--confirm-to`
+   required, gas sufficiency verified). Deliberately not executed here: running
+   it would pull a live private key into a context that keeps a transcript.
+2. **`repid-decay-weekly` is OFFLINE on Railway.** RepID decay is time-dependent,
+   so scores are **stale-high** right now and no dashboard shows it — UptimeRobot
+   reads 100% uptime because liveness is not production. Needs Railway access.
+3. **Atlas / Raven / `update-signals` edge functions paused ~6 weeks**, unnoticed,
+   and their source is **not in this repo** (`supabase/functions/` holds only
+   `agent-tools` and `embed-memory-backfill`). Fix the source gap before giving
+   them a verification role.
+4. **Cross-repo, needs `add_repo`:** patent text in `repid-engine`'s GitHub
+   description; hyperdag.org Brier table weekly auto-scan; trustchat.dev
+   leaderboard staleness (likely one source of truth, two readers);
+   aitrinitysymphony.com → hyperdag.org redirect.
+5. **Two React lint errors** (`SystemTrustScore:20`, `InstitutionalControls:123`,
+   `react-hooks/set-state-in-effect`). Not fixed here on purpose: no agent
+   session can observe these components after hydration, so the change cannot be
+   verified. Surface lane owns them. `npm run lint` exits 1 on exactly these two.
+6. Unchanged from before: Poseidon2 parameters, `static.crates.io` allow-list,
+   the phase-2 RLS migration ordering, `BASE_SEPOLIA_PRIVATE_KEY` baked into
+   `repid-engine`'s image layers.
+
+## Next 3 commands
+
+```bash
+npm run check                       # expect exit 0
+npm run check:deps                  # expect 5 VERIFIED — read BEFORE any audit fix
+# the Next 16 deploy is confirmed landed on both surfaces (see above); re-run this
+# after any future merge, since a platform keeps serving the last SUCCESSFUL build
+# when a new deploy fails — a healthy page is compatible with week-old code:
+#   select net.http_get(url := 'https://www.aitrinitysymphony.com/api/version');
 ```

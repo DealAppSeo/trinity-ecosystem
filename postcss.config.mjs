@@ -5,8 +5,10 @@
 // compiling app/globals.css.
 //
 // Declaring the config explicitly is the v4-correct setup and stops Next guessing.
-export default {
+const config = {
   plugins: {
     '@tailwindcss/postcss': {},
   },
 };
+
+export default config;

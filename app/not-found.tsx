@@ -17,6 +17,11 @@ export default function NotFound() {
           TrustRails serves a landing page and the institutional dashboard.
         </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+        {/* A HARD navigation is deliberate here. This is a recovery surface: the
+            client state that produced the error (or the 404) is exactly what we
+            want discarded, and <Link> would preserve it by navigating in-place.
+            The rule is correct in general and wrong for this file. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/" style={{
             background: '#1e293b', color: '#cbd5e1', border: '1px solid #334155',
             borderRadius: 8, padding: '9px 16px', fontSize: 13, textDecoration: 'none',

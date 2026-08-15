@@ -61,7 +61,7 @@ export function RiskSlider({
   return (
     <div style={{ background: '#1e293b', borderRadius: 12, padding: 24, marginBottom: 24 }}>
       <h3 style={{ color: '#f1f5f9', fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
-        🎚️ Set Your Institution's Risk Tolerance
+        🎚️ Set Your Institution&apos;s Risk Tolerance
       </h3>
       <p style={{ color: '#64748b', fontSize: 12, marginBottom: 16 }}>
         Like adjusting a portfolio risk model or cap-rate threshold. Weights determine how RepID is calculated for your institution.

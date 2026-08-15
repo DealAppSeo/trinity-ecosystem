@@ -1,0 +1,40 @@
+# Dependency updates.
+#
+# WHY THIS EXISTS. `npm audit` reported 9 high and 3 moderate advisories, and
+# thirteen dependencies were specified as `"latest"` — including
+# `@solana/web3.js`, `@supabase/supabase-js` and `bs58`, all of which sign or
+# transmit credentials. A floating specifier means a fresh `npm install` can
+# resolve to code nobody reviewed, which is the npm supply-chain vector of the
+# last two years. Those are now pinned to the versions actually in the lockfile,
+# and this file is what keeps them current without going back to floating.
+#
+# GROUPED ON PURPOSE. Ungrouped Dependabot on a repo this size opens enough PRs
+# that people stop reading them, which is the same failure mode as a gate that
+# is always red. Patches and minors arrive as one PR per ecosystem per week;
+# majors come separately because they need a human.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the safe stuff. CI is the gate: `npm run check` plus
+      # `next build` plus the e2e suite run on every PR, so a bad bump is
+      # caught before review rather than by review.
+      routine:
+        update-types: ["minor", "patch"]
+    ignore:
+      # Majors still get their own PR — they just do not join the group above.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # The workflows themselves pin actions by major tag (`actions/checkout@v4`).
+  # Those move too, and a stale action is a supply-chain surface of its own.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
