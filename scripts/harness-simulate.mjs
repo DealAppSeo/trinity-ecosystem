@@ -43,6 +43,20 @@ const SCATTER_WRONG = argv.includes('--scatter-wrong');
 // difficulty a per-task property all experts share, which correlates their
 // errors through the task rather than through the answer key.
 const HARDNESS_W = arg('hardness', 0);
+// Restore the pre-2026-08-14 cold-start rule: a flat 0.5 trust weight for any
+// cold expert, discarding whatever evidence it has already produced.
+const COLD_MIDPOINT = argv.includes('--cold-start-midpoint');
+// ESCALATION-SIGNAL ABLATION. Replaces the margin/earned/confidence decision
+// with a coin flip at this rate, keeping every other mechanism identical.
+//
+// It exists to answer the question that has to come BEFORE tuning `marginFloor`:
+// does the signal discriminate at all? A threshold is only worth choosing if
+// the thing it thresholds beats picking tasks at random for the same spend.
+// Note the signals `EscalationPolicy` reads — topEarned, runnerUpEarned,
+// topConfidence — are all properties of the EXPERTS. None of them can see the
+// task, so there is a real prior that they cannot predict which task is hard.
+// -1 disables the ablation and uses the real policy.
+const ESCALATE_RANDOM = arg('escalate-random', -1);
 
 
 const { load } = compileHarness();
@@ -321,7 +335,15 @@ function runHarness(seed, panel = null) {
     clock,
     limiter,
     capacity,
-    { explorationRate: 0.12, congestionWeight: 0.9, trustFloor: 2000, alternatesCount: Math.max(3, PANEL_SIZE + 1) },
+    {
+      explorationRate: 0.12,
+      congestionWeight: 0.9,
+      trustFloor: 2000,
+      alternatesCount: Math.max(3, PANEL_SIZE + 1),
+      // Ablation seam for the 2026-08-14 cold-start change. `--cold-start-midpoint`
+      // restores the flat 0.5, so the A/B can be re-run rather than trusted.
+      coldStartWeighting: COLD_MIDPOINT ? 'midpoint' : 'earned',
+    },
     new SeededRng(seed ^ 0x5eed)
   );
 
@@ -335,6 +357,7 @@ function runHarness(seed, panel = null) {
   const panelPolicy =
     panel && panel.adaptive ? new AdaptivePanelPolicy(agreement, panel.adaptive) : null;
   const escalation = panel ? new EscalationPolicy(clock, panel.escalateCfg ?? {}) : null;
+  const escalateRng = new SeededRng(seed ^ 0xe5ca1a);
 
   // Earned reputation, learned from observed outcomes. Confidence-weighted:
   // an expert's score is shrunk toward the neutral prior in proportion to how
@@ -356,6 +379,11 @@ function runHarness(seed, panel = null) {
       earnedScore: ledger.upperConfidenceBound(e.id, 2500),
       perceivedScore: e.claimedScore, // carried, never ranked on
       coldStart: ledger.isColdStart(e.id),
+      // Supplied so the router can distinguish "no evidence" from "thin
+      // evidence". Without it the router must stay conservative and never rank
+      // a cold expert below the midpoint, which discards every failing
+      // observation an expert makes before it graduates. See router.ts.
+      observations: ledger.observations(e.id),
     }));
 
   // Abandoned calls we have stopped waiting for but cannot prove are dead.
@@ -409,7 +437,10 @@ function runHarness(seed, panel = null) {
         // whose experts fail together needs the second gate; no amount of
         // per-task uncertainty makes a panel useful there.
         const worthIt = panelPolicy === null ? { panel: true } : panelPolicy.decide();
-        if (dec.escalate && worthIt.panel && members.length >= 2) {
+        // Ablation seam: same budget, no signal. Drawn from a dedicated stream
+        // so switching it on cannot shift any other random draw in the run.
+        const wantsPanel = ESCALATE_RANDOM >= 0 ? escalateRng.next() < ESCALATE_RANDOM : dec.escalate;
+        if (wantsPanel && worthIt.panel && members.length >= 2) {
           const proposals = [];
           let slowest = 0;
           for (const id of members) {
@@ -634,7 +665,22 @@ const { m: harness, ledger, breakers, capacity, timeouts } = runHarness(SEED);
 // Third arm: same harness, plus escalation-gated plurality aggregation. Built
 // because the ceiling analysis at the bottom showed top-1 has ~2pp left and
 // aggregation is the only mechanism that can cross the single-expert bound.
-const PANEL_CFG = { panelSize: PANEL_SIZE, escalateCfg: { marginFloor: 2000 } };
+// ESCALATION FLOOR: 1000, LOWERED FROM 2000 ON 2026-08-14 BY MEASUREMENT.
+//
+// Sprint Z swept it and 2000 was not a defensible point on the curve. It
+// escalated 89% of tasks — nearly always-panel — so it bought +4.30pp over
+// top-1 at +75% p99, while 1000 buys +3.11pp at +18% p99. The p99 knee sits
+// between 1000 and 1500, and marginal efficiency falls monotonically across the
+// range (3.20 pp per extra call at floor 250, 2.43 at 2000). Sprint P rejected
+// panel size 4 at +1.25pp for +298% p99; 2000 fails that same exchange rate.
+//
+// It is also where the escalation SIGNAL is worth having. Against random
+// escalation at a matched rate (`--escalate-random`), floor 1000 is +0.55pp
+// (t = 3.78, 18/20 seeds) while floor 2000 is +0.27pp (t = 2.06) — at 89%
+// escalation there is almost nothing left to select.
+//
+// Sweep it with `--margin-floor N`; the frontier is in SPRINT-LOG.md Sprint Z.
+const PANEL_CFG = { panelSize: PANEL_SIZE, escalateCfg: { marginFloor: arg('margin-floor', 1000) } };
 const { m: panelArm, agreement: panelAgreement } = runHarness(SEED, PANEL_CFG);
 // Fourth arm: the panel, gated on whether panels have measurably paid here.
 const ADAPTIVE_CFG = {
@@ -1219,13 +1265,19 @@ for (const k of [3, 4, 5]) {
     `  ${`omniscient PANEL of ${k} ceiling`.padEnd(34)} ${pctC(runOraclePanel(SEED, k)).padStart(8)}`
   );
 }
-console.log(`  ${'the harness panel of 3 (earned)'.padEnd(34)} ${pctC(panelCorrect).padStart(8)}`);
+console.log(
+  `  ${`the harness panel of ${PANEL_SIZE} (earned)`.padEnd(34)} ${pctC(panelCorrect).padStart(8)}`
+);
 {
-  const c3 = runOraclePanel(SEED, 3);
+  // MUST be the bound for the size actually run. This divided by the panel-of-3
+  // bound unconditionally and printed "panel of 3" in the label, so any run with
+  // `--panel-size 4` reported a ratio against the wrong denominator under the
+  // wrong name — the one number in this section a reader would quote.
+  const ck = runOraclePanel(SEED, PANEL_SIZE);
   console.log(
-    `\n  The panel arm is at ${pctC(panelCorrect / c3)} of the omniscient panel-of-3 bound.`
+    `\n  The panel arm is at ${pctC(panelCorrect / ck)} of the omniscient panel-of-${PANEL_SIZE} bound.`
   );
   console.log(
-    `  Remaining prize for choosing panel MEMBERS better: ${((c3 - panelCorrect) * 100).toFixed(2)}pp.`
+    `  Remaining prize for choosing panel MEMBERS better: ${((ck - panelCorrect) * 100).toFixed(2)}pp.`
   );
 }
