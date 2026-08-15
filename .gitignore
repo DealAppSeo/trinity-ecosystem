@@ -75,6 +75,8 @@ headroom.db
 .contracted-eval-check-*/
 .outcome-rep-check-*/
 .auditor-grant-check-*/
+.bft-judge-check-*/
+.handoff-check-*/
 
 # temp compile dir for check:custody-shadow
 .custody-shadow-check-*/
