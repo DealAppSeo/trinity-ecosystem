@@ -796,3 +796,63 @@ real regression.
 report yesterday's answer about today's code with full confidence. The cheap
 habit: before quoting a number from one, clear its cache once and confirm the
 number does not move.
+
+---
+
+## A16 — the security tool whose recommended fix was a six-year downgrade (2026-08-15)
+
+**Symptom.** `npm audit` reported 12 advisories (9 high, 3 moderate) and offered
+the usual remedy: *"To address all issues (including breaking changes), run
+`npm audit fix --force`."*
+
+**What that command would actually have done**, read out of `npm audit --json`'s
+`fixAvailable` field rather than out of the prose:
+
+| package | installed | npm's "fix" |
+|---|---|---|
+| `@solana/web3.js` | 1.98.4 | **0.0.3** |
+| `@solana/spl-token` | 0.4.15 | **0.1.8** |
+| `agent0-sdk` | 1.7.1 | **1.5.3** |
+
+All three installed versions were already the **latest published**. There was no
+forward fix to take, so the resolver went backwards until it found a version with
+no matching advisory — and versions old enough to predate the advisory database
+satisfy that trivially. `@solana/web3.js` is on the live payment path via
+`SolanaExecutor`; 0.0.3 predates the entire current API.
+
+**The failure shape.** After `--force` the audit count would have read **0
+vulnerabilities**, the number everyone checks, while the code got materially
+worse. Nothing in CI would have caught it: no test asserts a version floor, and
+the build would have failed later, somewhere unrelated, on a missing export.
+
+This is the same defect the rest of this file is about — a system reporting
+success it has not earned — arriving this time from a *security* tool, which is
+the last place anyone thinks to distrust.
+
+**The tell was in the metadata, not the summary.** `npm audit`'s human output
+says "breaking change" and names the package. It does **not** say the change is
+a downgrade. Only `fixAvailable.version` in the JSON shows the number, and only
+comparing it against the installed version shows the direction. A one-line node
+script over `npm audit --json` answered in seconds what the printed report
+actively obscured.
+
+**What was done instead.** Four different answers, because "fix the advisories"
+is four different problems:
+
+1. **A real fix existed** — `nanoid`, and `next`/`postcss` (21 CVEs) fixed only
+   in `next >= 16.3.1`. Upgraded 14.2.35 → 16.3.1, migrated the config, measured.
+2. **The dependency was not in the production surface** — `agent0-sdk` (and its
+   `helia` → `@libp2p/kad-dht` chain) is reached only by one operator script.
+   Moved to `devDependencies`, which is both accurate and drops it from the
+   shipped tree. Production-only advisories: 12 → 6.
+3. **No fix exists at any version** — `bigint-buffer`'s advisory covers `*`.
+   Downgrading trades one known advisory for years of unfixed ones. Left, stated.
+4. **The trap itself was made mechanical** — `scripts/check-deps.mjs` records a
+   version floor per package with the reason, and fails the build if anything
+   lands below it. Mutation-tested against the exact 0.0.3 downgrade.
+
+**The rule.** *Read what a fix does, not what it is called.* Before running any
+automated remediation, diff the proposed versions against the installed ones and
+check the **direction**. An advisory count is a proxy; a proxy that can be
+improved by making the code worse is not a measurement, and "0 vulnerabilities"
+is a claim like any other — it needs the same three outcomes as everything else.

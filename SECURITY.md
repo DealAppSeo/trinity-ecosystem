@@ -58,6 +58,15 @@ dangerous than one that reports failure.
   suites are probed by deliberately breaking the thing they guard and confirming
   they go red. Two cases where assertions reported green while never executing
   were found this way, and are recorded in `LESSONS.md`.
+- **Dependency floors are enforced, and `npm audit fix --force` is refused.**
+  On this dependency tree that command proposes rolling `@solana/web3.js` from
+  1.98.4 back to **0.0.3** — the resolver goes backwards when no forward fix
+  exists, and the advisory count then reads zero over six-year-old code on the
+  live payment path. `npm run check:deps` records a floor per package with the
+  reason and fails the build below it. Some advisories here therefore stay
+  **open and stated** rather than being cleared by a downgrade; where no fixed
+  version exists upstream, that is said plainly instead of being made to
+  disappear. See `LESSONS.md` A16.
 
 ## Where to look first
 

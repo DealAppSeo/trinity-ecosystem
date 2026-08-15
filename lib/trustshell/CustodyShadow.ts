@@ -87,7 +87,6 @@ export interface ShadowObservation {
  */
 type SupabaseLike = {
   from: (t: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     insert: (r: any) => PromiseLike<{ error: { message: string } | null }>;
   };
 };
