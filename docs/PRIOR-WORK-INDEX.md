@@ -56,6 +56,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Poseidon2 parameters, the circuit contract, and why we do not implement it | `docs/POSEIDON2-PARAMETER-REQUEST.md` | choosing a parameter set independently |
 | The paste-ready Poseidon2 request to send the other lane | `docs/POSEIDON2-HANDOVER-MESSAGE.md` | rewriting the ask from scratch |
 | Agent execution loop: what is already built, what is wiring, what is new | `docs/AGENT-LOOP-SCOPE.md` | re-surveying the harness modules yourself |
+| Which agent works which lane, the paths each owns, and the report block they all emit | `docs/AGENT-LOOP-PROMPTS.md` | inventing a lane split per session |
 | Browser automation for agents: install, Chrome resolution, and what `doctor` gets wrong | `docs/AGENT-BROWSER.md` | the upstream README, which documents none of it |
 
 ---
