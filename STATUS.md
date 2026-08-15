@@ -60,6 +60,7 @@ and it is isolated behind one interface.
 | `reputation-transition.ts` | reputation as a constrained append, not a mutable column — proves the sequence, never the score |
 | `harness/loop.ts` | the agent execution kernel — an agent cannot certify above what the harness observed |
 | `loop-authorizer.ts` | binds the loop to `ControlProof` — the first thing that asks this layer for permission |
+| `lib/mcp/client.ts` | the loop's tool surface — "unreachable" and "failed" never collapse |
 
 ---
 

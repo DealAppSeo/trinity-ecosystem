@@ -226,6 +226,62 @@ Mutation also caught two boundaries a passing suite had not reached: `>=` versus
 `verifyControlProof`), and recording a *leaf* nonce instead of the root's, which
 is a no-op for a direct grant and leaves an entire delegation chain replayable.
 
+### The MCP client — BUILT 2026-08-14
+
+`lib/mcp/client.ts`, `scripts/mcp-client-test.mjs` (20 assertions), wired into
+`npm run check` as `check:mcp-client`. 14 mutants, all killed.
+
+This was the one piece the scope called genuinely new rather than wiring, and
+the reason stands: `lib/mcp/server.ts` makes Trinity the tool **provider**, and
+a loop needs Trinity as the **consumer**.
+
+**The distinction the file exists to get right** is three wire outcomes that
+must not collapse into two:
+
+```
+the tool ran and succeeded    -> ok
+the tool ran and failed       -> error       (the model sees it and adapts)
+the tool could not be reached -> UNAVAILABLE (nothing was learned)
+```
+
+`tools.unavailable_is_not_checked` is constitutional, and its stated reason is
+this repo's own history: *reading a blocked host as failure is how a proxy 403
+became a credential rotation.* A transport failure tells the agent nothing about
+its call, so it surfaces as `unavailable`, which the kernel turns into a ceiling
+of NOT_CHECKED — an agent cannot certify a run in which it could not reach the
+thing it was certifying. A JSON-RPC error is the opposite: the server answered
+and refused, which is a real answer, so it is an `error` the agent can act on.
+Both collapse directions are tested, and the end-to-end consequence is tested
+too — the two kinds drive different loop outcomes.
+
+**What the client refuses to believe.** MCP lets a server annotate its own tools
+(`readOnlyHint`, `destructiveHint`). Those never decide effect. A remote server
+declaring its own tool harmless is self-report deciding blast radius — exactly
+what the kernel refuses from the model, and a server is further outside the
+trust boundary, since whoever controls it controls the annotation.
+`describeToolSurface()` records the claim as evidence beside the operator's
+classification and names disagreements in both directions.
+
+**Half the suite is interop, not mocking**: the client is driven against the
+real `handleRpc` over an in-process transport, so what is asserted is that the
+two halves of this repo agree on the wire rather than that the client agrees
+with a fixture written to match it. The adversarial half covers what a
+cooperating server cannot produce — transport failures, id mismatches, envelopes
+carrying both `result` and `error`.
+
+**A build hazard fixed on the way.** `mcp-fleet-smoke.mjs` pinned
+`rootDir: lib/mcp`, and `client.ts` imports the loop's port types from
+`lib/trustshell/harness/`, so it failed with TS6059. Pinned to `lib` instead —
+the same fix `check-identity.mjs` needed twice. The version that "works" is
+worse than the error: when tsc *can* infer a wider common root it silently
+relocates every emitted file and the load paths move with no error at all.
+
+Mutation also caught one real gap: non-text content blocks were dropped
+silently. No interop test reaches that path, because this repo's server always
+emits `structuredContent` — but a third-party server need not, and dropping an
+image block makes a tool that returned something look like a tool that returned
+nothing, so the agent reasons about an absence that is not real.
+
 ### Stage B — outcomes become reputation events
 
 Each completed turn emits a `ReputationEvent` into the committed history. This is
@@ -327,7 +383,7 @@ than a silent one.
 
 1. ~~**Stage A kernel**~~ — **DONE 2026-08-14.**
 2. ~~**The `Authorizer` adapter**~~ — **DONE 2026-08-14**, see below.
-3. **MCP client** — the one genuinely new module.
+3. ~~**MCP client**~~ — **DONE 2026-08-14**, see below.
 4. *(gate: the three Stage-B decisions)*
 5. **Stage B** — reputation events, closing the earned-score chain.
 6. **Stage C** — sub-agents, mostly assembly.
