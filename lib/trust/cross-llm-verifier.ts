@@ -27,7 +27,7 @@
  */
 
 import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export interface ProviderAnswer {
   provider: string;
@@ -94,18 +94,27 @@ function hashPrompt(prompt: string): string {
   return crypto.createHash('sha256').update(prompt).digest('hex').slice(0, 32);
 }
 
+/**
+ * Persistence client, or null when Supabase is not configured.
+ *
+ * This used to build its own client and read ONLY the legacy key names —
+ * `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_SERVICE_KEY`. It could not see
+ * `SUPABASE_SECRET_KEY` at all, which is the key name this project actually
+ * uses: the legacy JWTs are disabled project-wide. So in the documented target
+ * state — new key set, legacy names unset — this returned null and the caller's
+ * `if (!supabase) return` silently dropped every comparison record.
+ *
+ * Delegating to the shared helper fixes the key resolution (new name first,
+ * legacy names still accepted) and keeps one place that knows how this project
+ * authenticates. The helper THROWS when unconfigured rather than returning a
+ * broken client; that is caught here because this call site is genuinely
+ * optional — persistence is best-effort and must not fail a verification.
+ * The distinction worth keeping: the helper fails loudly for callers that need
+ * a client, and this wrapper opts out explicitly rather than by accident.
+ */
 function getSupabaseClient() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    process.env.SUPABASE_URL ||
-    '';
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    '';
-  if (!url || !key) return null;
   try {
-    return createClient(url, key);
+    return getSupabaseAdmin();
   } catch {
     return null;
   }

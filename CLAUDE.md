@@ -108,6 +108,61 @@ hardcoded as a fallback in `trade_pipeline.ts`).
 This project uses Supabase's **newer API keys** (5 `sb_publishable_…`, 9
 `sb_secret_…`).
 
+### KEYS ARE NOT ROLES — read this before writing an RLS policy
+
+**This is the single most re-litigated fact in the project.** It has been
+rediscovered repeatedly, and every time, the cause is the same conflation.
+Both halves below are true at once:
+
+| | old | new | status |
+|---|---|---|---|
+| **API KEY** (the credential you put in an env var) | `anon` JWT, `service_role` JWT | **`sb_publishable_…`**, **`sb_secret_…`** | legacy JWTs are **DEPRECATED and disabled here** |
+| **POSTGRES ROLE** (the principal RLS is written against) | `anon`, `authenticated`, `service_role` | *unchanged* | **ALIVE. Not deprecated. Do not remove from policies.** |
+
+The keys were replaced. **The roles were not.** A `sb_publishable_…` key
+authenticates **as the `anon` role**; a `sb_secret_…` key authenticates **as the
+`service_role` role**. So:
+
+- "The anon key is deprecated" — **true of the key, false of the role.**
+- `CREATE POLICY … TO anon` is still correct, current SQL. It is what governs
+  every browser caller, because the publishable key they hold *is* `anon`.
+- Deleting `anon` from a policy because "anon is deprecated" either does nothing
+  or silently changes authorization. That mistake is the reason this box exists.
+
+**`service_role` has `rolbypassrls = true`** [VERIFIED 2026-08-15 against
+`pg_roles`]. It never consults a policy. Therefore:
+
+- A policy `TO service_role` is **decorative** — it grants nothing that the role
+  did not already have.
+- To restrict a table to server-side callers only, you **DROP the policies that
+  reach `anon`/`PUBLIC`**. You do not "add a service_role policy". Secret-key
+  callers keep working by bypassing RLS, not by matching a rule.
+- Conversely, RLS **cannot** protect you from a leaked `sb_secret_…` key. RLS is
+  not a control on that path at all.
+
+`anon` and `authenticated` have `rolbypassrls = false`, so policies do bind them.
+
+**Do not take this on trust — ask the database.** `public.whoami()` returns the
+role the CALLING KEY resolved to. It is `SECURITY INVOKER`, read-only, and takes
+no arguments:
+
+```bash
+curl -s "$SUPABASE_URL/rest/v1/rpc/whoami" -X POST \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{}'
+```
+
+Called on 2026-08-15 with a **`sb_publishable_…`** key — a current, new-format
+key, not a legacy JWT — it returned:
+
+```json
+{"current_role_name": "anon", "session_user_name": "authenticator", "bypasses_rls": false}
+```
+
+That is the whole point in one line: **the new publishable key IS the `anon`
+role.** Not a replacement for it. `sb_secret_…` resolves to `service_role` the
+same way. If this comes up again, run the call rather than re-deriving it —
+that is what the function is for.
+
 **SETTLED 2026-08-12 — do not re-open.** The legacy `anon` and `service_role`
 JWTs are **disabled**; the dashboard shows a *"Re-enable JWT-based API keys"*
 button, which only appears when they are off. A copy of the legacy
