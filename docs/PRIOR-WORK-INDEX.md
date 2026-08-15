@@ -59,6 +59,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Browser automation for agents: install, Chrome resolution, and what `doctor` gets wrong | `docs/AGENT-BROWSER.md` | the upstream README, which documents none of it |
 | Dual-view (`/live`) plan: lane split, frozen event contract, what is and is not on the critical path | `docs/DUAL-VIEW-LAUNCH-PLAN.md` | the source Grok/XAI conversation, whose disk inventory was taken against a different repo — see its §1 |
 | What the harness caught and missed on a real session, and why 10 sessions is unmet | `docs/TRUSTSHELL-M6-DOGFOOD.md` | re-running the harness and assuming silence means clean |
+| **Which invariants are actually protected, and which only look protected.** 21 curated mutations, each naming the property it breaks; four outcomes (CAUGHT / SURVIVED / INVALID / DRIFT) because a non-compiling mutant is not evidence | `scripts/mutations.mjs` — run `npm run mutate` | a green test suite, which cannot distinguish a real assertion from one asserted over an unreachable branch |
 
 ---
 
