@@ -1126,12 +1126,25 @@ all killed (floating specifier, `next` reverted to 14.2.35, the exact
 `@solana/web3.js` → 0.0.3 downgrade, and an unreadable lockfile which must report
 NOT CHECKED rather than pass).
 
-**NOT CHECKED:** every deployed surface. Two majors of Next shipped with no
-post-deploy observation — `app.aitrinitysymphony.com` and `www` are proxy-denied
-from an agent session. `GET /api/version` answers "which commit, which surface"
-via `pg_net` and is the cheapest confirmation. Also NOT CHECKED: the live
-Supabase schema (e2e ran against the stub), cross-instance nonce replay, BFT
-consensus, Solana broadcast.
+**The Next 16 deploy — VERIFIED 2026-08-15 07:07Z, via `pg_net`.** Both surfaces
+are serving the upgrade, and both answered 200:
+
+| surface | platform | commit | `/` or `/dashboard` |
+|---|---|---|---|
+| `www.aitrinitysymphony.com` | vercel (iad1) | **b7c7177** | 200, 25,263 B, RSC payload present |
+| `app.aitrinitysymphony.com` | railway (us-east4) | **b7c7177** | 200, 18,260 B, RSC payload present |
+
+Neither body carried an error-page marker. So two majors of Next landed on both
+platforms, and server rendering works on the new stack. This was written as NOT
+CHECKED an hour earlier and then measured — the measurement is cheap and there
+was no reason to ship the caveat instead.
+
+**Still NOT CHECKED — do not read the above as more than it is.** SSR HTML
+renders identically whether or not a client effect throws, so nothing here
+proves post-hydration behaviour under React 19, and no agent session can observe
+it. The two `set-state-in-effect` findings live exactly there. Also NOT CHECKED:
+the live Supabase schema (e2e ran against the stub), cross-instance nonce replay,
+BFT consensus, Solana broadcast.
 
 **Refused, with reasons recorded:** `npm audit fix --force`. On this tree it
 proposes `@solana/web3.js` 1.98.4 → **0.0.3**, `@solana/spl-token` 0.4.15 →
@@ -1170,6 +1183,8 @@ zero over six-year-old code on the live payment path. `LESSONS.md` **A16**.
 ```bash
 npm run check                       # expect exit 0
 npm run check:deps                  # expect 5 VERIFIED — read BEFORE any audit fix
-# then, from somewhere pg_net can reach, confirm the Next 16 deploy actually landed:
+# the Next 16 deploy is confirmed landed on both surfaces (see above); re-run this
+# after any future merge, since a platform keeps serving the last SUCCESSFUL build
+# when a new deploy fails — a healthy page is compatible with week-old code:
 #   select net.http_get(url := 'https://www.aitrinitysymphony.com/api/version');
 ```
