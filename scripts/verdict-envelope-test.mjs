@@ -212,6 +212,38 @@ await check('evidenceMatches means "renders to the same evidence", NOT "byte-ide
   eq(result.outcome, 'VERIFIED', 'and the envelope still verifies');
 });
 
+await check("CHECKER AUTHORITY IS 'unverified' WHEN NOBODY VOUCHED", async () => {
+  // checker_must_not_be_doer stops a doer grading itself. It does not stop a
+  // doer PROPOSING the most lenient checker it can find — proposeContract is
+  // called by the doer and the unsigned contract already names checkerDid, so
+  // every signature in a shopped contract verifies. This field does not close
+  // that; it makes it visible where a third party reads.
+  const result = await verifyEnvelope({ envelope: await goodEnvelope() });
+  eq(result.checkerAuthority, 'unverified', 'no ControlProof means nobody vouched');
+  eq(result.outcome, 'VERIFIED', 'but it must NOT downgrade the outcome on its own');
+});
+
+await check('a verdict naming a ControlProof reads as attested', async () => {
+  const contract = await makeContract();
+  const verdict = await makeVerdict(contract, { controlProofRef: 'sig:abc123' });
+  const result = await verifyEnvelope({ envelope: await packEnvelope({ contract, verdict }) });
+  eq(result.checkerAuthority, 'attested', 'a named authority must be reported');
+});
+
+await check('a blank ControlProof is absent, not attested', async () => {
+  // A blank string is "absent" wearing a value's clothes, and it is exactly
+  // what a lazy producer emits.
+  const contract = await makeContract();
+  const verdict = await makeVerdict(contract, { controlProofRef: '   ' });
+  const result = await verifyEnvelope({ envelope: await packEnvelope({ contract, verdict }) });
+  eq(result.checkerAuthority, 'unverified', 'whitespace must not read as authority');
+});
+
+await check('malformed input claims no checker authority either', async () => {
+  const result = await verifyEnvelope({ envelope: 'not an envelope' });
+  eq(result.checkerAuthority, 'unverified', 'an unreadable envelope vouches for nothing');
+});
+
 // ── the attacks ─────────────────────────────────────────────────────────────
 
 await check('THE CONTRACT SWAP IS REFUSED AT PACK TIME', async () => {

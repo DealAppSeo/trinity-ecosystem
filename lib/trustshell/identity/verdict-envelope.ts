@@ -117,6 +117,23 @@ export interface EnvelopeVerification {
   /** Absent when the envelope was too malformed for a verdict check to mean anything. */
   verdict?: VerdictVerification;
   /**
+   * Whether the checker's authority to judge was attested by anybody.
+   *
+   * `attested` means the verdict names a ControlProof — some party vouched for
+   * this checker. `unverified` means it names none, which is NOT the same as
+   * the checker having no authority: it means nobody said.
+   *
+   * WHY A READER NEEDS THIS. `checker_must_not_be_doer` stops a doer grading
+   * itself; nothing stops a doer PROPOSING the most lenient checker it can
+   * find, because `proposeContract` is called by the doer and the unsigned
+   * contract it signs already names `checkerDid`. Every signature in a shopped
+   * contract verifies. This field does not close that gap — it makes it
+   * VISIBLE at the surface a third party actually reads, so an envelope whose
+   * checker nobody vouched for cannot be mistaken for one whose checker was
+   * assigned. See docs/ORNITH-ASSESSMENT-2026-08-15.md §2.2.
+   */
+  checkerAuthority: 'attested' | 'unverified';
+  /**
    * Whether supplied evidence is the evidence judged.
    *
    * `null` is a third state and it is the common one: no evidence was supplied,
@@ -148,6 +165,7 @@ function malformed(detail: string): EnvelopeVerification {
       contractHash: '',
       detail: 'not reached',
     },
+    checkerAuthority: 'unverified',
     evidenceMatches: null,
     detail,
   };
@@ -204,6 +222,13 @@ export async function verifyEnvelope(input: {
     return malformed(`the envelope could not be checked: ${(e as Error).message}`);
   }
 
+  // Present and non-blank, or nobody vouched. A blank string is "absent"
+  // wearing a value's clothes.
+  const authority: 'attested' | 'unverified' =
+    typeof verdict.controlProofRef === 'string' && verdict.controlProofRef.trim() !== ''
+      ? 'attested'
+      : 'unverified';
+
   let evidenceMatches: boolean | null = null;
   if (input.evidence !== undefined) {
     try {
@@ -213,6 +238,7 @@ export async function verifyEnvelope(input: {
         outcome: 'NOT_CHECKED',
         contract: contractCheck,
         verdict: verdictCheck,
+        checkerAuthority: authority,
         evidenceMatches: null,
         doerDid: contract.doerDid,
         checkerDid: contract.checkerDid,
@@ -238,6 +264,7 @@ export async function verifyEnvelope(input: {
     outcome,
     contract: contractCheck,
     verdict: verdictCheck,
+    checkerAuthority: authority,
     evidenceMatches,
     doerDid: contract.doerDid,
     checkerDid: contract.checkerDid,
