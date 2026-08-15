@@ -2588,3 +2588,626 @@ transiently.
 - `.github/workflows/prior-work.yml` has still never executed on GitHub.
 - Whether the `scan-secrets.mjs` working-tree fix conflicts with PR #25, which
   edits the same file's pattern list.
+
+---
+
+## 2026-08-14 — Sprint X: cold-start weighting
+
+Picked up the one item in `TRUST-HARNESS.md` § "Not yet built" that was both
+explicitly NOT CHECKED and free of a Sean gate: *"whether a newcomer added
+mid-run can now earn trust."* Everything here is `scripts/harness-newcomer.mjs`
+(`npm run sim:newcomer`) plus the A/B seam added to `harness-simulate.mjs`.
+
+### The ceiling, computed before anything was run
+
+Exploration is gated on `confidence < 0.5` and confidence is `n/(n+K)`, so
+exploration stops exactly at n = 20 — and nothing else in the harness hands an
+expert calls the ranking would not pick. A **flawless** newcomer therefore
+graduates at a closed-form ceiling:
+
+```
+observed(20)   = 8549 bps      EWMA alpha 0.06 from the 5000 prior
+confidence(20) = 0.500
+earned(20)     = 6775 bps      <- the graduation ceiling
+```
+
+Checked against the real `ReputationLedger`, not just derived: 6775 vs 6775,
+delta 0.3 bps. **PREDICTION, published before measuring:** any incumbent above
+**67.75%** true quality permanently out-ranks a perfect newcomer, so the
+cold-start cliff documented as closed at n=15 is merely relocated to n=20.
+
+### The prediction was REFUTED
+
+40 seeds: the newcomer wins an unassisted decision in **95%** of them and
+becomes the dominant expert in **80%**. The closed form assumed the incumbent's
+earned score sits at its true quality. It does not — under winner-take-all the
+leader's EWMA random-walks, and on the headline seed the incumbent fell from
+8455 to 6698 bps on a true quality of 0.80. The ceiling is real; it does not
+bind, because what it is measured against moves too.
+
+What a late arrival actually pays is a **lag**, not a lock-out. Against an
+omniscient router that adopts the best present expert immediately: **94.77% of
+bound, 4.82pp** left on the table.
+
+> **RETRACTED 2026-08-14 by Sprint Y.** That 4.82pp was measured ranking by the
+> point estimate, not the `upperConfidenceBound` the simulator ships — the same
+> wrong-sample error caught earlier in this very sprint and not propagated to
+> this figure. The real post-join gap is **0.45pp** after the fix below, and
+> **0.18pp** of that is irreducible. See Sprint Y.
+
+### The defect that was actually there
+
+Looking for the lock-out found something else, and it is not about newcomers.
+Pre-fix, on the headline seed, `vet-85` — the **best** veteran — took **20 of
+3000** calls, all of them exploration handouts, and froze at 6052 bps while the
+router rode `vet-80` on early luck. Over 200 seeds the pool failed to identify
+its own best member **41 times**.
+
+Root cause: `trustWeight` scored **any** cold expert at a flat 0.5, and
+`coldStart` covers two opposite situations — *no* evidence and *thin* evidence.
+An expert emits up to 20 outcomes before graduating and all 20 were discarded,
+including the failures that should have demoted it.
+
+### The fix, and what it cost to get right
+
+`ExpertProfile.observations` (optional) lets the router tell the two apart.
+With evidence, rank on the ledger's shrunk score; without it — or when the
+caller does not supply the count — floor at the midpoint.
+
+The first attempt swapped outright and **broke a routing test**: a caller
+passing `earnedScore: 0, coldStart: true` was then ranked at zero, scoring "no
+evidence" identically to "proven terrible". The profile's ledger-derived
+contract is documented and unenforced, so the test was right and the change was
+wrong. A pure one-sided floor fixed the safety hole but kept only **0.42pp of
+the 1.34pp** — because most of the win comes from the DOWNWARD direction, which
+a floor blocks. Hence the observation count.
+
+| measurement | before | after | delta |
+|---|---|---|---|
+| trust-only world, point-estimate ranking, 200 paired seeds | 81.58% | 82.93% | **+1.34pp** ± 0.27, t = 9.8, 164/200 up |
+| trust-only world, UCB ranking (what the sim ships), 200 seeds | 81.79% | 82.65% | **+0.86pp** ± 0.19, t = 8.7, 155/200 up |
+| full simulator, top-1, 24 paired seeds | 91.79% | 92.43% | **+0.64pp** ± 0.44, t = 2.83, 19/24 up |
+| full simulator, % of omniscient top-1 bound, 24 seeds | 97.31% | 98.16% | **+0.85pp** ± 0.57, t = 2.92, 20/24 up |
+| full simulator, panel-of-3, 24 paired seeds | 96.48% | 96.45% | −0.03pp ± 0.19, t = −0.28 — **no effect** |
+| pool identifies its best member, 200 seeds | 159/200 | 170/200 | +11 |
+| calls reaching the best expert, 200 seeds | 1793 | 2177 | +384 of 3000 |
+
+The remaining top-1 gap to the omniscient bound goes **2.69pp → 1.84pp**: about
+**32%** of the entire remaining prize for top-1 routing, in a mechanism the
+index lists as CLOSED.
+
+### Why this is not the artefact we were fooled by before
+
+`confidenceK` once looked like a win because a gem was planted in the pool. The
+signature here is the opposite: the win is **largest with no newcomer present at
+all** (+1.30pp) and **smallest in the planted-gem world** (+0.83pp), and the
+gem's traffic share goes **down** (51.2% → 48.8%) while quality goes up. It is
+not "explore more"; it is "rank a cold expert on the evidence it has".
+
+Under UCB ranking the gem world is the *largest* win (+2.12pp) and the gem's
+share rises, which is the artefact signature — so the **veterans-only** number
+is the one quoted, and the gem number is the least trustworthy of the four.
+
+### Mutation testing
+
+Five mutations of the new router logic, all compiled, all caught: evidence never
+detected (1 fail), evidence always assumed (3), midpoint floor removed (3),
+default flipped to midpoint (2), warm path forced to midpoint (3). Baseline
+58 passed / 0 failed restored after each.
+
+### Also — and a fifth contaminated measurement, mine
+
+`tsc --noEmit` is **0** errors, not 25. PR #25 deleted `motor-squad-graph.ts`,
+which held all 25. The CI baseline in `prior-work.yml` was still 25, so 25 new
+errors could have landed without the gate saying a word. It is now **0**: a
+plain regression gate, and it prints the offending lines when it trips.
+
+**I first set it to 4, from a contaminated instrument.** `npx tsc --noEmit`
+reported 4 locally — a `Set` iteration and three BigInt literals, all wanting a
+higher `target`. `tsconfig.json` targets `es2022`, under which none of those
+four diagnostics can occur, and that contradiction was visible in the numbers
+before CI was consulted. Cause: `incremental: true` plus a stale
+`tsconfig.tsbuildinfo` replaying cached diagnostics for files that had not
+changed since an era with a lower target. Delete the file and it is 0, twice
+over. CI checks out fresh, has no tsbuildinfo, and reported 0 all along.
+
+It was caught only by reading the CI log rather than trusting the green tick —
+the run passed either way, because 0 is under a threshold of 4. `CLAUDE.md`
+already warns that `tsconfig.tsbuildinfo` is a build artefact, but about
+`git stash` conflicts; that it can also manufacture **phantom compile errors**
+is now in `LESSONS.md`.
+
+### Single seed decided nothing here — twice
+
+The main simulator on its published seed showed the panel arm at 99.23% → 98.62%
+and that read as a regression. Across 24 paired seeds it is −0.03pp ± 0.19pp.
+Separately, the trust-only measurement was first run on `earnedScore` when the
+simulator actually ships `upperConfidenceBound` — the wrong sample, caught by
+reading the simulator rather than assuming it. Both numbers changed materially
+once corrected.
+
+### NOT CHECKED
+
+- Everything above is simulator evidence. No `agent_repid` replay, no live LLM.
+- Sections 3–6 of `harness-newcomer.mjs` neutralise similarity and congestion on
+  purpose; the full-simulator row is the one to quote for a world that varies
+  them.
+- Whether any caller outside the simulator supplies `observations`.
+  `lib/mcp/fleet.ts` does not, and therefore keeps the conservative floor.
+- ~~The 4.82pp adoption-lag prize is measured but **not attacked**.~~
+  **Superseded by Sprint Y**: the figure is retracted and the real residual is
+  0.27pp. Do not pick this up from here.
+
+---
+
+## 2026-08-14 — Sprint Y: the adoption lag, re-priced and attacked
+
+Brief was "attack the 4.82pp adoption lag." The first move was to re-price it,
+and the prize did not survive. `npm run sim:adoption`.
+
+### The 4.82pp is RETRACTED
+
+Two independent errors, both mine, both from Sprint X:
+
+1. **Wrong sample.** It was measured ranking by `ledger.earnedScore` — the point
+   estimate — when `harness-simulate.mjs` ships `ledger.upperConfidenceBound(id,
+   2500)`. This is the *same* error caught mid-Sprint-X on the trust-only A/B
+   and corrected there; it was never propagated to the prize figure. Reproduced
+   deliberately as an arm in the new script: the point-estimate ranking gives
+   post-join **91.09%** against omniscient **94.98%**, a 3.89pp gap, and 5.20pp
+   on the overall metric — which is where 4.82pp came from.
+2. **An omniscient bound quoted as a prize.** The omniscient router is *told*
+   which expert is best. A learner has to sample to find out, and every
+   observation spent on an expert that turns out worse is a loss no algorithm
+   avoids. That is regret, a property of the problem. Quoting the omniscient gap
+   promises work that cannot be delivered — the same error as optimising toward
+   an unmeasured bound, one level up.
+
+### Re-priced, with common random numbers
+
+Every arm now sees the same coin per (task, expert): `draws[t][id]` is
+pre-generated and the outcome is `draws[t][id] < trueQuality[id]`. Sprint X
+compared arms on a shared stream consumed in *selection* order, so two arms that
+diverged were also being handed different coins. 60 seeds × 3000 tasks,
+newcomer q=0.95 joining a warm fleet at task 800:
+
+| arm | overall | post-join |
+|---|---|---|
+| omniscient (knows the answer) | 92.26% | 94.98% |
+| **Thompson sampling** | 91.54% | **94.80%** |
+| UCB1 | 89.74% | 93.37% |
+| harness, post-Sprint-X | 91.06% | 94.53% |
+| harness, pre-Sprint-X | 89.17% | 93.82% |
+| harness, pre-X, point estimate *(the retracted config)* | 87.06% | 91.09% |
+
+Decomposition of the post-join gap:
+
+| quantity | value |
+|---|---|
+| omniscient − harness (pre-X) | 1.16pp ← what Sprint X should have recorded |
+| omniscient − harness (post-X) | **0.45pp** |
+| omniscient − Thompson | **0.18pp — IRREDUCIBLE**, the cost of not knowing |
+| **Thompson − harness (post-X)** | **0.27pp ± 0.15pp**, t = 3.56, ahead on 41/60 |
+
+So the attackable residual is **0.27pp**, not 4.82pp — about a third of what
+Sprint X's own fix delivered.
+
+### Three levers, and the frontier they all hit
+
+80 fresh paired seeds, disjoint from the train and held-out sets used to pick
+them. Bold = significant at |t| > 2.
+
+| lever | veterans | dud 0.55 | median 0.80 | gem 0.95 |
+|---|---|---|---|---|
+| `optimismBps` 2500 → 1000 | +0.30 | **+0.77** | **+0.65** | **−0.88** |
+| randomised UCB bonus | +0.31 | +0.39 | +0.33 | **−0.58** |
+| running mean instead of EWMA | +0.36 | +0.22 | +0.58 | **−1.99** |
+
+**All three move the same way.** Each buys accuracy where the newcomer is
+average-or-worse and pays for it where the newcomer is genuinely excellent.
+That is the exploration/exploitation frontier, and the harness is sitting on it.
+Which point is right depends on how likely a newly added agent is to beat the
+incumbents — a fact about the real fleet that no simulator can supply. **The
+default did not move.**
+
+The `optimismBps` sweep is also a clean demonstration of why the train/held-out
+split exists. Train picked **500** on the worst-case-world criterion (+0.49pp);
+held-out **rejected** it (−0.13pp). **1000** confirmed on both (+0.48pp train,
++0.47pp held-out) and was only found because the whole range was re-swept on
+held-out — the train tie-break had silently preferred 500 over an equal-scoring
+1000. Even so, 1000 is not adopted: see the frontier above.
+
+### A hypothesis refuted outright
+
+The residual is **not** the EWMA's forgetting. Replacing `alpha 0.06` with a
+running mean — identical shrinkage, identical UCB bonus, the only difference
+being that it does not forget — makes the gem world **1.99pp worse**
+(t = −5.69). The forgetting is **load-bearing**: it lets an incumbent's score
+decay so a newcomer can overtake, which is precisely the mechanism Sprint X
+identified. Anyone "fixing" that alpha to improve adoption will make adoption
+worse.
+
+### NOT CHECKED
+
+- Simulator evidence only, similarity and congestion neutralised.
+- Thompson and UCB1 are **references, not proposals**. Neither carries the
+  harness's capacity, breaker or trust-floor semantics, and a router that ranks
+  on posterior samples cannot state *why* it chose an expert — which is most of
+  what the ledger exists to do.
+- The deciding evidence for the frontier question is the distribution of *new
+  agent quality relative to incumbents* in the real fleet. That is in principle
+  answerable from `agent_repid` history and was **not** attempted here; every
+  real-data retraction in this repo came from assuming the shape of that data.
+
+---
+
+## 2026-08-14 — Sprint Z: the `marginFloor` retune
+
+Brief was "get the `marginFloor` retune" — the last item on the OPEN list that
+was not owned by Sean. Reproduce with the two seams added to the simulator this
+sprint:
+
+```bash
+node scripts/harness-simulate.mjs --margin-floor N          # sweep the floor
+node scripts/harness-simulate.mjs --margin-floor N --escalate-random R
+```
+
+### First: the parameter has no production caller
+
+`grep` for `new EscalationPolicy` returns the simulator, the experiment script,
+and `escalate.ts`'s own test file. **Nothing in `lib/` or `app/` imports
+`escalate.ts` at all**, and the module's own default is `marginFloor: 0`, i.e.
+**disabled**. The 2000 everyone has been discussing exists on exactly one line —
+`scripts/harness-simulate.mjs`, in `PANEL_CFG`.
+
+So there is no shipped 2000 to retune. This is a simulator constant governing
+which tasks the panel arm escalates, and its blast radius is the published panel
+figures, not production behaviour. That had to be established before tuning it;
+it changes what the answer is *for*.
+
+### Second: does the signal discriminate at all?
+
+A threshold is only worth choosing if the thing it thresholds beats picking at
+random for the same spend. There was a real prior that it would not:
+`EscalationPolicy` reads `topEarned`, `runnerUpEarned` and `topConfidence` —
+**all three are properties of the EXPERTS**. None of them can see the task, so
+none can predict which task is hard.
+
+`--escalate-random R` replaces the decision with a coin flip at rate R, keeping
+every other mechanism identical and drawing from a dedicated stream so no other
+random draw shifts. Matched on escalation rate, 20 paired seeds:
+
+| operating point | margin | random | calls (matched) | paired delta |
+|---|---|---|---|---|
+| floor 1000, rate 0.541 | 95.36% | 94.81% | 2.10 vs 2.08 | **+0.55pp** ± 0.29, t = 3.78, 18/20 |
+| floor 2000, rate 0.883 | 96.46% | 96.19% | 2.77 vs 2.77 | +0.27pp ± 0.26, t = 2.06, 13/20 |
+
+**The signal is real but its value is concentrated at low escalation rates.** At
+2000 the floor escalates 89% of tasks — nearly always-panel — so there is almost
+no selection left to do, and the signal is barely distinguishable from a coin
+flip. The prior was half right: the signal cannot see the task, but it does
+track how well-informed the ledger currently is, which predicts top-1 error.
+
+### The frontier, 10 seeds, panel of 3
+
+| floor | escal % | quality | calls | p99 ms | vs top-1 quality | vs top-1 p99 | pp per extra call |
+|---|---|---|---|---|---|---|---|
+| 0 | 0.0% | 92.20% | 1.02 | 181 | — | — | — |
+| 250 | 28.5% | 94.00% | 1.58 | 209 | +1.80pp | +16% | **3.20** |
+| 500 | 35.2% | 94.29% | 1.71 | 210 | +2.09pp | +16% | 3.01 |
+| 750 | 45.5% | 94.92% | 1.92 | 212 | +2.72pp | +17% | 3.02 |
+| **1000** | 54.2% | 95.31% | 2.09 | **214** | +3.11pp | **+18%** | 2.90 |
+| 1500 | 72.8% | 95.86% | 2.47 | 258 | +3.66pp | +42% | 2.52 |
+| **2000** *(current)* | 89.3% | 96.50% | 2.79 | **317** | +4.30pp | **+75%** | 2.43 |
+| 3000 | 99.1% | 97.01% | 2.98 | 306 | +4.81pp | +69% | 2.45 |
+
+**The p99 knee is between 1000 and 1500.** Up to 1000 the tail barely moves
+(+16–18%); past it the tail jumps to +42% and then +75%. Marginal efficiency
+declines monotonically across the whole range, from 3.20 pp per extra call at
+250 to 2.43 at 2000.
+
+### The answer
+
+**~1000, on the cost axis this repo already uses.** It captures **3.11pp of the
+4.81pp** available (65%) for **+18% p99** instead of 2000's **+75%**, and it is
+the operating point where the margin signal is worth having (+0.55pp over
+random, t = 3.78) rather than marginal (+0.27pp, t = 2.06). Sprint P rejected
+panel-size 4 at +1.25pp for +298% p99; by that same exchange rate 2000 is not a
+defensible point on this curve.
+
+**The constant was NOT changed, deliberately.** Every published panel figure —
+Sprint P's "99.23% of the omniscient panel-of-3 bound", the "+4.70pp crosses the
+single-expert ceiling" headline, the panel entries in `PRIOR-WORK-INDEX.md` — was
+measured with the panel arm at floor 2000. Moving it re-bases all of them, and
+re-basing other sprints' CLOSED results as a side effect of a tuning exercise is
+not a tuning exercise. Adopting 1000 means re-measuring those entries first; the
+frontier above is what makes that a decision rather than a guess.
+
+### NOT CHECKED
+
+- Simulator evidence. The real-data figure in the index (~91% of cron-only pairs
+  under 2000) is consistent with the 89.3% escalation rate measured here, but it
+  carries the unaligned-time caveat from Sprint U and was not re-derived.
+- The frontier is measured at `--hardness 0`, the published world, where every
+  task is equally hard. A world with shared task difficulty is exactly where a
+  task-blind signal should do worst, and that was not swept.
+- No production caller exists, so none of this is validated against one.
+
+---
+
+## 2026-08-14 — Sprint Z2: floor 1000 applied, Sprint P re-measured
+
+Sprint Z answered the `marginFloor` retune and declined to apply it because
+doing so re-bases Sprint P's published panel figures. Applied now, with those
+figures re-derived. `harness-simulate.mjs` `PANEL_CFG` is **1000**; sweep with
+`--margin-floor N`.
+
+### A reporting bug found on the way in
+
+The panel section divided by `runOraclePanel(SEED, 3)` unconditionally and
+printed the label `the harness panel of 3` regardless of `--panel-size`. Any run
+at size 4 or 5 therefore reported its ratio **against the wrong denominator
+under the wrong name** — and that ratio is the one number a reader quotes from
+that section. Fixed to use `PANEL_SIZE` for both. Sprint P's size comparison
+appears to have been made on raw quality rather than this ratio, so its
+conclusion is not affected, but the bug would have poisoned any re-derivation
+including this one.
+
+### The re-measurement — 20 seeds, both floors
+
+The originals were single-seed. Every number below is a 20-seed mean.
+
+| floor | size | panel q | % of panel-of-k bound | calls | p99 ms | escal % |
+|---|---|---|---|---|---|---|
+| 2000 | 3 | 96.38% | 98.17% | 2.77 | 362 | 88.4% |
+| 2000 | 4 | 98.17% | 98.62% | 3.80 | 852 | 93.7% |
+| 2000 | 5 | 97.96% | 98.74% | 4.43 | 925 | 92.0% |
+| **1000** | **3** | **95.37%** | **97.15%** | **2.12** | **214** | **55.6%** |
+| 1000 | 4 | 96.53% | 96.97% | 2.96 | 450 | 65.0% |
+| 1000 | 5 | 96.55% | 97.32% | 3.60 | 903 | 68.8% |
+
+**Entry 1 — panel membership selection.** Now **97.15% ± 0.25** of the
+omniscient panel-of-3 bound, **2.80pp** left. Sprint P published **99.23% /
+0.75pp**. Most of that gap is **not** the floor: the same 20-seed measurement at
+floor 2000 gives **98.17% ± 0.16**, so ~1.06pp of the difference is seed
+variance in a single-seed figure and ~1.02pp is the floor change. Not retracted
+— 99.23% is reproducible on its own seed — but it should never have been quoted
+as the fleet number.
+
+**And the published seed is the best of the twenty.** At floor 1000 the ratio
+spans **96.31–98.72%** across the 20 seeds, median 97.16, and the default seed
+`20260813` sits at **98.72 — the maximum**. That is not a coincidence to shrug
+at: every single-seed figure in this document was taken on the seed the
+simulator ships as its default, so the whole family of them skews to the
+favourable end. Quote the multi-seed mean, or say which seed.
+
+**Entry 2 — panel size.** Split, because half of it survived and half did not.
+
+- **`5` is strictly dominated by `4`: CONFIRMED**, at both floors, on 20 seeds.
+  At floor 1000 it buys **+0.01pp** for **3× the p99**. Stronger evidence than
+  the original had.
+- **`3` is the cost-adjusted optimum: REOPENED.** The number that closed it no
+  longer holds. Sprint P rejected 4 at *+1.25pp for +298% p99*. Measured now:
+  at floor 2000, 4 buys **+1.79pp for +135% p99**; at floor 1000, **+1.16pp for
+  +110% p99** — roughly a **2.7× better exchange rate** than the one that
+  justified the rejection. 3 may well still be right. It is no longer
+  *established* by the evidence cited for it, and settling it needs an explicit
+  pp-per-p99 exchange rate, which this repo has never written down. Moved to
+  OPEN rather than restated.
+
+**Entry 3 — crossing the single-expert ceiling.** Still **crossed**, which is
+the qualitative claim that matters, but the magnitude is far more
+configuration-dependent than any single number admits. Same seed (20260813),
+same floor 2000:
+
+| configuration | vs omniscient top-1 |
+|---|---|
+| default (agreeing-bloc errors, hardness 0) | **+2.10pp** |
+| `--scatter-wrong` | +3.80pp |
+| `--hardness 0.5` | **−0.10pp** — not crossed |
+| `--scatter-wrong --hardness 0.5` | +6.90pp |
+
+Over 20 seeds at the default: **+2.34pp** at floor 2000, **+1.34pp** at floor
+1000. **The published +4.70pp is not reproduced by any configuration tried
+here, and is NOT retracted** — retracting a figure whose configuration you
+cannot identify is a guess, not a correction. What is established is that the
+number swings from −0.10pp to +6.90pp across documented flags on one seed, so
+**quoting it without naming the configuration is meaningless**, and that is the
+defect to fix rather than the digit.
+
+### What this cost, honestly
+
+Applying 1000 lowers headline panel quality (96.38% → 95.37% at size 3) and the
+ceiling-crossing margin (+2.34 → +1.34pp). It buys a **41% p99 reduction**
+(362 → 214 ms) and **23% fewer calls** (2.77 → 2.12), and it moves escalation
+from 88% of tasks — where the signal is nearly a coin flip — to 56%, where it is
+worth +0.55pp over random. That is the trade Sprint Z priced and it is a trade,
+not a free win.
+
+### NOT CHECKED
+
+- Simulator evidence. `EscalationPolicy` still has no production caller, so
+  nothing here changes shipped behaviour.
+- The panel-size comparison at a fixed floor is not a clean cost experiment:
+  sizes 3/4/5 escalate at *different rates* (55.6/65.0/68.8% at floor 1000)
+  because the panel feeds the ledger, which moves the margin distribution. The
+  quality and p99 columns are still directly comparable; a rate-matched
+  size comparison was not run.
+- The exchange rate that would settle panel size 3 vs 4 does not exist anywhere
+  in this repo.
+
+---
+
+## 2026-08-14 — Sprint Z3: panel size 3 vs 4, settled
+
+Sprint Z2 reopened this and said settling it needed "an explicit pp-per-p99
+exchange rate, which this repo has never written down." **It turned out not to
+need one.** Inventing a rate would have been the wrong move — it would have
+buried a judgement call inside a number and presented the result as measured.
+
+### The reframe that removed the need
+
+Comparing sizes at a *fixed floor* conflates two different purchases: bigger
+panels **and** more escalation (at floor 1000 sizes 3/4/5 escalate 56.0 / 65.1 /
+68.0% of tasks, because the panel feeds the ledger and moves the margin
+distribution). Both are bought with the same budget.
+
+So the question is not "3 or 4" but: **given a call budget, is it better to
+panel more tasks or to make panels bigger?** If size 3 at some floor beats size
+4 at whatever floor costs the same, 3 wins across the frontier and the exchange
+rate never enters.
+
+Swept the full grid — sizes 3/4/5 × floors 250/500/1000/1500/2000/3000, 12
+seeds per cell — and took the Pareto frontier on each cost axis separately.
+
+### The answer: 3, by near-domination
+
+At **matched call cost**, 12 paired seeds:
+
+| budget | size 3 | size 4 | quality delta | p99 delta |
+|---|---|---|---|---|
+| ~2.97 calls | 96.83% @ floor 3000, p99 346 | 96.48% @ floor 1000, p99 388 | **+0.34pp** ± 0.29, t = 2.35 | **−42 ms** |
+| ~1.8 calls | 94.56% @ floor 500, p99 209 | 94.58% @ floor 250, p99 214 | −0.01pp ± 0.48, t = −0.05 (tied) | −5 ms, and −0.09 calls |
+
+**Size 4 never wins a matched-budget comparison.** At ~2.97 calls size 3 is
+better on quality *and* p99 simultaneously; at ~1.8 calls quality is a tie and
+size 3 is cheaper on both axes. That is domination, not a preference — which is
+why no pp-per-p99 rate is required to choose.
+
+On the **p99 frontier** size 3 owns the entire range it can reach (205 → 346 ms)
+and size 4 does not appear until **782 ms**. The intermediate size-4 points
+exist but are dominated: 4@1000 (388 ms, 96.48%) loses to 3@3000 (346 ms,
+96.83%) on both axes.
+
+Sprint P's conclusion therefore stands, but the reasoning that supported it
+(+1.25pp for +298% p99, one seed, one floor) does not, and had already stopped
+being true at the new floor. The right support is the matched-budget
+comparison above.
+
+### The one regime where 4 is correct, and it is not about cost
+
+**Size 3 saturates at ~96.8%.** At floor 3000 it already escalates **99.1%** of
+tasks; no further floor increase buys anything, because there is nothing left to
+escalate. Quality above ~96.8% is unreachable at size 3 *at any setting*.
+
+Exceeding it requires size 4, and the cheapest size-4 point above that ceiling
+is floor 1500: **97.59% at p99 782 ms** — a **2.3× p99 jump** for **+0.76pp**.
+
+So: **"is 4 ever right?" is a capability question — do we need better than 96.8%
+— not a cost-efficiency one.** Below that ceiling the answer is always 3. This
+is the distinction the old framing missed by comparing at a fixed floor.
+
+### NOT CHECKED
+
+- 12 seeds per cell. The decisive quality delta (+0.34pp ± 0.29, t = 2.35) only
+  just excludes zero; the p99 half of that comparison (−42 ms) is not marginal,
+  and the conclusion rests on both together.
+- Simulator evidence, default world (`--hardness 0`, agreeing-bloc errors).
+  Panel value is known to be highly configuration-dependent — see Sprint Z2,
+  where the ceiling-crossing margin ranged −0.10pp to +6.90pp across flags — so
+  the saturation ceiling of ~96.8% is a property of *this* world, not a constant.
+- `EscalationPolicy` still has no production caller; nothing here changes
+  shipped behaviour.
+
+---
+
+## 2026-08-14 — Sprint Z4: sub-task routing, priced — and the cost claim corrected
+
+`TRUST-HARNESS.md` calls sub-task routing the **"highest-value remaining item by
+impact"** and defers it as architecturally significant. The impact claim had
+never been measured. `npm run sim:subtask`.
+
+### It is the first item this session with a genuinely large prize
+
+A task is S sub-steps, **all of which must succeed** — the conjunctive shape of a
+tool-call chain. That deliberately favours the proposal: a product of maxima can
+far exceed the maximum of products, so if the prize were small even here it
+would be small everywhere. 8 experts, 4 steps, 3000 tasks, 24 seeds.
+
+`spread` is each (expert, step) cell's deviation from that expert's base
+competence. 0 = no specialisation; 0.30 = skills essentially uncorrelated.
+
+| spread | omni per-task | omni per-STEP | CEILING | learned/task | learned/STEP | ACHIEVED |
+|---|---|---|---|---|---|---|
+| 0.00 | 72.63% | 72.63% | 0.00pp | 65.50% | 65.48% | −0.02pp (t −0.1) |
+| 0.05 | 73.28% | 74.46% | 1.17pp | 66.08% | 66.48% | +0.39pp (t 0.9) |
+| **0.10** | 74.08% | 78.35% | **4.26pp** | 67.22% | 70.33% | **+3.11pp** (t 3.4) |
+| 0.15 | 74.09% | 82.42% | 8.32pp | 67.58% | 73.98% | +6.39pp (t 5.4) |
+| 0.20 | 74.19% | 86.44% | 12.24pp | 67.03% | 77.60% | +10.57pp (t 6.9) |
+| 0.30 | 73.05% | 92.51% | 19.46pp | 66.15% | 82.64% | +16.49pp (t 6.6) |
+
+The learned arm recovers **73–85% of the ceiling** despite spreading the same
+traffic over 4× as many cells, so the dilution cost is real but not decisive.
+
+**This clears the bar, unlike everything else measured this session.** Sprint V
+priced per-domain reputation at **+1.64pp** on real data and declined it. Sub-task
+routing exceeds that from spread ≥ 0.10 onward, and by 6× at spread 0.20.
+
+### The cost claim was half wrong, and checking it changes the decision
+
+`TRUST-HARNESS.md` says this "reshapes the task model and `router.ts` rather than
+adding to them." Checked against the code:
+
+- **`router.ts` needs no change.** `TrustRouter` holds no per-task state —
+  `route()` is a pure function of its arguments — so calling it once per sub-step
+  works **today**.
+- **`ReputationLedger` needs no change.** It keys on an opaque `string`, so
+  `record('agent::step', ok)` is already legal. The granular arm above proves it
+  by driving the *real* ledger with composite keys.
+- **The call site keys trust per (agent, step) while keeping `id` per agent**, so
+  capacity, rate limits and breakers stay agent-scoped:
+
+  ```js
+  profiles = agents.map((a) => ({
+    id: a.id,                                              // capacity/limits: per AGENT
+    earnedScore:  led.upperConfidenceBound(`${a.id}::${step}`),
+    coldStart:    led.isColdStart(`${a.id}::${step}`),
+    observations: led.observations(`${a.id}::${step}`),     // per (agent, step)
+  }));
+  ```
+
+- **Persistence is the one real blocker.** `supabase-reputation-store.ts` has
+  primary key `agent_name`, a single text column, so per-step scores cannot be
+  stored. In-memory sub-task reputation works now; surviving a restart needs the
+  rekey Sprint V declined.
+
+**Sprint X made this more viable than it was.** Granular cells are thin by
+construction, and the old flat-0.5 cold-start rule discarded every observation in
+a thin cell. `observations` on the profile is what lets a cell with 6 outcomes
+rank on those 6 outcomes.
+
+### Why it is still not built
+
+The prize is a function of `spread`, and **the fleet's spread is unknown**.
+Locating it on the curve needs per-(agent, sub-step) success rates, which do not
+exist: `repid_score_events` has no task key — the same blocker that stops
+co-failure, now gating two things instead of one.
+
+Sprint V is the caution. Ranks scrambled hard across domains, yet the
+volume-weighted prize was +1.64pp because the high-volume domains had the
+smallest spreads. **"The prize is not proportional to the drama."** Sub-task
+specialisation could be equally dramatic and equally worthless if the volume sits
+on steps everyone handles identically. Building on the simulator's curve without
+locating the fleet on it would be assuming the shape of the data — the single
+cause of all four retractions in this repo.
+
+### Self-check, and it is a bias check
+
+At spread 0 per-step routing has nothing to find, so the arms must tie. If the
+granular arm wins there, the model favours its own proposal and every number
+above is inflated. Gated in CI. Mutation-tested: adding a silent +0.02 to the
+granular arm's success probability produces `granular is 6.30pp ahead` and
+exit 1.
+
+### NOT CHECKED
+
+- Simulator evidence. No `agent_repid` replay.
+- Exploration is a flat 10% forever, where the router explores only while
+  cold-starters exist. That depresses **both** learned arms equally — the paired
+  delta is sound — but the absolute learned levels understate what the real
+  router would achieve.
+- The conjunctive all-steps-must-succeed model is the most favourable shape for
+  the proposal. A task whose steps are independent or averaged would show less.
+- No sub-task decomposition exists in the task model, so nothing here says how
+  tasks would be split into steps in practice — only what it would be worth if
+  they were.
