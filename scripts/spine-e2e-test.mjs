@@ -38,7 +38,7 @@ import { localTsc } from './local-tsc.mjs';
 import { compileHarness } from './lib/harness-compile.mjs';
 
 const outDir = mkdtempSync(join(process.cwd(), '.spine-e2e-check-'));
-let did, wc, ce, sj, env;
+let did, wc, ce, sj, env, ca, ac;
 try {
   execFileSync(
     localTsc(),
@@ -48,6 +48,9 @@ try {
       'lib/trustshell/identity/contracted-evaluator.ts',
       'lib/trustshell/identity/staged-judge.ts',
       'lib/trustshell/identity/verdict-envelope.ts',
+      'lib/trustshell/identity/checker-assignment.ts',
+      'lib/trustshell/identity/criteria-draw.ts',
+      'lib/trustshell/identity/assigned-contract.ts',
       '--outDir', outDir,
       // Pinned — see work-contract-test.mjs. Sixth occurrence of the hazard.
       '--rootDir', 'lib',
@@ -66,6 +69,8 @@ try {
   ce = await import(pathToFileURL(join(base, 'contracted-evaluator.js')).href);
   sj = await import(pathToFileURL(join(base, 'staged-judge.js')).href);
   env = await import(pathToFileURL(join(base, 'verdict-envelope.js')).href);
+  ca = await import(pathToFileURL(join(base, 'checker-assignment.js')).href);
+  ac = await import(pathToFileURL(join(base, 'assigned-contract.js')).href);
 } catch (e) {
   rmSync(outDir, { recursive: true, force: true });
   console.error('spine-e2e compilation failed\n');
@@ -82,6 +87,8 @@ const { proposeContract, countersignContract, CONTRACT_DOMAIN } = wc;
 const { createContractedEvaluator } = ce;
 const { createStagedJudge } = sj;
 const { packEnvelope, verifyEnvelope } = env;
+const { eligiblePool } = ca;
+const { assembleAssignedContract, verifyAssignedContract } = ac;
 
 let passed = 0;
 const failures = [];
@@ -240,6 +247,110 @@ await check('a judge that fails the work produces an envelope that says so', asy
   eq(verified.outcome, 'FAILED', 'and the envelope reports the failure');
   eq(verified.evidenceMatches, true, 'over evidence it genuinely covers');
   eq(verified.contract.outcome, 'VERIFIED', 'while the contract itself remains valid');
+});
+
+await check('THE COMPLETE CHAIN: nobody picked the judge, nobody picked the exam', async () => {
+  // Everything above starts from a contract someone composed by hand. This one
+  // starts from a draw. It is the whole design in a single run:
+  //
+  //   committed panel + committed bank + a beacon nobody owns
+  //     -> checker drawn, criteria drawn, contract assembled
+  //     -> doer signs a contract it did not compose
+  //     -> agent loop runs, staged judge escalates
+  //     -> independent checker signs a verdict
+  //     -> envelope verifies offline, for a stranger holding none of it
+  const extraCheckers = await Promise.all([0, 1, 2, 3].map(() => generateKeyPair()));
+  const candidates = [
+    { did: checker.did, qualification: { tier: 3, badges: ['code-review'] } },
+    ...extraCheckers.map((k) => ({ did: k.did, qualification: { tier: 3, badges: ['code-review'] } })),
+    // The doer is in the panel and the best qualified. It must still never be drawn.
+    { did: doer.did, qualification: { tier: 5, badges: ['code-review'] } },
+  ];
+  const keyFor = new Map([[checker.did, checker], ...extraCheckers.map((k) => [k.did, k])]);
+  const requirement = { minTier: 2, requiredBadges: ['code-review'] };
+  const bank = Array.from({ length: 8 }, (_, i) => ({
+    id: `b${i}`, statement: `bank criterion ${i}`, minScore: 0.9,
+  }));
+
+  const assigned = await assembleAssignedContract({
+    taskId: 'spine-assigned',
+    doerDid: doer.did,
+    deliverable: 'a working thing',
+    requirement,
+    nonce: 'spine',
+    beacon: 'drand:round:31337',
+    candidates,
+    bank,
+    criteriaCount: 2,
+    proposedAt: '2026-08-15T00:00:00.000Z',
+  });
+
+  // SMOKE CHECK ONLY, and worth saying so: this is one draw from a panel of
+  // five, so it catches a broken doer-exclusion about one time in six.
+  // Removing the exclusion leaves THIS suite green [mutation-tested]. The
+  // property is enforced and killed properly in check:checker-assignment
+  // (explicit exclusion assertion) and check:assigned-contract (40 beacons).
+  truthy(assigned.unsigned.checkerDid !== doer.did, 'the doer must not be its own judge (smoke)');
+  const pool = eligiblePool({ candidates, requirement, doerDid: doer.did }).pool;
+  const assemblyOk = await verifyAssignedContract({
+    unsigned: assigned.unsigned, assignment: assigned.assignment,
+    criteriaProof: assigned.criteriaProof, pool, bank,
+  });
+  eq(assemblyOk.outcome, 'VERIFIED', 'the assembly must be checkable before anyone signs it');
+
+  const drawnKey = keyFor.get(assigned.unsigned.checkerDid);
+  truthy(drawnKey, 'the drawn checker must be one the harness can act as');
+
+  const { doerSignature } = await proposeContract({ unsigned: assigned.unsigned, doerKey: doer.privateKey });
+  const contract = await countersignContract({
+    unsigned: assigned.unsigned, doerSignature, checkerKey: drawnKey.privateKey,
+  });
+
+  const staged = createStagedJudge({
+    tiers: [
+      { name: 'mechanical', judge: { async judge() { return { outcome: 'NOT_CHECKED', detail: 'no command' }; } } },
+      { name: 'panel', judge: { async judge() { return { outcome: 'VERIFIED', score: 0.97, detail: 'judged' }; } } },
+    ],
+  });
+  const evaluator = createContractedEvaluator({
+    contract, checkerKey: drawnKey.privateKey, judge: staged.judge,
+    now: () => new Date('2026-08-15T02:00:00.000Z'),
+  });
+
+  const result = await runAgentLoop({
+    taskId: 'spine-assigned',
+    policy: {
+      maxIterations: 3, noProgressAbortAfter: 3, toolsAllowed: ['run_tests'],
+      irreversibleRequiresHuman: [], untrustedOutputSources: [],
+      maxWritesPerSession: 0, toolEffects: { run_tests: 'read' },
+    },
+    model: {
+      calls: 0,
+      async turn() {
+        this.calls += 1;
+        if (this.calls === 1) return { calls: [{ id: 'a', name: 'run_tests', args: {} }] };
+        return { calls: [], handoff: { outcome: 'VERIFIED', summary: 'done', evidence: [] } };
+      },
+    },
+    tools: { async call() { return { content: '42 passed' }; } },
+    authorizer: { async authorize() { return { allowed: true, reason: 'read-only' }; } },
+    evaluator,
+    criteria: assigned.unsigned.criteria,
+    doerDid: doer.did,
+    clock: new ManualClock(1000),
+  });
+
+  eq(result.outcome, 'VERIFIED', 'the judged run must stand');
+  eq(result.evaluation.independent, true, 'and the kernel must see an independent checker');
+
+  const envelope = await packEnvelope({ contract, verdict: result.evaluation.evaluation.verdict });
+  const stranger = await verifyEnvelope({
+    envelope: JSON.parse(JSON.stringify(envelope)),
+    evidence: result.turns,
+  });
+  eq(stranger.outcome, 'VERIFIED', 'a stranger holding none of our infrastructure must verify it');
+  eq(stranger.evidenceMatches, true, 'over the evidence the run actually produced');
+  eq(stranger.checkerDid, assigned.unsigned.checkerDid, 'and the checker they see is the one drawn');
 });
 
 rmSync(outDir, { recursive: true, force: true });
