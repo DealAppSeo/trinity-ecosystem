@@ -103,6 +103,17 @@ scaffold-optimising models it stops being theoretical, because *choosing who
 judges you* is exactly the kind of move a joint scaffold-and-solution optimiser
 would discover. It is a higher-yield strategy than writing better code.
 
+> **UPDATE 2026-08-15, after building it: the assessment below was too
+> pessimistic, and the fix cost nothing.** `proposeContract` takes the unsigned
+> contract as an *input* — nothing requires the doer to have built it. Moving
+> construction to an assigner (`assigned-contract.ts`) hands the doer a contract
+> whose checker and criteria were both drawn, with **the same payload bytes, the
+> same interop spec, and no cross-lane decision at all**. Candidate 1
+> ("assignment, not proposal") turned out to be both the strongest option and
+> the cheapest. The lever was never the format; it was who calls the
+> constructor. The paragraph below is kept as written because the reasoning that
+> led to the wrong conclusion is worth seeing.
+
 **Why this is not fixed in this commit.** The obvious fix — record who selected
 the checker — changes `contractPayload`, which is a signed canonical encoding and
 part of the interop surface already handed to the other lane. That is the same
