@@ -125,8 +125,42 @@ the destructive path was closed in full and the append path was left intact.
 policies to `service_role` once `trustrails-dev` is moved onto
 `SUPABASE_SECRET_KEY` — that is one env change and one follow-up migration.
 
-**Still OPEN:** the other ~57 anon-writable tables, held for a soak period so a
-regression has one obvious cause.
+**Batch 4 applied 2026-08-15 — the fleet-wide sweep.** Measured after, with the
+same effective-access query used throughout (permissive policy reaching
+`anon`/`PUBLIC` whose `USING`/`WITH CHECK` are literally `true`):
+
+| | before batch 4 | after |
+|---|---:|---:|
+| tables with **RLS disabled** | 14 | **0** |
+| tables anon can **UPDATE or DELETE** | 57 | **0** |
+| tables anon can **INSERT** | 57 | **17** |
+| tables anon can **read** | 231 | 196 |
+
+**Phase A removed anon UPDATE/DELETE everywhere and preserved INSERT**, because
+`waitlist` has **three live browser INSERT paths** in `trustrails-dev`
+(`WaitlistForm.tsx`, `SuiteWaitlistForm.tsx`, `demo/page.tsx`) on a serving
+domain. A public signup form inserting with the publishable key is the *correct*
+design; a blanket revoke would have broken signups on a live product. Nothing
+legitimately needs anon UPDATE or DELETE, so that class closed with no writer
+affected. Verified live on one row: insert **201**, delete of that row **200
+`[]`** (zero rows), read still **200**.
+
+**Phase B removed anon INSERT from 40 internal tables** — logs, metrics, shadow
+fixtures, agent state, document storage — each with no client writer found across
+105 `'use client'` files. The most valuable single entry is
+`antigravity_prompt_queue`: an anon-writable queue feeding an agent loop is an
+unauthenticated prompt-injection channel. Now **401 / 42501** [VERIFIED].
+
+**The 17 remaining insertable tables are deliberate, not residue:** the waitlist
+family, `email_captures`, `referrals`, `trinity_leads`, `trinity_access_requests`,
+and user-driven tables like `notifications`, `repid_votes`, `trinity_bids`,
+`trinity_chat_messages`. Public forms need them.
+
+**Coverage gap, stated because it shaped the rule:** `trustmarket` is private and
+access was never granted; `aitrinitysymphony-landing` was not cloned. Neither was
+scanned for client writers. That is exactly why Phase B required a table to be
+*unambiguously internal* as well as writer-free — "no writer found" is not "no
+writer exists".
 
 *Counts at closure were 141,164 and 161,457 — exact `count(*)`. The 139,659 and
 155,428 quoted earlier in this document's first draft were `reltuples` planner
