@@ -96,38 +96,116 @@ violation — which would have made the feed delete its own history. Dangling
 And: `Array.prototype.with` typechecks under `lib: esnext` but is ES2023 and
 absent on Node 18. The type checker could not see it.
 
-## Gate
+## Gate — CI-confirmed
 
-`npm run check` **exit 0, 612 assertions** (438 → 523 → 612), `tsc --noEmit`
-**0 errors**, `next build` clean, `check:prior-work` 16/16 docs indexed.
+`npm run check` **exit 0, 753 assertions** (438 → 523 → 612 → 707 → 753),
+`tsc --noEmit` **0 errors**, `next build` clean, `check:prior-work` 16/16 docs.
 
-**Mutation-tested, each caught, each compiled.** Contract: all-green fixtures,
-dropped `reason` requirement, edges surviving node removal. Receipt: dropped
-confabulation guard (reproduces `✓ VERIFIED 0 claims · 0 backed` verbatim),
-skipped core-hash recomputation, unsorted canonical keys, ceiling instead of
-floor. Plus nine tamper mutations across every hashed field.
+[VERIFIED on CI, not only locally] PR #33 head `a8b3dbf`: **`check` success in
+6m00s on Node 24**, `prior-work` success, Vercel success. Every earlier `check`
+run on this branch was superseded by the next push before finishing; this is the
+first to complete end to end, and it covers M2–M5.
+
+**Mutation-tested throughout — 21 mutations, 20 caught first time.** Contract 3,
+receipt 4 (+9 tamper), verifier 4, claims 5, init 5. The one that survived is the
+most useful result in the session: restoring `T1/backed` passed all 32 claim
+assertions, because the invariant asserting it never happens used a fixture where
+the branch was never reached. **An invariant asserted over a situation that never
+arises is a comment, not a test.**
+
+## TrustShell M2–M5, all landed this session
+
+| # | What | Assertions |
+|---|---|---|
+| M2 `2f87a0d` | Session receipt — canonical hashing, stable `audit_hash`, Ed25519 self-attestation, local SQLite | 89 |
+| M3 `452fa31` | Independent offline verifier — zero TrustShell imports, zero deps | 60 |
+| M4 `1518a6d` | T0/T1 claim checking + published FPR | 35 |
+| M5 `a8b3dbf` | `trustshell init` — Stop hook, dry-run default, reversible | 46 |
+
+**Every one falsified something `TRUSTSHELL-V1.md` asserted**, and the spec now
+carries all four corrections in place:
+
+1. **§4.1 named the wrong git question.** `git diff --name-only HEAD` reported
+   13 mismatches out of 15 on a real session — every one a file genuinely written
+   then committed or newly created. Corrected to working tree ∪ commits-since-start;
+   0 mismatches after.
+2. **§8's `@hyperdag/proof-verifier` cannot verify a receipt.** It is a Plonky3
+   STARK verifier for `{agent_id, repid_score, threshold, tier}`. Handed a receipt
+   it returns `deser: io error`. [VERIFIED — installed and invoked.]
+3. **§9's package table was wrong twice.** `@hyperdag/trustshell@1.3.0` is the
+   HAL/RepID SDK against a live backend — zero occurrences of `transcript`,
+   `audit_hash`, `session_receipt` in `dist/`. Its `verify` command already means
+   something else, so the spec's `trustshell verify <session>` would collide.
+4. **§4.3's T1 cried wolf.** See the measurement below.
+
+**§12 Q1, Q2 and Q3 are now decided** (local SQLite; per-developer key;
+no MCP tools).
+
+## The M4 measurement, and why it is the honest part
+
+Sample: **one session** — every real transcript in this container. Too small to
+generalise from, and §4.3.1 says so instead of quoting a rate as if it held.
+
+| pass | raised | true | false | precision |
+|---|--:|--:|--:|---|
+| first draft | 2 | 0 | **2** | **0%** |
+| after tightening | 0 | 0 | 0 | undefined |
+
+Both were hand-labelled and both wrong: a claim linked to an unrelated failed
+call, and `[VERIFIED]` — this repo's epistemic tag — scored as a success
+assertion. Three rule changes followed, each now a regression fixture. The
+largest: **T1 no longer emits `backed`.** It can refute; it cannot confirm.
+Scoring adjacency as support would let a receipt reach VERIFIED on proximity
+alone.
+
+**T0's rate is `0/0`, undefined** — zero `mcp__` ids and zero backticked built-in
+names across all 48 spans. It fires on synthetic input, so it is not dead, but
+its trigger shape looks rare in real output. Reporting that as 0% would be the
+two-outcome collapse again.
 
 ## REAL vs STUB
 
-**REAL:** the dual-view contract, validator and fixtures; receipt build, canonical
-hashing, signing, verification, porcelain parsing, SQLite store; `keyPairFromSeed`.
+**REAL:** dual-view contract/validator/fixtures; receipt build, canonical
+hashing, signing, verification, porcelain parsing, SQLite store; independent
+verifier; T0/T1 claim checking; `trustshell init` end-to-end (hook fired as
+Claude Code would, receipt landed in SQLite, exit 0); `keyPairFromSeed`.
 
-**NOT BUILT:** M3 (`proof-verifier` accepting a receipt) — **no third party has
-verified one yet**, so the launch claim is *offline-verifiable signature*, not
-*independently attested*. M4 claim checking. M5 `trustshell init`. The entire
-`/live` UI. No adapter yet maps `v_fleet_truth` → `PaiEvent`.
+**NOT BUILT:** **M6 — the dogfood, and the spec calls it the deliverable that
+matters.** The entire `/live` UI. No adapter yet maps `v_fleet_truth` → `PaiEvent`.
 
-**NOT CHECKED:** everything about `repid-engine`; store availability on a runtime
-without `node:sqlite` (degrades to NOT CHECKED by design).
+**NOT CHECKED:** `repid-engine` (no `add_repo` approval) — every §1 claim about it
+is ASSUMED; `trustshell init` against a *live* Claude Code session, since that
+mutates the running environment; store availability without `node:sqlite`.
+
+**Honest launch claim:** offline-verifiable signature and an independent
+re-derivation path — **not** independent attestation, and **not** zero-knowledge.
+
+## Note for whoever runs CI checks next
+
+`curl` to the GitHub Actions API returns **403 "Resource not accessible by
+integration"**, and `GH_TOKEN` does not fix it — the token lacks `actions:read`.
+Only the `mcp__github__*` tools can read Actions here. A Bash poll parses the 403
+as "still waiting" and times out silently, which is indistinguishable from a job
+that never finished. Cost an hour of false confidence this session.
 
 ## BLOCKED_FOR_SEAN
 
-1. **`add_repo` approval for `DealAppSeo/repid-engine`** — so the §1 inventory is
-   checked rather than assumed, and the HITL adapter can be scoped.
-2. **Board exception** — confirm `/live` is a route on Shell and Market, not a
-   thirteenth vertical.
-3. Carried forward, unchanged: rotate the Base Sepolia deployer key (#73, owns
-   ERC-8004 ids 3747/3748/3750 — do not cite them as provenance);
+1. **`add_repo` approval for `DealAppSeo/repid-engine`** — so the §1 inventory in
+   `docs/DUAL-VIEW-LAUNCH-PLAN.md` is checked rather than assumed, and the HITL
+   adapter can be scoped.
+2. **Real transcripts for M6.** This container holds exactly **one**. Ten sessions
+   is the acceptance criterion, and it is also the only thing that would make the
+   M4 false-positive number worth quoting.
+3. **Board exception** — confirm `/live` is a route on TrustShell and TrustMarket,
+   not a thirteenth vertical, so the freeze holds.
+4. **Publishing the receipt tooling** — it needs a name that does not collide with
+   the shipped `@hyperdag/trustshell`, whose `verify` already means something else.
+   A publish is irreversible and is not an agent's call.
+5. **Installing the Stop hook live in this environment** — `trustshell init` is
+   built, tested and reversible, but applying it mutates the running session's
+   config, so it has not been applied.
+6. Carried forward, unchanged: rotate the Base Sepolia deployer key (#73 — owns
+   ERC-8004 ids 3747/3748/3750; do not cite them as provenance);
    `static.crates.io` on the proxy allow-list (#75); `repid_config` `anon` read
    policy + live `enterprise_api_key`; Poseidon2 parameter handover;
    `20260813210000_agent_repid_earned_observations.sql` written and unapplied;
@@ -135,19 +213,24 @@ without `node:sqlite` (degrades to NOT CHECKED by design).
 
 ## Steer for the parallel RepID/HAL lane
 
-`PRIOR-WORK-INDEX` closes routing (97.9% of bound), panel membership (99.23%)
-and panel size (3). **Do not retune them.** The open problem is data capture:
-`bftAccuracy` carries RepID's heaviest weight — **0.40** — with zero rows in both
-BFT tables, and no table records per-agent latency. That is 50% of the weight
-that can only resolve to zero regardless of tuning. See plan §9.
+`docs/PRIOR-WORK-INDEX.md` closes routing (**97.9%** of bound), panel membership
+(**99.23%**) and panel size (**3**, settled). **Do not retune them** — it returns
+approximately nothing and this repo has paid for that lesson once.
+
+The open problem is **data capture, not scoring**: `bftAccuracy` carries RepID's
+heaviest weight — **0.40** — with zero rows in both BFT tables, and no table
+records per-agent latency. That is 50% of the weight that can only resolve to
+zero regardless of tuning. See `DUAL-VIEW-LAUNCH-PLAN.md` §9.
 
 ## Next 3 commands
 
 ```sh
-npm run check                                   # exit 0, 612 assertions
-node scripts/trustshell-receipt.mjs <session.jsonl> --git-reconcile
-# M3: make @hyperdag/proof-verifier@0.2.0 accept a SessionReceipt.
-# It is what turns a self-attested receipt into something a stranger can check.
+npm run check                                   # exit 0, 753 assertions
+node scripts/trustshell-init.mjs                # dry run — shows the Stop hook
+node scripts/trustshell-receipt.mjs <session.jsonl> --git-reconcile --claims
+# M6 is next and is the deliverable that matters: run against 10 real sessions,
+# publish what it caught AND what it missed. Blocker: this container holds
+# exactly ONE transcript, so M6 needs sessions from elsewhere.
 ```
 
 ---
