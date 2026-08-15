@@ -165,7 +165,7 @@ all 25 after the fixes. The three that survived were each worth the run:
 - **A malformed mutant is not a kill.** One mutation did not compile, which
   proves only that the type checker works. Rewritten to compile, it killed.
 
-**The two gates are tested as a pair**, per LESSONS A12, written before the
+**The two gates are tested as a pair**, per LESSONS A13, written before the
 mutation run rather than after it — the compound "both gates deleted" mutant is
 in the suite's fixture set from the start.
 
@@ -210,7 +210,7 @@ all out of scope, which would hide a configuration failure inside what reads as
 normal behaviour.
 
 **Two real defects found by the tests, neither visible by reading** — both
-written up as LESSONS A13:
+written up as LESSONS A14:
 
 - **`valueOf` is on `Object.prototype`**, so the optional value-extractor option
   was never absent. Omitting it resolved to the inherited method, which `?.`

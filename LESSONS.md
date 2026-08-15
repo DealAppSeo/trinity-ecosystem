@@ -557,7 +557,59 @@ Sean-gated decision, not a sprint convenience.
 
 ---
 
-## A12 — a witness field that nothing constrained, and a "canonical" encoding that was a concatenation (2026-08-14)
+## A12 — the whole dashboard died because two components agreed on a name (2026-08-14)
+
+**Found by the browser, not by any gate.** `npm run check` was green, `tsc
+--noEmit` clean, `next build` succeeded, CI green, both surfaces serving the
+right commit. `/dashboard` was replaced end to end by "Something failed to
+load", and none of the above could see it, because the throw happens in the
+browser after hydration.
+
+```
+Error: cannot add `postgres_changes` callbacks for
+       realtime:public:agent_kya_registry after `subscribe()`.
+```
+
+`SystemTrustScore` and `AgentRepIDGrid` both watch `agent_kya_registry`, and
+both named their channel after the table: `.channel('public:agent_kya_registry')`.
+A supabase-js channel topic is an **identity**, not a description. The second
+component to mount bound `.on()` to a channel already past `subscribe()`,
+supabase-js threw, the throw escaped the `useEffect`, and the error boundary
+took the **entire page** — trust score, receipt feed, risk controls, all of it —
+not just the component that made the mistake.
+
+**Why it reads as correct.** `public:<table>` is the exact string the Supabase
+realtime docs use in their examples, so both authors independently wrote the
+idiomatic thing. The convention is only wrong at the second call site, and
+nothing at the first one hints that a second exists. Fix: one topic per
+subscriber (`system-trust:…`, `repid-grid:…`), not one per table.
+
+**The blast radius is the real lesson.** An unhandled throw inside one
+component's effect is not scoped to that component. Three healthy components
+were dark because a fourth mis-named a string, and the page said nothing about
+which one.
+
+**What this cost, and what it did not.** It cost nothing to find once a browser
+was pointed at a production build of the merged commit — it was the first thing
+the browser said. It had been invisible to five green gates. That asymmetry is
+the argument for `npm run setup:browser` existing at all: this class of defect
+is only observable by rendering the page, and this repo had no way to render a
+page until 2026-08-14.
+
+**Two things the same pass surfaced, not fixed here:**
+
+- `app/login/page.tsx:135–158` — the Email and Password `<label>`s carry no
+  `htmlFor` and the inputs no `id`, so the accessibility tree shows two
+  `textbox [required]` with **no accessible name**. Visually labelled,
+  programmatically not. The a11y snapshot showed this without being asked.
+- `SystemTrustScore.load()` does `setData(await res.json())` with no `res.ok`
+  check. On a 500 the JSON parse throws and the component sits on "Loading trust
+  score..." forever, reporting nothing. Production returns 200 so it is latent,
+  but it is the house defect again: a failure that renders as a pending state.
+
+---
+
+## A13 — a witness field that nothing constrained, and a "canonical" encoding that was a concatenation (2026-08-14)
 
 **[VERIFIED] — both found while writing assertions for
 `reputation-transition.ts`, before either had shipped.**
@@ -626,7 +678,9 @@ which is now written in two files — mutate the pair, not the parts.
 
 ---
 
-## A13 — an optional callback that is never absent, and a replay defence that recorded nothing (2026-08-14)
+---
+
+## A14 — an optional callback that is never absent, and a replay defence that recorded nothing (2026-08-14)
 
 **[VERIFIED] — both found by tests while building `loop-authorizer.ts`, the
 adapter binding the agent loop to `ControlProof`. Neither was visible by
@@ -702,53 +756,3 @@ this is the third time that lesson has been paid for here, after the `maxValue`
 cap and the rate limiter.
 
 ---
-
-## A14 — the whole dashboard died because two components agreed on a name (2026-08-14)
-
-**Found by the browser, not by any gate.** `npm run check` was green, `tsc
---noEmit` clean, `next build` succeeded, CI green, both surfaces serving the
-right commit. `/dashboard` was replaced end to end by "Something failed to
-load", and none of the above could see it, because the throw happens in the
-browser after hydration.
-
-```
-Error: cannot add `postgres_changes` callbacks for
-       realtime:public:agent_kya_registry after `subscribe()`.
-```
-
-`SystemTrustScore` and `AgentRepIDGrid` both watch `agent_kya_registry`, and
-both named their channel after the table: `.channel('public:agent_kya_registry')`.
-A supabase-js channel topic is an **identity**, not a description. The second
-component to mount bound `.on()` to a channel already past `subscribe()`,
-supabase-js threw, the throw escaped the `useEffect`, and the error boundary
-took the **entire page** — trust score, receipt feed, risk controls, all of it —
-not just the component that made the mistake.
-
-**Why it reads as correct.** `public:<table>` is the exact string the Supabase
-realtime docs use in their examples, so both authors independently wrote the
-idiomatic thing. The convention is only wrong at the second call site, and
-nothing at the first one hints that a second exists. Fix: one topic per
-subscriber (`system-trust:…`, `repid-grid:…`), not one per table.
-
-**The blast radius is the real lesson.** An unhandled throw inside one
-component's effect is not scoped to that component. Three healthy components
-were dark because a fourth mis-named a string, and the page said nothing about
-which one.
-
-**What this cost, and what it did not.** It cost nothing to find once a browser
-was pointed at a production build of the merged commit — it was the first thing
-the browser said. It had been invisible to five green gates. That asymmetry is
-the argument for `npm run setup:browser` existing at all: this class of defect
-is only observable by rendering the page, and this repo had no way to render a
-page until 2026-08-14.
-
-**Two things the same pass surfaced, not fixed here:**
-
-- `app/login/page.tsx:135–158` — the Email and Password `<label>`s carry no
-  `htmlFor` and the inputs no `id`, so the accessibility tree shows two
-  `textbox [required]` with **no accessible name**. Visually labelled,
-  programmatically not. The a11y snapshot showed this without being asked.
-- `SystemTrustScore.load()` does `setData(await res.json())` with no `res.ok`
-  check. On a 500 the JSON parse throws and the component sits on "Loading trust
-  score..." forever, reporting nothing. Production returns 200 so it is latent,
-  but it is the house defect again: a failure that renders as a pending state.

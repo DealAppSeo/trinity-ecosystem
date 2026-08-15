@@ -48,7 +48,7 @@
 // algebra here would be the silent-disagreement bug above.
 //
 // The redundancy has a known consequence, learned the expensive way in LESSONS
-// A12: two checks that each make the other redundant are invisible to
+// A13: two checks that each make the other redundant are invisible to
 // single-mutation testing, and "each one is individually redundant" is exactly
 // the argument that deletes both. The suite mutates them as a PAIR.
 

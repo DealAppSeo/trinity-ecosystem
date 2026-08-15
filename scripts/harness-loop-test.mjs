@@ -18,7 +18,7 @@
 //     dangerous calls through the cheapest door.
 //   * 'the authorizer throwing fails CLOSED' — a component that cannot answer
 //     has not said yes.
-//   * 'BOTH gates are independently load-bearing' — LESSONS A12: two checks
+//   * 'BOTH gates are independently load-bearing' — LESSONS A13: two checks
 //     that each make the other redundant are invisible to single-mutation
 //     testing, and "each is individually redundant" is the argument that
 //     deletes both. Written before the mutation run rather than after it.
@@ -364,7 +364,7 @@ await check('THE AUTHORIZER THROWING FAILS CLOSED', async () => {
 });
 
 await check('BOTH GATES ARE INDEPENDENTLY LOAD-BEARING', async () => {
-  // LESSONS A12, applied before the mutation run rather than after it. Deleting
+  // LESSONS A13, applied before the mutation run rather than after it. Deleting
   // either gate alone must be observable, or "each one is individually
   // redundant" becomes the argument that deletes both.
   //
