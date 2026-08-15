@@ -12,7 +12,7 @@
     "check:legacy-key": "node scripts/check-legacy-key.mjs",
     "check:mcp-fleet": "node scripts/mcp-fleet-smoke.mjs",
     "check:mcp-client": "node scripts/mcp-client-test.mjs",
-    "check": "npm run check:secrets && npm run check:deps && npm run check:auth && npm run check:harness && npm run check:transcript && npm run check:memory && npm run check:mcp-fleet && npm run check:mcp-client && npm run check:harness-portable && npm run check:harness-routing && npm run check:harness-consensus && npm run check:harness-agreement && npm run check:harness-loop && npm run check:prior-work && npm run check:earned && npm run check:zkp && npm run check:identity && npm run check:custody-shadow && npm run check:e2e-harness && npm run check:dual-view && npm run check:receipt && npm run check:receipt-verifier && npm run check:claims && npm run check:init && npm run check:trust && npx tsc --noEmit",
+    "check": "node scripts/check-all.mjs",
     "north": "node scripts/north-star.mjs",
     "graph": "graphify update .",
     "graph:ecosystem": "bash scripts/graph-ecosystem.sh",
@@ -45,6 +45,8 @@
     "experiment": "node scripts/harness-experiment.mjs",
     "repid:replay": "node scripts/repid-replay.mjs",
     "check:identity": "node scripts/check-identity.mjs",
+    "check:work-contract": "node scripts/work-contract-test.mjs",
+    "check:contracted-evaluator": "node scripts/contracted-evaluator-test.mjs",
     "check:dual-view": "node scripts/check-dual-view-contract.mjs",
     "check:receipt": "node scripts/check-receipt.mjs",
     "trustshell:receipt": "node scripts/trustshell-receipt.mjs",
@@ -56,7 +58,9 @@
     "trustshell:dogfood": "node scripts/trustshell-dogfood.mjs",
     "check:trust": "node scripts/check-trust-foundation.mjs",
     "check:custody-shadow": "node scripts/check-custody-shadow.mjs",
-    "check:deps": "node scripts/check-deps.mjs"
+    "check:deps": "node scripts/check-deps.mjs",
+    "check:types": "tsc --noEmit",
+    "check:runner": "node scripts/check-runner-test.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

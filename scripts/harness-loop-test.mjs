@@ -102,6 +102,17 @@ const policy = (over = {}) => ({
   untrustedOutputSources: [],
   maxWritesPerSession: 0,
   toolEffects: { read_thing: 'read' },
+  // EXPLICIT false, and it must stay explicit. The default is ON — a run with
+  // no evaluator is capped at NOT_CHECKED — which is correct for production and
+  // wrong for these fixtures, because every one of them exercises the CEILING
+  // in isolation and would otherwise be measuring the evaluator's absence
+  // instead of the mechanism under test.
+  //
+  // Setting it here rather than omitting it is deliberate: `undefined` means
+  // TRUE in the kernel, so an omission would silently turn the strict default
+  // back on for the whole suite. Evaluator behaviour has its own section below,
+  // where the default is left alone.
+  requireIndependentEvaluation: false,
   ...over,
 });
 
@@ -115,8 +126,19 @@ const run = (over = {}) =>
     model: over.model ?? scriptedModel([{ calls: [], handoff: handoff('VERIFIED') }]),
     tools: over.tools ?? okDispatcher(),
     authorizer: over.authorizer ?? allowAll,
+    evaluator: over.evaluator,
+    criteria: over.criteria,
+    doerDid: over.doerDid,
     clock: over.clock ?? new ManualClock(1000),
   });
+
+/** An evaluator that returns fixed verdicts under a chosen identity. */
+const scriptedEvaluator = (verdicts, { evaluatorDid = 'did:key:zJUDGE', usage } = {}) => ({
+  async evaluate() {
+    return { verdicts, evaluatorDid, usage, detail: 'scripted' };
+  },
+});
+const passes = (id, score) => [{ criterionId: id, outcome: 'VERIFIED', score, detail: 'looks right' }];
 
 // ── the claim ceiling — the property the whole kernel exists for ────────────
 
@@ -576,6 +598,369 @@ await check('a model client that throws says NOTHING about the task', async () =
   eq(r.outcome, 'NOT_CHECKED', 'a harness fault was scored as a task outcome');
   eq(r.stopReason, 'model_error', 'stop reason');
   eq(r.claimed, undefined, 'nothing was claimed');
+});
+
+// ── the evaluator port ──────────────────────────────────────────────────────
+//
+// The ceiling is arithmetic and cannot see a stub that returns the right shape.
+// These assertions cover the ways an evaluator could hand back a pass it has
+// not earned, which is the same defect one layer up from the one the ceiling
+// exists to catch.
+
+const evalPolicy = { requireIndependentEvaluation: true };
+const crit = (id, minScore) => ({ id, statement: `${id} must hold`, minScore });
+
+await check('NO EVALUATOR CAPS THE RUN AT NOT_CHECKED when one is required', async () => {
+  // The default polarity. Forgetting to wire an evaluator must not produce a
+  // clean VERIFIED indistinguishable from a properly judged run.
+  const r = await run({ policy: evalPolicy });
+  eq(r.outcome, 'NOT_CHECKED', 'an unevaluated run certified itself');
+  eq(r.claimed, 'VERIFIED', 'the claim itself is preserved');
+  match(r.downgradedBecause, /no evaluator was configured/, 'the reason must name the absence');
+  eq(r.evaluation, undefined, 'nothing ran, so there is no evaluation record');
+});
+
+await check('OMITTING requireIndependentEvaluation IS THE STRICT SETTING, not the lax one', async () => {
+  // The polarity is the whole point: absence must mean ON. If `undefined` read
+  // as false, every caller who never heard of the setting would get silent
+  // self-certification — the exact failure the port exists to prevent.
+  const r = await run({ policy: { requireIndependentEvaluation: undefined } });
+  eq(r.outcome, 'NOT_CHECKED', 'an absent setting must behave as ON');
+});
+
+await check('switching it off is an EXPLICIT false and then the run stands', async () => {
+  const r = await run({ policy: { requireIndependentEvaluation: false } });
+  eq(r.outcome, 'VERIFIED', 'an explicit opt-out must actually opt out');
+});
+
+await check('AN EVALUATOR THAT IS THE DOER CANNOT CERTIFY', async () => {
+  // `verification.checker_must_not_be_doer`, enforced by comparing DIDs rather
+  // than by trusting a flag. A VERIFIED from a judge that is the doer is
+  // exactly the self-certification the design forbids.
+  const did = 'did:key:zSAME';
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a')],
+    doerDid: did,
+    evaluator: scriptedEvaluator(passes('a'), { evaluatorDid: did }),
+  });
+  eq(r.outcome, 'NOT_CHECKED', 'an agent certified its own work');
+  eq(r.evaluation.independent, false, 'independence must be recorded as refuted');
+  match(r.downgradedBecause, /same identity/, 'the reason must name the collision');
+});
+
+await check('but a SELF-EVALUATOR CAN STILL CONDEMN', async () => {
+  // The asymmetry, asserted because it would be easy to "fix" by discarding a
+  // self-evaluation wholesale. An agent marking its own work bad is credible in
+  // a way that an agent marking its own work good is not, and throwing the
+  // verdict away would let a self-aware failure be reported as merely
+  // unexamined.
+  const did = 'did:key:zSAME';
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a')],
+    doerDid: did,
+    evaluator: scriptedEvaluator([{ criterionId: 'a', outcome: 'FAILED', detail: 'stubbed' }], {
+      evaluatorDid: did,
+    }),
+  });
+  eq(r.outcome, 'FAILED', 'a self-reported failure must survive the independence cap');
+});
+
+await check('A TRAILING SPACE DOES NOT MAKE AN IDENTITY INDEPENDENT OF ITSELF', async () => {
+  // One character is the whole bypass, and string equality is the only thing
+  // standing between it and a certified self-evaluation.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a')],
+    doerDid: 'did:key:zSAME',
+    evaluator: scriptedEvaluator(passes('a'), { evaluatorDid: ' did:key:zSAME ' }),
+  });
+  eq(r.evaluation.independent, false, 'whitespace must not buy independence');
+  eq(r.outcome, 'NOT_CHECKED', 'and must not buy certification');
+});
+
+await check('A MISSING DID IS NOT_CHECKED — neither independent nor guilty', async () => {
+  // The third state. `null` means the question was never answered: reporting
+  // `false` would allege a violation that may not have happened, and `true`
+  // would certify the constitutional invariant on no evidence.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a')],
+    evaluator: scriptedEvaluator(passes('a'), { evaluatorDid: undefined }),
+  });
+  eq(r.evaluation.independent, null, 'unprovable independence must be null, not false');
+  eq(r.outcome, 'NOT_CHECKED', 'and must not certify');
+  match(r.downgradedBecause, /could not be established/, 'the reason must say it was unproven');
+});
+
+await check('an INDEPENDENT evaluator certifying all criteria leaves VERIFIED standing', async () => {
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a'), crit('b')],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator([...passes('a'), ...passes('b')]),
+  });
+  eq(r.outcome, 'VERIFIED', 'a properly judged clean run must not be downgraded');
+  eq(r.evaluation.independent, true, 'independence established');
+});
+
+await check('AN EMPTY CRITERIA LIST IS NOT A PASS', async () => {
+  // Otherwise "forget the contract" is the cheapest route past the judge, and
+  // it looks identical in the record to a clean run.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator([]),
+  });
+  eq(r.outcome, 'NOT_CHECKED', 'judging against nothing established something');
+  eq(r.evaluation.ran, false, 'no evaluation should be recorded as having run');
+  match(r.evaluation.detail, /nothing to judge against/, 'reason');
+});
+
+await check('AN UNJUDGED CRITERION IS NOT_CHECKED, not silently dropped', async () => {
+  // An evaluator that answers two of three questions has not answered three.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a'), crit('b')],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator(passes('a')),
+  });
+  eq(r.outcome, 'NOT_CHECKED', 'a missing verdict was treated as a pass');
+  match(r.downgradedBecause, /'b' was not judged at all/, 'the missing criterion must be named');
+});
+
+await check('A HARD FLOOR OVERRULES A LENIENT EVALUATOR', async () => {
+  // The floor is enforced in the kernel, not by the judge it constrains.
+  // An evaluator returning VERIFIED at 0.4 against a floor of 0.8 is wrong, and
+  // a floor that trusts the evaluator to apply it is decorative.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a', 0.8)],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator(passes('a', 0.4)),
+  });
+  eq(r.outcome, 'FAILED', 'a score below a hard floor must fail');
+  match(r.downgradedBecause, /below its hard floor of 0\.8/, 'the floor must be named');
+});
+
+await check('A SCORE EXACTLY AT THE FLOOR PASSES — the boundary, in both directions', async () => {
+  // Found by mutation: `<` and `<=` were interchangeable against every other
+  // assertion in this file, so one criterion at exactly its floor decided
+  // nothing. `minScore` is a MINIMUM ACCEPTABLE score, so equality passes —
+  // and the neighbouring value must still fail, or the assertion only proves
+  // the comparison is loose rather than that it is correct.
+  const at = await run({
+    policy: evalPolicy,
+    criteria: [crit('a', 0.8)],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator(passes('a', 0.8)),
+  });
+  eq(at.outcome, 'VERIFIED', 'a score exactly at the floor was rejected');
+
+  const just = await run({
+    policy: evalPolicy,
+    criteria: [crit('a', 0.8)],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator(passes('a', 0.7999999)),
+  });
+  eq(just.outcome, 'FAILED', 'a score just below the floor was accepted');
+});
+
+await check('A FLOOR WITH NO SCORE IS NOT_CHECKED — absent is not a pass', async () => {
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a', 0.8)],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator(passes('a', undefined)),
+  });
+  eq(r.outcome, 'NOT_CHECKED', 'an untested floor was reported as met');
+  match(r.downgradedBecause, /floor was never tested/, 'reason');
+});
+
+await check('a score outside [0,1] does not satisfy a floor', async () => {
+  // 1.5 against a floor of 0.8 passes a naive `>=`. It is a malformed
+  // measurement, and a malformed measurement tests nothing.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a', 0.8)],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator(passes('a', 1.5)),
+  });
+  eq(r.outcome, 'NOT_CHECKED', 'an out-of-range score satisfied a floor');
+});
+
+await check('NO AVERAGING — one failed criterion fails the unit of work', async () => {
+  // A mean would let 0.95 and 0.95 pay for 0.10. That is the arithmetic form of
+  // shipping a feature with its security check stubbed and calling it 90% done.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a', 0.5), crit('b', 0.5), crit('c', 0.5)],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator([
+      ...passes('a', 0.95),
+      ...passes('b', 0.95),
+      ...passes('c', 0.1),
+    ]),
+  });
+  eq(r.outcome, 'FAILED', 'strong criteria paid for a broken one');
+});
+
+await check('CONTRADICTORY DUPLICATE VERDICTS RESOLVE TO THE WEAKER', async () => {
+  // Last-write-wins would make the outcome depend on array order, which is a
+  // verdict an evaluator could flip by reordering its own output.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a')],
+    doerDid: 'did:key:zDOER',
+    evaluator: scriptedEvaluator([
+      { criterionId: 'a', outcome: 'FAILED', detail: 'broken' },
+      { criterionId: 'a', outcome: 'VERIFIED', detail: 'fine, actually' },
+    ]),
+  });
+  eq(r.outcome, 'FAILED', 'a later VERIFIED overwrote an earlier FAILED');
+});
+
+await check('AN EVALUATOR THAT THROWS IS NOT_CHECKED, never FAILED', async () => {
+  // `reliability.harness_error_marks_not_checked`, one layer up. A judge that
+  // crashed has said nothing about the work; reading the crash as a verdict
+  // would make an outage look like a defect in the code under test.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a')],
+    doerDid: 'did:key:zDOER',
+    evaluator: { async evaluate() { throw new Error('panel unreachable'); } },
+  });
+  eq(r.outcome, 'NOT_CHECKED', 'an evaluator outage was scored as a task failure');
+  eq(r.evaluation.ran, false, 'a crashed evaluation did not run');
+  match(r.downgradedBecause, /evaluator threw/, 'reason');
+});
+
+await check('the evaluator runs on FAILED runs too, not only on confident ones', async () => {
+  // Evaluating only the runs that ended in a handoff would build the evidence
+  // base exclusively out of work the agent felt good about.
+  let sawIt = false;
+  await run({
+    policy: { ...evalPolicy, maxIterations: 2 },
+    criteria: [crit('a')],
+    doerDid: 'did:key:zDOER',
+    model: scriptedModel([{ calls: [call('read_thing')] }]),
+    evaluator: {
+      async evaluate(req) {
+        sawIt = true;
+        truthy(req.turns.length > 0, 'the evaluator must receive the record');
+        return { verdicts: passes('a'), evaluatorDid: 'did:key:zJUDGE', detail: 'x' };
+      },
+    },
+  });
+  truthy(sawIt, 'a run that never handed off was not evaluated');
+});
+
+// ── spend instrumentation ───────────────────────────────────────────────────
+//
+// The one rule: an unreported cost is UNKNOWN, never zero. A run that looks
+// free because nothing measured it is this repo's defining defect with a
+// different unit on it.
+
+await check('AN UNREPORTED COST IS NOT_CHECKED, NOT ZERO', async () => {
+  const r = await run({ model: scriptedModel([{ calls: [], handoff: handoff('VERIFIED') }]) });
+  eq(r.spend.outcome, 'NOT_CHECKED', 'unmeasured spend was reported as measured');
+  eq(r.spend.total.costUsd.total, 0, 'nothing usable was summed');
+  eq(r.spend.total.costUsd.reported, 0, 'and nothing claimed to be reported');
+  truthy(r.spend.total.costUsd.missing > 0, 'the gap must be counted, not implied');
+  match(r.spend.detail, /understates the run by an unknown amount/, 'the summary must say so');
+});
+
+await check('SPEND NEVER LOWERS THE RUN CEILING', async () => {
+  // How well we measured cost is not evidence about the task. A run judged
+  // clean must stay VERIFIED even when nothing reported a token.
+  const r = await run({ model: scriptedModel([{ calls: [], handoff: handoff('VERIFIED') }]) });
+  eq(r.spend.outcome, 'NOT_CHECKED', 'precondition: spend is unmeasured');
+  eq(r.outcome, 'VERIFIED', 'unmeasured cost was allowed to downgrade the task outcome');
+});
+
+await check('fully reported usage totals correctly and is VERIFIED', async () => {
+  const usage = { inputTokens: 10, outputTokens: 4, costUsd: 0.5 };
+  const r = await run({
+    model: scriptedModel([
+      { calls: [call('read_thing')], usage },
+      { calls: [], handoff: handoff('VERIFIED'), usage },
+    ]),
+    tools: {
+      async call() {
+        return { content: 'ok', usage: { inputTokens: 1, outputTokens: 1, costUsd: 0.25 } };
+      },
+    },
+  });
+  eq(r.spend.outcome, 'VERIFIED', 'complete coverage should be VERIFIED');
+  eq(r.spend.model.costUsd.total, 1, 'two model turns at 0.5');
+  eq(r.spend.tools.costUsd.total, 0.25, 'one dispatched call');
+  eq(r.spend.total.costUsd.total, 1.25, 'the total is the sum of the phases');
+  eq(r.spend.total.events, 3, 'two model turns plus one tool call');
+});
+
+await check('PHASES ARE SEPARATE — model, tools and evaluation do not blur', async () => {
+  // Cost-per-phase is the measurement the build order asks for. A single total
+  // cannot answer what the accountable verifier costs.
+  const r = await run({
+    policy: evalPolicy,
+    criteria: [crit('a')],
+    doerDid: 'did:key:zDOER',
+    model: scriptedModel([{ calls: [], handoff: handoff('VERIFIED'), usage: { costUsd: 2 } }]),
+    evaluator: scriptedEvaluator(passes('a'), { usage: { costUsd: 0.5 } }),
+  });
+  eq(r.spend.model.costUsd.total, 2, 'model phase');
+  eq(r.spend.evaluation.costUsd.total, 0.5, 'evaluation phase — the verifier overhead');
+  eq(r.spend.tools.events, 0, 'no tools were called');
+  eq(r.spend.total.costUsd.total, 2.5, 'total');
+});
+
+await check('A MALFORMED FIGURE IS FAILED, AND IS NEVER SUMMED', async () => {
+  // Worse than absent: it asserts something false, and one NaN turns the whole
+  // total into NaN with no record of which event produced it.
+  const r = await run({
+    model: scriptedModel([
+      { calls: [], handoff: handoff('VERIFIED'), usage: { costUsd: NaN, inputTokens: 5 } },
+    ]),
+  });
+  eq(r.spend.outcome, 'FAILED', 'a malformed figure was tolerated');
+  eq(r.spend.total.costUsd.total, 0, 'NaN must not reach the total');
+  eq(r.spend.total.costUsd.malformed, 1, 'and must be counted as malformed');
+  eq(r.spend.total.inputTokens.total, 5, 'the usable figure beside it still counts');
+  eq(r.spend.total.costUsd.missing, 0, 'malformed is not missing — they are different facts');
+});
+
+await check('a negative cost is malformed, not a credit', async () => {
+  const r = await run({
+    model: scriptedModel([{ calls: [], handoff: handoff('VERIFIED'), usage: { costUsd: -5 } }]),
+  });
+  eq(r.spend.total.costUsd.malformed, 1, 'a negative cost must be rejected');
+  eq(r.spend.total.costUsd.total, 0, 'and must not offset a real cost');
+});
+
+await check('a non-numeric figure from an uncompiled caller is malformed', async () => {
+  // The port boundary. TypeScript's `number` is a claim about a caller that may
+  // never have been compiled.
+  const r = await run({
+    model: scriptedModel([{ calls: [], handoff: handoff('VERIFIED'), usage: { costUsd: '0.50' } }]),
+  });
+  eq(r.spend.total.costUsd.malformed, 1, 'a string cost must not be summed');
+  eq(r.spend.total.costUsd.total, 0, 'string concatenation must not reach the total');
+});
+
+await check('A REFUSED CALL IS NOT AN UNPRICED EVENT', async () => {
+  // It never reached the dispatcher, so its cost really is zero. Counting it as
+  // unreported would make coverage look worse than the run actually is.
+  const r = await run({
+    policy: { toolsAllowed: [] },
+    model: scriptedModel([
+      { calls: [call('read_thing')] },
+      { calls: [], handoff: handoff('VERIFIED') },
+    ]),
+  });
+  truthy(r.session.deniedAttempts > 0, 'precondition: something was denied');
+  eq(r.spend.tools.events, 0, 'a denied call was priced as an unknown-cost event');
 });
 
 // ── report ──────────────────────────────────────────────────────────────────
