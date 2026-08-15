@@ -35,6 +35,7 @@
 // and names what would be needed.
 
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 
 const ROOT = process.cwd();
@@ -185,13 +186,45 @@ const record = (id, domain, status, detail, why) =>
 // and this is the meta-case: check:prior-work is what stops retracted figures
 // from reappearing, and it is worth nothing if it is not in `npm run check`.
 {
+  // ASK THE RUNNER, do not pattern-match its command string.
+  //
+  // `npm run check` used to be one long `&&` chain naming every suite, so a
+  // substring test answered this. It is now `node scripts/check-all.mjs`, which
+  // DISCOVERS suites — so the names are no longer in the string, and a
+  // substring test would report VIOLATION over a gate that does run.
+  //
+  // Asking the runner is also a STRONGER control than the string test was: it
+  // reports what will actually execute, so it still fires if a gate is defined
+  // but skipped by discovery — a case the substring version could not see.
+  // The chain fallback is kept so this control survives a revert.
   const pkg = JSON.parse(read('package.json'));
   const chain = pkg.scripts?.check ?? '';
-  const missing = ['check:prior-work', 'check:secrets'].filter((s) => !chain.includes(s));
+  const required = ['check:prior-work', 'check:secrets'];
+
+  let gates = null;
+  let how = 'the check chain';
+  if (/check-all\.mjs/.test(chain)) {
+    const listed = spawnSync('node', ['scripts/check-all.mjs', '--list'], {
+      cwd: ROOT, encoding: 'utf8',
+    });
+    if (listed.status === 0) {
+      gates = listed.stdout.split('\n').map((l) => l.trim()).filter(Boolean);
+      how = 'the discovered suite list';
+    }
+  }
+
+  // A runner that cannot say what it runs is itself the violation: nothing here
+  // may fall back to "assume it is fine".
+  const missing = gates === null
+    ? required.filter((s) => !chain.includes(s))
+    : required.filter((s) => !gates.includes(s));
+
   record(
     'TF-04', 'AI Governance',
     missing.length ? 'VIOLATION' : 'ENFORCED',
-    missing.length ? `absent from \`npm run check\`: ${missing.join(', ')}` : 'claim + secret gates are wired into `npm run check`',
+    missing.length
+      ? `absent from ${how}: ${missing.join(', ')}`
+      : `claim + secret gates run (verified against ${how}${gates ? `, ${gates.length} suites` : ''})`,
     'a gate that never runs is decoration',
   );
 }
