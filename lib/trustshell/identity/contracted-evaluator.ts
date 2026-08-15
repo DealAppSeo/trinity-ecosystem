@@ -234,7 +234,7 @@ export function createContractedEvaluator(input: ContractedEvaluatorInput): {
         requested.size !== contracted.size || [...contracted].some((id) => !requested.has(id));
 
       const evidence = renderEvidence(request.turns);
-      const evidenceHash = await hash(evidence);
+      const evidenceHash = await evidenceDigest(evidence);
 
       const verdicts: CriterionVerdict[] = [];
       const scores: CriterionScore[] = [];
@@ -371,7 +371,15 @@ function weaker(a: Outcome, b: Outcome): Outcome {
   return rank[a] <= rank[b] ? a : b;
 }
 
-async function hash(value: string): Promise<string> {
+/**
+ * The canonical evidence digest.
+ *
+ * EXPORTED so `verdict-envelope.ts` can recompute an evidence hash the same way
+ * the evaluator did. A second copy of this two-line function would be a second
+ * canonical encoding, and two canonical encodings that drift is exactly how a
+ * verdict ends up vouching for evidence it never saw.
+ */
+export async function evidenceDigest(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return (
     'sha256:' +
@@ -404,7 +412,7 @@ export async function attestCheckerAuthority(input: {
   const payload = [
     'zkrepid:checker-authority:v1',
     input.checkerDid,
-    await hash(contractPayload(input.contract)),
+    await evidenceDigest(contractPayload(input.contract)),
     input.controlProofRef,
     input.at,
   ].join(SEP);
