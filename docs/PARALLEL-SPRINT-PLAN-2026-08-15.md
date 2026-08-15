@@ -118,7 +118,8 @@ graph TD
   A1 --> A2 --> G2
   A3 --> G1
   A5 --> G3
-  D0["D0 · CHECK-constraint DDL<br/>Sean · unblocks WORK_* + peer-verify"]:::human --> G1
+  D0["D0 · CHECK-constraint DDL<br/>Sean · unblocks WORK_* only"]:::human --> G1
+  D1b["D1b · DID to repid_agents.id<br/>Sean · no mapping exists"]:::human --> G1
 
   X["X · circuit leaf vocabulary<br/>HANDOVER, do not build"]:::block
 
@@ -190,7 +191,7 @@ narrative.
 |---|---|---|
 | W0 | `trinity_tasks` writes > 100 rows/day for 3 consecutive days | one query |
 | W1 | ~~a loop run produces a verdict from a `contracted-evaluator` with `evaluatorDid ≠ doerDid`, in a `*-test.mjs`~~ **MET BEFORE W1 STARTED** — see the correction in §0. Replaced by: **the port fit holds at compile time**, so drift the runtime suite cannot see is caught | `npm run check:types` exit 0, mutation-tested |
-| W2 | `WORK_VERIFIED` rows exist in shadow with `repid_delta_applied = 0` | one query |
+| W2 | ~~`WORK_VERIFIED` rows exist in shadow with `repid_delta_applied = 0`~~ **WRONG — `applied = 0` is 53,972 ordinary clean HAL rows.** Replaced by: a `WORK_VERIFIED` row exists whose `metadata->>'mode' = 'shadow'` and whose `counterparty_agent_id` is the checker | one query, and the row must be distinguishable from routine traffic |
 | W3 | every published HAL number carries `{corpus_hash, families_answered, coverage, pre/post-cliff}` | run-card present or the number is not published |
 | W4 | one receipt written end-to-end: HAL → RepID → postcard → x402, all four links dated the same day | `npm run north` shows 4 × LIVE |
 
@@ -209,8 +210,38 @@ the costs differ by orders of magnitude.
 | add a value | CHECK-constraint DDL (**Sean**) | **cross-lane handover** |
 
 **DO, in W2:** `WORK_VERIFIED` / `WORK_DISPUTED` (doer) and `VERIFY_CONFIRMED` /
-`VERIFY_FALSE_PASS` (checker) in the **live ledger**, deltas inside the existing
-`[-10, +5]` band, `doer ≠ checker`, shadow-emit before apply.
+`VERIFY_FALSE_PASS` (checker) in the **live ledger**, `doer ≠ checker`,
+shadow-emit before apply. DDL written and unapplied:
+`supabase/migrations/20260815190000_work_seat_event_types.sql`.
+
+> **CORRECTION 2026-08-15, on starting W2 — four measured facts killed four
+> assumptions in this section's first draft.**
+>
+> 1. **There is no `[-10, +5]` band on the table.** `repid_score_events.delta`
+>    ranges **-1940 to +500** live. The band Grok Code cited is
+>    `DELTA_BAND_MIN/MAX` in repid-engine's *delta-statement* layer — a
+>    different thing from what the ledger accepts. "Keep the delta inside the
+>    published band" was never a constraint this table imposed.
+> 2. **The live HAL band is three values: `0` (79,390 rows), `-10` (68,322) and
+>    `+1` — five rows in total.** A positive HAL delta has fired **5 times in
+>    147,717 events**. So "award +3, the same magnitude as a clean HAL bonus" is
+>    3× the largest positive delta the system has ever issued, and that bonus is
+>    effectively unused. **The magnitude for verified work is UNMEASURED** and
+>    must be argued on its own evidence — the `maxDisagreement` precedent
+>    applies: no default is better than a guessed one.
+> 3. **`repid_delta_applied = 0` is not a shadow marker.** 53,972 ordinary clean
+>    HAL rows already carry it. The old W2 exit criterion would have been
+>    satisfied by rows indistinguishable from routine traffic.
+> 4. **`doer ≠ checker` is already enforced in the database** —
+>    `repid_score_events_counterparty_not_self`. The constitutional invariant
+>    has a last line of defence we did not know we had, and these four event
+>    types are the first for which it becomes load-bearing.
+>
+> **And one new blocker:** `agent_id` / `counterparty_agent_id` are FKs to
+> `repid_agents(id)`, which are **uuids**, while a signed verdict names a
+> **DID**. No DID→agent mapping exists — `identity_claims` and
+> `sandbox_repid_credentials` both hold **0 rows**. A verdict currently cannot
+> name the agent it is about.
 
 **DO NOT:** grow `REPUTATION_SIGNALS` past 7 in this repo. #48 declined this
 deliberately. Direction already travels in the signal *name*, so no bytes move.
@@ -244,7 +275,8 @@ Each of these has already cost a sprint or a retraction.
 | # | ask | unblocks |
 |---|---|---|
 | **1** | **Railway redeploy of the Trinity fleet.** Down 29 days; the fleet's own alert says *"Manual redeploy required. Autonomous redeploy disabled."* | W0, and every live measurement in W3/W4 |
-| **2** | **CHECK-constraint DDL on `repid_score_events.event_type`** for `WORK_*`/`VERIFY_*` | W2 apply-mode, **and** the dead peer-verify writer — one DDL, two fixes |
+| **2** | **Apply `supabase/migrations/20260815190000_work_seat_event_types.sql`** — widens the `event_type` CHECK for `WORK_*`/`VERIFY_*`. Written, unapplied, inert on its own (widens a CHECK, writes no rows) | W2. **It does NOT fix peer-verify** — that literal lives in repid-engine and was not guessed; confirm the string, then add it in a follow-up |
+| **2b** | **A DID → `repid_agents.id` mapping.** `agent_id` is a uuid FK; a verdict names a DID; `identity_claims` and `sandbox_repid_credentials` are both empty | any row at all. Without it W2 cannot name the agent a verdict is about |
 | 3 | Decision: does the XAI lane accept a doer leaf in `ReputationSignal`? | the circuit half, W4+ |
 
 Existing NORTH-STAR blockers (egress allowlist, `BASE_SEPOLIA_PRIVATE_KEY` in
