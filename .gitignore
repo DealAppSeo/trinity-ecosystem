@@ -80,6 +80,9 @@ headroom.db
 # sets screenshotDir. Machine-local config lives in ~/.agent-browser/, not here.
 .agent-browser/
 
+# TrustShell Stop-hook output (§7.3 — redirected so a crash cannot reach the session)
+.trustshell.log
+
 # Compiled output emitted next to TypeScript sources. lib/ is source-only: every
 # check script compiles to a temp dir. A stale .js beside its .ts drifts from
 # source silently and some resolvers prefer it. Committed once in e44c9f0 by a

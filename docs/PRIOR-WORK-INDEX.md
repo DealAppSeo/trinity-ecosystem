@@ -42,7 +42,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Failures and their root causes | `LESSONS.md` | — |
 | The RepID/HAL data model and its known defects | `docs/ROADMAP-HYBRID-REPID.md` | live queries |
 | Harness profile / settings authority model | `docs/HARNESS-SPEC.md` | — |
-| TrustShell spec, M1 built, M2 blocked | `docs/TRUSTSHELL-V1.md` | — |
+| TrustShell spec and milestone ledger — M1–M6 built, every one having falsified something the spec asserted | `docs/TRUSTSHELL-V1.md` | the spec's own unbuilt half, which is a plan not a description |
 | Agent memory: recall path, both halves of the bug | `docs/AGENT-MEMORY-SPEC.md` | — |
 | MCP fleet discovery endpoint | `docs/MCP-FLEET.md` | — |
 | Release ordering, order-dependent steps | `docs/SHIP-CHECKLIST.md` | — |
@@ -57,6 +57,8 @@ part of `npm run check`, so it fails the same gate everything else does.
 | The paste-ready Poseidon2 request to send the other lane | `docs/POSEIDON2-HANDOVER-MESSAGE.md` | rewriting the ask from scratch |
 | Agent execution loop: what is already built, what is wiring, what is new | `docs/AGENT-LOOP-SCOPE.md` | re-surveying the harness modules yourself |
 | Browser automation for agents: install, Chrome resolution, and what `doctor` gets wrong | `docs/AGENT-BROWSER.md` | the upstream README, which documents none of it |
+| Dual-view (`/live`) plan: lane split, frozen event contract, what is and is not on the critical path | `docs/DUAL-VIEW-LAUNCH-PLAN.md` | the source Grok/XAI conversation, whose disk inventory was taken against a different repo — see its §1 |
+| What the harness caught and missed on a real session, and why 10 sessions is unmet | `docs/TRUSTSHELL-M6-DOGFOOD.md` | re-running the harness and assuming silence means clean |
 
 ---
 

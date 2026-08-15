@@ -61,6 +61,109 @@ export async function generateExportableKeyPair(): Promise<KeyPair> {
   return finishKeyPair(kp);
 }
 
+/**
+ * DER prefix for a PKCS#8-wrapped Ed25519 private key, per RFC 8410 §7.
+ *
+ *   30 2e             SEQUENCE (46 bytes)
+ *     02 01 00        INTEGER 0                      -- version
+ *     30 05           SEQUENCE (5 bytes)             -- AlgorithmIdentifier
+ *       06 03 2b6570  OID 1.3.101.112                -- id-Ed25519
+ *     04 22           OCTET STRING (34 bytes)        -- PrivateKey
+ *       04 20         OCTET STRING (32 bytes)        -- CurvePrivateKey
+ *
+ * WebCrypto will not import a bare 32-byte Ed25519 seed — 'raw' is public-key
+ * only — so a stored seed has to be wrapped before it can be used. The bytes are
+ * fixed for every Ed25519 key, which is why this is a constant rather than a DER
+ * encoder.
+ */
+const PKCS8_ED25519_PREFIX = new Uint8Array([
+  0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
+]);
+
+/**
+ * Rebuild a key pair from a stored 32-byte seed, bs58-encoded.
+ *
+ * This is what per-developer key custody needs: a receipt signed today must be
+ * signable by the same identity next week, which means the key has to come from
+ * somewhere durable rather than being generated per run.
+ *
+ * The seed is the private key. Anything that can read it can sign as this
+ * identity, so it belongs in a secret store or an environment variable that is
+ * not committed — never in a repo, and never in a receipt.
+ */
+export async function keyPairFromSeed(seedBs58: string): Promise<KeyPair> {
+  let seed: Uint8Array;
+  try {
+    seed = bs58.decode(seedBs58);
+  } catch {
+    throw new Error('Ed25519 seed is not valid base58.');
+  }
+  if (seed.length !== 32) {
+    // A 64-byte value is the common mistake: some libraries call the
+    // seed-plus-public-key concatenation "the private key". Say so, because the
+    // wrong half silently produces a different identity.
+    throw new Error(
+      `Ed25519 seed must be 32 bytes, got ${seed.length}. If you have 64, that is ` +
+        'the seed concatenated with the public key — pass the first 32 bytes.'
+    );
+  }
+
+  const pkcs8 = new Uint8Array(PKCS8_ED25519_PREFIX.length + 32);
+  pkcs8.set(PKCS8_ED25519_PREFIX, 0);
+  pkcs8.set(seed, PKCS8_ED25519_PREFIX.length);
+
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8',
+    pkcs8.slice().buffer as ArrayBuffer,
+    { name: 'Ed25519' },
+    false,
+    ['sign']
+  );
+
+  // WebCrypto cannot derive the public key from a private one, and there is no
+  // portable Ed25519 scalar multiplication here. Recover it by signing a fixed
+  // probe and testing candidate keys is not viable either — so instead, derive
+  // it the only way WebCrypto allows: import the seed as a JWK with `d` set and
+  // let the implementation compute `x`.
+  const jwk = await crypto.subtle.exportKey('jwk', await importSeedAsJwkPrivate(seed));
+  if (typeof jwk.x !== 'string') {
+    throw new Error('WebCrypto did not return a public component for this seed.');
+  }
+  const raw = base64UrlToBytes(jwk.x);
+
+  const publicKey = await crypto.subtle.importKey(
+    'raw',
+    raw.slice().buffer as ArrayBuffer,
+    { name: 'Ed25519' },
+    true,
+    ['verify']
+  );
+
+  return { did: didFromPublicKeyBytes(raw), publicKey, privateKey };
+}
+
+/** Import the seed as an extractable JWK purely to read back the public `x`. */
+async function importSeedAsJwkPrivate(seed: Uint8Array): Promise<CryptoKey> {
+  const pkcs8 = new Uint8Array(PKCS8_ED25519_PREFIX.length + 32);
+  pkcs8.set(PKCS8_ED25519_PREFIX, 0);
+  pkcs8.set(seed, PKCS8_ED25519_PREFIX.length);
+  return crypto.subtle.importKey(
+    'pkcs8',
+    pkcs8.slice().buffer as ArrayBuffer,
+    { name: 'Ed25519' },
+    true,
+    ['sign']
+  );
+}
+
+function base64UrlToBytes(s: string): Uint8Array {
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=');
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 async function finishKeyPair(kp: CryptoKeyPair): Promise<KeyPair> {
   const raw = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
   return {

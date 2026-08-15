@@ -233,6 +233,29 @@ export interface TranscriptGraph {
   addressableRecords: number;
 }
 
+/**
+ * One assistant `text` block: the unit §3 calls "the claims".
+ *
+ * `thinking` blocks are deliberately NOT claims. A model reasoning aloud about
+ * what it might do is not an assertion to the user, and treating it as one would
+ * flag every considered-then-rejected option as a false statement — the single
+ * fastest way to make a hallucination detector useless.
+ *
+ * Text is carried verbatim because a detector needs the words. Anything that
+ * PUBLISHES a derived artifact must bound what it copies out; see the note on
+ * Finding.claimSpan in receipt/types.ts.
+ */
+export interface ClaimSpan {
+  /** uuid of the assistant record carrying this block. */
+  recordUuid: string | null;
+  /** Groups blocks belonging to one API turn, as `spend` does. */
+  requestId: string | null;
+  timestamp: string | null;
+  /** Position in document order across the whole transcript, from 0. */
+  index: number;
+  text: string;
+}
+
 export interface ParsedTranscript {
   sessionId: string | null;
   cwd: string | null;
@@ -244,6 +267,11 @@ export interface ParsedTranscript {
   transcriptSha256: string | null;
   census: TranscriptCensus;
   tools: ToolInvocation[];
+  /**
+   * Assistant text blocks in document order. Added in parser 1.1.0 for the T0/T1
+   * claim checkers; nothing in the receipt's actions or spend blocks reads it.
+   */
+  claims: ClaimSpan[];
   spend: SpendSummary;
   /** Distinct files named by write-tool inputs, sorted. */
   filesTouched: string[];
@@ -267,7 +295,7 @@ export interface ParseOptions {
  * Bumped whenever the meaning of any counted field changes, so an old receipt
  * stays interpretable against the parser that produced it (§11).
  */
-export const PARSER_VERSION = 'trustshell-transcript/1.0.0';
+export const PARSER_VERSION = 'trustshell-transcript/1.1.0';
 
 // ---------------------------------------------------------------------------
 // Internals
@@ -299,6 +327,7 @@ interface RawUsage {
 
 interface RawBlock {
   type?: unknown;
+  text?: unknown;
   id?: unknown;
   name?: unknown;
   input?: unknown;
@@ -533,6 +562,7 @@ export function parseTranscript(text: string, options: ParseOptions = {}): Parse
   }
 
   const invocations = new Map<string, ToolInvocation>();
+  const claims: ClaimSpan[] = [];
   const invocationOrder: string[] = [];
   const results = new Map<string, PendingResult>();
   const phantomToolResult: string[] = [];
@@ -565,8 +595,19 @@ export function parseTranscript(text: string, options: ParseOptions = {}): Parse
       }
 
       if (blockType === 'text') {
-        if (type === 'assistant') blocks.assistantText++;
-        else blocks.userText++;
+        if (type === 'assistant') {
+          blocks.assistantText++;
+          const body = str(block.text);
+          if (body) {
+            claims.push({
+              recordUuid: str(record.uuid),
+              requestId: str(record.requestId),
+              timestamp,
+              index: claims.length,
+              text: body,
+            });
+          }
+        } else blocks.userText++;
         continue;
       }
       if (blockType === 'thinking') {
@@ -752,6 +793,7 @@ export function parseTranscript(text: string, options: ParseOptions = {}): Parse
     endedAt,
     models: Array.from(modelsSeen).sort(),
     transcriptSha256: options.sha256 ?? null,
+    claims,
     census: {
       lines,
       parsedRecords: records.length,
