@@ -1,9 +1,10 @@
 # TrustShell v1 — specification
 
-**Status:** spec, with M1 built. §10 is the ledger — M1 (transcript parser) is
-done and proven; M2–M6 are not started. §3 and §4.2 carry corrections the M1
-build forced on the spec that specified it.
-**Date:** 2026-08-12, revised 2026-08-13
+**Status:** spec, with M1 and M2 built. §10 is the ledger — M1 (transcript
+parser) and M2 (session receipt) are done and proven; M3–M6 are not started.
+§3 and §4.2 carry corrections the M1 build forced on the spec that specified
+them; §4.1 and §12 carry M2's. §12 Q1 and Q2 are **decided**, not open.
+**Date:** 2026-08-12, revised 2026-08-15
 
 TrustShell turns an AI agent's assertions into receipts you can verify without
 trusting the agent or the vendor.
@@ -138,11 +139,36 @@ Cheap and fully decidable from the transcript. For each session emit:
   `tool_result` returned
 - writes separated from reads: `Edit`/`Write`/`Bash` with side effects, versus
   `Read`/`Grep`/`Glob`
-- files touched, reconciled against `git diff` for the same `gitBranch`
+- files touched, reconciled against what changed on disk during the session
 - orphan invocations (denied, interrupted, in-flight) — reported, never hidden
 
-The reconciliation against `git diff` is what makes this more than a log: it
-catches an agent that says it edited a file when nothing changed on disk.
+The reconciliation is what makes this more than a log: it catches an agent that
+says it edited a file when nothing changed on disk.
+
+**Corrected 2026-08-15, by the M2 build.** This bullet said *"reconciled against
+`git diff` for the same `gitBranch`"*, and the CLI implemented exactly that.
+`git diff --name-only HEAD` lists **unstaged edits to tracked files**, which is
+not the question. Run against a real session it reported **13 mismatches out of
+15 files**, every one of them a file the agent genuinely wrote and then either
+committed (gone from `diff HEAD`) or created new (untracked, so also absent).
+
+A reconciler that cries wolf is worse than none: it trains people to ignore the
+marker, which is §11's named risk for T1 arriving early via a different route.
+The question that matches the intent is *what changed during this session* —
+the union of the working tree including untracked files
+(`git status --porcelain -uall -z`) and anything committed since the session
+started (`git log --since`). If the session start is unknown the commit half
+cannot be bounded, so the receipt reports **NOT CHECKED** rather than
+reconciling against a window it invented. After the fix: **0 mismatches** on the
+same session.
+
+Second-order, and the reason `receipt/git.ts` is a module with its own
+assertions rather than four lines in a script: the caller `.trim()`-ed git's
+porcelain output. An unstaged modification leads with a **space** (`" M path"`),
+so trimming shifted the first record by one and returned one path missing its
+first character — a single false mismatch that looked exactly like a real
+finding. Whitespace-significant formats need a parser that is tested, not a
+slice at the call site.
 
 ### 4.2 Spend — what did it cost, and was it authorised?
 
@@ -339,7 +365,7 @@ mechanical, not clever, and it is the whole first-run experience.
 | # | Deliverable | Done when |
 | :-- | :-- | :-- |
 | M1 | Transcript parser | **DONE 2026-08-13.** `lib/trustshell/TranscriptParser.ts`, 42 assertions in `scripts/check-transcript-parser.mjs`, CLI `scripts/trustshell-parse.mjs`. Reproduces §3 on the live session; **0 phantom results**; 0 malformed lines; 0 unrecognised record types; 0 new `tsc` errors. Corrections it forced are folded into §3 and §4.2 above. |
-| M2 | Actions + spend receipt | Receipt emitted, `audit_hash` stable across re-runs of the same transcript |
+| M2 | Actions + spend receipt | **DONE 2026-08-15.** `lib/trustshell/receipt/` (types, canonical, build, sign, git, store-sqlite), 89 assertions in `scripts/check-receipt.mjs`, CLI `scripts/trustshell-receipt.mjs`. `audit_hash` stable across re-runs [VERIFIED on a live 294-line session: identical hash twice, `ts_…` id derived from it]. Storage and custody decided — see §12. Nine tamper mutations detected; four mutations of the checker itself caught, each compiled. **The receipt reads `NOT CHECKED`, and §12.5 explains why that is the correct output rather than a shortfall.** |
 | M3 | `proof-verifier` accepts it | Third party verifies offline; tampering with any field fails |
 | M4 | T0 + T1 claim checking | Catches ≥1 real `LESSONS.md` entry; false-positive rate measured and published |
 | M5 | `trustshell init` + MCP tools | `npx trustshell init` → working in Claude Code, receipt visible in-session |
@@ -368,13 +394,48 @@ Stated up front so they can be watched:
 
 ## 12. Open questions
 
-1. **Receipt storage** — Supabase table (queryable, needs RLS designed correctly
-   this time), local SQLite (private, no sharing), or both?
-2. **Signing key custody** — per-developer local key, or an org key? Local means
-   receipts are self-attested; org means a service must hold a key.
+1. ~~**Receipt storage**~~ — **DECIDED 2026-08-15: local SQLite first.** Private
+   by default, nothing to misconfigure, and no RLS policy to get wrong — this
+   project already carries two tables at `USING (true)` for `anon` (LESSONS S1)
+   and a live enterprise key readable from the browser bundle. Implemented in
+   `receipt/store-sqlite.ts` on built-in `node:sqlite`, so no new dependency and
+   no native module. Publishing to Supabase stays a **separate, explicit step**,
+   so "recorded" and "published" cannot be confused. Availability is a
+   three-outcome question: on a runtime without `node:sqlite` the store reports
+   unavailable and the caller records NOT CHECKED — building, hashing, signing
+   and verifying are all pure and work everywhere.
+2. ~~**Signing key custody**~~ — **DECIDED 2026-08-15: per-developer local key.**
+   `--sign` reads `TRUSTSHELL_SIGNING_KEY` and **refuses to generate one**: a key
+   invented on first run produces receipts signed by something nobody kept, which
+   looks like provenance and carries none. `identity/did.ts` gained
+   `keyPairFromSeed` for this.
+   **The consequence is carried in the data, not in a README.** A receipt signed
+   by the developer whose agent produced it is *self-attested* — it proves the
+   bytes are unchanged, not that anyone independent looked.
+   `attestation.kind` is `self` / `org` / `unsigned`, and
+   `verifyReceiptSignature` returns `independentlyAttested` separately from
+   `outcome` so a surface cannot render the two with the same chrome. §8's
+   re-derivation path — recompute `audit_hash` from the same transcript bytes,
+   no key, no trust in the signer — remains the real proof; the signature is
+   convenience.
 3. **Does the marker belong in-session?** MCP tool output is visible to the
    agent, which can then talk about its own score. Cleanest v1 is CLI/file
    output only, out of the model's context. Recommend that.
 4. **RepID linkage** — bind a session receipt to an `agent_kya_registry` row, or
    keep developer sessions entirely separate from the agent registry? These are
    different trust domains and conflating them early would be hard to undo.
+5. **Why an M2 receipt says `NOT CHECKED`, and why that is not a shortfall.**
+   Claim checking does not ship until M4, so `claims_total`, `claims_unchecked`
+   and `claims_failed` are all zero. A naive "nothing failed" test reads that as
+   success and renders `✓ VERIFIED  0 claims · 0 backed`. That is §1's defect
+   reproduced inside the product, and it is the *fourth* instance of the shape in
+   this repo — after the 6/6 E2E against a service that never ran a round, the
+   green build over two undefined references, and the credential check that
+   passed with no credential.
+   `markerFor` therefore returns `NOT_CHECKED` **unconditionally** while no claim
+   tier is enabled, and an internal error forces the same. `checkReceipt` takes
+   the **floor** of its parts, never the ceiling: a perfect signature over data
+   nobody checked is still `NOT CHECKED`. Both rules are asserted, and both were
+   confirmed by mutation — removing the first makes an M2 receipt print
+   `✓ VERIFIED  0 claims · 0 backed`, which is exactly the output the rule exists
+   to prevent.

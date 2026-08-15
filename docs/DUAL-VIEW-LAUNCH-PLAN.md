@@ -120,7 +120,20 @@ The instruction was to build the hard parts first and bridge the wiring gaps.
 Ranked by *how much downstream work it unblocks* × *how impossible it is to
 fake*:
 
-### H1 — The session receipt (TrustShell M2 + M3). **The load-bearing gap.**
+### H1 — The session receipt (TrustShell M2 + M3). **M2 DONE 2026-08-15; M3 open.**
+
+> **Updated 2026-08-15.** M2 has landed — `lib/trustshell/receipt/`, 89
+> assertions, CLI, local SQLite store, per-developer self-attestation. §12 Q1
+> and Q2 (storage, key custody) are **decided**; see `TRUSTSHELL-V1.md` §12.
+> M3 (`proof-verifier` accepts the receipt) is the next item on this lane, and
+> it is what turns a self-attested receipt into something a stranger can check.
+> The paragraphs below describe why this ranked first and remain accurate about
+> everything M3 still blocks.
+>
+> One thing the MVP must inherit from M2: the receipt reads **NOT CHECKED**, and
+> that is correct output, not a shortfall — claim checking is M4. The dual-view's
+> chip must render three states from day one. If it can only show green, it is a
+> trust badge.
 
 Nothing in this repo emits, signs, or verifies a session receipt. `TRUSTSHELL-V1.md`
 §10 has M1 done and M2–M6 not started, and `SESSION_SUMMARY.md` states the
@@ -456,14 +469,12 @@ outcomes in every report — VERIFIED / NOT CHECKED / FAILED.
 
 Ordered by what they block.
 
-1. **Receipt storage** (`TRUSTSHELL-V1.md` §12 Q1) — Supabase, local SQLite, or
-   both. **Blocks H1/M2, which blocks the launch claim.** Recommendation: local
-   SQLite first (private by default, no RLS to design), Supabase as an explicit
-   publish step. Note `repid_config` is already `anon`-readable and holds a live
-   enterprise key — this repo does not have a good record with permissive
-   policies (LESSONS S1).
-2. **Signing-key custody** (§12 Q2) — per-developer local key (self-attested) or
-   org key (a service must hold it). **Blocks M2/M3.**
+1. ~~**Receipt storage**~~ — **DECIDED 2026-08-15: local SQLite first**, Supabase
+   as a separate explicit publish step. Shipped on built-in `node:sqlite`; no new
+   dependency, no RLS to get wrong.
+2. ~~**Signing-key custody**~~ — **DECIDED 2026-08-15: per-developer local key.**
+   Receipts are self-attested and say so in `attestation.kind`; the CLI refuses
+   to generate a key rather than mint provenance nobody kept.
 3. **Board exception** — confirm `/live` is a TrustShell + TrustMarket route, not
    a thirteenth vertical, so the freeze holds.
 4. **`repid-engine` access for agent sessions** — `add_repo` approval, so the
