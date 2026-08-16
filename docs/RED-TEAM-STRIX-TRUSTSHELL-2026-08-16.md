@@ -130,11 +130,14 @@ probe in `scripts/redteam/probes/`; a raw observation becomes a file in
 
 ## Recommended next steps
 
-1. **Add trustshell.dev to `CLAUDE.md` § Deployment topology** with its Vercel
-   project id and the repo that builds it, so the next reader does not rediscover
-   a live surface. (Left to the human — editing the topology table from an
-   assumption is the mistake that table exists to prevent; it needs the Vercel
-   `domains` array to fill in correctly.)
+1. ~~Add trustshell.dev to `CLAUDE.md` § Deployment topology~~ **DONE
+   2026-08-16, verified against the Vercel API** rather than from the name.
+   Project `trustshell-landing` (`prj_ye1cqfvwyj9axPMXZBdkfB7YCE0k`), repo
+   `DealAppSeo/trustshell`; its `domains` array confirms it serves the domain, so
+   the name-match is real here, not a third decoy. Production `6cfd2d3`
+   (`dpl_J53jTJ3cXf…`) is the current production target and matches what pg_net
+   served — production is not stale. The finding above that trustshell.dev has no
+   `/api/version` stands.
 2. **Run Strix** per the guide, `--target <repo>` first.
 3. If the header posture holds up under Strix's browser agent, it is a small,
    safe Vercel config change (add CSP / `X-Frame-Options` / `nosniff`).
