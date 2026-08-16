@@ -1123,6 +1123,68 @@ export const MUTATIONS = [
     find: '  if (n < MIN_BATCH) return MIN_BATCH;',
     replace: '  if (n < MIN_BATCH) return n;',
   },
+
+  // ── check:acceptance-loop ─────────────────────────────────────────────────
+  {
+    id: 'acceptance-exhausted-reads-as-delivered',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'a spent revision budget is NOT a standard met. This is the house defect in one line: ' +
+      'EXHAUSTED means the process ran out of road, and shipping on it reports an auditor ' +
+      "sign-off that never happened. `isDelivered` exists precisely so callers cannot write " +
+      "`status !== 'REVISE'` and treat running out as done",
+    find: "export function isDelivered(state: AcceptanceState): boolean {\n  return state.status === 'ACCEPTED';",
+    replace:
+      "export function isDelivered(state: AcceptanceState): boolean {\n" +
+      "  return state.status === 'ACCEPTED' || state.status === 'EXHAUSTED';",
+  },
+  {
+    id: 'acceptance-auditor-substitution-unnoticed',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      "the sticky auditor. checker-assignment.ts defeats checker-shopping AT THE DRAW, and " +
+      'both of its defences are properties of a SINGLE draw. Re-drawing per revision ' +
+      'reintroduces the entire attack — "rejected? resubmit for a new auditor" is the re-roll ' +
+      'the deterministic seed exists to prevent, and it arrives disguised as diligence',
+    find: '    if (rounds[i].auditorDid !== first) return { stable: false, at: i };',
+    replace: '    if (rounds[i].auditorDid === first) return { stable: false, at: i };',
+  },
+  {
+    id: 'acceptance-outage-consumes-revision-budget',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'only REJECTED spends budget. staged-judge.ts already holds that "a provider outage is ' +
+      'not a defect report, and must not be able to condemn the work"; one level up, letting ' +
+      "NOT_CHECKED decrement the allowance lets a flaky judge exhaust a correct doer and " +
+      'produce EXHAUSTED on work nobody ever judged',
+    find: "  const rejected = rounds.filter((r) => r.verdict === 'REJECTED');",
+    replace: "  const rejected = rounds.filter((r) => r.verdict !== 'ACCEPTED');",
+  },
+  {
+    id: 'acceptance-stall-never-detected',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'resubmitting identical bytes is its own outcome. Without it a doer that changes ' +
+      'nothing burns the budget to EXHAUSTED, which reads as "we tried" — STALLED separates ' +
+      '"could not fix it" from "did not change it", and only one of those is the doer\'s fault',
+    find: '  if (rejected.length >= 2) {',
+    replace: '  if (rejected.length >= Number.MAX_SAFE_INTEGER) {',
+  },
+  {
+    id: 'acceptance-later-rejection-unaccepts',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'acceptance is final. Scanning only the last round lets a re-review revoke a delivered ' +
+      'result, so a signed-off deliverable could be retroactively withdrawn by running the ' +
+      'auditor again — the reputation events and the envelope have already been issued',
+    find: '  for (const round of rounds) {\n    if (round.verdict === \'ACCEPTED\') {',
+    replace: '  for (const round of rounds.slice(-1)) {\n    if (round.verdict === \'ACCEPTED\') {',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
