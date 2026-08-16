@@ -521,6 +521,31 @@ export const MUTATIONS = [
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
   {
+    id: 'auditor-grant-analysed-against-a-different-map',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/identity/spine.ts',
+    protects:
+      "the auditor grant is analysed against the LOOP'S OWN toolEffects, not a map supplied " +
+      'beside it. This is the whole reason the grant is minted in the spine rather than at ' +
+      'the call site: a grant proven read-only against a different effect map than the loop ' +
+      'enforces would verify perfectly and describe a different world. The mutant hardcodes ' +
+      'a permissive map, and both refusal cases then mint happily',
+    find: '      toolEffects: execution.policy.toolEffects,',
+    replace: "      toolEffects: { run_tests: 'read', deploy: 'read' },",
+  },
+  {
+    id: 'auditor-grant-minted-but-not-bound',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/identity/spine.ts',
+    protects:
+      'the verdict REFERENCES the authority it was rendered under. A grant that is minted, ' +
+      'checked and then not bound into the signed verdict leaves a third party unable to ask ' +
+      'what the judge could touch — the grant becomes a thing we did rather than a thing ' +
+      'anyone can check, which is the distinction the whole module exists for',
+    find: '    controlProofRef: auditorGrant?.proof.delegateSignature,',
+    replace: '    controlProofRef: undefined,',
+  },
+  {
     id: 'spend-limit-reads-zero-when-unreadable',
     suite: 'check:loud-errors',
     file: 'lib/trustshell/KYAValidator.ts',

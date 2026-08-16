@@ -39,7 +39,7 @@ Ranked by *distance from firing*, not by size. Each repro was run on `3a0890b`.
 | **R1** | A consumer can obtain an evaluator for the loop (`TRUST-HARNESS-DESIGN` §5 step 2 — *"creates the production caller everything else needs"*) | `grep -c "identity/contracted-evaluator" lib/trustshell/index.ts` → **0** | **not wired** | **FIXED** |
 | **R2** | The Evaluator port is invoked on a real contracted action, not only unit tests (§2 *the loop*) | `grep -rn runAgentLoop lib/ app/` → 0 callers; every call is in `scripts/` | **not switched on** | **FIXED** |
 | **R3** | Evidence-vs-progress is visible for accept *and* reject (§5 step 5) | `outcome-to-reputation.ts` — 0 importers; correct code, never executed outside its own test | **not fed** | **FIXED** |
-| **R4** | Read-only auditor grant enforced on a live path (§5 step 6) | `auditor-grant.ts` — 0 importers | **not wired** | **PARTIAL** — now reachable, still no live caller |
+| **R4** | Read-only auditor grant enforced on a live path (§5 step 6) | `auditor-grant.ts` — 0 importers | **not wired** | **FIXED** — minted by the spine, see §9 |
 | **R5** | Auth/RLS failures are loud | 5 sites destructure `{ data }` and drop `error` | **error swallowed** | **FIXED** — 4 of 5; the 5th is a decision, see §8 |
 | **R6** | HAL produces | already root-caused | **externally blocked** | **NOT REOPENED** — see §6 |
 
@@ -106,7 +106,7 @@ The doer-seat gap stays **OPEN and cross-lane blocked** — this change makes it
 
 ## 5. The guard: `npm run check:spine-reachable`
 
-**29 assertions.** It asks two questions no unit suite can:
+**29 assertions at first landing; 40 after §9.** It asks two questions no unit suite can:
 
 - **A. Reachability** — static, on the barrel. Fails even if every other suite passes.
 - **B. Does it fire** — runs the *shipped* composition end to end, not a re-assembly.
@@ -125,7 +125,7 @@ would pass on an export that throws on first call.
 
 The first mutant is the real defect from this morning: the guard would have caught
 it. Both compiling mutants are registered in `scripts/mutations.mjs`
-(**36 → 38 CAUGHT** at this point; §8 takes it to **41**, all 0 SURVIVED / 0 INVALID / 0 DRIFT).
+(**36 → 38 CAUGHT** at this point; §8 takes it to **41** and §9 to **43**, all 0 SURVIVED / 0 INVALID / 0 DRIFT).
 
 **Honest survivor:** this suite does **not** kill the `doer === checker` defence-in-depth
 throw — `eligiblePool` already excludes the doer, so that branch never fires in the
@@ -139,7 +139,7 @@ fixture. The property is killed properly in `check:checker-assignment` and
 | item | why not checked | what would verify it |
 |---|---|---|
 | **`runContractedWork` under a REAL judge** | every tier in the fixture is a stub | wire `bft-judge` as a tier against a live provider panel and A/B it against a single tuned evaluator — **`TRUST-HARNESS-DESIGN` §4.3, still assumed, not measured** |
-| **R4 — auditor grant on a live path** | now reachable; no production caller passes a `controlProofRef` | a caller that delegates a read-only grant and has `analyseReadOnly` refuse a write-reaching capability set |
+| **R4 under a REAL capability fleet** | the grant is minted and enforced on the live path (§9), but against fixture tool maps | a real `toolCapabilities`/`toolEffects` pair from a deployed fleet — and note the design's own warning: a fleet with a half-populated effect map cannot mint a grant at all, which is the correct failure |
 | **R5 against a LIVE database** | fixed and asserted against injected failures (§8); no live PostgREST call was made | replay each failure against a real RLS denial with a publishable key — proxy-denied from an agent session |
 | **cost-per-phase / cost-per-verified-outcome** | `LoopResult.spend` is carried through but nothing aggregates it across runs | §4.4 — a real run with priced calls |
 | **whether any of this runs in production** | no app route calls `runContractedWork` | an HTTP or job caller. **Deliberately not added here** — a new product surface is outside this pass |
@@ -240,6 +240,64 @@ precise failure naming the property.
 
 ---
 
+## 9. R4 — the auditor grant, wired to the live path
+
+**Intended.** `TRUST-HARNESS-DESIGN` §5 step 6 — a read-only delegated
+ControlProof for the auditor, described there as *"assembly of `delegation.ts` +
+`loop-authorizer.ts`; near-zero new code"*.
+
+**Was.** `auditor-grant.ts` existed, was mutation-tested, and had **zero
+importers**. The module's own header explains why that matters more than usual:
+*"read-only capabilities" is not a checkable statement* — a capability string is
+an opaque name, and `read:*` authorizes a write the moment somebody maps a write
+tool under it. The module COMPUTES read-only by searching for reachable
+write-or-unknown tools. None of that ran anywhere.
+
+**Fix.** `runContractedWork` now mints the grant for the **drawn** checker and
+binds its reference into the signed verdict.
+
+### The one design decision worth the space
+
+`analyseReadOnly` needs a `toolEffects` map. So does the loop — `LoopPolicy`
+already carries one. **The spine passes the loop's own map** rather than
+accepting a second one beside it:
+
+```ts
+toolEffects: execution.policy.toolEffects,   // not a parameter
+```
+
+That is the entire reason to mint the grant *here* rather than at the call site.
+A grant proven read-only against a different effect map than the loop enforces
+would verify perfectly and describe a different world — a proof about a
+hypothetical fleet, attached to a real run. One map, one source, no way for the
+two to disagree.
+
+The mutation that protects it hardcodes a permissive map, and **both refusal
+cases then mint happily** — which is exactly the failure the wiring exists to
+prevent.
+
+### What it refuses
+
+| condition | outcome |
+|---|---|
+| capability set reaches a **write** tool in the loop's map | refuses to mint |
+| reaches a tool the loop's map **does not classify** | refuses — an unlabelled tool is a blast radius nobody measured |
+| no identity for the drawn checker | refuses, never substitutes |
+| `doer === checker` | refused inside `delegateAuditorGrant` itself |
+
+### It stays optional, and the absence stays honest
+
+Omitting `auditorGrant` leaves `controlProofRef` undefined, which the contracted
+evaluator records as an **unverified** authority — never as an authorized one.
+An assertion pins that the run still completes without it: the grant is
+additive, not a new gate.
+
+**11 new assertions** (29 → 40), **2 new mutations** (41 → 43 CAUGHT), including
+one proving the verdict actually carries the reference rather than the grant
+being minted, checked, and then dropped on the floor.
+
+---
+
 ## 7. Measurements
 
 | measure | before | after |
@@ -248,8 +306,10 @@ precise failure naming the property.
 | `runAgentLoop` callers outside `scripts/` | 0 | 1 (`spine.ts`, shipped) |
 | shipped composition of the full chain | none (test-only) | `runContractedWork` |
 | `npm run check` | 51 suites | **53 suites**, 52 VERIFIED / 1 NOT_CHECKED / 0 FAILED |
-| `npm run mutate` | 36 CAUGHT | **41 CAUGHT**, 0 SURVIVED / 0 INVALID / 0 DRIFT |
+| `npm run mutate` | 36 CAUGHT | **43 CAUGHT**, 0 SURVIVED / 0 INVALID / 0 DRIFT |
 | reads that drop `error` in `lib/`+`app/` | 5 | **1**, and it carries a written rationale |
+| `check:spine-reachable` assertions | — | **40** (29 at first landing, +11 for the grant) |
+| spine modules with a live caller | 0 of 10 | **10 of 10** |
 | `tsc --noEmit` | 0 errors | 0 errors |
 
 `check:legacy-key` is the single NOT_CHECKED, unchanged: absent credential,

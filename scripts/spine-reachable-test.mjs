@@ -308,6 +308,148 @@ await check('THE CONTRACT SUPPLIES THE CRITERIA, not the caller', async () => {
   );
 });
 
+// ---------------------------------------------------------------------------
+// D. The auditor grant, on the live path.
+//
+// `auditor-grant.ts` had zero importers. It is now minted BY the spine for the
+// DRAWN checker, and — the part that matters — analysed against
+// `execution.policy.toolEffects`, the very map the loop enforces. A grant
+// checked against some other effect map would verify perfectly and prove
+// nothing about the run it accompanies.
+// ---------------------------------------------------------------------------
+
+const idm = await import(pathToFileURL(join(outDir, 'trustshell', 'identity', 'identity.js')).href);
+const cpm = await import(
+  pathToFileURL(join(outDir, 'trustshell', 'identity', 'control-proof.js')).href
+);
+
+const mkId = (n) => idm.createAgentIdentity(n, { exportable: true });
+const human = await mkId('human');
+const operator = await mkId('operator');
+const idDoer = await mkId('doer');
+const idCheckers = await Promise.all(['c0', 'c1', 'c2', 'c3', 'c4'].map((n) => mkId(n)));
+const idFor = new Map(idCheckers.map((k) => [k.did, k]));
+
+const parentProof = await cpm.issueControlProof({
+  human,
+  agent: operator,
+  audience: 'spine-reachable',
+  capabilities: ['test:*'],
+  ttlSeconds: 3600,
+});
+
+const idCandidates = [
+  ...idCheckers.map((k) => ({ did: k.did, qualification: { tier: 3, badges: ['code-review'] } })),
+  { did: idDoer.did, qualification: { tier: 5, badges: ['code-review'] } },
+];
+
+function grantAssignment(taskId) {
+  return { ...assignmentFor(taskId), doerDid: idDoer.did, candidates: idCandidates };
+}
+
+const READ_ONLY_CAPS = {
+  parent: parentProof,
+  delegator: operator,
+  auditorIdentityFor: (d) => idFor.get(d),
+  capabilities: ['test:*'],
+  toolCapabilities: { run_tests: 'test:run' },
+  ttlSeconds: 600,
+};
+
+function grantRun(taskId, over = {}, execOver = {}) {
+  const ex = execution();
+  return runContractedWork({
+    assignment: grantAssignment(taskId),
+    doerKey: idDoer.privateKey,
+    checkerKeyFor: (d) => idFor.get(d)?.privateKey,
+    tiers: TIERS,
+    execution: { ...ex, policy: { ...ex.policy, ...execOver } },
+    auditorGrant: { ...READ_ONLY_CAPS, ...over },
+    now: () => new Date('2026-08-16T02:00:00.000Z'),
+    observedAt: '2026-08-16T02:00:00.000Z',
+  });
+}
+
+await check('the auditor grant is MINTED for the drawn checker and bound into the verdict', async () => {
+  const out = await grantRun('grant-happy');
+
+  truthy(out.auditorGrant, 'a grant must be minted');
+  eq(out.auditorGrant.analysis.readOnly, true, 'and it must be PROVABLY read-only');
+  eq(
+    out.auditorGrant.proof.grant.delegateDid,
+    out.assigned.unsigned.checkerDid,
+    'the grant must name the DRAWN checker, not some other auditor'
+  );
+  truthy(out.auditorGrant.proof.grant.delegateDid !== idDoer.did, 'and never the doer');
+
+  // The binding is the point: the verdict carries a reference to the authority
+  // under which it was rendered, so a third party can ask what the judge could
+  // touch instead of taking our word for it.
+  eq(
+    out.verdict?.controlProofRef,
+    out.auditorGrant.proof.delegateSignature,
+    'the signed verdict must reference the grant it was rendered under'
+  );
+});
+
+await check('REFUSAL: the grant reaches a WRITE tool in the LOOP\'S OWN effect map', async () => {
+  // Nothing changes about the capability set. The only change is that the LOOP
+  // now declares a write tool — and because the grant is analysed against the
+  // loop's map, that alone must make minting refuse. This is the assertion that
+  // proves the two maps are genuinely the same map.
+  await refuses(
+    () =>
+      grantRun(
+        'grant-write',
+        { toolCapabilities: { run_tests: 'test:run', deploy: 'test:deploy' } },
+        { toolEffects: { run_tests: 'read', deploy: 'write' } }
+      ),
+    'not provably read-only',
+    'a capability set reaching a write tool must not mint'
+  );
+});
+
+await check('REFUSAL: a tool the effect map does not classify counts as a write', async () => {
+  // `deploy` is reachable but absent from the loop's toolEffects. An unlabelled
+  // tool is a blast radius nobody measured, so it blocks the grant rather than
+  // being assumed safe.
+  await refuses(
+    () =>
+      grantRun(
+        'grant-unclassified',
+        { toolCapabilities: { run_tests: 'test:run', deploy: 'test:deploy' } },
+        { toolEffects: { run_tests: 'read' } }
+      ),
+    'not provably read-only',
+    'an unclassified reachable tool must not mint'
+  );
+});
+
+await check('REFUSAL: no identity for the drawn checker', async () => {
+  await refuses(
+    () => grantRun('grant-noid', { auditorIdentityFor: () => undefined }),
+    'no identity for the drawn checker',
+    'minting under a different agent\'s identity must be refused, never substituted'
+  );
+});
+
+await check('the grant is OPTIONAL, and its absence is honest', async () => {
+  // Omitting it leaves `controlProofRef` undefined, which the contracted
+  // evaluator records as an UNVERIFIED authority — never as an authorized one.
+  const out = await runContractedWork({
+    assignment: grantAssignment('grant-absent'),
+    doerKey: idDoer.privateKey,
+    checkerKeyFor: (d) => idFor.get(d)?.privateKey,
+    tiers: TIERS,
+    execution: execution(),
+    now: () => new Date('2026-08-16T02:00:00.000Z'),
+    observedAt: '2026-08-16T02:00:00.000Z',
+  });
+  eq(out.auditorGrant, undefined, 'no grant when none was requested');
+  eq(out.verdict?.controlProofRef, undefined, 'and no authority is claimed');
+  eq(out.loop.outcome, 'VERIFIED', 'the run still completes — the grant is additive');
+});
+
 rmSync(outDir, { recursive: true, force: true });
 
 console.log(`\nspine-reachable: ${passed} passed, ${failures.length} failed\n`);
