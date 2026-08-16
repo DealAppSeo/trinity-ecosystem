@@ -60,7 +60,7 @@
 // and a verdict whose contract names a different task is FAILED, not
 // NOT_CHECKED. That is not a gap in the evidence; it is evidence of a mismatch.
 
-import { sign, verify, type Did } from './did';
+import { compareDids, sameDid, sign, verify, type Did } from './did';
 import {
   verifyVerdict,
   type Outcome,
@@ -408,7 +408,7 @@ async function verifyCheckpoint(
 
   // SELF-CERTIFICATION, checked before anything else because it is the one
   // failure that a perfectly valid verdict still exhibits.
-  if (checkpoint.checkerDid && checkpoint.checkerDid.trim() === handoff.agentDid.trim()) {
+  if (sameDid(checkpoint.checkerDid, handoff.agentDid)) {
     return {
       ...base,
       effective: 'NOT_CHECKED',
@@ -499,7 +499,7 @@ async function verifyCheckpoint(
   // The checker named on the verdict must also be the one the checkpoint
   // claims, or the checkpoint's self-certification check was answered about
   // somebody else.
-  if (checkpoint.checkerDid && checkpoint.checkerDid.trim() !== supplied.verdict.checkerDid.trim()) {
+  if (compareDids(checkpoint.checkerDid, supplied.verdict.checkerDid) === 'different') {
     return {
       ...base,
       effective: 'FAILED',
@@ -511,7 +511,7 @@ async function verifyCheckpoint(
   }
   // And the real checker must still not be the handing-off agent, even when the
   // checkpoint declined to name one.
-  if (supplied.verdict.checkerDid.trim() === handoff.agentDid.trim()) {
+  if (sameDid(supplied.verdict.checkerDid, handoff.agentDid)) {
     return {
       ...base,
       effective: 'NOT_CHECKED',

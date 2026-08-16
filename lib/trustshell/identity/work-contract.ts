@@ -56,7 +56,7 @@
 // missing piece stays missing and visible instead of being quietly filled by
 // the party it is supposed to constrain.
 
-import { sign, verify, type Did } from './did';
+import { compareDids, sameDid, sign, verify, type Did } from './did';
 
 export const CONTRACT_DOMAIN = 'zkrepid:work-contract:v1';
 export const VERDICT_DOMAIN = 'zkrepid:work-verdict:v1';
@@ -176,7 +176,7 @@ function assertContractSane(c: UnsignedContract): void {
         'nothing, and an empty contract would be the cheapest route past the checker.'
     );
   }
-  if (c.doerDid.trim() === c.checkerDid.trim()) {
+  if (sameDid(c.doerDid, c.checkerDid)) {
     throw new Error(
       `the doer and the checker are the same identity (${c.doerDid}). ` +
         'verification.checker_must_not_be_doer is constitutional — no layer may waive it.'
@@ -286,7 +286,7 @@ export async function verifyContract(contract: WorkContract): Promise<ContractVe
   // assertContractSane already refused a self-checked contract, so reaching here
   // means it held. Recomputed rather than assumed, so the field is evidence
   // rather than a restatement of the caller's input.
-  const independent = contract.doerDid.trim() !== contract.checkerDid.trim();
+  const independent = compareDids(contract.doerDid, contract.checkerDid) === 'different';
 
   if (doerOk && checkerOk && independent) {
     return {
@@ -443,7 +443,7 @@ export async function verifyVerdict(input: {
   // Without this, a valid contract plus a valid verdict from an unrelated
   // identity would pass every individual check while the agreed checker never
   // judged anything.
-  const rightChecker = verdict.checkerDid.trim() === contract.checkerDid.trim();
+  const rightChecker = sameDid(verdict.checkerDid, contract.checkerDid);
   const criteria = scoreAgainstContract(contract.criteria, verdict.scores);
 
   if (!sigOk || !bound || !rightChecker) {
@@ -575,7 +575,7 @@ export function veritasSignal(
   // ground truth, it is the same self-certification wearing a different hat —
   // and the panel grading its own prior verdicts is the specific version of it
   // that would look most convincing in a dashboard.
-  if (observation.observerDid && observation.observerDid.trim() === verdict.checkerDid.trim()) {
+  if (sameDid(observation.observerDid, verdict.checkerDid)) {
     throw new Error(
       `the observation was produced by ${observation.observerDid}, which is the checker ` +
         'being graded. A checker cannot supply the ground truth for its own verdict — ' +

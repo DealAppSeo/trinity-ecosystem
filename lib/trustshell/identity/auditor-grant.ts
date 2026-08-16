@@ -56,7 +56,7 @@ import { delegate, type DelegatedControlProof } from './delegation';
 import { permits } from './capability';
 import type { ControlProof } from './control-proof';
 import type { AgentIdentity } from './identity';
-import type { Did } from './did';
+import { sameDid, type Did } from './did';
 
 /** Tool name → the capability a call to it requires. Same shape the authorizer uses. */
 export type ToolCapabilityMap = Readonly<Record<string, string>>;
@@ -217,7 +217,7 @@ export async function delegateAuditorGrant(input: AuditorGrantInput): Promise<Au
   // this is the path where a violation would be least visible, because a
   // delegation chain verifies perfectly whether or not the delegate happens to
   // be the agent under audit.
-  if (input.auditor.did.trim() === input.doerDid.trim()) {
+  if (sameDid(input.auditor.did, input.doerDid)) {
     throw new Error(
       `the auditor and the doer are the same identity (${input.auditor.did}). ` +
         'verification.checker_must_not_be_doer is constitutional; an agent may not hold a ' +
