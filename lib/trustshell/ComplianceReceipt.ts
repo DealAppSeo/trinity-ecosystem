@@ -8,8 +8,10 @@ import {
   halReceiptRow,
   type HalClassificationInput,
 } from './hal-receipt';
+import { paymentAuditPreimage, requireAuditSecret } from './receipt-audit';
 
 export { halReceiptAuditPreimage, halReceiptRow, type HalClassificationInput };
+export { paymentAuditPreimage, requireAuditSecret } from './receipt-audit';
 
 export class ComplianceReceiptGenerator {
   private get supabase() { return getSupabaseAdmin(); }
@@ -31,22 +33,24 @@ export class ComplianceReceiptGenerator {
     const receiptId = crypto.randomUUID();
     const fireblocksPreAuthId = `FB-PREAUTH-${receiptId.slice(0, 8).toUpperCase()}`;
 
-    // Build audit hash — tamper-evident proof of entire receipt
-    const auditData = [
-      receiptId,
-      params.kyaResult.agentName,
-      params.kyaResult.repidScore.toString(),
-      params.amountUSDC.toString(),
-      params.recipientAddress,
-      // An unevaluated proof must not hash as though it passed, or two
-      // materially different receipts produce the same audit hash.
-      params.bftProof.evaluated ? params.bftProof.passed.toString() : 'not_evaluated',
-      params.bftProof.consensusWeight?.toFixed(4) ?? 'null',
-      params.solanaTxHash ?? 'no_tx',
-      params.ruleHash,
-    ].join(':');
-
-    const auditHash = await this.sha256(auditData);
+    // Built by `receipt-audit.ts` so it can be asserted directly. Inline here,
+    // it was never tested, and both defects hal-receipt.ts had already fixed for
+    // the HAL preimage were still live: an absent tx hash rendered as the
+    // literal 'no_tx' collided with a real tx hash of that value.
+    const auditHash = await this.auditHmac(
+      paymentAuditPreimage({
+        receiptId,
+        agentName: params.kyaResult.agentName,
+        repidScore: params.kyaResult.repidScore,
+        amountUSDC: params.amountUSDC,
+        recipientAddress: params.recipientAddress,
+        // Three states, matching what is stored in `bft_passed`.
+        bftPassed: params.bftProof.evaluated ? params.bftProof.passed : null,
+        consensusWeight: params.bftProof.consensusWeight ?? null,
+        solanaTxHash: params.solanaTxHash,
+        ruleHash: params.ruleHash,
+      })
+    );
 
     const receipt: ComplianceReceipt = {
       receiptId,
@@ -156,7 +160,7 @@ export class ComplianceReceiptGenerator {
     c: HalClassificationInput
   ): Promise<{ receiptId: string; auditHash: string }> {
     const receiptId = crypto.randomUUID();
-    const auditHash = await this.sha256(halReceiptAuditPreimage(c, receiptId));
+    const auditHash = await this.auditHmac(halReceiptAuditPreimage(c, receiptId));
 
     const { error } = await this.supabase
       .from('kya_compliance_receipts')
@@ -176,9 +180,22 @@ export class ComplianceReceiptGenerator {
     return { receiptId, auditHash };
   }
 
-  private async sha256(data: string): Promise<string> {
+  /**
+   * HMAC-SHA256 over an audit preimage.
+   *
+   * Renamed from `sha256`, which lied about what it computes — a reader
+   * checking an audit hash with `sha256sum` would get a mismatch and have no
+   * way to know why.
+   *
+   * The secret is REQUIRED. It used to fall back to a constant printed in this
+   * file, which made every audit hash forgeable by anyone holding the repo. See
+   * `receipt-audit.ts`.
+   */
+  private async auditHmac(preimage: string): Promise<string> {
     const crypto = await import('crypto');
-    const secret = process.env.TRUSTRAILS_HMAC_SECRET || 'trinity-default-sbt-secret';
-    return crypto.createHmac('sha256', secret).update(data).digest('hex');
+    return crypto
+      .createHmac('sha256', requireAuditSecret(process.env))
+      .update(preimage)
+      .digest('hex');
   }
 }

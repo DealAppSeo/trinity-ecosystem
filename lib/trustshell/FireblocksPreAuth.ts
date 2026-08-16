@@ -41,7 +41,10 @@ export class FireblocksPreAuth {
       zkpAttestationCID:   receipt.zkpProofCID,
       humanCustodyBound:   receipt.humanCustodyBound,
       insuranceCoverage:   receipt.insuranceCoverage,
-      withinPolicyLimits:  receipt.withinDailyLimit && receipt.withinTxLimit,
+      // EXPLICIT `=== true`, so an UNEVALUATED limit (null) is not within
+      // policy. `a && b` already fell the safe way here, but by coincidence of
+      // null being falsy rather than by a decision anyone wrote down.
+      withinPolicyLimits:  receipt.withinDailyLimit === true && receipt.withinTxLimit === true,
       recommendedAction:   receipt.bftProof.passed && receipt.kyaVerified
         ? 'approve'
         : receipt.agentRepidScore > 6000
