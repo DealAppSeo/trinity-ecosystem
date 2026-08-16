@@ -521,6 +521,63 @@ export const MUTATIONS = [
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
   {
+    id: 'zk-build-group-hashes-twice',
+    suite: 'check:zk-cost',
+    file: 'lib/trustshell/identity/nullifier.ts',
+    protects:
+      'a Merkle group over N leaves costs exactly N-1 hashes. Redundant hashing is invisible ' +
+      'to every functional suite — the root still verifies — but in a circuit the constraint ' +
+      'count is dominated by exactly this number, so doubling it doubles the proof',
+    find: '      next.push(i + 1 < cur.length ? await scheme.hashPair(cur[i], cur[i + 1]) : cur[i]);',
+    replace:
+      '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
+  },
+  {
+    id: 'zk-verify-asserts-membership-instead-of-checking-it',
+    suite: 'check:zk-cost',
+    file: 'lib/trustshell/identity/nullifier.ts',
+    protects:
+      'verification WALKS the membership path rather than assuming it. The mutant keeps the ' +
+      'loop, keeps the comparison, and simply sets the node to the claimed root — so every ' +
+      'boolean stays identical and only the hash count betrays it. That is the borrowed-member ' +
+      'attack surface: membership asserted rather than checked',
+    find: `  for (const step of statement.privateWitness.membership) {
+    node = step.left
+      ? await scheme.hashPair(step.hash, node)
+      : await scheme.hashPair(node, step.hash);
+  }`,
+    replace: `  for (const step of statement.privateWitness.membership) {
+    void step;
+  }
+  node = statement.publicInputs.groupRoot;`,
+  },
+  {
+    id: 'zk-cost-counter-measures-itself',
+    suite: 'check:zk-cost',
+    file: 'lib/trustshell/identity/cost.ts',
+    protects:
+      'the counting wrapper DELEGATES to the scheme under test instead of digesting on its ' +
+      'own. A counter that computes its own values keeps reporting cheerfully after the real ' +
+      'scheme starts throwing — measuring itself rather than the subject, which is how a ' +
+      'benchmark comes to describe nothing',
+    find: `      cost.hashPair++;
+      return inner.hashPair(left, right);`,
+    replace: `      cost.hashPair++;
+      return 'h:' + left + right;`,
+  },
+  {
+    id: 'zk-cost-model-stops-being-a-bound',
+    suite: 'check:zk-cost',
+    file: 'lib/trustshell/identity/cost.ts',
+    protects:
+      'COST_MODEL states the OPTIMUM, not a recording of current behaviour. The mutant makes ' +
+      'the model linear in group size; a model that merely echoed the implementation would ' +
+      'ratify exactly that regression the moment somebody re-recorded it',
+    find:
+      '  membershipPathLength: (n: number): number => Math.ceil(Math.log2(Math.max(1, n))),',
+    replace: '  membershipPathLength: (n: number): number => Math.max(0, n - 1),',
+  },
+  {
     id: 'hal-accuracy-pools-incomparable-modes',
     suite: 'check:hal-accuracy',
     file: 'lib/hal/accuracy.ts',

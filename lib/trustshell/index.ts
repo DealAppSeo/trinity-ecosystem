@@ -168,6 +168,15 @@ export type {
   AssignmentInput,
 } from './identity/spine';
 
+/**
+ * What a zk RepID operation COSTS, in hash calls — the only unit that survives
+ * the change of hash function. See `identity/cost.ts`: the production
+ * `IBindingScheme` throws pending Poseidon2 parameters, so a millisecond figure
+ * from this repo would describe a hash we will never ship.
+ */
+export { countingScheme, totalCalls, verifyGrowth, COST_MODEL, ZERO_COST } from './identity/cost';
+export type { HashCost, CountingScheme } from './identity/cost';
+
 export {
   CONTRACT_DOMAIN,
   VERDICT_DOMAIN,

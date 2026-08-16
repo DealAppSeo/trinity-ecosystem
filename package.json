@@ -23,6 +23,7 @@
     "check:transcript": "node scripts/check-transcript-parser.mjs",
     "check:memory": "node scripts/check-memory-recall.mjs",
     "check:earned": "node scripts/check-earned-metrics.mjs",
+    "check:zk-cost": "node scripts/zk-cost-test.mjs",
     "check:zkp": "node scripts/check-zkp-attestation.mjs",
     "check:e2e-harness": "node scripts/check-e2e-harness.mjs",
     "test:e2e": "node scripts/e2e/run-e2e.mjs",
