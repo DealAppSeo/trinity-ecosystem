@@ -791,6 +791,33 @@ export const MUTATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // lib/trustshell/schema/decoys.ts — from #53 on main. 623 tables, 501 empty,
+  // and seven empties named almost exactly like the table that matters.
+  // -------------------------------------------------------------------------
+  {
+    id: 'decoy-matcher-never-fires',
+    suite: 'check:schema-names',
+    file: 'lib/trustshell/schema/decoys.ts',
+    protects:
+      'a real query against an empty decoy table is caught. A query against an empty ' +
+      'table returns [] with no error, so it reads as "the data does not exist" rather ' +
+      'than "I asked the wrong table" — the exact confusion recorded in LESSONS.md',
+    find: '  return tableUsagePatterns(table).some((re) => re.test(line));',
+    replace: '  return false;',
+  },
+  {
+    id: 'decoy-matcher-flags-prose',
+    suite: 'check:schema-names',
+    file: 'lib/trustshell/schema/decoys.ts',
+    protects:
+      'prose is NOT flagged, only queries. Every current mention of a decoy in this repo ' +
+      'is documentation ABOUT the problem; failing those would force someone to delete ' +
+      'the record of a correction in order to get a green build',
+    find: '  return tableUsagePatterns(table).some((re) => re.test(line));',
+    replace: '  return line.includes(table);',
+  },
+
+  // -------------------------------------------------------------------------
   // From #52 on main. The spine reachability pair and the silent-empty guard.
   // -------------------------------------------------------------------------
   {

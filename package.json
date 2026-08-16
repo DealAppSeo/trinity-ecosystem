@@ -81,6 +81,7 @@
     "check:hal-chain": "node scripts/check-hal-chain.mjs",
     "check:hal-receipt": "node scripts/check-hal-receipt.mjs",
     "check:throughput": "node scripts/check-throughput.mjs",
+    "check:schema-names": "node scripts/check-schema-names.mjs",
     "check:spine-reachable": "node scripts/spine-reachable-test.mjs",
     "check:loud-errors": "node scripts/loud-errors-test.mjs"
   },
