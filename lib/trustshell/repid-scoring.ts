@@ -14,21 +14,19 @@
 //
 // Five defects, each verified by computation before being written down:
 //
-// 1. **THE SCORE CANNOT REACH THE GATE IT FEEDS.** `weightedSum` is a convex
-//    combination of five values in [0,1] with weights summing to 1, so its
-//    maximum is exactly 1.0. Through `2000 * log10(1 + ws*100)` that yields a
-//    maximum score of **4008** — while the default `min_repid_payment` is
-//    **5000**, Gold is 5000 and Platinum is 7500. A flawless agent is Silver
-//    and can never be authorized to pay. Gold would need a weighted sum of
-//    3.15; Platinum, 56.2.
+// 1. **THE SCORE COULD NOT REACH THE GATE IT FEEDS — FIXED 2026-08-16.** With
+//    the multiplier at 2000 the maximum attainable score was **4008** against a
+//    payment threshold of **5000**, so Gold, Platinum and the payment path were
+//    unreachable for everyone, permanently. Gold would have needed a weighted
+//    sum of 3.15 when the maximum is 1.0.
 //
 //    This is the standing rule in CLAUDE.md — *compute the ceiling before
 //    optimising toward it* — applied to a scoring curve instead of a component.
-//    `reachableCeiling()` below makes it one function call, and
-//    `describeCoherence()` turns it into a statement an operator can act on.
-//    **The calibration itself is deliberately NOT changed here**: re-tuning the
-//    curve moves every agent's score, which is a product decision, not a
-//    refactor. What this file does is make the incoherence impossible to miss.
+//    The multiplier is now 5000 (Sean's call; see `SCORE_LOG_MULTIPLIER` for
+//    what it did to the tier distribution). `reachableCeiling()` and
+//    `describeCoherence()` are what keep it fixed: any future re-tune that puts
+//    a gate back above the ceiling fails the suite instead of silently closing
+//    the payment path again.
 //
 // 2. **TWO TIER LADDERS THAT DISAGREE.** `KYAValidator` used `>` and
 //    `RepIDConfig` used `>=` over the same thresholds, so at exactly 2500,
@@ -238,7 +236,35 @@ export function sumContributions(b: ScoreBreakdown): number {
 // ---------------------------------------------------------------------------
 
 /** Multiplier on the log curve. Named so `reachableCeiling` cannot drift from it. */
-export const SCORE_LOG_MULTIPLIER = 2000;
+/**
+ * Multiplier on the log curve. **Raised 2000 -> 5000 on 2026-08-16**, by
+ * Sean's decision, to make the score reach the gates it feeds.
+ *
+ * At 2000 the maximum attainable score was 4008 against a payment threshold of
+ * 5000, so Gold, Platinum and the payment path were unreachable for everyone.
+ * At 5000 a flawless agent computes 10021.6 and reports 10000 — THE CAP NOW
+ * BINDS, which it did not before, so every agent above weightedSum 0.99 reads
+ * exactly 10000.
+ *
+ * WHAT THIS DID TO THE DISTRIBUTION, computed rather than assumed. Over the
+ * honest weighted-sum range [0, 1]:
+ *
+ *   Bronze     2.2%      Gold      21.6%
+ *   Silver     6.8%      Platinum  69.4%
+ *
+ * Platinum now begins at a weighted sum of 0.306 — an agent performing at ~31%
+ * of the maximum holds the 500,000 USDC daily limit. That is a property of the
+ * log curve's steepness, not of the multiplier: `log10` compresses the top of
+ * the range hard, so raising the multiplier to reach the gates necessarily
+ * widens the top tier.
+ *
+ * If that distribution is wrong, THE TIER FLOORS ARE THE KNOB, not this
+ * constant — moving them redistributes without re-breaking reachability, and
+ * `describeCoherence` will refuse any set that puts a floor back above the
+ * ceiling. Recorded here so the next person changing either one can see what
+ * the other costs.
+ */
+export const SCORE_LOG_MULTIPLIER = 5000;
 export const SCORE_LOG_INPUT_SCALE = 100;
 
 export function scoreFromWeightedSum(weightedSum: number): number {
@@ -269,6 +295,17 @@ export interface CoherenceReport {
   /** VERIFIED when every gate below is reachable; FAILED when one is not. */
   outcome: 'VERIFIED' | 'FAILED';
   ceiling: number;
+  /**
+   * Every gate that was compared against the ceiling, reachable or not.
+   *
+   * A report that lists only the FAILURES cannot distinguish "the tier floors
+   * were checked and are fine" from "the tier floors were never in the list".
+   * Once the multiplier was raised, every floor sat below the ceiling and their
+   * inclusion became unobservable from the outcome alone — mutation testing
+   * caught exactly that. Saying what was examined is the same discipline as the
+   * three-outcome rule, applied to a report instead of a verdict.
+   */
+  gatesConsidered: readonly { name: string; floor: number }[];
   /** Gates the score is compared against: tier floors plus the payment threshold. */
   unreachable: readonly { name: string; floor: number; needsWeightedSum: number }[];
   detail: string;
@@ -302,6 +339,7 @@ export function describeCoherence(paymentThreshold: number): CoherenceReport {
     return {
       outcome: 'VERIFIED',
       ceiling,
+      gatesConsidered: gates,
       unreachable: [],
       detail: `every gate is reachable: the highest attainable score is ${ceiling}`,
     };
@@ -309,6 +347,7 @@ export function describeCoherence(paymentThreshold: number): CoherenceReport {
   return {
     outcome: 'FAILED',
     ceiling,
+    gatesConsidered: gates,
     unreachable,
     detail:
       `the highest attainable score is ${ceiling}, but ${unreachable.length} gate(s) sit above it: ` +

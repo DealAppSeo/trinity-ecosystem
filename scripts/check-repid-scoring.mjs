@@ -76,50 +76,87 @@ const match = (s, re, what) => { if (!re.test(String(s))) throw new Error(`${wha
 
 // ── the ceiling ─────────────────────────────────────────────────────────────
 
-check('THE SCORE CANNOT REACH THE GATE IT FEEDS — pinned', () => {
-  // The finding that mattered most, and it is one arithmetic call. The weighted
-  // sum is a convex combination of five values in [0,1] with weights summing to
-  // 1, so its maximum is exactly 1.0 — and the curve maps that to 4008.
+check('THE SCORE REACHES THE GATE IT FEEDS — pinned', () => {
+  // Was 4008 against a threshold of 5000, which closed the payment path for
+  // everyone. The multiplier is now 5000 (Sean's decision, 2026-08-16).
   //
-  // 4008 is asserted as a PINNED NUMBER on purpose. If somebody re-tunes the
-  // curve this test fails and they must decide, deliberately, what the new
-  // ceiling is and whether the gates still sit under it.
-  eq(reachableCeiling(), 4008, 'the highest attainable score');
-  truthy(reachableCeiling() < 5000, 'the default payment threshold of 5000 is above it');
-  eq(tierForScore(reachableCeiling()), 'Silver', 'a flawless agent is Silver');
+  // Still a PINNED NUMBER, and that is the point of it: a future re-tune fails
+  // here and forces someone to decide deliberately what the new ceiling is and
+  // whether the gates still sit under it, rather than rediscovering a dead
+  // payment path months later.
+  eq(reachableCeiling(), 10000, 'the highest attainable score');
+  truthy(reachableCeiling() >= 5000, 'the default payment threshold is now reachable');
+  eq(tierForScore(reachableCeiling()), 'Platinum', 'a flawless agent is Platinum');
+  eq(describeCoherence(5000).outcome, 'VERIFIED', 'and the default configuration is coherent');
 });
 
-check('describeCoherence NAMES every unreachable gate', () => {
-  // "Not coherent" is not actionable. "Gold at 5000 needs a weighted sum of
-  // 3.15, and the maximum is 1.0" is.
-  const r = describeCoherence(5000);
-  eq(r.outcome, 'FAILED', 'the default configuration is incoherent');
-  eq(r.ceiling, 4008, 'ceiling reported');
-  eq(r.unreachable.map((g) => g.name).sort(), ['payment threshold', 'tier Gold', 'tier Platinum'], 'all three named');
-  match(r.detail, /cannot exceed 1\.0/, 'the reason must state why they can never be met');
+check('THE CAP NOW BINDS, which it did not before', () => {
+  // At multiplier 2000 the curve maxed at 4008 and the 10000 cap was decorative.
+  // At 5000 a flawless agent computes 10021.6, so the cap is load-bearing and
+  // the top ~1% of the range is flat. Asserted so it is a known property rather
+  // than a surprise the first time two excellent agents tie.
+  eq(scoreFromWeightedSum(1), 10000, 'a flawless agent is capped, not 10021');
+  eq(scoreFromWeightedSum(0.995), 10000, 'and so is one just below it');
+  truthy(scoreFromWeightedSum(0.98) < 10000, 'but the flattening starts near the very top, not early');
+});
+
+check('EVERY TIER IS NOW REACHABLE, and at what cost', () => {
+  // The distribution is a consequence of the log curve's steepness, not of the
+  // multiplier, and it is recorded because it decides spending limits: Platinum
+  // carries 500,000 USDC/day and now begins at a weighted sum of ~0.306.
+  const at = (ws) => tierForScore(scoreFromWeightedSum(ws));
+  eq(at(0.0), 'Bronze', 'nothing earns nothing');
+  eq(at(0.03), 'Silver', 'Silver from ~0.022');
+  eq(at(0.1), 'Gold', 'Gold from ~0.090');
+  eq(at(0.31), 'Platinum', 'Platinum from ~0.306');
+  eq(at(1.0), 'Platinum', 'and a flawless agent is Platinum');
+  // The floors are the knob if this is wrong — asserted so the docstring and
+  // the behaviour cannot drift apart.
+  truthy(weightedSumRequiredFor(7500) < 0.31 && weightedSumRequiredFor(7500) > 0.30, 'Platinum floor ~0.306');
+});
+
+check('describeCoherence STILL CATCHES an unreachable gate', () => {
+  // The check that found the original defect must keep working now that the
+  // default configuration is coherent — otherwise raising the multiplier would
+  // have quietly disarmed the very thing that caught it.
+  const r = describeCoherence(15000);
+  eq(r.outcome, 'FAILED', 'a threshold above the ceiling is still incoherent');
+  eq(r.ceiling, 10000, 'ceiling reported');
+  eq(r.unreachable.map((g) => g.name), ['payment threshold'], 'and only the offending gate is named');
+  match(r.detail, /cannot exceed 1\.0/, 'the reason must state why it can never be met');
   // Found by mutation: matching only the explanation left the gate NAMES
-  // droppable, and "3 gates are unreachable" is not actionable.
-  match(r.detail, /tier Gold at 5000 would need a weighted sum of 3\.15/, 'each gate must be named with its floor and requirement');
-  match(r.detail, /payment threshold at 5000/, 'including the payment threshold');
-  const gold = r.unreachable.find((g) => g.name === 'tier Gold');
-  truthy(gold.needsWeightedSum > 3 && gold.needsWeightedSum < 3.2, `Gold needs ~3.15, got ${gold.needsWeightedSum}`);
+  // droppable, and "1 gate is unreachable" is not actionable.
+  match(r.detail, /payment threshold at 15000 would need a weighted sum of/, 'named with its floor and requirement');
 });
 
-check('a coherent configuration reports VERIFIED', () => {
-  // Proves the check can pass — a gate that always fails is not a gate. With
-  // the threshold under the ceiling and no tier above it, coherence holds.
-  const r = describeCoherence(3000);
-  eq(r.unreachable.map((g) => g.name).sort(), ['tier Gold', 'tier Platinum'], 'tiers still unreachable');
-  eq(describeCoherence(3000).outcome, 'FAILED', 'so it is still FAILED overall');
-  // And with the tier floors themselves under the ceiling it would pass; assert
-  // the arithmetic directly rather than mutating the exported ladder.
-  eq(weightedSumRequiredFor(4008) <= 1.0001, true, 'the ceiling is reachable by definition');
+check('COHERENCE SAYS WHICH GATES IT CHECKED, not only which failed', () => {
+  // Once the multiplier was raised, every tier floor sat below the ceiling, so
+  // dropping the floors from the gate list changed no outcome and survived
+  // mutation. A report that lists only failures cannot distinguish "checked and
+  // fine" from "never looked" — the three-outcome rule, applied to a report.
+  const r = describeCoherence(5000);
+  eq(r.gatesConsidered.map((g) => g.name).sort(),
+     ['payment threshold', 'tier Gold', 'tier Platinum', 'tier Silver'],
+     'every tier floor and the payment threshold must be compared');
+  eq(r.gatesConsidered.find((g) => g.name === 'tier Platinum').floor, 7500, 'with its floor');
 });
+
+check('the DEFAULT configuration reports VERIFIED', () => {
+  // The state raising the multiplier produced, asserted directly rather than
+  // inferred from the absence of a failure.
+  const r = describeCoherence(5000);
+  eq(r.outcome, 'VERIFIED', 'every gate is reachable');
+  eq(r.unreachable.length, 0, 'nothing is unreachable');
+  match(r.detail, /every gate is reachable/, 'and it says so');
+});
+
 
 check('A NON-FINITE WEIGHTED SUM SCORES ZERO, not the maximum', () => {
-  // Found by mutation: nothing exercised the guard, so flipping REPID_MIN to
-  // REPID_MAX survived — a NaN weighted sum would have scored a perfect 10000
-  // and cleared every gate, which is the failure mode this whole file is about.
+  // Found by mutation, then DELETED BY ACCIDENT when a line-range replacement
+  // re-pinned the coherence tests around it, and found again by the same
+  // mutation on the next run. Restored here — a NaN weighted sum scoring a
+  // perfect 10000 would clear every gate, which is the failure this whole file
+  // is about, and it is now reachable in a way it was not at multiplier 2000.
   for (const bad of [NaN, Infinity, -Infinity, undefined, null, 'x']) {
     eq(scoreFromWeightedSum(bad), 0, `${JSON.stringify(bad)} must score 0`);
   }
@@ -132,7 +169,7 @@ check('reachableCeiling is DERIVED from the curve, not restated', () => {
 });
 
 check('weightedSumRequiredFor inverts the curve', () => {
-  for (const score of [1000, 2500, 4008]) {
+  for (const score of [1000, 2500, 7500]) {
     const ws = weightedSumRequiredFor(score);
     eq(scoreFromWeightedSum(ws), score, `round trip at ${score}`);
   }
