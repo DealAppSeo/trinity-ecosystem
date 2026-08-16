@@ -1296,8 +1296,12 @@ export const MUTATIONS = [
     protects:
       'an out-of-range score is malformed, not clamped. Clamping 4.7 to 1 invents a confidence ' +
       'the model never expressed and turns a broken response into a maximal pass',
-    find: '      return null;\n    }\n    score = o.score;',
-    replace: '      score = Math.min(1, Math.max(0, Number(o.score) || 0));\n    }\n    score = score ?? o.score;',
+    find:
+      '    if (typeof o.score !== \'number\' || !Number.isFinite(o.score) || o.score < 0 || o.score > 1) {\n' +
+      '      return null;\n    }\n    score = o.score;',
+    replace:
+      '    if (typeof o.score !== \'number\' || !Number.isFinite(o.score)) {\n' +
+      '      return null;\n    }\n    score = Math.min(1, Math.max(0, o.score));',
   },
 ];
 
