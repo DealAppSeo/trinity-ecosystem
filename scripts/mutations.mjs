@@ -1211,6 +1211,46 @@ export const MUTATIONS = [
     find: "  if (input.signatureValid !== true || input.boundToContract !== true) return 'NOT_CHECKED';",
     replace: "  if (input.signatureValid !== true) return 'NOT_CHECKED';",
   },
+
+  // ── check:review-session ──────────────────────────────────────────────────
+  {
+    id: 'review-doer-seed-falls-back',
+    suite: 'check:review-session',
+    file: 'lib/trustshell/review/session.ts',
+    protects:
+      'missing configuration throws and names the variable. This is the dummy-fallback defect ' +
+      'lib/CLAUDE.md removed on purpose, in its worst form: a fallback SEED does not fail ' +
+      'visibly like a fallback URL — it produces a perfectly valid Ed25519 signature attesting ' +
+      'to an identity nobody holds, and every layer above reads that as a signed contract',
+    find: '  const doerSeed = env.TRUSTSHELL_DOER_SEED?.trim();',
+    replace: "  const doerSeed = env.TRUSTSHELL_DOER_SEED?.trim() || 'fallback-doer-seed';",
+  },
+  {
+    id: 'review-single-auditor-pool-accepted',
+    suite: 'check:review-session',
+    file: 'lib/trustshell/review/session.ts',
+    protects:
+      'a pool of one is not a draw. The same reasoning as MIN_MEANINGFUL_POOL in ' +
+      'checker-assignment and MIN_MEANINGFUL_GROUP in nullifier: the mechanism runs, the proof ' +
+      'verifies, and it identifies the auditor exactly — "a named checker wearing a ' +
+      "lottery's clothes\". The draw would still be recomputable, which is what makes it " +
+      'convincing and wrong',
+    find: 'export const MIN_AUDITOR_POOL = 2;',
+    replace: 'export const MIN_AUDITOR_POOL = 1;',
+  },
+  {
+    id: 'review-exhausted-attempts-resubmit-the-last',
+    suite: 'check:review-session',
+    file: 'lib/trustshell/review/session.ts',
+    protects:
+      'running out of submissions returns null rather than repeating. Repeating the last ' +
+      'attempt makes the loop judge identical bytes twice and score STALLED — blaming the doer ' +
+      'for failing to revise work it has not yet been told about. Sessions are stateless: the ' +
+      'revision is in the NEXT request, and the honest answer is a non-terminal REVISE',
+    find: '      const submitted = request.attempts[round];',
+    replace:
+      '      const submitted = request.attempts[Math.min(round, request.attempts.length - 1)];',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

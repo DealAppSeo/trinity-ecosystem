@@ -336,8 +336,25 @@ export interface AcceptedWorkInput extends Omit<ContractedWorkInput, 'execution'
    * A function rather than a list, because a revision is a RESPONSE: round two
    * exists to address what round one was told. Passing pre-built attempts would
    * describe a loop that cannot learn, which is the thing being built here.
+   *
+   * RETURN `null` WHEN THERE IS NOTHING FURTHER TO SUBMIT. The loop then stops
+   * and returns the state as it stands — which will be non-terminal, normally
+   * REVISE.
+   *
+   * This exists because the doer is not always in-process. Over HTTP the doer
+   * is the caller: it submits, the auditor rejects, and the revision arrives in
+   * a LATER request, possibly minutes later, possibly never. Without this the
+   * only ways to model that are to block a request waiting for a party that is
+   * not there, or to fabricate an attempt — and a fabricated attempt is judged
+   * work the doer never did.
+   *
+   * A non-terminal return is therefore a legitimate, expected outcome, not a
+   * failure: "we got as far as the evidence allows, and the ball is with the
+   * doer."
    */
-  attempt: (context: AttemptContext) => Promise<AttemptSubmission> | AttemptSubmission;
+  attempt: (
+    context: AttemptContext
+  ) => Promise<AttemptSubmission | null> | AttemptSubmission | null;
 }
 
 export interface AcceptedWorkResult {
@@ -379,6 +396,12 @@ export async function runAcceptedWork(
       rounds,
       lastDetail: previousRejection?.detail,
     });
+
+    // The doer has nothing further to submit. Stop with the state as it stands
+    // rather than fabricating a round — see `attempt`. `state` is whatever the
+    // previous iteration computed, so an empty first call correctly leaves
+    // NOT_STARTED.
+    if (submission === null) break;
 
     const result = await runContractedWork({
       assignment: input.assignment,
