@@ -89,6 +89,26 @@ export interface JudgeOpinion {
    * one, which is exactly backwards.
    */
   disagreement?: number;
+  /**
+   * TRUE means "a human must look at this", as distinct from "I could not
+   * decide". Both are NOT_CHECKED; only one is resolvable by asking another
+   * model.
+   *
+   * WHY THIS EXISTS. Measured 2026-08-15, `scripts/panel-tier-test.mjs`: a
+   * `bft-judge` whose Pythagorean veto had fired returned NOT_CHECKED meaning
+   * human escalation, and `createStagedJudge` — which reads NOT_CHECKED as
+   * "escalate to the next tier" — consulted the next model, which said
+   * VERIFIED. The panel's finding that the unanimity was itself the warning
+   * sign became a pass. One value carried two meanings and the weaker one won.
+   *
+   * DELIBERATELY NOT AN `Outcome`. Three outcomes are the signed vocabulary and
+   * a fourth would be a cross-lane interop change. This is a ROUTING hint on an
+   * internal port: it never reaches `contractPayload`, `issueVerdict`, or any
+   * signed byte. A referral tells you who should decide next, not what was
+   * found — a verdict that conflated the two would be asserting a finding it
+   * does not have.
+   */
+  referToHuman?: boolean;
   detail: string;
 }
 
@@ -104,8 +124,16 @@ export interface Judge {
 // imported from it. The kernel is meant to ship as a standalone package; an
 // import here would be harmless in this direction, but it would make this file
 // the place a future reader looks to learn what the kernel requires, and the
-// two would drift. `check:types` catches a mismatch because the adapter is
-// assigned to the port in the test.
+// two would drift.
+//
+// TWO THINGS CATCH THE DRIFT, and neither alone is enough.
+// `scripts/contracted-evaluator-test.mjs` runs the real `runAgentLoop` with a
+// real evaluator, which catches every field the loop READS. It cannot catch a
+// field it does not read: a required addition to the kernel's `Evaluation` left
+// that suite at 20/20 green while this adapter no longer satisfied the port
+// [mutation-tested 2026-08-15]. `contracted-evaluator-port.ts` closes that half
+// at compile time. This comment previously credited `check:types` alone, which
+// was unearned — `tsc` reads no `.mjs`, so it never saw that test at all.
 
 export interface CriterionVerdict {
   criterionId: string;
@@ -226,7 +254,7 @@ export function createContractedEvaluator(input: ContractedEvaluatorInput): {
         requested.size !== contracted.size || [...contracted].some((id) => !requested.has(id));
 
       const evidence = renderEvidence(request.turns);
-      const evidenceHash = await hash(evidence);
+      const evidenceHash = await evidenceDigest(evidence);
 
       const verdicts: CriterionVerdict[] = [];
       const scores: CriterionScore[] = [];
@@ -363,7 +391,15 @@ function weaker(a: Outcome, b: Outcome): Outcome {
   return rank[a] <= rank[b] ? a : b;
 }
 
-async function hash(value: string): Promise<string> {
+/**
+ * The canonical evidence digest.
+ *
+ * EXPORTED so `verdict-envelope.ts` can recompute an evidence hash the same way
+ * the evaluator did. A second copy of this two-line function would be a second
+ * canonical encoding, and two canonical encodings that drift is exactly how a
+ * verdict ends up vouching for evidence it never saw.
+ */
+export async function evidenceDigest(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return (
     'sha256:' +
@@ -396,7 +432,7 @@ export async function attestCheckerAuthority(input: {
   const payload = [
     'zkrepid:checker-authority:v1',
     input.checkerDid,
-    await hash(contractPayload(input.contract)),
+    await evidenceDigest(contractPayload(input.contract)),
     input.controlProofRef,
     input.at,
   ].join(SEP);

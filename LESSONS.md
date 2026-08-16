@@ -974,3 +974,116 @@ Before reading a PR's status, confirm it is mergeable — `git merge-tree
 `grep -c CONFLICT` on that output does **not**, because SQL `ON CONFLICT` and
 prose both match. Merge `main` in before trusting a green tick, and treat
 "no run exists" as a distinct outcome from "the run passed".
+
+## A19 — the documented rule that was enforced in one directory (2026-08-15)
+
+**[VERIFIED by reproduction: the defect was introduced, caught by CI, fixed, and
+the guard re-run against a deliberate reintroduction.]**
+
+`work-contract.ts` has said it since it was written: *"Written as an escape,
+never as a raw byte. A literal U+001F in source has landed here twice and both
+times was caught by a byte scan rather than by reading — it is invisible in every
+editor and survives review."*
+
+It landed a **third** time, in `checker-assignment.ts`, written by the agent that
+had read that warning **in the same session**. The separator was authored as an
+escape and arrived on disk as the character itself.
+
+**What caught it, and what did not.** `check:identity` caught it in CI and turned
+the PR red — it already runs exactly this scan over `lib/trustshell/identity/`.
+The guard worked. What did **not** catch it: the module's own 15 assertions, a
+9-of-10 mutation run, `tsc --noEmit`, and reading the diff. The local signal was
+an accident — a `grep` printed `const SEP = ` followed by two quotes with nothing
+visible between them, and the empty-looking quotes were the only tell.
+
+**The finding that mattered more than the fix.** The scan existed only for
+`identity/`. Running the same scan repo-wide found the defect **still live
+elsewhere**: two raw U+001F in the kernel (`loop.ts`, in the tool-call and
+observation fingerprints) and **four raw NUL bytes in `agreement.ts`**, in the
+pair key two agents compare.
+
+Those four are not a new discovery. They are the incident `work-contract.ts`
+already describes — *"four raw NUL bytes once sat in this repo's wire formats …
+and the interop spec handed to the other lane was wrong because of it"* — sitting
+untouched, in live wire-format code, believed fixed for months. **The rule was
+documented, the incident was written up, and the enforcement covered one
+directory out of the tree.**
+
+All eleven are now escapes. Behaviour is identical, because the escape and the
+character compile to the same string; six suites stayed green across the change,
+which is what makes it a source-representation edit rather than a wire-format
+one.
+
+**The rule.** *A rule that has been violated three times is not a rule, it is a
+wish — and a guard that covers one directory does not cover the repository.*
+When an incident is worth writing into a header, it is worth a `check:` script
+with the scope of the hazard rather than the scope of the file it was found in.
+`npm run check:raw-bytes` now scans every `.ts`, `.tsx`, `.mjs`, `.js` and `.sql`
+under `lib/`, `scripts/`, `app/` and `supabase/`.
+
+**How this entry was nearly written wrong, twice.** The first draft of the guard
+claimed *"nothing caught it"*, which was false — `check:identity` did, in CI.
+And the shell refused the command that would have appended this very lesson,
+because the text quoting the hazard contained the hazard. Both are the same
+shape as the defect itself: a claim about bytes, made without looking at them.
+
+**A second-order note, from the same night.** Two mutation readings during this
+work were artifacts rather than evidence — one scored an unregistered npm
+script's "missing script" exit as a killed mutant, and one reported a survivor
+whose mutation never applied because bash had mangled the anchor. Both looked
+exactly like the result being sought. **A non-zero exit is not automatically the
+failure you were looking for**, and a mutation harness must prove the mutation
+landed before it reports on what the mutation did.
+
+## A20 — two correct components, one value, two meanings (2026-08-15)
+
+`bft-judge.ts` and `staged-judge.ts` were built in separate lanes. Both were
+unit-tested, both mutation-tested, both correct. Their composition was wrong, and
+neither suite could see it.
+
+The shared value is `Outcome.NOT_CHECKED`, and each lane gave it a meaning:
+
+- `bft-judge` returns it for a fired Pythagorean veto, meaning **"the panel's
+  unanimity is itself the warning sign — a HUMAN must look"**.
+- `staged-judge` reads it as **"this tier could not decide — ASK THE NEXT
+  TIER"**.
+
+Both readings are defensible in isolation. Composed, the second silently consumes
+the first: measured on the first run, a vetoing panel placed anywhere but **last**
+had its referral escalated to a single model, which said VERIFIED. Every unit test
+stayed green. Every signature in the chain verified. The verdict was wrong and
+nothing in the system said so.
+
+**It was worse than losing a signal — it inverted one.** The panel's entire claim
+is that *more model agreement is the problem here*. The staged judge's repair was
+to ask one more model. The remedy was the disease.
+
+**Why no unit suite could have caught it.** Each unit is self-consistent under its
+own reading. A suite written from inside one lane asserts that lane's meaning and
+passes. **The bug lives in the gap between two vocabularies, and a gap has no
+owner** — the same shape as `repid_score_events.event_type` versus
+`ReputationSignal`, and the same shape as the two Vercel projects named after
+domains they do not serve. This repo keeps producing it.
+
+**The rule.** *When two components exchange a value from a small enumeration,
+write a suite that belongs to neither and run it before trusting the composition.*
+The question it must ask is not "does each side handle every case" — both did —
+but **"does each side mean the same thing by each case".**
+
+**The fix that was rejected, and why it matters more than the one built.** The
+zero-code option was to document the ordering constraint: *put the panel last*.
+That is not a fix. It leaves a **config file** standing between a vetoed run and
+a false pass, and tier order is data — a correctness property that holds for one
+ordering is not a property. The built fix makes the judge state which
+`NOT_CHECKED` it meant (`referToHuman`), so position stops mattering; one
+assertion now pins the whole thing, checking that a vetoing panel yields the same
+outcome at every position.
+
+**And the part that is easy to get wrong in the other direction.** Not every
+`NOT_CHECKED` is a referral. `bft-judge`'s truncated-evidence case is genuinely
+resolvable by a judge with a bigger window, so it deliberately does **not** set
+the flag, and an outage is recorded as `referredToHuman: false` — counting
+provider downtime as human referrals would bury the referral rate in
+infrastructure noise. **A signal that fires for everything measures nothing.**
+Both omissions are asserted, not assumed: `check:panel-tier` fails if truncation
+or an outage ever claims a referral.
