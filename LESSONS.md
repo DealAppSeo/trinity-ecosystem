@@ -1293,3 +1293,33 @@ when a provider is actually called. A third of the work, a full-looking row.
 4. **Non-empty is not valid.** 12 rows carry the literal string `used:2` in
    `hal_providers_used` where names belong. A count written into a name field
    means an "is it non-empty" check can still pass on garbage. Still OPEN.
+
+### The same rows read as a feature by a second lane
+
+The sharpest part of this arrived from outside. Working independently, the
+grok-code lane (PR #55) measured the same corpus, found the same three-mode
+trap, computed the same AUC 0.9579, caught the same tie-handling error — and
+built the better artefact, a `PooledModes` refusal in code where this lane had
+only written a recommendation. It also recorded:
+
+> *"HAL's veto is not a threshold: 41 rows vetoed below 0.43, zero above it
+> escaping."*
+
+**Those 41 are exactly the no-provider rows** — the partition is exact, 41 of 41
+sub-threshold vetoes from empty-provider rows, 0 from rows where a provider ran.
+Read from the veto side it looks like a bonus detection path lifting recall from
+0.807 to 0.904. Read from the provider side it is 41 vetoes cast with nothing
+consulted: 19 landed on hallucinations (67.9% of that group's positives), 22 on
+clean answers (71.0% of its negatives). **It fires slightly more often on the
+clean ones.**
+
+**The lesson is not that the other lane was careless — it was not.** It is that
+the *same rows* support a capability reading and a defect reading, and the column
+that separates them (`hal_providers_used`) is in neither the metric nor the veto
+flag. Two competent measurements of the same table disagreed about what HAL
+*does*, and only joining on execution resolved it.
+
+Corollary for this lane: when a second measurement of your subject exists, **read
+it before publishing yours.** The cross-check cost one query and changed a
+headline; not doing it would have left two documents on `main` describing the
+same 41 rows in opposite terms.

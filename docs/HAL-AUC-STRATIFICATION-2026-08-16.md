@@ -208,6 +208,47 @@ counted in an accuracy denominator is the *lesser* issue; the verdict itself was
 unearned. This is the defect class the repo's own `CLAUDE.md` opens with, found
 inside the component built to catch it.
 
+### 5.5 The same 41 rows were independently read as a *capability*
+
+**Cross-checked 2026-08-16 against PR #55**, where the grok-code lane measured
+HAL's accuracy independently and reached the same stratification, the same
+AUC 0.9579, and the same tie-handling correction — and built the stronger
+artefact, a `PooledModes` refusal in `lib/hal/accuracy.ts` rather than this
+document's recommendation. One line there needs this section:
+
+> *"HAL's veto is not a threshold: 41 rows vetoed below 0.43, zero above it
+> escaping."*
+
+True, and the cause is not a second veto mechanism. **Those 41 are exactly the
+no-provider rows.** The partition is exact:
+
+| | vetoes **below** 0.43 | vetoes **at/above** 0.43 | rows |
+|---|---|---|---|
+| **EMPTY providers** | **41** | 0 | 59 |
+| provider(s) called | **0** | 166 | 336 |
+
+Every sub-threshold veto came from a row with no provider; every provider-called
+row was vetoed only at threshold.
+
+Split those 41 by label and the "extra veto path" evaporates:
+
+- **19** fired on hallucinations — 19 of 28 positives, a **67.9%** veto rate
+- **22** fired on clean answers — 22 of 31 negatives, a **71.0%** veto rate
+
+**It fires slightly more often on clean answers than on hallucinations**, which
+is what AUC 0.5150 on this group predicts. Crediting it with lifting recall from
+0.807 to 0.904 is buying recall with 41 coin flips.
+
+**What survives, stated because a correction that overreaches is worth less than
+one that doesn't:** the ceiling conclusion in #55 holds. Removing the 41 drops
+realized F1 to the pure cut, 0.8760 against a best-possible 0.890547 — 98.37% of
+the bound rather than 98.95%. The number moves; the decision that re-cutting the
+threshold is not where the value lies does not. And AUC 0.9579 is threshold-free
+and veto-free, so it is untouched — indeed it is *conservative*, because it pools
+the 59 no-run rows in.
+
+### 5.6 What is still not known
+
 **NOT CHECKED: whether this reaches production.** `hal_production_events` holds
 **5 rows**, dated 2026-04-16 to 2026-04-25, and has an entirely different schema
 with no provider column — so it cannot answer the question either way. That the
