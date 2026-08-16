@@ -30,6 +30,23 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * DELIBERATELY DROPS `error`, and this one is a decision rather than an
+ * oversight — recorded here because it pattern-matches the four real defects
+ * fixed alongside it (2026-08-16) and will otherwise be "fixed" by the next
+ * reader.
+ *
+ * The difference is what a failure produces. The others returned a *plausible
+ * wrong answer* — 0 spent, no such agent, default weights, no institutions —
+ * that nothing downstream could distinguish from a real one. This cannot: no
+ * session means no Authorization header, the route answers 401, and `apiFetch`
+ * throws `ApiError` with `isUnauthenticated` set. The failure is already loud,
+ * one layer down.
+ *
+ * Throwing here would be strictly worse. A signed-out user is the ordinary
+ * case, not an error, and a transient refresh failure would take the whole app
+ * down instead of degrading to a sign-in prompt.
+ */
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await getSupabaseBrowser().auth.getSession();
   const token = data.session?.access_token;

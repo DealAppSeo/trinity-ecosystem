@@ -520,6 +520,55 @@ export const MUTATIONS = [
     find: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid);',
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
+  {
+    id: 'spend-limit-reads-zero-when-unreadable',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'a daily spend that could not be READ is never reported as 0 SPENT. This is the ' +
+      'payment path: the caller compares the result against spendingLimitDaily, so an ' +
+      'RLS denial silently became the single most permissive answer the function can ' +
+      'give. `(null || []).reduce(...)` is 0, and nothing downstream could tell that ' +
+      'apart from a genuinely quiet day',
+    // `&& false`, not `if (false)`, so `error` stays referenced and the mutant
+    // cannot fail for an unused-variable reason instead of the real one.
+    find:
+      '    if (error) {\n' +
+      '      throw new Error(',
+    replace:
+      "    if (error && error.code === 'NEVER_MATCHES') {\n" +
+      '      throw new Error(',
+  },
+  {
+    id: 'risk-weights-silently-default-when-unreadable',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/RepIDConfig.ts',
+    protects:
+      "an institution's chosen risk weights are never silently replaced by OURS. The " +
+      'condition must distinguish PGRST116 (no config row — defaulting is correct and ' +
+      'is the common case) from any other error (RLS, expired key, transport), which ' +
+      'previously also returned the defaults and looked deliberate',
+    find: "    if (error && error.code !== 'PGRST116') {",
+    replace: "    if (error && error.code === 'PGRST116') {",
+  },
+  {
+    id: 'unreadable-registry-reads-as-unregistered-agent',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'THREE OUTCOMES on agent resolution. A failed read must be `unreadable`, never ' +
+      '`absent` — otherwise a permissions failure reports the agent as having no track ' +
+      'record, which is a plausible wrong answer about reputation. `load()` twelve ' +
+      'lines below already refuses exactly this for its own read',
+    find:
+      '      if (error) {\n' +
+      '        return {\n' +
+      "          status: 'unreadable',",
+    replace:
+      "      if (error && error.code === 'NEVER_MATCHES') {\n" +
+      '        return {\n' +
+      "          status: 'unreadable',",
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
