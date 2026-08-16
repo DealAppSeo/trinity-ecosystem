@@ -80,7 +80,9 @@
     "check:repid-scoring": "node scripts/check-repid-scoring.mjs",
     "check:hal-chain": "node scripts/check-hal-chain.mjs",
     "check:hal-receipt": "node scripts/check-hal-receipt.mjs",
-    "check:throughput": "node scripts/check-throughput.mjs"
+    "check:throughput": "node scripts/check-throughput.mjs",
+    "check:spine-reachable": "node scripts/spine-reachable-test.mjs",
+    "check:loud-errors": "node scripts/loud-errors-test.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

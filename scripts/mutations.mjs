@@ -789,6 +789,105 @@ export const MUTATIONS = [
     find: '    JSON.stringify(PAYMENT_AUDIT_DOMAIN),',
     replace: "    '',",
   },
+
+  // -------------------------------------------------------------------------
+  // From #52 on main. The spine reachability pair and the silent-empty guard.
+  // -------------------------------------------------------------------------
+  {
+    id: 'spine-unreachable-from-barrel',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/index.ts',
+    protects:
+      'the spine stays REACHABLE. Every module below was correct, mutation-tested and ' +
+      'green while being importable by nobody — measured 2026-08-16, 0 of 10 exported ' +
+      'from the barrel. No unit suite can see this, because a test imports by path, ' +
+      'which is exactly the access a real consumer does not have',
+    find:
+      "export { analyseReadOnly, delegateAuditorGrant } from './identity/auditor-grant';\n" +
+      'export type {\n' +
+      '  ToolCapabilityMap,\n' +
+      '  ToolEffect as GrantToolEffect,\n' +
+      '  ToolEffectMap,\n' +
+      '  WriteReach,\n' +
+      '  ReadOnlyAnalysis,\n' +
+      '  AuditorGrantInput,\n' +
+      '  AuditorGrant,\n' +
+      "} from './identity/auditor-grant';",
+    replace: '// MUTANT: auditor-grant dropped from the barrel',
+  },
+  {
+    id: 'spine-substitutes-a-checker-it-can-sign-as',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/identity/spine.ts',
+    protects:
+      'a drawn checker this harness cannot act as is REFUSED, never substituted. The ' +
+      'tempting repair — fall back to a key we do hold — is checker-shopping arriving ' +
+      'as error handling, and this mutant signs the verdict with the DOER\'s own key, ' +
+      'which every signature check downstream would still call valid',
+    find: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid);',
+    replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
+  },
+  {
+    id: 'spend-limit-reads-zero-when-unreadable',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'a daily spend that could not be READ is never reported as 0 SPENT. This is the ' +
+      'payment path: the caller compares the result against spendingLimitDaily, so an ' +
+      'RLS denial silently became the single most permissive answer the function can ' +
+      'give. `(null || []).reduce(...)` is 0, and nothing downstream could tell that ' +
+      'apart from a genuinely quiet day',
+    // RETARGETED IN THE #52 MERGE. This mutant originally broke the `throw`
+    // that main added. Both lanes fixed this fail-open independently — main by
+    // throwing, this branch by returning `number | null` — and the merge kept
+    // the nullable return, so the throw the mutant edited no longer exists and
+    // the entry would have gone DRIFT. It now restores the same defect against
+    // the same fixture: an unreadable ledger reporting a confident 0.
+    find: '    if (error || !data) return null;',
+    replace: '    if (error || !data) return 0;',
+  },
+  {
+    id: 'spend-total-drops-an-unparseable-row',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'a row whose amount will not parse makes the TOTAL unknown, not SMALLER. The hole ' +
+      'capturing the query error does not close: `reduce((s, r) => s + Number(...), 0)` ' +
+      'folds one bad row to NaN, and `NaN > limit` is false — so the unparseable row ' +
+      'PASSES the limit it broke. Skipping it is the same bug with a tidier total',
+    find: '      if (!Number.isFinite(amount)) return null;',
+    replace: '      if (!Number.isFinite(amount)) continue;',
+  },
+  {
+    id: 'risk-weights-silently-default-when-unreadable',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/RepIDConfig.ts',
+    protects:
+      "an institution's chosen risk weights are never silently replaced by OURS. The " +
+      'condition must distinguish PGRST116 (no config row — defaulting is correct and ' +
+      'is the common case) from any other error (RLS, expired key, transport), which ' +
+      'previously also returned the defaults and looked deliberate',
+    find: "    if (error && error.code !== 'PGRST116') {",
+    replace: "    if (error && error.code === 'PGRST116') {",
+  },
+  {
+    id: 'unreadable-registry-reads-as-unregistered-agent',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'THREE OUTCOMES on agent resolution. A failed read must be `unreadable`, never ' +
+      '`absent` — otherwise a permissions failure reports the agent as having no track ' +
+      'record, which is a plausible wrong answer about reputation. `load()` twelve ' +
+      'lines below already refuses exactly this for its own read',
+    find:
+      '      if (error) {\n' +
+      '        return {\n' +
+      "          status: 'unreadable',",
+    replace:
+      "      if (error && error.code === 'NEVER_MATCHES') {\n" +
+      '        return {\n' +
+      "          status: 'unreadable',",
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

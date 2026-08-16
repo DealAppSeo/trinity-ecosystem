@@ -13,7 +13,10 @@ import {
 } from './repid-scoring';
 
 export class KYAValidator {
-  private get supabase() { return getSupabaseAdmin(); }
+  /** Optional injected client for tests. Still lazy — see lib/CLAUDE.md. */
+  constructor(private readonly injectedClient?: ReturnType<typeof getSupabaseAdmin>) {}
+
+  private get supabase() { return this.injectedClient ?? getSupabaseAdmin(); }
 
   /**
    * Look up an agent, distinguishing ABSENT from UNREADABLE.
@@ -70,13 +73,42 @@ export class KYAValidator {
   /**
    * Spend in the last 24h, or NULL when the history could not be read.
    *
-   * The original discarded the query error and returned `(data || []).reduce(…)`,
-   * so a database failure produced 0 — indistinguishable from "has spent
-   * nothing" — and the daily-limit check then PASSED. A DB outage granted the
-   * full daily allowance, silently, on the payment path.
+   * FAILS CLOSED, and this is the one on the list that had teeth. It used to
+   * destructure only `data`, so an RLS denial or a transport fault returned
+   * `(null || []).reduce(...)` === **0 spent today** — and the caller is
+   * `validate()`, which compares that against `spendingLimitDaily`. A
+   * permissions failure read as "this agent has spent nothing", the single most
+   * permissive answer the function can give, on the path that authorizes
+   * payments. `getAgentProfile` directly above already captured `error`; this
+   * was the same file disagreeing with itself.
    *
-   * Absent is not zero. The nullable return is what forces the caller to have
-   * an opinion about a limit it could not evaluate.
+   * ── WHY NULL RATHER THAN A THROW ───────────────────────────────────────────
+   *
+   * BOTH LANES FOUND THIS AND FIXED IT DIFFERENTLY. #52 on main threw; this
+   * branch returns `number | null`. The merge keeps NULL, for two reasons that
+   * are about evidence rather than taste:
+   *
+   * 1. A throw records nothing. This value flows into `checkDailyLimit` and
+   *    then into a compliance receipt's `withinDailyLimit`, which is `boolean |
+   *    null` precisely so the receipt can carry "this limit was NOT evaluated"
+   *    as a fact about the decision. An exception 500s the request and leaves
+   *    no artifact saying which check did not run.
+   * 2. A throw does not survive the next `try/catch`. A gate that throws tends
+   *    to acquire a handler returning the permissive answer, which is how this
+   *    class of bug comes back. A nullable return is enforced by the compiler
+   *    at every call site instead.
+   *
+   * The throw's reasoning is kept above because it is right about the danger,
+   * and the message it carried is preserved in `checkDailyLimit`'s NOT_CHECKED
+   * detail. Absent is not zero, either way.
+   *
+   * ── AND A HOLE THE THROW DID NOT CLOSE ─────────────────────────────────────
+   *
+   * `(data || []).reduce((s, r) => s + Number(r.payment_amount_usdc), 0)` yields
+   * **NaN** for a single unparseable amount, and `NaN > limit` is `false` — so a
+   * row that will not parse passes the limit rather than failing it. Capturing
+   * the query error does not touch that path. A row whose amount cannot be read
+   * makes the TOTAL unknown, not smaller, so it returns null here too.
    */
   async getDailySpend(agentName: string): Promise<number | null> {
     const since = new Date(Date.now() - 86_400_000).toISOString();
@@ -91,6 +123,8 @@ export class KYAValidator {
     for (const row of data) {
       const amount = Number(row.payment_amount_usdc);
       // A row whose amount will not parse makes the TOTAL unknown, not smaller.
+      // `reduce` would fold it to NaN, and `NaN > limit` is false — so the
+      // unparseable row would have PASSED the limit it broke.
       if (!Number.isFinite(amount)) return null;
       total += amount;
     }

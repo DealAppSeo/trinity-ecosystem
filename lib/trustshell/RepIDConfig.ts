@@ -42,27 +42,66 @@ export interface RepIDCalculationResult {
 }
 
 export class RepIDCalculator {
-  private get supabase() { return getSupabaseAdmin(); }
+  /**
+   * Optional injected client for tests. Still lazy, and deliberately so: this
+   * class is instantiated at MODULE SCOPE in
+   * `app/api/trustrails/repid/configure/route.ts`, so constructing a client
+   * here would run at build time and fail the build (lib/CLAUDE.md).
+   */
+  constructor(private readonly injectedClient?: ReturnType<typeof getSupabaseAdmin>) {}
+
+  private get supabase() { return this.injectedClient ?? getSupabaseAdmin(); }
 
   private readonly DEFAULT_WEIGHTS: RepIDWeights = DEFAULT_WEIGHTS;
 
   /**
-   * Weights for an institution, VALIDATED ON READ.
+   * Weights for an institution: UNREADABLE IS LOUD, and what IS read is
+   * VALIDATED.
    *
-   * The stored value is checked with the same rule the setter applies, because
+   * Both halves of this arrived independently — the refusal from #52 on main,
+   * the validation from this branch — and the merge keeps both, because they
+   * close different holes and either one alone leaves the other open.
+   *
+   * TWO REASONS `data` CAN BE NULL, and only one of them is fine. `.single()`
+   * reports PGRST116 when the row simply does not exist — an institution with
+   * no custom risk config — and falling back to the defaults is exactly right
+   * for that. Every OTHER error (RLS denial, expired key, transport fault) also
+   * produced `data === null` and so also returned the defaults, silently
+   * replacing an institution's *chosen* risk posture with ours on the path that
+   * computes their RepID scores. The weights would look deliberate. So: absent
+   * row is a default, unreadable row throws.
+   *
+   * And what IS read is checked with the same rule the setter applies, because
    * the setter is not the only writer — a migration or another service can put
    * anything in `institution_risk_config`. Weights that do not sum to 1 break
    * the score's range, which is the one route to a tier the honest maximum
    * cannot reach. Unusable stored weights fall back to the defaults rather than
    * throwing, since this sits on a gate's read path, but the fallback is a
    * deliberate substitution rather than the `|| DEFAULT` coincidence it was.
+   *
+   * A NOTE ON THE TWO REFUSAL STYLES in this class. This path throws; the
+   * threshold path below returns NOT_CHECKED. That is not drift — an
+   * institution's weights have no honest substitute, so there is nothing to
+   * report and the only correct move is to stop, whereas a threshold that could
+   * not be read is a specific, reportable state the payment route turns into a
+   * 503 naming the cause. Both refuse; they differ in how much the caller can
+   * say about why.
    */
   async getInstitutionWeights(institutionId = 'default'): Promise<RepIDWeights> {
-    const { data } = await this.supabase
+    const { data, error } = await this.supabase
       .from('institution_risk_config')
       .select('repid_weights')
       .eq('institution_id', institutionId)
       .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw new Error(
+        `could not read institution_risk_config for "${institutionId}": ${error.message}. ` +
+          `Refusing to fall back to default weights, which would silently overwrite this ` +
+          `institution's chosen risk posture with ours.`
+      );
+    }
+
     const stored = data?.repid_weights;
     if (stored === undefined || stored === null) return this.DEFAULT_WEIGHTS;
     return weightsProblem(stored) === null ? (stored as RepIDWeights) : this.DEFAULT_WEIGHTS;

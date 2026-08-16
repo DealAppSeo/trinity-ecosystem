@@ -141,6 +141,32 @@ that never ran. It is recorded here so that when the main-path scan does run, th
 first result is compared against 30 findings / 7 usable rather than read as a
 new baseline.
 
+#### RESOLVED — VERIFIED on the main path, 2026-08-16
+
+The branch landed as `0b4a166` and the main-path scan ran for the first time,
+in run `31920004705` (job `95098253121`). Steps 9/10/11 all `success`; step 8,
+the PR-only path, correctly `skipped`. Compared against the baseline this
+section was written to protect:
+
+```
+scanning 689 commits (660 reused, 29 new)…
+30 finding(s): 0 usable in working tree, 7 usable in history.
+```
+
+**30 findings / 7 usable — identical to the local measurement.** The untracking
+is VERIFIED: with the tracked copy gone, `actions/cache` restore-keys is the
+only source, and it worked.
+
+**One prediction in this section was wrong, and the way it was wrong is the
+useful part.** It anticipated *"~0s on a cache hit, ~45s cold"* — a binary. The
+step took **18s**, which is neither, and briefly read as an anomaly. It is not:
+`660 reused, 29 new` is a **partial** hit via restore-keys, scanning only the
+commits added since the last cached run. That is the mechanism working exactly
+as designed, and the two-outcome prediction had no room to express it. Recorded
+because "the measurement didn't match either expected value" is precisely the
+moment this repo has historically reached for a wrong explanation — the third
+outcome was missing from the *prediction*, not from the system.
+
 ### 4.2 A claim in the index that cost a re-check
 
 The index recorded the cache as producing *"output byte-identical to the
