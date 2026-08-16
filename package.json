@@ -77,7 +77,8 @@
     "check:probes": "node scripts/check-probes-selftest.mjs && node scripts/check-probes.mjs",
     "mutate": "node scripts/mutate.mjs",
     "check:hal-receipt": "node scripts/check-hal-receipt.mjs",
-    "check:throughput": "node scripts/check-throughput.mjs"
+    "check:throughput": "node scripts/check-throughput.mjs",
+    "check:schema-names": "node scripts/check-schema-names.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",
