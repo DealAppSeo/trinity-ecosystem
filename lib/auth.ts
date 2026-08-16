@@ -140,7 +140,16 @@ export async function authorizeInstitution(
 /** Institutions this actor can see, for populating a picker. */
 export async function listInstitutions(actor: Actor): Promise<Array<{ institutionId: string; role: InstitutionRole }>> {
   if (actor.type === 'service') {
-    const { data } = await getSupabaseAdmin().from('institution_config').select('institution_id');
+    // Captures `error` for the same reason the member branch below does, and
+    // it was the only one of the two that did not. A failed read returned
+    // `(null ?? [])` — an empty list, which renders as "you have access to no
+    // institutions" and is indistinguishable from a correct empty result.
+    const { data, error } = await getSupabaseAdmin()
+      .from('institution_config')
+      .select('institution_id');
+
+    if (error) throw new AuthError(503, `Could not list institutions: ${error.message}`);
+
     return (data ?? []).map((r: { institution_id: string }) => ({
       institutionId: r.institution_id,
       role: 'owner' as const,
