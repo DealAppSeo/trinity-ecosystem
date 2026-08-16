@@ -1087,3 +1087,91 @@ provider downtime as human referrals would bury the referral rate in
 infrastructure noise. **A signal that fires for everything measures nothing.**
 Both omissions are asserted, not assumed: `check:panel-tier` fails if truncation
 or an outage ever claims a referral.
+
+---
+
+## A19 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
+
+**[VERIFIED] — the run is in CI: `check` green, `test:e2e` red, same commit.**
+
+`npm run check` — the repo's own comprehensive gate, the one `check-all.mjs`
+discovers 52 suites for — reported **52 VERIFIED, 0 NOT_CHECKED, 0 FAILED**.
+The same commit failed CI.
+
+The workflow runs three things, and `check` is only the first:
+
+```
+npm run check        # 52 suites  <- the one everybody runs
+npx next build
+npm run test:e2e     # 37 steps over HTTP against a real server
+```
+
+The failure was a **denial reason reworded**. `checkPerTxLimit` said "exceeds
+the per-transaction limit of 100" where the original said "exceeds per-tx limit
+100", and `scripts/e2e/run-e2e.mjs:356` matches `/exceeds per-tx limit/i`
+against it **over HTTP**. Nothing in the 52 suites touches that string, because
+none of them starts a server.
+
+**Why it is the house defect and not a slip.** The reworded string is a
+`denialReason` written into a compliance receipt — an artifact whose entire
+purpose is being evidence. Its wording is an observable contract, and it was
+edited as though it were prose, in a commit whose subject was *fixing* unearned
+claims. Confidence came from a green run that structurally could not see the
+break.
+
+**The rule.** *Before claiming a change is green, run what CI runs — all of it.*
+`npm run check && npx next build && npm run test:e2e`. A suite that does not
+start a server cannot see an HTTP contract, and `check-all.mjs`'s summary line
+is honest about what it ran, not about what CI will.
+
+Also, from the same incident: the fast suite now duplicates the e2e's own
+regexes (`check:repid-scoring`, 'THE DENIAL WORDING IS A CONTRACT'), so the next
+break shows up in seconds rather than after a build and a server boot.
+
+---
+
+## A20 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
+
+**[VERIFIED] — `curl` to the REST endpoint returns 403; the MCP tool returns the
+same runs successfully, seconds apart.**
+
+An agent session watching its own PR wrote the obvious poll:
+
+```bash
+until out=$(curl -s ".../commits/$SHA/check-runs" | python3 -c "
+  d=json.load(sys.stdin)
+  runs=[r for r in d.get('check_runs',[]) if ...]
+  if runs and all(completed): print(...)"); [ -n "$out" ]; do sleep 30; done
+```
+
+It never fired. Not once, across four PRs and a whole night.
+
+```
+$ curl -s -w '%{http_code}' .../check-runs
+403 {"message": "Resource not accessible by integration"}
+```
+
+**The session's GitHub token cannot read `/check-runs` over REST.** The MCP
+tool (`pull_request_read` with `method: get_check_runs`) reads the same data
+fine — different auth path. So the capability exists; only that route is closed.
+
+**Why it survived a whole night undetected.** `d.get('check_runs', [])` turns a
+403 body into an empty list. Empty list → no completed runs → print nothing →
+the `until` loop treats it as "not finished yet" and sleeps. **A poll with two
+states — fired / not yet — silently absorbs a third: cannot look.** Which is
+this repository's founding defect, committed inside the tooling built to verify
+this repository.
+
+The tell was available and ignored: the watchers ran to their full timeout
+*every time*, and CI results only ever arrived via webhook wake events. A poll
+that has never once fired is not a slow poll.
+
+**The rules.**
+
+1. **Read CI status through the MCP tool, not `curl`.** REST `/check-runs` is
+   403 from a session.
+2. **A poll loop must distinguish "not ready" from "could not read".** Check the
+   HTTP status; a non-200 is NOT_CHECKED and must be surfaced, never slept on.
+   `.get(key, [])` on an unparsed error body is the exact line that hides it.
+3. **A watcher that has never fired is evidence about the watcher.** Silence
+   from a check is not a result.

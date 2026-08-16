@@ -161,13 +161,40 @@ const RLS_DENIED = { message: 'permission denied for table', code: '42501' };
 // 1. KYAValidator.getDailySpend — the one with teeth. It gates payments.
 // ---------------------------------------------------------------------------
 
+// RECONCILED IN THE #52 MERGE — two lanes, one defect, two different fixes.
+//
+// This suite asserted that `getDailySpend` THROWS. The zkrepid branch had
+// independently made it return `number | null` and threaded that through
+// `checkDailyLimit`, `validate()` and the receipt's `withinDailyLimit`, which
+// is `boolean | null` so a receipt can carry "this limit was NOT evaluated" as
+// a fact about the decision. The merge kept the nullable return, for reasons
+// recorded on the method: a throw leaves no artifact saying which check did not
+// run, and a throwing gate tends to acquire a `try/catch` returning the
+// permissive answer, which is how this class of bug returns.
+//
+// THE INTENT OF THIS TEST IS UNCHANGED and is what matters: a permissions
+// failure must never read as "spent nothing today". Only the shape of the
+// refusal moved, from an exception to a value the compiler forces every caller
+// to handle.
 await check('getDailySpend REFUSES an unreadable ledger instead of reporting 0', async () => {
   const v = new KYA.KYAValidator(fakeClient({ data: null, error: RLS_DENIED }));
-  await refuses(
-    () => v.getDailySpend('TORCH'),
-    'refusing to report a daily spend',
-    'an RLS denial must not read as "spent nothing today"'
+  const spend = await v.getDailySpend('TORCH');
+  eq(spend, null, 'an RLS denial must not read as "spent nothing today"');
+  // The distinction that had teeth: null and 0 are different answers, and the
+  // old code could only give the second one.
+  truthy(spend !== 0, 'and must be distinguishable from a genuinely quiet day');
+});
+
+await check('getDailySpend REFUSES a row whose amount will not parse', async () => {
+  // The hole capturing the query error does not close. `reduce` folds one bad
+  // row to NaN, and `NaN > limit` is false — so the unparseable row PASSES the
+  // limit it broke. An unknown total is not a smaller one.
+  const v = new KYA.KYAValidator(
+    fakeClient({ data: [{ payment_amount_usdc: 10 }, { payment_amount_usdc: 'not-a-number' }], error: null })
   );
+  eq(await v.getDailySpend('TORCH'), null, 'one unreadable amount makes the TOTAL unknown');
+  truthy(!Number.isFinite(10 + Number('not-a-number')), 'precondition: reduce would have folded it to NaN');
+  truthy(!(NaN > 1000), 'precondition: and NaN clears every limit rather than failing it');
 });
 
 await check('getDailySpend still sums a real result', async () => {
