@@ -855,6 +855,44 @@ export const MUTATIONS = [
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
   {
+    id: 'repid-saturation-band-goes-unfound',
+    suite: 'check:repid-marginal',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'the scan finds the band where score has ALREADY reached REPID_MAX. With a strict `>` ' +
+      'it never fires — the clamp means the score never exceeds the maximum, only equals it — ' +
+      'so saturation reports at weightedSum 1 and the dead band measures zero. The defect ' +
+      'would then be invisible in the very gate written to measure it',
+    find: '    if (scoreFromWeightedSum(ws) >= REPID_MAX) {',
+    replace: '    if (scoreFromWeightedSum(ws) > REPID_MAX) {',
+  },
+  {
+    id: 'repid-overshoot-erased',
+    suite: 'check:repid-marginal',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'the overshoot is REPORTED, because it is the cause. 57200/0.5 evaluates to 10072.42 at ' +
+      'weightedSum 1 against a REPID_MAX of 10000, and those 72 points are what create the ' +
+      'dead band. Zeroing it leaves the band visible with no explanation, which sends the ' +
+      'next reader to reshape the logarithm — the one change that cannot fix it',
+    find: '    overshoot: uncappedAtOne - REPID_MAX,',
+    replace: '    overshoot: 0,',
+  },
+  {
+    id: 'repid-marginal-ignores-the-clamp',
+    suite: 'check:repid-marginal',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'marginal value is measured through the REAL scoring function, clamp included. The ' +
+      'mutant computes the raw curve instead and reports 83.42 at weightedSum 0.99 where the ' +
+      'module actually pays 11 — which is precisely the confusion this gate exists to settle: ' +
+      'the curve is nearly flat, and the collapse at the top belongs to the clamp',
+    find:
+      '  const to = scoreFromWeightedSum(Math.min(1, weightedSum + delta));',
+    replace:
+      '  const to = SCORE_LOG_MULTIPLIER * Math.log10(1 + (weightedSum + delta) * SCORE_LOG_INPUT_SCALE);',
+  },
+  {
     id: 'zk-build-group-hashes-twice',
     suite: 'check:zk-cost',
     file: 'lib/trustshell/identity/nullifier.ts',

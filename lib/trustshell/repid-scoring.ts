@@ -707,3 +707,68 @@ export function isPlaceholderProofCid(cid: unknown): boolean {
   if (typeof cid !== 'string' || cid.trim() === '') return true;
   return /^ZKP_STUB_/.test(cid.trim());
 }
+
+// ---------------------------------------------------------------------------
+// MARGINAL VALUE — what does real improvement actually buy?
+//
+// Sprint D4 recorded the inversion as a property of the CURVE: "+0.01 of real
+// improvement was worth 880 points at the bottom and 0 at the top", and
+// predicted the 57200/0.5 recalibration would reduce it. Measured here, the
+// prediction holds — but the DIAGNOSIS does not, and the difference changes
+// what a fix would have to touch.
+//
+// Below saturation the curve's own spread is 124 -> 83, a factor of **1.49**.
+// That is a logarithm behaving like a logarithm, and it is not the finding.
+//
+// The collapse to zero is the CLAMP. `scoreFromWeightedSum` floors at
+// `REPID_MAX`, and 57200/0.5 evaluates to **10072.42** at weightedSum 1 — so
+// the calibration overshoots the maximum by 72 points and every agent above
+// weightedSum ~= 0.9915 scores exactly 10000. Inside that band, measurable
+// improvement is worth exactly nothing.
+//
+// So "the curve pays least at the top" is the wrong target. Reshaping the log
+// would move 1.49; only the overshoot moves the zero.
+// ---------------------------------------------------------------------------
+
+/** Points bought by adding `delta` at `weightedSum`. Drives the real curve. */
+export function marginalValueAt(weightedSum: number, delta = 0.01): number {
+  const from = scoreFromWeightedSum(weightedSum);
+  const to = scoreFromWeightedSum(Math.min(1, weightedSum + delta));
+  return to - from;
+}
+
+export interface Saturation {
+  /** Smallest weighted sum this module already scores at `REPID_MAX`. */
+  atWeightedSum: number;
+  /** Width of the dead band, in weighted-sum units. */
+  bandWidth: number;
+  /** What the curve WOULD score at weightedSum 1 with no clamp. */
+  uncappedAtOne: number;
+  /** By how much the calibration overshoots `REPID_MAX`. The cause. */
+  overshoot: number;
+}
+
+/**
+ * Where does improvement stop paying, and why?
+ *
+ * Found by scanning the real function rather than inverting it: the inverse is
+ * the thing that was already wrong once here (`weightedSumRequiredFor` returned
+ * a sum scoring one point short), so this asks the module directly.
+ */
+export function saturationPoint(step = 0.0001): Saturation {
+  let at = 1;
+  for (let ws = 0; ws <= 1 + 1e-12; ws += step) {
+    if (scoreFromWeightedSum(ws) >= REPID_MAX) {
+      at = Math.min(1, ws);
+      break;
+    }
+  }
+  const uncappedAtOne =
+    SCORE_LOG_MULTIPLIER * Math.log10(1 + 1 * SCORE_LOG_INPUT_SCALE);
+  return {
+    atWeightedSum: at,
+    bandWidth: Math.max(0, 1 - at),
+    uncappedAtOne,
+    overshoot: uncappedAtOne - REPID_MAX,
+  };
+}

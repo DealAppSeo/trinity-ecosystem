@@ -79,10 +79,27 @@ repid-engine, outside this repo's push scope → **BLOCKED_FOR_SEAN**. Read
 `v_repid_proof_score_audit`, which buckets on score alone and reports a
 misleading 99.7%.
 
-**D4. The marginal-value inversion is unresolved.** +0.01 of real improvement was
-worth 880 points at the bottom of the range and 0 at the top under 5000/100.
-Re-measure under 57200/0.5 — the reshaped curve should have reduced it, but that
-is a prediction, not a measurement. `scripts/sim/repid-adversarial.mjs` prints it.
+**D4. MEASURED 2026-08-16 — the prediction held, the diagnosis did not.**
+`npm run check:repid-marginal`, 6 assertions, 3 mutations.
+
+The recalibration did reduce it: the top now buys 11 points where 5000/100 bought
+0. But **11 is not the curve.** Sampled below saturation the curve's own spread is
+124 → 83, a factor of **1.49** — a logarithm behaving like a logarithm.
+
+The collapse to zero is the **clamp**. 57200/0.5 evaluates to **10072.42** at
+weightedSum 1 against a `REPID_MAX` of 10000, so the calibration **overshoots by
+72.42 points** and everything above weightedSum ≈ 0.9915 scores exactly 10000 —
+a **0.87%-wide dead band where real improvement buys nothing at all**.
+
+This changes what a fix touches. *"The curve pays least at the top"* sends someone
+to reshape the logarithm, which would move 1.49; **only the overshoot moves the
+zero.** Closing it means lowering the multiplier so the curve lands ON 10000,
+which moves every score and therefore every tier → **Sean-gated**, and reported
+as NOT CHECKED by the gate rather than failing the build (rule 4).
+
+The sim's headline "11.3×" is measured at weightedSum 0.99, which straddles
+saturation and so blends the curve with the clamp. Both numbers are right; only
+the causal reading was wrong.
 
 **D5. `humanCustody` is still self-asserted.** Option B made the flag alone
 insufficient for Silver, which removes the free ride but not the underlying
