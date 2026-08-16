@@ -130,6 +130,48 @@ export interface ChainVerification {
 export const CHAIN_CUTOVER_ISO = '2026-06-02T00:24:19.273292Z';
 
 /**
+ * DRIVEN OVER LIVE ROWS 2026-08-16, not only over fixtures.
+ *
+ * Until then every assertion about this file rested on entries its own author
+ * invented, and a fixture author picks the timestamp format, the null shape and
+ * the id spacing that a database actually decides. A property can be true in
+ * fixtures and false in production without a single test going red.
+ *
+ * A 16-row window of `hal_classifications` straddling the cutover instant
+ * (ids 44764–44779; six unchained rows, then ten chained, the first of which is
+ * the cutover row itself) was pulled through the Supabase MCP tool and passed to
+ * `verifyHalChain` unmodified. The rows are NOT committed — the preflight fences
+ * forbid prod rows as git fixtures — so this note records the outcome, which is
+ * the part that has to survive.
+ *
+ *   no hasher, full window   NOT_CHECKED, 0 defects, 16 links unchecked
+ *   no hasher, chained tail  NOT_CHECKED, 9 unchecked of 10 entries
+ *   WRONG hasher             FAILED, 9 × link_mismatch — it does not shrug
+ *   oracle hasher            VERIFIED, 9/9 links recomputed and matched
+ *
+ * The last line is why this note exists. VERIFIED being REACHABLE is the defect
+ * this file already fixed once — the window's first entry has no predecessor
+ * inside it, and counting that as a gap made the outcome impossible — and it was
+ * fixed against fixtures. It is now demonstrated on production rows.
+ *
+ * The middle two confirm the distinction that is easiest to get wrong:
+ * `windowStartUnverifiable` is FALSE on the full window, where the first row's
+ * link is genuinely null (adoption before chaining began), and TRUE on the tail,
+ * where the first row's link points at a predecessor outside the window (a
+ * boundary). An absent link and an unexaminable one are different facts.
+ *
+ * WHAT THIS DOES NOT SHOW: the live chain is still NOT_CHECKED. The oracle above
+ * was handed each entry's stored successor link, so it proves the verifier can
+ * reach VERIFIED — it proves nothing about whether the real links are correct.
+ * That still needs the producer's formula, which is not in this repository.
+ */
+export const LIVE_RUN_2026_08_16 =
+  'verifyHalChain was driven over 16 real hal_classifications rows spanning the cutover: ' +
+  'NOT_CHECKED without a hasher, FAILED (9 link_mismatch) under a wrong hasher, VERIFIED 9/9 ' +
+  'under an oracle. VERIFIED is reachable on production rows, not only on fixtures. The live ' +
+  'chain remains unverified: the oracle proves the verifier works, not that the links are right.';
+
+/**
  * Verify a run of HAL entries.
  *
  * `entries` must be a contiguous window ordered by `created_at`. Ordering is
