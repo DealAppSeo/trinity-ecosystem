@@ -79,7 +79,8 @@ const match = (s, re, what) => { if (!re.test(String(s))) throw new Error(`${wha
 
 check('THE SCORE REACHES THE GATE IT FEEDS — pinned', () => {
   // Was 4008 against a threshold of 5000, which closed the payment path for
-  // everyone. The multiplier is now 5000 (Sean's decision, 2026-08-16).
+  // everyone. The curve is now 57200/0.5 (Sean's Option B, 2026-08-16) — the
+  // 5000/100 step in between fixed reachability and broke discrimination.
   //
   // Still a PINNED NUMBER, and that is the point of it: a future re-tune fails
   // here and forces someone to decide deliberately what the new ceiling is and
@@ -92,28 +93,58 @@ check('THE SCORE REACHES THE GATE IT FEEDS — pinned', () => {
 });
 
 check('THE CAP NOW BINDS, which it did not before', () => {
-  // At multiplier 2000 the curve maxed at 4008 and the 10000 cap was decorative.
-  // At 5000 a flawless agent computes 10021.6, so the cap is load-bearing and
-  // the top ~1% of the range is flat. Asserted so it is a known property rather
-  // than a surprise the first time two excellent agents tie.
+  // At 2000/100 the curve maxed at 4008 and the 10000 cap was decorative. At
+  // 57200/0.5 a flawless agent computes 10072.4, so the cap is load-bearing and
+  // scores flatten above weightedSum 0.9913 — 0.9% of the range. Asserted so it
+  // is a known property rather than a surprise the first time two excellent
+  // agents tie.
   eq(scoreFromWeightedSum(1), 10000, 'a flawless agent is capped, not 10021');
   eq(scoreFromWeightedSum(0.995), 10000, 'and so is one just below it');
   truthy(scoreFromWeightedSum(0.98) < 10000, 'but the flattening starts near the very top, not early');
 });
 
-check('EVERY TIER IS NOW REACHABLE, and at what cost', () => {
-  // The distribution is a consequence of the log curve's steepness, not of the
-  // multiplier, and it is recorded because it decides spending limits: Platinum
-  // carries 500,000 USDC/day and now begins at a weighted sum of ~0.306.
+check('EVERY TIER IS REACHABLE, AND ESCAPABLE — the cost of each', () => {
+  // Under 5000/100 these read 0.022 / 0.090 / 0.306, and Platinum starting at
+  // 31% of maximum was the defect: every operating fleet cleared it, so the
+  // ladder sorted nobody. Under 57200/0.5 the gates cost what they say.
   const at = (ws) => tierForScore(scoreFromWeightedSum(ws));
   eq(at(0.0), 'Bronze', 'nothing earns nothing');
-  eq(at(0.03), 'Silver', 'Silver from ~0.022');
-  eq(at(0.1), 'Gold', 'Gold from ~0.090');
-  eq(at(0.31), 'Platinum', 'Platinum from ~0.306');
+  eq(at(0.21), 'Bronze', 'just below the Silver floor');
+  eq(at(0.22), 'Silver', 'Silver from ~0.2118');
+  eq(at(0.45), 'Gold', 'Gold from ~0.4459');
+  eq(at(0.71), 'Platinum', 'Platinum from ~0.7049');
   eq(at(1.0), 'Platinum', 'and a flawless agent is Platinum');
-  // The floors are the knob if this is wrong — asserted so the docstring and
-  // the behaviour cannot drift apart.
-  truthy(weightedSumRequiredFor(7500) < 0.31 && weightedSumRequiredFor(7500) > 0.30, 'Platinum floor ~0.306');
+  // Pinned so the docstring and the behaviour cannot drift apart. Platinum
+  // costing ~70% of the maximum rather than ~31% IS the recalibration.
+  const p = weightedSumRequiredFor(7500);
+  truthy(p > 0.70 && p < 0.71, `Platinum floor ~0.7049, got ${p}`);
+});
+
+check('THE INVERSE ACTUALLY REACHES THE SCORE IT NAMES', () => {
+  // It did not. `weightedSumRequiredFor(2500)` returned a weighted sum scoring
+  // 2499 — Bronze, not Silver — so the function's name was false at exactly the
+  // boundary it exists to describe. The closed form `(10^(s/M) - 1)/S` is right
+  // as real arithmetic and wrong as floating point: `scoreFromWeightedSum`
+  // FLOORS, and both `10**x - 1` and `log10(1+x)` lose significance near zero,
+  // in opposite directions. No algebra makes them round-trip; bisecting the
+  // forward curve does.
+  //
+  // PREDATES the 57200/0.5 recalibration — 933 of the first 4,000 scores landed
+  // short under 5000/100 too. The larger multiplier only made it visible.
+  for (const s of [1, 2, 100, 2500, 5000, 7500, 9999, 10000]) {
+    truthy(scoreFromWeightedSum(weightedSumRequiredFor(s)) >= s,
+      `the weighted sum named for ${s} must actually score >= ${s}`);
+  }
+  // The whole domain, not a sample — the failures clustered at the extremes,
+  // which is exactly where a sampled test would have missed them.
+  let short = 0;
+  for (let s = 1; s <= 10000; s += 1) {
+    if (scoreFromWeightedSum(weightedSumRequiredFor(s)) < s) short += 1;
+  }
+  eq(short, 0, 'every score in the domain must be reachable by its own named weighted sum');
+  // And an UNREACHABLE gate still reports > 1, which is what makes
+  // describeCoherence's explanation legible.
+  truthy(weightedSumRequiredFor(15000) > 1, 'a gate above the ceiling still reads as impossible');
 });
 
 check('describeCoherence STILL CATCHES an unreachable gate', () => {
