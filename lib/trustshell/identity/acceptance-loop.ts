@@ -86,6 +86,27 @@ export interface AcceptancePolicy {
    * Counts rejections, not rounds: NOT_CHECKED does not consume budget.
    */
   maxRejections: number;
+  /**
+   * Total rounds, whatever their verdict, before ABANDONED.
+   *
+   * ── WHY A SECOND BOUND EXISTS, AND HOW IT WAS FOUND ────────────────────────
+   *
+   * `maxRejections` alone CANNOT terminate the loop. "NOT_CHECKED never spends
+   * the doer's budget" is the right policy — a flaky judge must not be able to
+   * exhaust correct work — but combined with "run until terminal" it means a
+   * judge that is permanently unavailable produces REVISE forever. Both rules
+   * are individually correct and jointly non-terminating.
+   *
+   * This was not reasoned out in advance. It was found by running the loop
+   * end-to-end against a reviewer that never returns a signed verdict: the
+   * suite hung, for nine minutes, until it was killed. The module header
+   * claimed to prevent exactly this livelock while containing it.
+   *
+   * So the outage case gets its own bound and its own outcome. It is NOT
+   * EXHAUSTED — that word means the doer used up its revisions, and here the
+   * doer may never have been judged at all.
+   */
+  maxRounds?: number;
 }
 
 /**
@@ -99,6 +120,16 @@ export interface AcceptancePolicy {
  */
 export const DEFAULT_MAX_REJECTIONS = 3;
 
+/**
+ * Total rounds before ABANDONED.
+ *
+ * Comfortably above `DEFAULT_MAX_REJECTIONS` so it never pre-empts a genuine
+ * EXHAUSTED — this bound is a backstop against an unavailable judge, not a
+ * second opinion about the work. If it fires, something is wrong with the
+ * harness rather than with the doer.
+ */
+export const DEFAULT_MAX_ROUNDS = 10;
+
 export type AcceptanceState =
   /** Signed off. `round` is the index of the accepting round. */
   | { status: 'ACCEPTED'; round: number; auditorDid: string }
@@ -108,6 +139,14 @@ export type AcceptanceState =
   | { status: 'EXHAUSTED'; rejections: number; lastDetail?: string }
   /** Identical bytes resubmitted after a rejection. */
   | { status: 'STALLED'; digest: string }
+  /**
+   * The round cap was reached without the auditor ever deciding.
+   *
+   * Distinct from EXHAUSTED on purpose: EXHAUSTED means the doer spent its
+   * revisions, ABANDONED means the judge never answered. Reporting an outage as
+   * a spent budget blames the doer for the harness.
+   */
+  | { status: 'ABANDONED'; rounds: number; notChecked: number }
   /** No round has been run. Distinct from a round that produced nothing. */
   | { status: 'NOT_STARTED' };
 
@@ -117,6 +156,70 @@ export type AcceptanceState =
  * Returns the offending round index rather than a boolean, because the caller's
  * only useful action is to point at where the substitution happened.
  */
+/**
+ * Turn one round's evidence into a round verdict.
+ *
+ * The three inputs are exactly what `ContractedWorkResult` exposes, kept as
+ * primitives so this is assertable without keys, signatures or a running loop.
+ *
+ * ── THE DISTINCTION THIS FUNCTION EXISTS FOR ─────────────────────────────────
+ *
+ * A verdict that FAILS VERIFICATION is not a rejection of the work. A bad
+ * signature, a verdict bound to a different contract, a hash that does not
+ * reproduce — none of those are the auditor saying "this is not good enough".
+ * They are the harness saying "I cannot read what the auditor said."
+ *
+ * Scoring that as REJECTED would spend the doer's revision budget on a
+ * signature bug, and enough of them would produce EXHAUSTED on work that was
+ * never actually judged — the same failure `staged-judge.ts` prevents one level
+ * down, where a throwing tier escalates as NOT_CHECKED rather than condemning
+ * the work. So an unverifiable verdict is NOT_CHECKED here, always.
+ *
+ * Only a verdict that was READABLE and said FAILED is a rejection.
+ *
+ * ── DO NOT USE `verdictVerification.outcome` FOR THIS ────────────────────────
+ *
+ * The first version of this function took that field, because it is called
+ * `outcome` on a thing called `VerdictVerification` and reads exactly like
+ * "did verification succeed". It is not. It FOLDS IN `criteriaOutcome` — the
+ * question of whether the agreed criteria were met — so a correctly signed,
+ * correctly bound verdict that rejects the work reports `outcome: 'FAILED'`.
+ *
+ * Measured, not assumed: with a reviewer returning FAILED, one round yields
+ * `hasVerdict=true, verdict.outcome=FAILED, verdictVerification.outcome=FAILED`.
+ * Reading that field therefore classified EVERY rejection as unreadable, so no
+ * round ever consumed budget and the loop ran forever. That is how the hang was
+ * found — by running the composition end to end, not by reading it.
+ *
+ * The readability signals are `signatureValid` and `boundToContract`. Those ask
+ * about the verdict as a document; `outcome` answers about the work.
+ */
+export function roundVerdictFor(input: {
+  /** Whether the evaluator produced a signed verdict at all. */
+  hasVerdict: boolean;
+  /** `verdictVerification.signatureValid` — is this really the auditor's signature? */
+  signatureValid?: boolean;
+  /** `verdictVerification.boundToContract` — does it answer THIS contract? */
+  boundToContract?: boolean;
+  /** `verdict.outcome` — what the auditor actually concluded. */
+  verdictOutcome?: 'VERIFIED' | 'NOT_CHECKED' | 'FAILED';
+}): RoundVerdict {
+  // Nothing was signed. The common cause is a judge outage arriving as an
+  // absent verdict; absent is the honest representation, not a forged empty one.
+  if (!input.hasVerdict) return 'NOT_CHECKED';
+
+  // The harness could not read the verdict AS A DOCUMENT — bad signature, or
+  // bound to a different contract. Not the doer's fault, and so not the doer's
+  // budget. Note both must be explicitly true: an absent flag is not a pass.
+  if (input.signatureValid !== true || input.boundToContract !== true) return 'NOT_CHECKED';
+
+  if (input.verdictOutcome === 'VERIFIED') return 'ACCEPTED';
+  if (input.verdictOutcome === 'FAILED') return 'REJECTED';
+
+  // Verified as readable, and the auditor declined to decide. Not a rejection.
+  return 'NOT_CHECKED';
+}
+
 export function auditorIsStable(rounds: readonly Round[]): { stable: true } | { stable: false; at: number } {
   if (rounds.length === 0) return { stable: true };
   const first = rounds[0].auditorDid;
@@ -171,6 +274,19 @@ export function evaluateAcceptance(
     };
   }
 
+  // Checked AFTER exhaustion, so a run that genuinely spent its revisions is
+  // reported as EXHAUSTED rather than as an outage. This branch is reachable
+  // only when rounds accumulated without enough of them being rejections —
+  // which is to say, when the judge was not deciding.
+  const maxRounds = policy.maxRounds ?? DEFAULT_MAX_ROUNDS;
+  if (rounds.length >= maxRounds) {
+    return {
+      status: 'ABANDONED',
+      rounds: rounds.length,
+      notChecked: rounds.filter((r) => r.verdict === 'NOT_CHECKED').length,
+    };
+  }
+
   return {
     status: 'REVISE',
     remaining: policy.maxRejections - rejected.length,
@@ -197,5 +313,10 @@ export function isDelivered(state: AcceptanceState): boolean {
  * becomes a pass.
  */
 export function isTerminal(state: AcceptanceState): boolean {
-  return state.status === 'ACCEPTED' || state.status === 'EXHAUSTED' || state.status === 'STALLED';
+  return (
+    state.status === 'ACCEPTED' ||
+    state.status === 'EXHAUSTED' ||
+    state.status === 'STALLED' ||
+    state.status === 'ABANDONED'
+  );
 }

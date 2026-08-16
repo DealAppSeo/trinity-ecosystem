@@ -1185,6 +1185,32 @@ export const MUTATIONS = [
     find: '  for (const round of rounds) {\n    if (round.verdict === \'ACCEPTED\') {',
     replace: '  for (const round of rounds.slice(-1)) {\n    if (round.verdict === \'ACCEPTED\') {',
   },
+  {
+    id: 'acceptance-loop-cannot-terminate-under-an-outage',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'the SECOND bound. maxRejections alone cannot terminate the loop: "NOT_CHECKED never ' +
+      'spends the doer\'s budget" is correct, and combined with "run until terminal" it means ' +
+      'an unavailable judge yields REVISE forever. Both rules are individually right and ' +
+      'jointly non-terminating. This was found by running it — the suite hung for nine ' +
+      'minutes before it was killed — not by reading it',
+    find: '  if (rounds.length >= maxRounds) {',
+    replace: '  if (rounds.length >= Number.MAX_SAFE_INTEGER) {',
+  },
+  {
+    id: 'acceptance-unreadable-verdict-scored-as-a-rejection',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'BOTH readability signals are required. A verdict bound to a different contract is not ' +
+      'the auditor faulting the work, and charging it to the revision budget spends the ' +
+      "doer's allowance on a harness bug. Dropping either half also re-opens the trap that " +
+      'hung this loop once: reading a rejection as unreadable, or an unreadable verdict as a ' +
+      'rejection, are the two ways to get this exactly backwards',
+    find: "  if (input.signatureValid !== true || input.boundToContract !== true) return 'NOT_CHECKED';",
+    replace: "  if (input.signatureValid !== true) return 'NOT_CHECKED';",
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

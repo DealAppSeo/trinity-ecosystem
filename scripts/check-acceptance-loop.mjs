@@ -37,7 +37,8 @@ try {
 }
 
 const {
-  evaluateAcceptance, auditorIsStable, isDelivered, isTerminal, DEFAULT_MAX_REJECTIONS,
+  evaluateAcceptance, auditorIsStable, isDelivered, isTerminal, roundVerdictFor,
+  DEFAULT_MAX_REJECTIONS, DEFAULT_MAX_ROUNDS,
 } = mod;
 
 const AUD = 'did:key:auditor-1';
@@ -57,6 +58,50 @@ const reset = () => { n = 0; };
 const P = (maxRejections) => ({ maxRejections });
 
 const assertions = [
+  // ── mapping a round's evidence to a verdict ───────────────────────────────
+  //
+  // The readability signals are signatureValid + boundToContract, NOT
+  // verificationOutcome. That field folds in criteriaOutcome, so a valid verdict
+  // rejecting the work reports FAILED and was misread as unreadable — every
+  // rejection became NOT_CHECKED, no round spent budget, and the loop hung.
+  [
+    'a readable verdict saying VERIFIED is an acceptance',
+    () => roundVerdictFor({ hasVerdict: true, signatureValid: true, boundToContract: true, verdictOutcome: 'VERIFIED' }) === 'ACCEPTED',
+  ],
+  [
+    'A READABLE VERDICT SAYING FAILED IS A REJECTION — the case whose misreading hung the loop',
+    () => roundVerdictFor({ hasVerdict: true, signatureValid: true, boundToContract: true, verdictOutcome: 'FAILED' }) === 'REJECTED',
+  ],
+  [
+    'no signed verdict is NOT_CHECKED — an absent verdict signs nothing off and condemns nothing',
+    () => roundVerdictFor({ hasVerdict: false }) === 'NOT_CHECKED',
+  ],
+  [
+    'a bad signature is NOT_CHECKED, never a rejection — the harness failing to read the ' +
+      'auditor is not the auditor faulting the work',
+    () => roundVerdictFor({ hasVerdict: true, signatureValid: false, boundToContract: true, verdictOutcome: 'FAILED' }) === 'NOT_CHECKED',
+  ],
+  [
+    'a verdict bound to a different contract is NOT_CHECKED',
+    () => roundVerdictFor({ hasVerdict: true, signatureValid: true, boundToContract: false, verdictOutcome: 'FAILED' }) === 'NOT_CHECKED',
+  ],
+  [
+    'an unreadable verdict cannot ACCEPT either — forging acceptance is the worse direction',
+    () => roundVerdictFor({ hasVerdict: true, signatureValid: false, boundToContract: true, verdictOutcome: 'VERIFIED' }) === 'NOT_CHECKED',
+  ],
+  [
+    'an ABSENT readability flag is not a pass — both must be explicitly true',
+    () => roundVerdictFor({ hasVerdict: true, verdictOutcome: 'VERIFIED' }) === 'NOT_CHECKED',
+  ],
+  [
+    'an auditor that read the work and declined to decide has not rejected it',
+    () => roundVerdictFor({ hasVerdict: true, signatureValid: true, boundToContract: true, verdictOutcome: 'NOT_CHECKED' }) === 'NOT_CHECKED',
+  ],
+  [
+    'a missing verdict outcome is never an acceptance',
+    () => roundVerdictFor({ hasVerdict: true, signatureValid: true, boundToContract: true }) === 'NOT_CHECKED',
+  ],
+
   // ── the sticky auditor: the draw's guarantee, extended across rounds ───────
   ['one auditor across rounds is stable', () => {
     reset();
@@ -167,6 +212,75 @@ const assertions = [
     reset();
     return evaluateAcceptance([r('NOT_CHECKED')]).status === 'REVISE';
   }],
+
+  // ── TERMINATION: the property that "NOT_CHECKED costs nothing" breaks ─────
+  //
+  // These exist because the loop HUNG. "An outage never spends budget" and "run
+  // until terminal" are each correct and jointly non-terminating: a judge that
+  // never decides yields REVISE forever. Found by running it, not by reading it.
+  [
+    'an unavailable judge terminates as ABANDONED rather than looping forever',
+    () => {
+      reset();
+      const rounds = Array.from({ length: 10 }, () => r('NOT_CHECKED'));
+      return evaluateAcceptance(rounds, { maxRejections: 3, maxRounds: 10 }).status === 'ABANDONED';
+    },
+  ],
+  [
+    'ABANDONED is terminal — this is the assertion that would have caught the hang',
+    () => {
+      reset();
+      const rounds = Array.from({ length: 10 }, () => r('NOT_CHECKED'));
+      return isTerminal(evaluateAcceptance(rounds, { maxRejections: 3, maxRounds: 10 })) === true;
+    },
+  ],
+  [
+    'ABANDONED is not a delivery',
+    () => {
+      reset();
+      const rounds = Array.from({ length: 10 }, () => r('NOT_CHECKED'));
+      return isDelivered(evaluateAcceptance(rounds, { maxRejections: 3, maxRounds: 10 })) === false;
+    },
+  ],
+  [
+    'ABANDONED counts the unjudged rounds, so an outage is visible as an outage',
+    () => {
+      reset();
+      const rounds = Array.from({ length: 4 }, () => r('NOT_CHECKED'));
+      return evaluateAcceptance(rounds, { maxRejections: 3, maxRounds: 4 }).notChecked === 4;
+    },
+  ],
+  [
+    'EXHAUSTED outranks ABANDONED — a doer that really spent its revisions is not an outage',
+    () => {
+      reset();
+      return evaluateAcceptance(
+        [r('REJECTED'), r('REJECTED'), r('REJECTED')],
+        { maxRejections: 3, maxRounds: 3 }
+      ).status === 'EXHAUSTED';
+    },
+  ],
+  [
+    'below the round cap an outage still just asks for another round',
+    () => {
+      reset();
+      return evaluateAcceptance(
+        [r('NOT_CHECKED'), r('NOT_CHECKED')], { maxRejections: 3, maxRounds: 10 }
+      ).status === 'REVISE';
+    },
+  ],
+  [
+    'the round cap defaults, so a policy that omits it still terminates',
+    () => {
+      reset();
+      const rounds = Array.from({ length: DEFAULT_MAX_ROUNDS }, () => r('NOT_CHECKED'));
+      return evaluateAcceptance(rounds, { maxRejections: 3 }).status === 'ABANDONED';
+    },
+  ],
+  [
+    'the round cap sits above the rejection bound, so it never pre-empts a real EXHAUSTED',
+    () => DEFAULT_MAX_ROUNDS > DEFAULT_MAX_REJECTIONS,
+  ],
 
   // ── resubmitting the same bytes ───────────────────────────────────────────
   [

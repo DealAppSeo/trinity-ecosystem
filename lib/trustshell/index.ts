@@ -168,6 +168,40 @@ export type {
   AssignmentInput,
 } from './identity/spine';
 
+/**
+ * The chain run REPEATEDLY against one drawn auditor, until it signs off.
+ *
+ * Exported beside `runContractedWork` rather than instead of it: a single
+ * judged round is a legitimate thing to want, and hiding it would push callers
+ * back to hand-assembly — the failure this barrel exists to prevent.
+ *
+ * `isDelivered` is exported deliberately. `AcceptanceState` has three terminal
+ * statuses and only one of them is a delivery; without a predicate, callers
+ * write `status !== 'REVISE'` and ship on a spent budget.
+ */
+export { runAcceptedWork } from './identity/spine';
+export type {
+  AcceptedWorkInput,
+  AcceptedWorkResult,
+  AttemptContext,
+  AttemptSubmission,
+} from './identity/spine';
+export {
+  evaluateAcceptance,
+  auditorIsStable,
+  roundVerdictFor,
+  isDelivered,
+  isTerminal,
+  DEFAULT_MAX_REJECTIONS,
+  DEFAULT_MAX_ROUNDS,
+} from './identity/acceptance-loop';
+export type {
+  Round as AcceptanceRound,
+  RoundVerdict,
+  AcceptancePolicy,
+  AcceptanceState,
+} from './identity/acceptance-loop';
+
 export {
   CONTRACT_DOMAIN,
   VERDICT_DOMAIN,

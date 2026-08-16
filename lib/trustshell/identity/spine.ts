@@ -70,6 +70,16 @@ import {
   type RunAgentLoopInput,
   type LoopResult,
 } from '../harness/loop';
+import {
+  evaluateAcceptance,
+  auditorIsStable,
+  roundVerdictFor,
+  isTerminal,
+  DEFAULT_MAX_REJECTIONS,
+  type Round,
+  type AcceptancePolicy,
+  type AcceptanceState,
+} from './acceptance-loop';
 
 /**
  * Derived from the assigner rather than restated, so this file cannot drift
@@ -261,5 +271,170 @@ export async function runContractedWork(
     verdictVerification,
     envelope,
     reputation,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The acceptance loop, wired.
+//
+// `runContractedWork` is ONE round. A professional review is not one round: it
+// is send-it-back, get-it-improved, look-again, and only then sign off. This is
+// that loop, and it adds no new signed byte — every guarantee below is one the
+// underlying modules already made. Composition is again where honest return
+// values become refusals.
+//
+// ── WHY THE DRAW IS REPEATED RATHER THAN HOISTED ─────────────────────────────
+//
+// The obvious implementation hoists the draw out of the round so the auditor is
+// sticky by construction. This one calls `runContractedWork` per round with the
+// SAME `assignment`, and then CHECKS stickiness with `auditorIsStable`.
+//
+// That is deliberate, and it is not belt-and-braces. `assembleAssignedContract`
+// is deterministic in `H(requestCommitment ‖ beacon ‖ poolCommitment)`, so an
+// identical assignment redraws the identical checker — stickiness is already a
+// property of the inputs. What is NOT guaranteed is that the inputs stay
+// identical. A beacon is a drand round or a block hash; a caller that passes
+// "the current beacon" each round, which is the natural thing to write, silently
+// re-draws and hands the doer a fresh auditor per revision. That is
+// checker-shopping arriving through a parameter that looks like good hygiene.
+//
+// Hoisting the draw would make that caller's mistake invisible. Checking it
+// makes the mistake an error naming the round it happened on. The invariant is
+// enforced against what actually occurred, not assumed from what should have.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** What the caller is told before producing the next attempt. */
+export interface AttemptContext {
+  /** 0-based round index. */
+  round: number;
+  /** Every round so far, in order. */
+  rounds: readonly Round[];
+  /** The most recent rejection's stated reason, when there is one. */
+  lastDetail?: string;
+}
+
+export interface AttemptSubmission {
+  /** The loop inputs for this attempt. Same omissions as ContractedWorkInput. */
+  execution: ContractedWorkInput['execution'];
+  /**
+   * Digest of exactly what is being submitted this round.
+   *
+   * Supplied by the caller because only it knows what the deliverable IS. A
+   * digest this layer derived from `execution` would hash the instructions
+   * rather than the artefact, and two different deliverables produced from one
+   * prompt would collide — making a genuine revision look like a stall.
+   */
+  submissionDigest: string;
+}
+
+export interface AcceptedWorkInput extends Omit<ContractedWorkInput, 'execution'> {
+  /** Defaults to DEFAULT_MAX_REJECTIONS. */
+  policy?: AcceptancePolicy;
+  /**
+   * Produce the next attempt. Called once per round.
+   *
+   * A function rather than a list, because a revision is a RESPONSE: round two
+   * exists to address what round one was told. Passing pre-built attempts would
+   * describe a loop that cannot learn, which is the thing being built here.
+   */
+  attempt: (context: AttemptContext) => Promise<AttemptSubmission> | AttemptSubmission;
+}
+
+export interface AcceptedWorkResult {
+  state: AcceptanceState;
+  rounds: readonly Round[];
+  /** Full result per round, same order. Rejected attempts are kept as evidence. */
+  attempts: readonly ContractedWorkResult[];
+  /**
+   * The attempt that was signed off.
+   *
+   * ABSENT unless `state.status === 'ACCEPTED'`. EXHAUSTED and STALLED leave
+   * this undefined on purpose: there is no deliverable, and a caller reaching
+   * for one gets `undefined` rather than the last rejected attempt dressed as a
+   * result.
+   */
+  delivered?: ContractedWorkResult;
+}
+
+/**
+ * Run rounds against ONE drawn auditor until it signs off, the budget is spent,
+ * or the doer stops changing the work.
+ *
+ * Returns rather than throws on every non-accepted terminal state. EXHAUSTED
+ * and STALLED are outcomes to escalate, not exceptions — and a throw would lose
+ * `attempts`, which is the evidence a human needs to decide which it was.
+ */
+export async function runAcceptedWork(
+  input: AcceptedWorkInput
+): Promise<AcceptedWorkResult> {
+  const policy = input.policy ?? { maxRejections: DEFAULT_MAX_REJECTIONS };
+  const rounds: Round[] = [];
+  const attempts: ContractedWorkResult[] = [];
+  let state: AcceptanceState = { status: 'NOT_STARTED' };
+
+  for (let index = 0; ; index += 1) {
+    const previousRejection = [...rounds].reverse().find((r) => r.verdict === 'REJECTED');
+    const submission = await input.attempt({
+      round: index,
+      rounds,
+      lastDetail: previousRejection?.detail,
+    });
+
+    const result = await runContractedWork({
+      assignment: input.assignment,
+      doerKey: input.doerKey,
+      checkerKeyFor: input.checkerKeyFor,
+      tiers: input.tiers,
+      execution: submission.execution,
+      now: input.now,
+      observedAt: input.observedAt,
+      observation: input.observation,
+    });
+    attempts.push(result);
+
+    rounds.push({
+      index,
+      auditorDid: result.assigned.unsigned.checkerDid,
+      submissionDigest: submission.submissionDigest,
+      // `verdictVerification.outcome` is deliberately NOT passed — it folds in
+      // criteriaOutcome, so a valid verdict that rejects the work reports
+      // FAILED there and would be misread as unreadable. See roundVerdictFor.
+      verdict: roundVerdictFor({
+        hasVerdict: result.verdict !== undefined,
+        signatureValid: result.verdictVerification?.signatureValid,
+        boundToContract: result.verdictVerification?.boundToContract,
+        verdictOutcome: result.verdict?.outcome,
+      }),
+      // The auditor's reason, taken from the criterion that failed rather than
+      // invented here. Absent when nothing failed, which is the correct shape:
+      // a rejection with no stated cause should read as missing, not as ''.
+      detail: result.verdict?.scores?.find((s) => s.outcome === 'FAILED')?.criterionId,
+    });
+
+    // Checked EVERY round, not once at the end. A substituted auditor means the
+    // rounds already run were judged by different people, so continuing would
+    // accumulate more work under an invariant that is already broken.
+    const stability = auditorIsStable(rounds);
+    if (!stability.stable) {
+      throw new Error(
+        `the drawn auditor changed at round ${stability.at}: ` +
+          `${rounds[0].auditorDid} → ${rounds[stability.at].auditorDid}. ` +
+          'The assignment must be identical across revisions — a moving beacon ' +
+          'silently re-draws, which hands the doer a fresh judge per rejection ' +
+          'and is checker-shopping spread across rounds.'
+      );
+    }
+
+    state = evaluateAcceptance(rounds, policy);
+    if (isTerminal(state)) break;
+  }
+
+  return {
+    state,
+    rounds,
+    attempts,
+    // Bound to ACCEPTED explicitly rather than to "the last attempt", so an
+    // EXHAUSTED run cannot hand back its final rejected attempt as a delivery.
+    delivered: state.status === 'ACCEPTED' ? attempts[state.round] : undefined,
   };
 }
