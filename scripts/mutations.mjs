@@ -512,6 +512,89 @@ export const MUTATIONS = [
     find: '  return tableUsagePatterns(table).some((re) => re.test(line));',
     replace: '  return line.includes(table);',
   },
+  {
+    id: 'spine-unreachable-from-barrel',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/index.ts',
+    protects:
+      'the spine stays REACHABLE. Every module below was correct, mutation-tested and ' +
+      'green while being importable by nobody — measured 2026-08-16, 0 of 10 exported ' +
+      'from the barrel. No unit suite can see this, because a test imports by path, ' +
+      'which is exactly the access a real consumer does not have',
+    find:
+      "export { analyseReadOnly, delegateAuditorGrant } from './identity/auditor-grant';\n" +
+      'export type {\n' +
+      '  ToolCapabilityMap,\n' +
+      '  ToolEffect as GrantToolEffect,\n' +
+      '  ToolEffectMap,\n' +
+      '  WriteReach,\n' +
+      '  ReadOnlyAnalysis,\n' +
+      '  AuditorGrantInput,\n' +
+      '  AuditorGrant,\n' +
+      "} from './identity/auditor-grant';",
+    replace: '// MUTANT: auditor-grant dropped from the barrel',
+  },
+  {
+    id: 'spine-substitutes-a-checker-it-can-sign-as',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/identity/spine.ts',
+    protects:
+      'a drawn checker this harness cannot act as is REFUSED, never substituted. The ' +
+      'tempting repair — fall back to a key we do hold — is checker-shopping arriving ' +
+      'as error handling, and this mutant signs the verdict with the DOER\'s own key, ' +
+      'which every signature check downstream would still call valid',
+    find: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid);',
+    replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
+  },
+  {
+    id: 'spend-limit-reads-zero-when-unreadable',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'a daily spend that could not be READ is never reported as 0 SPENT. This is the ' +
+      'payment path: the caller compares the result against spendingLimitDaily, so an ' +
+      'RLS denial silently became the single most permissive answer the function can ' +
+      'give. `(null || []).reduce(...)` is 0, and nothing downstream could tell that ' +
+      'apart from a genuinely quiet day',
+    // `&& false`, not `if (false)`, so `error` stays referenced and the mutant
+    // cannot fail for an unused-variable reason instead of the real one.
+    find:
+      '    if (error) {\n' +
+      '      throw new Error(',
+    replace:
+      "    if (error && error.code === 'NEVER_MATCHES') {\n" +
+      '      throw new Error(',
+  },
+  {
+    id: 'risk-weights-silently-default-when-unreadable',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/RepIDConfig.ts',
+    protects:
+      "an institution's chosen risk weights are never silently replaced by OURS. The " +
+      'condition must distinguish PGRST116 (no config row — defaulting is correct and ' +
+      'is the common case) from any other error (RLS, expired key, transport), which ' +
+      'previously also returned the defaults and looked deliberate',
+    find: "    if (error && error.code !== 'PGRST116') {",
+    replace: "    if (error && error.code === 'PGRST116') {",
+  },
+  {
+    id: 'unreadable-registry-reads-as-unregistered-agent',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'THREE OUTCOMES on agent resolution. A failed read must be `unreadable`, never ' +
+      '`absent` — otherwise a permissions failure reports the agent as having no track ' +
+      'record, which is a plausible wrong answer about reputation. `load()` twelve ' +
+      'lines below already refuses exactly this for its own read',
+    find:
+      '      if (error) {\n' +
+      '        return {\n' +
+      "          status: 'unreadable',",
+    replace:
+      "      if (error && error.code === 'NEVER_MATCHES') {\n" +
+      '        return {\n' +
+      "          status: 'unreadable',",
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

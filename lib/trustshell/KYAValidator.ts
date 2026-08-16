@@ -5,7 +5,10 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import type { AgentKYAProfile, KYAComplianceResult } from './types';
 
 export class KYAValidator {
-  private get supabase() { return getSupabaseAdmin(); }
+  /** Optional injected client for tests. Still lazy — see lib/CLAUDE.md. */
+  constructor(private readonly injectedClient?: ReturnType<typeof getSupabaseAdmin>) {}
+
+  private get supabase() { return this.injectedClient ?? getSupabaseAdmin(); }
 
   async getAgentProfile(agentName: string): Promise<AgentKYAProfile | null> {
     const { data, error } = await this.supabase
@@ -28,14 +31,38 @@ export class KYAValidator {
     };
   }
 
+  /**
+   * FAILS CLOSED, and this is the one on the list that had teeth.
+   *
+   * It used to destructure only `data`, so an RLS denial or a transport fault
+   * returned `(null || []).reduce(...)` === **0 spent today** — and the caller
+   * is `validate()`, which compares that against `spendingLimitDaily`. A
+   * permissions failure therefore read as "this agent has spent nothing",
+   * which is the single most permissive answer the function can give, on the
+   * path that authorizes payments.
+   *
+   * Throwing is the safe direction: a spend limit cannot be enforced against
+   * an unknown spend, so the payment must not proceed. `getAgentProfile`
+   * directly above already captures `error`; this is the same file disagreeing
+   * with itself.
+   */
   async getDailySpend(agentName: string): Promise<number> {
     const since = new Date(Date.now() - 86_400_000).toISOString();
-    const { data } = await this.supabase
+    const { data, error } = await this.supabase
       .from('kya_compliance_receipts')
       .select('payment_amount_usdc')
       .eq('agent_name', agentName)
       .eq('bft_passed', true)
       .gte('created_at', since);
+
+    if (error) {
+      throw new Error(
+        `refusing to report a daily spend that could not be read for "${agentName}": ` +
+          `${error.message}. Treating an unreadable ledger as 0 spent would authorize ` +
+          `a payment against a limit nobody checked.`
+      );
+    }
+
     return (data || []).reduce((s, r) => s + Number(r.payment_amount_usdc), 0);
   }
 

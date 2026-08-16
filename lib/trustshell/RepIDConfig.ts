@@ -28,7 +28,15 @@ export interface RepIDCalculationResult {
 }
 
 export class RepIDCalculator {
-  private get supabase() { return getSupabaseAdmin(); }
+  /**
+   * Optional injected client for tests. Still lazy, and deliberately so: this
+   * class is instantiated at MODULE SCOPE in
+   * `app/api/trustrails/repid/configure/route.ts`, so constructing a client
+   * here would run at build time and fail the build (lib/CLAUDE.md).
+   */
+  constructor(private readonly injectedClient?: ReturnType<typeof getSupabaseAdmin>) {}
+
+  private get supabase() { return this.injectedClient ?? getSupabaseAdmin(); }
 
   private readonly DEFAULT_WEIGHTS: RepIDWeights = {
     bftAccuracy:        0.40,
@@ -38,12 +46,36 @@ export class RepIDCalculator {
     humanCustodyScore:  0.05,
   };
 
+  /**
+   * TWO REASONS `data` CAN BE NULL HERE, and only one of them is fine.
+   *
+   * `.single()` reports PGRST116 when the row simply does not exist — an
+   * institution with no custom risk config. Falling back to the defaults is
+   * exactly right for that, and it is the common case.
+   *
+   * Every OTHER error — RLS denial, expired key, transport fault — also
+   * produced `data === null` before this change, and so also returned the
+   * defaults. That silently replaces an institution's *chosen* risk weights
+   * with ours on the path that computes their RepID scores, and nothing
+   * anywhere would say so. The weights would look deliberate.
+   *
+   * So: absent row is a default, unreadable row is loud.
+   */
   async getInstitutionWeights(institutionId = 'default'): Promise<RepIDWeights> {
-    const { data } = await this.supabase
+    const { data, error } = await this.supabase
       .from('institution_risk_config')
       .select('repid_weights')
       .eq('institution_id', institutionId)
       .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw new Error(
+        `could not read institution_risk_config for "${institutionId}": ${error.message}. ` +
+          `Refusing to fall back to default weights, which would silently overwrite this ` +
+          `institution's chosen risk posture with ours.`
+      );
+    }
+
     return (data?.repid_weights as RepIDWeights) || this.DEFAULT_WEIGHTS;
   }
 
