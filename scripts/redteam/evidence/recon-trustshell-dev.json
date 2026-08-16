@@ -1,0 +1,22 @@
+{
+  "surface": "trustshell.dev",
+  "url": "https://www.trustshell.dev/",
+  "collectedAt": "2026-08-16T17:20:15.667Z",
+  "collectedBy": "claude-code session claude/trust-layer-red-team-ujpq6a",
+  "collectedVia": "supabase pg_net net.http_get from project qnnpjhlxljtqyigedwkb (net._http_response ids 5100-5103); direct curl and browser are proxy-denied 403 from this session",
+  "note": "PASSIVE keyless recon only. No exploitation, no authenticated probing. Response headers are for the SSR root document; behaviour on other routes and after hydration is NOT CHECKED from here.",
+  "observations": {
+    "apex_trustshell_dev": { "statusCode": 200, "servedBy": "vercel sfo1", "canonicalHost": "www.trustshell.dev" },
+    "www_root": { "statusCode": 200, "servedBy": "vercel sfo1", "server": "Vercel", "app": "next.js SSR, deployment dpl_J53jTJ3cXfRJPuQcoV3XtSPzEwC5" },
+    "api_version": { "statusCode": 404, "note": "no /api/version endpoint — unlike the aitrinitysymphony surfaces, so commit/config-readiness is not observable here" },
+    "response_headers_on_root": {
+      "strict-transport-security": "max-age=63072000",
+      "content-security-policy": null,
+      "x-frame-options": null,
+      "x-content-type-options": null,
+      "referrer-policy": null,
+      "permissions-policy": null,
+      "cache-control": "public, max-age=0, must-revalidate"
+    }
+  }
+}

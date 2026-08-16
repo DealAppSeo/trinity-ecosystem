@@ -273,10 +273,18 @@ record what it actually observed, not what the README promises.
 
 | tool | fits | where it would plug in |
 |---|---|---|
+| **Strix** | agentic web pentester — HTTP proxy + browser + shell, validates with PoCs, OWASP Top 10 | the **deployed web apps** this suite cannot reach (`trustshell.dev`, the aitrinitysymphony surfaces) — client-side and dynamic bugs. Run guide: `scripts/redteam/tools/strix.md` |
 | **NVIDIA Garak** | broad model-level scanning: hallucination, prompt injection, package hallucination, encoding, leakage | pointed at a HAL-backed endpoint or a model that routes through TrustShell |
 | **Microsoft PyRIT** | multi-turn adaptive attacks (Crescendo, TAP) | HAL decision loops and long-horizon agent autonomy — the thing a single-shot probe cannot reach |
 | **Promptfoo** | CI-style regression suites at the application layer | a second gate beside `check:redteam` for wrapper/RAG behaviour |
 | **DeepTeam** | agentic systems mapped to OWASP LLM / Agent Top 10 | coverage-mapping, not a replacement for custom probes |
+
+Every one of these is a **collector** (§5): it needs Docker, egress and/or an LLM
+key that an agent session here does not have, and it produces observations and
+PoCs that a probe here judges. None runs from a proxied sandbox — Strix in
+particular needs a Docker daemon and direct reach to the target, both absent
+here (verified 2026-08-16). Hand them to an operator or an external agent; take
+back their evidence, not their verdicts.
 
 **Custom probes outrank all of them for this system**, and that is not a
 preference. Garak and PyRIT attack a *model*; the interesting failures here are
