@@ -1253,7 +1253,66 @@ that has never once fired is not a slow poll.
 
 ---
 
-## A17 — the credential scanner could not see binary files, and the speed fix is what found it (2026-08-16)
+## A21 — a detector scored as anti-predictive because two modes use different scales (2026-08-16)
+
+**[VERIFIED] — pooled AUC 0.4493 [0.4075, 0.4911]; the same score on the only
+stratum where the comparison is defined gives 0.9579 [0.9375, 0.9784]. Full
+measurement and reproduction SQL in `docs/HAL-AUC-STRATIFICATION-2026-08-16.md`.**
+
+HAL detection accuracy was being computed over "1,825 labelled rows" and coming
+out at roughly 0.46 — *below* chance, which says a detector is reliably
+**anti**-predictive. Caught before publication.
+
+Two properties of `hal_runner_results` explain the whole thing:
+
+- **All 197 labelled hallucinations live in one `hal_mode`** (`fact-check-s2`).
+  The other two modes contribute 1,163 negatives and zero positives.
+- **`mock` mode writes `hal_score` on a 0–100 scale** — minimum 50.055, median
+  70.503 — while `real` and `fact-check-s2` write 0–1.
+
+AUC is the probability a random positive outranks a random negative. Pool those
+and 653 mock negatives outrank **every** positive before HAL's behaviour is
+consulted. The pooled statistic answers *"do mock rows score higher than
+fact-check rows?"* — yes, by definition of the scale.
+
+**The near-miss is the point.** 0.46 is not an absurd number. It is close enough
+to 0.5 to read as "the detector is weak", which is a publishable-sounding,
+narratively satisfying, completely wrong conclusion — and the real answer is the
+opposite of it. The detector is strong.
+
+**The second tell, available without any stratification.** The pooled figure
+crosses the chance line depending on which defensible filter is applied: nulls
+scored as 0 gives 0.5206, scored-rows-only 0.4839, scored-and-generation-
+succeeded 0.4493. Only the last separates from 0.5, and it is the cleanest-
+looking of the three. *A quantity whose sign depends on which reasonable filter
+you pick is not yet a measurement*, and that was visible before anyone looked at
+`hal_mode`.
+
+**The rules.**
+
+1. **Before pooling a score across groups, check that the score means the same
+   thing in each.** One `select min, median, max ... group by mode` would have
+   ended this. Different units in one column is not exotic; it is what happens
+   when a mock path and a real path are written months apart.
+2. **A stratum with zero positives cannot inform a ranking metric — it can only
+   dilute it.** Check class support per group before pooling, not after the
+   number looks wrong.
+3. **Below-chance AUC is a sample bug until proven otherwise.** A genuinely
+   inverted detector is rare; an incomparable sample is common. Treat it as a
+   shape question first.
+4. **Average ranks within ties.** `hal_score` has 730 distinct values over 1,710
+   rows, so ties are dense. Naive tie-breaking on a near-constant score produces
+   an AUC just below 0.5 on its own — a second independent route to the same
+   wrong conclusion, and one that would have survived fixing the scale problem.
+
+This is the fourth instance of the failure class the prior-work index already
+names — *suspect the sample before the measurement* — and the third caused
+specifically by an unexamined assumption about the **shape** of the data rather
+than its values.
+
+---
+
+## A22 — the credential scanner could not see binary files, and the speed fix is what found it (2026-08-16)
 
 **This started as a performance sprint and ended as a security one.** Both halves
 matter, and the order matters more.
