@@ -92,10 +92,6 @@ const DECLARED = new Map([
     'throughput/ledger',
     'the producer-liveness ledger. Its consumer is the runtime lane (T12), which observes rather than imports; a product importer is not the goal.',
   ],
-  [
-    'hal-chain',
-    'the HAL chain verifier. NOT deliberate — this one is a live gap: `hal_classifications.previous_entry_hash` has been written since 2026-06-02 and nothing walks it. Link verification is NOT_CHECKED until the fleet lane publishes the hashing formula (568 constructions tried, none reproduced a stored link), but the STRUCTURAL verdict is computable today and no surface shows it.',
-  ],
 ]);
 
 const results = [];
