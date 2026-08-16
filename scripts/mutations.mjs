@@ -855,6 +855,31 @@ export const MUTATIONS = [
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
   {
+    id: 'earned-metrics-shrinks-toward-the-fleet-mean',
+    suite: 'check:hal-repid-linkage',
+    file: 'lib/trustshell/EarnedMetrics.ts',
+    protects:
+      'the shrinkage target is ZERO, so absent evidence costs and never pays. Shrinking ' +
+      'toward a population mean lets a brand-new agent inherit the fleet\'s earned ' +
+      'reputation — the laundering vector the whole design exists to prevent — and this ' +
+      'metric decides whether an agent may move money',
+    find: 'export const PRIOR_VALUE = 0;',
+    replace: 'export const PRIOR_VALUE = 0.5;',
+  },
+  {
+    id: 'earned-metrics-drops-the-shrinkage',
+    suite: 'check:hal-repid-linkage',
+    file: 'lib/trustshell/EarnedMetrics.ts',
+    protects:
+      '`value` is the SHRUNK rate and `rawValue` the bare ratio. Without shrinkage a single ' +
+      'flawless observation scores 1.0 and a cold-start agent reads as a veteran. The two ' +
+      'also behave differently in time — rawValue is invariant, value decays toward the ' +
+      'prior — so collapsing them makes a SQL-derived rate look like the production metric ' +
+      'when it is not',
+    find: '  const value = (successWeight + k * prior) / (weight + k);',
+    replace: '  const value = successWeight / weight;',
+  },
+  {
     id: 'repid-saturation-band-goes-unfound',
     suite: 'check:repid-marginal',
     file: 'lib/trustshell/repid-scoring.ts',
