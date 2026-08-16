@@ -22,11 +22,13 @@
 //
 //    This is the standing rule in CLAUDE.md — *compute the ceiling before
 //    optimising toward it* — applied to a scoring curve instead of a component.
-//    The multiplier is now 5000 (Sean's call; see `SCORE_LOG_MULTIPLIER` for
-//    what it did to the tier distribution). `reachableCeiling()` and
-//    `describeCoherence()` are what keep it fixed: any future re-tune that puts
-//    a gate back above the ceiling fails the suite instead of silently closing
-//    the payment path again.
+//    Raising the multiplier to 5000 fixed that and produced the MIRROR defect:
+//    the gate then never closed, and a weak fleet came out 99% Platinum. Both
+//    have one cause — the floors were calibrated against each other and never
+//    against the curve. The curve is now 57200/0.5 (Sean's call, Option B of a
+//    measured pair; see `SCORE_LOG_MULTIPLIER`). `reachableCeiling()` and
+//    `describeCoherence()` keep a gate REACHABLE; `check:repid-calibration`
+//    keeps it ESCAPABLE. It took both to close this.
 //
 // 2. **TWO TIER LADDERS THAT DISAGREE.** `KYAValidator` used `>` and
 //    `RepIDConfig` used `>=` over the same thresholds, so at exactly 2500,
@@ -237,35 +239,64 @@ export function sumContributions(b: ScoreBreakdown): number {
 
 /** Multiplier on the log curve. Named so `reachableCeiling` cannot drift from it. */
 /**
- * Multiplier on the log curve. **Raised 2000 -> 5000 on 2026-08-16**, by
- * Sean's decision, to make the score reach the gates it feeds.
+ * The log curve's two constants. **THESE MOVE TOGETHER — see below.**
  *
- * At 2000 the maximum attainable score was 4008 against a payment threshold of
- * 5000, so Gold, Platinum and the payment path were unreachable for everyone.
- * At 5000 a flawless agent computes 10021.6 and reports 10000 — THE CAP NOW
- * BINDS, which it did not before, so every agent above weightedSum 0.99 reads
- * exactly 10000.
+ * ── HISTORY, BECAUSE BOTH FAILURE MODES HAPPENED HERE ───────────────────────
  *
- * WHAT THIS DID TO THE DISTRIBUTION, computed rather than assumed. Over the
- * honest weighted-sum range [0, 1]:
+ * 2000/100  the gate never OPENED. Maximum attainable score 4008 against a
+ *           payment threshold of 5000, so Gold, Platinum and the payment path
+ *           were unreachable for everyone, permanently.
+ * 5000/100  the gate never CLOSED. Simulated through this module, a WEAK fleet
+ *           (45% BFT accuracy, 30% catch rate) came out 99% Platinum, holding
+ *           the 500,000 USDC daily limit. Every operating population landed in
+ *           the top tier; the ladder sorted nobody.
+ * 57200/0.5 present. Chosen by measurement, not taste — see
+ *           `scripts/sim/repid-calibration.mjs`, which searches the
+ *           (scale, multiplier) grid for the pair that best separates simulated
+ *           populations while keeping the floors at their plain values.
  *
- *   Bronze     2.2%      Gold      21.6%
- *   Silver     6.8%      Platinum  69.4%
+ * ── WHY THE INPUT SCALE IS THE REAL KNOB ────────────────────────────────────
  *
- * Platinum now begins at a weighted sum of 0.306 — an agent performing at ~31%
- * of the maximum holds the 500,000 USDC daily limit. That is a property of the
- * log curve's steepness, not of the multiplier: `log10` compresses the top of
- * the range hard, so raising the multiplier to reach the gates necessarily
- * widens the top tier.
+ * `log10` compresses hard. With a scale of 100, `1 + ws*100` spans 1..101 and a
+ * real fleet's whole operating range — weighted sums roughly 0.35 to 0.85 —
+ * lands in the top ~1,700 points of a 10,000-point scale. No choice of
+ * multiplier fixes that, because the multiplier scales the compressed range
+ * without decompressing it. Dropping the scale to 0.5 makes the argument span
+ * 1..1.5, where log10 is far closer to linear, and the multiplier then restores
+ * the range. That is why both constants changed at once.
  *
- * If that distribution is wrong, THE TIER FLOORS ARE THE KNOB, not this
- * constant — moving them redistributes without re-breaking reachability, and
- * `describeCoherence` will refuse any set that puts a floor back above the
- * ceiling. Recorded here so the next person changing either one can see what
- * the other costs.
+ * ── WHAT THIS DOES TO THE DISTRIBUTION, computed rather than assumed ────────
+ *
+ * Over the honest weighted-sum range [0, 1]:
+ *
+ *              was (5000/100)      now (57200/0.5)
+ *   Bronze          2.2%                21.2%
+ *   Silver          6.8%                23.4%
+ *   Gold           21.6%                25.9%
+ *   Platinum       69.4%                29.5%
+ *
+ * READ THAT AS A PROPERTY OF THE CURVE, NOT OF ANY FLEET. A uniform sweep over
+ * weightedSum answers "how much of the INPUT RANGE maps to each tier"; no set
+ * of real agents is uniform over [0,1]. For population figures — the ones that
+ * actually matter — run `npm run check:repid-calibration`.
+ *
+ * Platinum now begins at weightedSum 0.7049, up from 0.306. The floors keep
+ * their plain meaning: 2500 needs 0.2118, 5000 needs 0.4459.
+ *
+ * THE CAP STILL BINDS, narrowly: a flawless agent computes 10072.4 and reports
+ * 10000, so scores flatten above weightedSum 0.9913 — 0.9% of the range, down
+ * from 1%+ before. Asserted, so it is a known property rather than a surprise
+ * the first time two excellent agents tie.
+ *
+ * ── IF YOU CHANGE EITHER CONSTANT ───────────────────────────────────────────
+ *
+ * Run `npm run check:repid-calibration`. It fails the ladder that cannot sort,
+ * which is the check that did not exist when the 2000 -> 5000 change was made
+ * and would have caught its consequence immediately. `describeCoherence` only
+ * proves a gate is REACHABLE; that suite proves it is ESCAPABLE.
  */
-export const SCORE_LOG_MULTIPLIER = 5000;
-export const SCORE_LOG_INPUT_SCALE = 100;
+export const SCORE_LOG_MULTIPLIER = 57200;
+export const SCORE_LOG_INPUT_SCALE = 0.5;
 
 export function scoreFromWeightedSum(weightedSum: number): number {
   if (typeof weightedSum !== 'number' || !Number.isFinite(weightedSum)) return REPID_MIN;
@@ -286,10 +317,60 @@ export function reachableCeiling(): number {
   return scoreFromWeightedSum(1);
 }
 
-/** What the weighted sum would have to be for a score — the inverse of the curve. */
+/**
+ * The weighted sum required to REACH a score — and it must actually reach it.
+ *
+ * The closed-form inverse `(10^(s/M) - 1) / S` is correct as real arithmetic and
+ * WRONG as floating point. `scoreFromWeightedSum` takes a FLOOR, so a result one
+ * unit-in-the-last-place low scores one point short, and the function's own name
+ * becomes false: `weightedSumRequiredFor(2500)` returned a weighted sum scoring
+ * **2499** — Bronze, not Silver.
+ *
+ * NOT INTRODUCED BY THE 57200/0.5 RECALIBRATION, only made easier to see:
+ * measured over the closed form, 933 of the first 4,000 scores landed short
+ * under the OLD constants and 4,024 of the first 9,000 under the new ones. A
+ * larger multiplier amplifies the same last-bit error rather than causing it.
+ *
+ * So the definition is tightened from "the real-valued inverse" to **the
+ * smallest weighted sum that this module actually scores at or above `score`**,
+ * which is the property every caller already assumed. It is reached by nudging
+ * exact by construction — bounded, and asserted to round
+ * trip for every score in the domain.
+ *
+ * It matters because this is the number quoted to an operator asking what an
+ * agent needs to clear a gate, and `describeCoherence` puts it in the report
+ * that explains why a gate is unreachable.
+ */
 export function weightedSumRequiredFor(score: number): number {
-  return (10 ** (score / SCORE_LOG_MULTIPLIER) - 1) / SCORE_LOG_INPUT_SCALE;
+  if (typeof score !== 'number' || !Number.isFinite(score)) return NaN;
+  if (score <= REPID_MIN) return 0;
+
+  // Above the reachable ceiling there is NO answer in [0,1]. Return the
+  // mathematical inverse so a caller can see HOW FAR out of range the gate is —
+  // `describeCoherence` prints exactly this to explain an unreachable gate, and
+  // "3.15" is the number that made the original finding legible. `expm1` rather
+  // than `10**x - 1` because the latter subtracts two nearly-equal numbers and
+  // loses about five significant digits near zero.
+  if (scoreFromWeightedSum(1) < score) {
+    return Math.expm1((score / SCORE_LOG_MULTIPLIER) * Math.LN10) / SCORE_LOG_INPUT_SCALE;
+  }
+
+  // Otherwise BISECT for the smallest weighted sum this module actually scores
+  // at or above `score`. Exact by construction, and immune to the precision of
+  // any closed form — which is the point: the closed-form inverse and the
+  // forward curve disagree at the last bit in BOTH directions, so no amount of
+  // algebra makes them round-trip. Searching the forward function does.
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 200; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (mid === lo || mid === hi) break;
+    if (scoreFromWeightedSum(mid) >= score) hi = mid;
+    else lo = mid;
+  }
+  return hi;
 }
+
 
 /**
  * The payment threshold used when an institution has not stored one.
@@ -625,4 +706,69 @@ export function checkDailyLimit(
 export function isPlaceholderProofCid(cid: unknown): boolean {
   if (typeof cid !== 'string' || cid.trim() === '') return true;
   return /^ZKP_STUB_/.test(cid.trim());
+}
+
+// ---------------------------------------------------------------------------
+// MARGINAL VALUE — what does real improvement actually buy?
+//
+// Sprint D4 recorded the inversion as a property of the CURVE: "+0.01 of real
+// improvement was worth 880 points at the bottom and 0 at the top", and
+// predicted the 57200/0.5 recalibration would reduce it. Measured here, the
+// prediction holds — but the DIAGNOSIS does not, and the difference changes
+// what a fix would have to touch.
+//
+// Below saturation the curve's own spread is 124 -> 83, a factor of **1.49**.
+// That is a logarithm behaving like a logarithm, and it is not the finding.
+//
+// The collapse to zero is the CLAMP. `scoreFromWeightedSum` floors at
+// `REPID_MAX`, and 57200/0.5 evaluates to **10072.42** at weightedSum 1 — so
+// the calibration overshoots the maximum by 72 points and every agent above
+// weightedSum ~= 0.9915 scores exactly 10000. Inside that band, measurable
+// improvement is worth exactly nothing.
+//
+// So "the curve pays least at the top" is the wrong target. Reshaping the log
+// would move 1.49; only the overshoot moves the zero.
+// ---------------------------------------------------------------------------
+
+/** Points bought by adding `delta` at `weightedSum`. Drives the real curve. */
+export function marginalValueAt(weightedSum: number, delta = 0.01): number {
+  const from = scoreFromWeightedSum(weightedSum);
+  const to = scoreFromWeightedSum(Math.min(1, weightedSum + delta));
+  return to - from;
+}
+
+export interface Saturation {
+  /** Smallest weighted sum this module already scores at `REPID_MAX`. */
+  atWeightedSum: number;
+  /** Width of the dead band, in weighted-sum units. */
+  bandWidth: number;
+  /** What the curve WOULD score at weightedSum 1 with no clamp. */
+  uncappedAtOne: number;
+  /** By how much the calibration overshoots `REPID_MAX`. The cause. */
+  overshoot: number;
+}
+
+/**
+ * Where does improvement stop paying, and why?
+ *
+ * Found by scanning the real function rather than inverting it: the inverse is
+ * the thing that was already wrong once here (`weightedSumRequiredFor` returned
+ * a sum scoring one point short), so this asks the module directly.
+ */
+export function saturationPoint(step = 0.0001): Saturation {
+  let at = 1;
+  for (let ws = 0; ws <= 1 + 1e-12; ws += step) {
+    if (scoreFromWeightedSum(ws) >= REPID_MAX) {
+      at = Math.min(1, ws);
+      break;
+    }
+  }
+  const uncappedAtOne =
+    SCORE_LOG_MULTIPLIER * Math.log10(1 + 1 * SCORE_LOG_INPUT_SCALE);
+  return {
+    atWeightedSum: at,
+    bandWidth: Math.max(0, 1 - at),
+    uncappedAtOne,
+    overshoot: uncappedAtOne - REPID_MAX,
+  };
 }

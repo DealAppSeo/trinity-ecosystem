@@ -33,7 +33,7 @@
 // Never prints a token. Exit 1 on LIVE, 2 on NOT MEASURED, 0 otherwise — a
 // check that could not run must not be greppable as success.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 const TIMEOUT_MS = 15_000;
 
@@ -67,20 +67,97 @@ function claims(token) {
   }
 }
 
-/** Every complete legacy JWT anywhere in history, deduped, newest ref first. */
+/** Largest blob we will read. Above this it is an archive or a media file. */
+const MAX_BLOB_BYTES = 2_000_000;
+/** Blobs per `cat-file --batch` invocation. Bounds peak memory, not correctness. */
+const BLOB_BATCH = 512;
+
+/**
+ * Every complete legacy JWT anywhere in history, deduped.
+ *
+ * SCANS UNIQUE BLOBS, NOT COMMITS — for two separate reasons, one speed and one
+ * correctness, and the second is why this is not merely an optimisation.
+ *
+ * SPEED. The previous version ran one `git grep <commit>` per commit: 710
+ * subprocesses, each re-reading every file in that commit's tree. A file
+ * unchanged for 700 commits was scanned 700 times. Measured 2026-08-16 on this
+ * repo: **28.9s**, against **0.97s** for 5,553 unique blobs — the same content,
+ * read once each.
+ *
+ * CORRECTNESS. `git grep` SKIPS BINARY FILES by default, and that is a blind
+ * spot in a credential scanner rather than a preference. Switching to blobs
+ * immediately found a sixth legacy JWT the per-commit scan had never reported,
+ * inside `trinity-science/app/__pycache__/anfis_router.cpython-313.pyc` — a
+ * committed .pyc. That token is `role=anon` and every legacy key on this project
+ * is disabled, so it is inert; the point is that a `service_role` token
+ * committed inside ANY binary — a .pyc, a build artifact, a bundled archive —
+ * would have been equally invisible. A scanner that cannot see a file class
+ * reports clean about a place it never looked.
+ *
+ * The batch stream is parsed by the declared object size rather than regexed
+ * whole, so a token can never be manufactured across two blobs' boundary.
+ */
 function collectLegacyJwts() {
   const found = new Map();
-  const commits = git(['rev-list', '--all']).split('\n').filter(Boolean);
-  for (const commit of commits) {
-    const text = git(['grep', '-h', '-E', GIT_GREP_ERE, commit, '--'], { allowNoMatch: true });
-    if (!text) continue;
+
+  // oid -> a path it was seen at, for the report. rev-list gives "<oid> <path>".
+  const pathByOid = new Map();
+  for (const line of git(['rev-list', '--objects', '--all']).split('\n')) {
+    if (!line) continue;
+    const sp = line.indexOf(' ');
+    if (sp === -1) pathByOid.set(line, '');
+    else pathByOid.set(line.slice(0, sp), line.slice(sp + 1));
+  }
+
+  const check = spawnSync(
+    'git',
+    ['cat-file', '--batch-check=%(objectname) %(objecttype) %(objectsize)'],
+    { input: [...pathByOid.keys()].join('\n'), encoding: 'utf8', maxBuffer: 1 << 30 }
+  );
+  const blobs = [];
+  for (const line of String(check.stdout ?? '').split('\n')) {
+    const [oid, type, size] = line.split(' ');
+    if (type === 'blob' && Number(size) <= MAX_BLOB_BYTES) blobs.push(oid);
+  }
+
+  const record = (text, oid) => {
     for (const token of text.match(JWT) ?? []) {
       if (found.has(token)) continue;
       const c = claims(token);
       if (!c.role) continue;
-      found.set(token, { token, role: c.role, ref: c.ref ?? null, exp: c.exp ?? null });
+      found.set(token, {
+        token,
+        role: c.role,
+        ref: c.ref ?? null,
+        exp: c.exp ?? null,
+        path: pathByOid.get(oid) || '(unnamed blob)',
+      });
+    }
+  };
+
+  for (let i = 0; i < blobs.length; i += BLOB_BATCH) {
+    const batch = blobs.slice(i, i + BLOB_BATCH);
+    // latin1 so every byte round-trips: a JWT is ASCII, and utf8 decoding of a
+    // binary blob would replace bytes and could split a match.
+    const out = spawnSync('git', ['cat-file', '--batch'], {
+      input: batch.join('\n'),
+      encoding: 'latin1',
+      maxBuffer: 1 << 30,
+    });
+    const stream = String(out.stdout ?? '');
+    // "<oid> blob <size>\n" then exactly <size> bytes then "\n".
+    let pos = 0;
+    while (pos < stream.length) {
+      const nl = stream.indexOf('\n', pos);
+      if (nl === -1) break;
+      const [oid, type, size] = stream.slice(pos, nl).split(' ');
+      const bytes = Number(size);
+      if (type !== 'blob' || !Number.isFinite(bytes)) break;
+      record(stream.slice(nl + 1, nl + 1 + bytes), oid);
+      pos = nl + 1 + bytes + 1;
     }
   }
+
   return [...found.values()];
 }
 

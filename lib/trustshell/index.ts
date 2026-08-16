@@ -202,6 +202,15 @@ export type {
   AcceptanceState,
 } from './identity/acceptance-loop';
 
+/**
+ * What a zk RepID operation COSTS, in hash calls — the only unit that survives
+ * the change of hash function. See `identity/cost.ts`: the production
+ * `IBindingScheme` throws pending Poseidon2 parameters, so a millisecond figure
+ * from this repo would describe a hash we will never ship.
+ */
+export { countingScheme, totalCalls, verifyGrowth, COST_MODEL, ZERO_COST } from './identity/cost';
+export type { HashCost, CountingScheme } from './identity/cost';
+
 export {
   CONTRACT_DOMAIN,
   VERDICT_DOMAIN,
@@ -334,3 +343,19 @@ export type {
   HandoffVerification,
   VerifyHandoffInput,
 } from './identity/handoff';
+
+// The HAL chain verifier. Exported so a consumer can ask whether the audit
+// chain holds — until 2026-08-16 this module was importable by nobody, which
+// made the verdict uncomputable outside its own test. `verifyHalChain` reports
+// three outcomes and returns NOT_CHECKED for link verification until an
+// `EntryHasher` is supplied, because the producer's hashing formula lives in
+// the fleet rather than here. Structure is checkable today; links are not.
+export { verifyHalChain, CHAIN_CUTOVER_ISO, LIVE_RUN_2026_08_16 } from './hal-chain';
+export type {
+  HalChainEntry,
+  EntryHasher,
+  ChainOutcome,
+  ChainDefectKind,
+  ChainDefect,
+  ChainVerification,
+} from './hal-chain';

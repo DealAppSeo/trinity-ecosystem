@@ -219,8 +219,16 @@ fallbacks in client code must spell out each candidate; server code can loop.
 
 **Publishable keys map to the `anon` Postgres role and ship in the browser
 bundle.** They are public. Anything reachable under an `anon` RLS policy is
-reachable by anyone who views source. See LESSONS S1 — two tables are currently
-`USING (true)` for `anon`.
+reachable by anyone who views source.
+
+**It is 196 tables, not two** [MEASURED 2026-08-16 against `pg_policies`]. This
+line previously said "two", generalising LESSONS S1 — which had audited exactly
+two tables and never claimed they were the only ones. Both of S1's are now fixed
+(`agent_kya_registry` and `kya_compliance_receipts` are `{authenticated}`), so
+the sentence was wrong in both directions at once: the named pair was closed and
+the real number was two orders of magnitude larger. Full finding, severity and
+the remediation SQL: `LESSONS.md` S3. Do not re-derive the count by reading a
+migration — ask `pg_policies`.
 
 ## Network, in cloud/remote sessions
 

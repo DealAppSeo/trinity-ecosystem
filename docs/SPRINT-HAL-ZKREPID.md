@@ -1,0 +1,168 @@
+# HAL + zkRepID sprint loop
+
+**Read `docs/PRIOR-WORK-INDEX.md` first.** This file is the *backlog*; the index
+is the record of what is already closed and which numbers are retracted.
+
+Standing shape of each sprint, because both of this branch's worst findings came
+from skipping step 1:
+
+1. **Measure the ceiling / the population before tuning toward it.** Compute what
+   the system *can* do before optimising. Two of the three RepID defects were
+   invisible until something was simulated rather than reasoned about.
+2. **Drive the production module, never a reimplementation.** Every sim in
+   `scripts/sim/` compiles the real `.ts` and calls it. A sim of a copy proves
+   nothing about production.
+3. **Turn each finding into a gate that can go red on its own.** A measurement in
+   a commit message rots. `check:repid-calibration` flipped NOT_CHECKED →
+   VERIFIED with no edit when the fix landed; that is the shape to copy.
+4. **Report NOT_CHECKED for anything blocked on an operator decision.** A gate
+   that fails the build over a pending product call makes the build permanently
+   red, which is how a gate gets ignored.
+
+---
+
+## CLOSED this sprint (all measured, all in the index)
+
+| finding | how it was found |
+|---|---|
+| The RepID gate never OPENED — flawless agent 4008 vs threshold 5000 | computing the ceiling |
+| The gate then never CLOSED — a weak fleet was 99% Platinum | population simulation |
+| Silver cost 2.16% of maximum; the self-asserted custody flag alone cleared it | adversarial sim |
+| `weightedSumRequiredFor(2500)` returned a sum scoring **2499** | round-trip over the whole domain |
+| The coherence check graded a threshold the gate does not use (`??` vs `||`) | reading two call sites against each other |
+| A negative stored threshold opened the payment gate for everyone | live column inspection (no CHECK constraint) |
+| `verifyHalChain` had only ever run on its own fixtures | driving it over live rows |
+| The mutation gate was green over a set excluding all new code | reading the manifest against the diff |
+
+---
+
+## Sprint C — HAL, open
+
+**C1. The producer's hash formula is still unknown.** 568 constructions tried
+against a real adjacent pair; none reproduced a stored link. Until it is supplied
+the chain is NOT_CHECKED and `EntryHasher` stays a port. **Blocked** on the
+Trinity fleet / repid-engine lane. *Do not brute-force further without a new
+idea* — 568 attempts is already evidence that guessing is the wrong method.
+
+**C2. TRACED 2026-08-16 — the linkage is REAL and LIVE; the domain claim is
+CONFOUNDED and stays NOT ESTABLISHED.** `npm run check:hal-repid-linkage`,
+7 assertions, 2 mutations.
+
+The path, followed end to end rather than assumed:
+
+```
+HAL veto -> repid_score_events.hallucination_caught = true
+         -> v_agent_earned_observations: signal 'integrity',
+            success := (hallucination_caught IS NOT TRUE)
+         -> EarnedMetricsRepo: measureRate(bySignal('integrity'))
+         -> veritasCatchRate, weight 0.30
+         -> RepID score -> tier -> daily payment limit
+```
+
+**Live, not dormant.** 152,157 observations, **every one carrying an
+`agent_id`** (the view requires it), 46.0% scoring as failures; recency-weighted
+effective N is **38,895** against a floor of 1, fleet value **0.4597** across 104
+agents.
+
+**But the domain comparison cannot carry the claim.** Within the single domain
+`review` the caught rate runs **0.00% (May) → 60.18% (Jun) → 51.04% (Jul) →
+0.00% (Aug)**, and fleet-wide 2.13% → 59.28% → 67.63% → 4.39%. A base rate moving
+30× inside the measurement window swamps any gap between domains, so the pooled
+comparison that would show "internal work is penalised" is confounded. A
+within-month gap does exist (June: `review` 60.18% vs `general` 3.06%) — that is
+a lead on one month against an unexplained regime change, not a result.
+
+**Settling C2 needs the regime change explained first.** Same lesson as the HAL
+pooled-AUC trap, one table over.
+
+**Two properties of `measureRate` were pinned on the way, because this session
+got both wrong before running them:** `rawValue` is invariant under advancing
+`now` (decay cancels in the ratio, so a SQL-derived rate reads identical at every
+horizon) while **`value` is not** — it shrinks toward `PRIOR_VALUE` = 0 as
+evidence ages. Anyone quoting a SQL rate as "the metric" is quoting `rawValue`
+and will disagree with production. The shrinkage toward zero is **deliberate and
+documented**: absent evidence must cost, never pay, because shrinking toward a
+population mean would let a new agent inherit the fleet's reputation.
+
+**C3. No table records fact-check quorum vetoes.** `hal_quorum_receipts` and
+`hal_quorum_validator_votes` do not exist though a writer targets them (settled).
+So the veto rate is unmeasurable from here — any claim about it is UNVERIFIABLE,
+not zero.
+
+---
+
+## Sprint D — zkRepID, open
+
+**D1. Two score lineages that never reconcile. HIGHEST VALUE, and it gets worse
+with use.** `RepIDCalculator.calculate()` computes fresh from EarnedMetrics and
+drives the payment decision; `agent_kya_registry.repid_score` is only ever nudged
+`stored + delta` by `updateRepID` and is never recomputed from metrics. After the
+57200/0.5 recalibration the stored scores sit on the OLD scale and computed ones
+on the new, diverging ±10 per payment. Reconciling changes spending limits →
+**Sean-gated**. See `v_repid_tier_drift` (changelog #140).
+
+**D2. Stored tier ≠ stored score for 9 of 12 agents.** All drift is in the safe
+direction; `updateRepID` cannot produce new drift. Legacy rows. Fixing them
+raises limits → **Sean-gated**. Subsumed by D1 if D1 is done properly.
+
+**D3. 21,965 ZK proofs assert `is_real` over a stub score.** Writer is in
+repid-engine, outside this repo's push scope → **BLOCKED_FOR_SEAN**. Read
+`v_repid_proof_claim_integrity` (changelog #139), **not**
+`v_repid_proof_score_audit`, which buckets on score alone and reports a
+misleading 99.7%.
+
+**D4. MEASURED 2026-08-16 — the prediction held, the diagnosis did not.**
+`npm run check:repid-marginal`, 6 assertions, 3 mutations.
+
+The recalibration did reduce it: the top now buys 11 points where 5000/100 bought
+0. But **11 is not the curve.** Sampled below saturation the curve's own spread is
+124 → 83, a factor of **1.49** — a logarithm behaving like a logarithm.
+
+The collapse to zero is the **clamp**. 57200/0.5 evaluates to **10072.42** at
+weightedSum 1 against a `REPID_MAX` of 10000, so the calibration **overshoots by
+72.42 points** and everything above weightedSum ≈ 0.9915 scores exactly 10000 —
+a **0.87%-wide dead band where real improvement buys nothing at all**.
+
+This changes what a fix touches. *"The curve pays least at the top"* sends someone
+to reshape the logarithm, which would move 1.49; **only the overshoot moves the
+zero.** Closing it means lowering the multiplier so the curve lands ON 10000,
+which moves every score and therefore every tier → **Sean-gated**, and reported
+as NOT CHECKED by the gate rather than failing the build (rule 4).
+
+The sim's headline "11.3×" is measured at weightedSum 0.99, which straddles
+saturation and so blends the curve with the clamp. Both numbers are right; only
+the causal reading was wrong.
+
+**D5. `humanCustody` is still self-asserted.** Option B made the flag alone
+insufficient for Silver, which removes the free ride but not the underlying
+issue: nothing in this repo verifies the KYA-registry boolean. Gate it behind
+verification, or accept it explicitly.
+
+---
+
+## Sprint E — the structural one, deliberately deferred
+
+**E1. Make `scripts/mutations.mjs` discovery-based**, the way `npm run check`
+discovers `check:*`. Both merge conflicts on 2026-08-16 were the tail of that one
+shared array — LESSONS A17 in a different file. **Do it when main is quiet**;
+rewriting the manifest while other lanes have open PRs against it causes exactly
+the conflict it fixes.
+
+---
+
+## Running the sims
+
+```
+node scripts/sim/repid-adversarial.mjs    # cheapest path to each gate, marginal value
+node scripts/sim/repid-calibration.mjs    # can the ladder discriminate; solves for floors
+npm run check:repid-calibration           # the gate; 0 VERIFIED / 2 NOT_CHECKED
+```
+
+Both sims are **deterministic** — an LCG, never `Math.random`. A sim whose answer
+changes between runs cannot be a gate, and the mutation runner would score it as
+flaky rather than as evidence.
+
+**A negative result is only as wide as the grid that produced it.** The Option B
+search first reported "the log form cannot separate these populations"; the grid
+capped the multiplier at 12,000 and the answer was 57,200. Anything reporting
+IMPOSSIBLE must show it looked where the answer is.
