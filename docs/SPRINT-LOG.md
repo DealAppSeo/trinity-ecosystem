@@ -124,9 +124,21 @@ verified by execution:
   one file, and it is a prompt. Self-reported bid confidence is never
   reconciled against outcomes.
 
-**LangGraph** — took the `TimeoutPolicy` run-vs-idle split (still unbuilt, and
-the highest-value remaining item), `_replay.py`'s rewind-to-before-the-failure
-plus first-visit semantics, and the control-flow-vs-failure error taxonomy.
+**LangGraph** — took the `TimeoutPolicy` run-vs-idle split (~~still unbuilt, and
+the highest-value remaining item~~ — **SUPERSEDED 2026-08-16: built in Sprint C,
+§7 of this file**, `lib/trustshell/harness/timeout.ts` + 38 green assertions,
+with abandonment accounting added in Sprint K), `_replay.py`'s
+rewind-to-before-the-failure plus first-visit semantics, and the
+control-flow-vs-failure error taxonomy.
+
+> The parenthetical above was true when written and false from Sprint C onward,
+> while **this same file already said so twice** — "backlog exhausted … run/idle
+> timeout split — built, Sprint C" at the top, and §7 in full. It is corrected in
+> place rather than deleted because of what it cost: on 2026-08-16 it was read as
+> current, cited as open work, recommended twice to Sean, and copied into
+> `PRIOR-WORK-INDEX.md` and `INTERRUPT-AS-AUTHORIZATION-2026-08-15.md` before
+> anyone opened `timeout.ts`. A stale line in a "what came from where" section
+> outranks a correct line elsewhere, because that section is what gets quoted.
 
 **crewAI examples** — took the bounded retry that ends in a **named terminal
 branch** rather than an exception. An exception gets caught somewhere generic

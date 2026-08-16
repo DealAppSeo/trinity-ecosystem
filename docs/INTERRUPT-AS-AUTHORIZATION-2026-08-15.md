@@ -185,9 +185,30 @@ Stated up front so it is not claimed later by someone reading only §4.
 ## 8. Where this sits in the queue, and why it is not next
 
 Behind everything in `HARNESS-RESEARCH-2026-08-15.md` §8. Specifically behind
-the evaluator port, which is the differentiator, and behind the run-vs-idle
-`TimeoutPolicy` split, which is cheap and already flagged as the highest-value
-remaining LangGraph item.
+the evaluator port, which is the differentiator.
+
+> **Corrected 2026-08-16.** This section originally also placed it behind "the
+> run-vs-idle `TimeoutPolicy` split, which is cheap and already flagged as the
+> highest-value remaining LangGraph item." That split has been **built since
+> Sprint C** — `lib/trustshell/harness/timeout.ts`, 38 green assertions, with the
+> abandonment ledger added in Sprint K. The claim came from a stale parenthetical
+> in `SPRINT-LOG.md` and was written here without opening the module.
+>
+> Re-checked against `lib/` the same day, since one stale status implies others
+> [VERIFIED 2026-08-16 by file presence, not by reading each implementation]:
+>
+> | taken from LangGraph | state |
+> |---|---|
+> | run/idle `TimeoutPolicy` | **built** — `harness/timeout.ts` |
+> | `_replay.py` rewind + first-visit | **built** — `harness/replay.ts` |
+> | message transforms (head/tail) | **built** — `harness/transform.ts` |
+> | `retry_on` **predicate** | **NOT BUILT** — no `RetryPolicy`/`retryOn` anywhere in `lib/` |
+> | control-flow-vs-failure error taxonomy | **PARTIAL / NOT CHECKED** — `AttemptTimeoutError` exists in `timeout.ts`; whether the full separation was implemented was not established |
+>
+> So the genuinely remaining LangGraph item is the **`retry_on` predicate**, not
+> the timeout split. Presence of a file is weaker evidence than reading it, and
+> that is all the two "built" claims above rest on beyond `timeout.ts`, which was
+> read.
 
 It is also behind its own precondition. `harness/replay.ts` is the natural home
 for interrupts, and today `MemoryCheckpointStore` is its only `CheckpointStore`
