@@ -117,6 +117,30 @@ pass. It is not — with the file present and ignored, the working-tree scan
 reports *"No credential-shaped strings found"* and references the file **0**
 times.
 
+### 4.3 NOT CHECKED IN CI — and a green run does not say otherwise
+
+**The path that consumes the state file did not execute.** On PR `e66b292` all
+three jobs concluded SUCCESS, and steps 9–11 — *restore history scan state*,
+*report credentials in git history*, *save history scan state* — are each
+`conclusion: skipped`.
+
+That is by design, not a fault: the **PR path** scans only the PR's own commits
+(step 8, `--since`, 16s) and never reads the cache. The full-history scan with
+`--state` runs on the **other** path. So the change was verified locally
+(cold 44.8s / warm 0.254s, identical findings, §4.1) and **has never run in CI**.
+It first will when this branch lands on `main`.
+
+The exposure is bounded and worth stating exactly: the step carries `|| true`, so
+it cannot fail a run, and the worst case is one cold scan of roughly 45s (longer
+on a slower runner). But *bounded* is not *verified* — *"all checks green"* on
+this PR is **not** evidence about this change, because the step that would
+produce that evidence was skipped.
+
+**This is the house defect in miniature**: a green run standing in for a check
+that never ran. It is recorded here so that when the main-path scan does run, the
+first result is compared against 30 findings / 7 usable rather than read as a
+new baseline.
+
 ### 4.2 A claim in the index that cost a re-check
 
 The index recorded the cache as producing *"output byte-identical to the
