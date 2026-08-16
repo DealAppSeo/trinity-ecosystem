@@ -44,13 +44,45 @@ the chain is NOT_CHECKED and `EntryHasher` stays a port. **Blocked** on the
 Trinity fleet / repid-engine lane. *Do not brute-force further without a new
 idea* — 568 attempts is already evidence that guessing is the wrong method.
 
-**C2. HAL vetoes TRUE claims about internals** — settled fact, reproduced 4/4,
-recorded in `settled_facts_DO_NOT_REPEAT`. **Do not re-derive it.** The open
-question is whether that false-positive mode propagates into RepID:
-`veritasCatchRate` is `measureRate(bySignal('integrity'))`, so the linkage runs
-through observation rows rather than directly from HAL. **NOT ESTABLISHED** —
-trace it before claiming it. If it holds, agents doing internal work are
-systematically under-scored, which is a cross-cutting HAL↔RepID defect.
+**C2. TRACED 2026-08-16 — the linkage is REAL and LIVE; the domain claim is
+CONFOUNDED and stays NOT ESTABLISHED.** `npm run check:hal-repid-linkage`,
+7 assertions, 2 mutations.
+
+The path, followed end to end rather than assumed:
+
+```
+HAL veto -> repid_score_events.hallucination_caught = true
+         -> v_agent_earned_observations: signal 'integrity',
+            success := (hallucination_caught IS NOT TRUE)
+         -> EarnedMetricsRepo: measureRate(bySignal('integrity'))
+         -> veritasCatchRate, weight 0.30
+         -> RepID score -> tier -> daily payment limit
+```
+
+**Live, not dormant.** 152,157 observations, **every one carrying an
+`agent_id`** (the view requires it), 46.0% scoring as failures; recency-weighted
+effective N is **38,895** against a floor of 1, fleet value **0.4597** across 104
+agents.
+
+**But the domain comparison cannot carry the claim.** Within the single domain
+`review` the caught rate runs **0.00% (May) → 60.18% (Jun) → 51.04% (Jul) →
+0.00% (Aug)**, and fleet-wide 2.13% → 59.28% → 67.63% → 4.39%. A base rate moving
+30× inside the measurement window swamps any gap between domains, so the pooled
+comparison that would show "internal work is penalised" is confounded. A
+within-month gap does exist (June: `review` 60.18% vs `general` 3.06%) — that is
+a lead on one month against an unexplained regime change, not a result.
+
+**Settling C2 needs the regime change explained first.** Same lesson as the HAL
+pooled-AUC trap, one table over.
+
+**Two properties of `measureRate` were pinned on the way, because this session
+got both wrong before running them:** `rawValue` is invariant under advancing
+`now` (decay cancels in the ratio, so a SQL-derived rate reads identical at every
+horizon) while **`value` is not** — it shrinks toward `PRIOR_VALUE` = 0 as
+evidence ages. Anyone quoting a SQL rate as "the metric" is quoting `rawValue`
+and will disagree with production. The shrinkage toward zero is **deliberate and
+documented**: absent evidence must cost, never pay, because shrinking toward a
+population mean would let a new agent inherit the fleet's reputation.
 
 **C3. No table records fact-check quorum vetoes.** `hal_quorum_receipts` and
 `hal_quorum_validator_votes` do not exist though a writer targets them (settled).
@@ -79,10 +111,27 @@ repid-engine, outside this repo's push scope → **BLOCKED_FOR_SEAN**. Read
 `v_repid_proof_score_audit`, which buckets on score alone and reports a
 misleading 99.7%.
 
-**D4. The marginal-value inversion is unresolved.** +0.01 of real improvement was
-worth 880 points at the bottom of the range and 0 at the top under 5000/100.
-Re-measure under 57200/0.5 — the reshaped curve should have reduced it, but that
-is a prediction, not a measurement. `scripts/sim/repid-adversarial.mjs` prints it.
+**D4. MEASURED 2026-08-16 — the prediction held, the diagnosis did not.**
+`npm run check:repid-marginal`, 6 assertions, 3 mutations.
+
+The recalibration did reduce it: the top now buys 11 points where 5000/100 bought
+0. But **11 is not the curve.** Sampled below saturation the curve's own spread is
+124 → 83, a factor of **1.49** — a logarithm behaving like a logarithm.
+
+The collapse to zero is the **clamp**. 57200/0.5 evaluates to **10072.42** at
+weightedSum 1 against a `REPID_MAX` of 10000, so the calibration **overshoots by
+72.42 points** and everything above weightedSum ≈ 0.9915 scores exactly 10000 —
+a **0.87%-wide dead band where real improvement buys nothing at all**.
+
+This changes what a fix touches. *"The curve pays least at the top"* sends someone
+to reshape the logarithm, which would move 1.49; **only the overshoot moves the
+zero.** Closing it means lowering the multiplier so the curve lands ON 10000,
+which moves every score and therefore every tier → **Sean-gated**, and reported
+as NOT CHECKED by the gate rather than failing the build (rule 4).
+
+The sim's headline "11.3×" is measured at weightedSum 0.99, which straddles
+saturation and so blends the curve with the clamp. Both numbers are right; only
+the causal reading was wrong.
 
 **D5. `humanCustody` is still self-asserted.** Option B made the flag alone
 insufficient for Silver, which removes the free ride but not the underlying
