@@ -85,7 +85,8 @@
     "check:throughput": "node scripts/check-throughput.mjs",
     "check:schema-names": "node scripts/check-schema-names.mjs",
     "check:spine-reachable": "node scripts/spine-reachable-test.mjs",
-    "check:loud-errors": "node scripts/loud-errors-test.mjs"
+    "check:loud-errors": "node scripts/loud-errors-test.mjs",
+    "check:dormancy": "node scripts/check-dormancy.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",
