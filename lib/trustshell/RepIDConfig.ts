@@ -2,14 +2,20 @@
 // TrustShell Sprint — Created March 26 2026 by Gemini
 
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import {
+  DEFAULT_WEIGHTS,
+  contributionsOf,
+  describeCoherence,
+  normalizeMetrics,
+  scoreFromWeightedSum,
+  sumContributions,
+  tierForScore,
+  weightsProblem,
+  type CoherenceReport,
+  type RepIDWeights,
+} from './repid-scoring';
 
-export interface RepIDWeights {
-  bftAccuracy:        number;
-  veritasCatchRate:   number;
-  x402SuccessRate:    number;
-  latencyOpportunity: number;
-  humanCustodyScore:  number;
-}
+export type { RepIDWeights };
 
 export interface RepIDCalculationResult {
   repidScore:      number;
@@ -30,21 +36,43 @@ export interface RepIDCalculationResult {
 export class RepIDCalculator {
   private get supabase() { return getSupabaseAdmin(); }
 
-  private readonly DEFAULT_WEIGHTS: RepIDWeights = {
-    bftAccuracy:        0.40,
-    veritasCatchRate:   0.30,
-    x402SuccessRate:    0.15,
-    latencyOpportunity: 0.10,
-    humanCustodyScore:  0.05,
-  };
+  private readonly DEFAULT_WEIGHTS: RepIDWeights = DEFAULT_WEIGHTS;
 
+  /**
+   * Weights for an institution, VALIDATED ON READ.
+   *
+   * The stored value is checked with the same rule the setter applies, because
+   * the setter is not the only writer — a migration or another service can put
+   * anything in `institution_risk_config`. Weights that do not sum to 1 break
+   * the score's range, which is the one route to a tier the honest maximum
+   * cannot reach. Unusable stored weights fall back to the defaults rather than
+   * throwing, since this sits on a gate's read path, but the fallback is a
+   * deliberate substitution rather than the `|| DEFAULT` coincidence it was.
+   */
   async getInstitutionWeights(institutionId = 'default'): Promise<RepIDWeights> {
     const { data } = await this.supabase
       .from('institution_risk_config')
       .select('repid_weights')
       .eq('institution_id', institutionId)
       .single();
-    return (data?.repid_weights as RepIDWeights) || this.DEFAULT_WEIGHTS;
+    const stored = data?.repid_weights;
+    if (stored === undefined || stored === null) return this.DEFAULT_WEIGHTS;
+    return weightsProblem(stored) === null ? (stored as RepIDWeights) : this.DEFAULT_WEIGHTS;
+  }
+
+  /**
+   * Can the score reach the gates it is compared against?
+   *
+   * Exposed so an operator can ask without running a payment. It is one
+   * arithmetic call and it answers the question a green test suite cannot.
+   */
+  async coherence(institutionId = 'default'): Promise<CoherenceReport> {
+    const { data } = await this.supabase
+      .from('institution_risk_config')
+      .select('min_repid_payment')
+      .eq('institution_id', institutionId)
+      .single();
+    return describeCoherence(data?.min_repid_payment ?? 5000);
   }
 
   async calculate(
@@ -61,32 +89,11 @@ export class RepIDCalculator {
 
     const weights = await this.getInstitutionWeights(institutionId);
 
-    const normalized = {
-      bft:     rawMetrics.bftAccuracy / 100,
-      veritas: rawMetrics.veritasCatchRate / 100,
-      x402:    rawMetrics.x402SuccessRate / 100,
-      latency: Math.max(0, 1 - rawMetrics.latencyMs / 2000),
-      custody: rawMetrics.humanCustody ? 1 : 0,
-    };
-
-    const breakdown = {
-      bftContribution:     normalized.bft     * weights.bftAccuracy,
-      veritasContribution: normalized.veritas  * weights.veritasCatchRate,
-      x402Contribution:    normalized.x402     * weights.x402SuccessRate,
-      latencyContribution: normalized.latency  * weights.latencyOpportunity,
-      custodyContribution: normalized.custody  * weights.humanCustodyScore,
-    };
-
-    const weightedSum = Object.values(breakdown).reduce((s, v) => s + v, 0);
-
-    const repidScore = Math.min(10000, Math.max(0,
-      Math.floor(2000 * Math.log10(1 + weightedSum * 100))
-    ));
-
-    const repidTier =
-      repidScore >= 7500 ? 'Platinum' :
-      repidScore >= 5000 ? 'Gold'     :
-      repidScore >= 2500 ? 'Silver'   : 'Bronze';
+    const normalized = normalizeMetrics(rawMetrics);
+    const breakdown = contributionsOf(normalized, weights);
+    const weightedSum = sumContributions(breakdown);
+    const repidScore = scoreFromWeightedSum(weightedSum);
+    const repidTier = tierForScore(repidScore);
 
     const { data: config } = await this.supabase
       .from('institution_risk_config')
@@ -113,11 +120,10 @@ export class RepIDCalculator {
   ): Promise<void> {
     const current = await this.getInstitutionWeights(institutionId);
     const merged  = { ...current, ...weights };
-    const sum     = Object.values(merged).reduce((s, v) => s + v, 0);
 
-    if (Math.abs(sum - 1.0) > 0.01) {
-      throw new Error(`Weights must sum to 1.0. Current sum: ${sum.toFixed(2)}`);
-    }
+    // Same rule the reader applies. One validator, so the two cannot drift.
+    const problem = weightsProblem(merged);
+    if (problem !== null) throw new Error(`refusing to store these weights: ${problem}`);
 
     await this.supabase
       .from('institution_risk_config')

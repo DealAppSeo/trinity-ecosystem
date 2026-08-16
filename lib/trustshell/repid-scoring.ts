@@ -1,0 +1,425 @@
+// lib/trustshell/repid-scoring.ts
+//
+// The pure half of RepID scoring: the tier ladder, the normalization, the score
+// curve, and the spend arithmetic.
+//
+// ZERO IMPORTS, deliberately — the same reason `hal-receipt.ts` gives. Its two
+// callers (`RepIDConfig.ts`, `KYAValidator.ts`) reach Supabase through the `@/`
+// alias, so a check suite cannot compile either standalone, and consequently
+// NEITHER HAS EVER HAD A TEST. Both are load-bearing: RepIDConfig backs
+// `/api/trustrails/repid/configure`, and KYAValidator gates `VaultPermission`.
+// The thing nobody could run is the thing nobody checked.
+//
+// ── WHAT MEASURING THIS FIRST FOUND ─────────────────────────────────────────
+//
+// Five defects, each verified by computation before being written down:
+//
+// 1. **THE SCORE CANNOT REACH THE GATE IT FEEDS.** `weightedSum` is a convex
+//    combination of five values in [0,1] with weights summing to 1, so its
+//    maximum is exactly 1.0. Through `2000 * log10(1 + ws*100)` that yields a
+//    maximum score of **4008** — while the default `min_repid_payment` is
+//    **5000**, Gold is 5000 and Platinum is 7500. A flawless agent is Silver
+//    and can never be authorized to pay. Gold would need a weighted sum of
+//    3.15; Platinum, 56.2.
+//
+//    This is the standing rule in CLAUDE.md — *compute the ceiling before
+//    optimising toward it* — applied to a scoring curve instead of a component.
+//    `reachableCeiling()` below makes it one function call, and
+//    `describeCoherence()` turns it into a statement an operator can act on.
+//    **The calibration itself is deliberately NOT changed here**: re-tuning the
+//    curve moves every agent's score, which is a product decision, not a
+//    refactor. What this file does is make the incoherence impossible to miss.
+//
+// 2. **TWO TIER LADDERS THAT DISAGREE.** `KYAValidator` used `>` and
+//    `RepIDConfig` used `>=` over the same thresholds, so at exactly 2500,
+//    5000 and 7500 the two disagreed about the tier — one says Silver, the
+//    other Bronze. Same defect the loop kernel's DID comparison had: one rule,
+//    two implementations, disagreeing on the boundary. There is now one ladder.
+//
+// 3. **AN ABSENT DAILY SPEND READ AS ZERO.** `getDailySpend` destructured away
+//    the query error and returned `(data || []).reduce(...)`, so a database
+//    failure produced 0 — indistinguishable from "has spent nothing" — and the
+//    daily-limit check then PASSED. A DB outage granted the full daily
+//    allowance. Absent is not zero; this is the `Usage`/`Figure` lesson from
+//    the loop kernel, in the place where it costs money.
+//
+// 4. **A FABRICATED PROOF ID.** `zkp_proof_cid || \`ZKP_STUB_${name}_VERIFIED\``
+//    turned a missing proof into a non-empty string containing the word
+//    VERIFIED. Any consumer testing presence saw a proof that does not exist.
+//
+// 5. **NORMALIZATION UNBOUNDED ABOVE.** `pct / 100` and `1 - ms/2000` were
+//    clamped at 0 but not at 1, so an accuracy recorded as 150% or a negative
+//    latency inflated the weighted sum past 1.0 — the one route to a Gold score
+//    the honest path cannot reach.
+
+/** Score domain. A score outside this is a bug in whatever produced it. */
+export const REPID_MIN = 0;
+export const REPID_MAX = 10000;
+
+export type RepIDTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+
+/**
+ * The canonical tier ladder — ONE definition, inclusive lower bounds.
+ *
+ * Inclusive (`>=`) because that is how a threshold reads in every other part of
+ * this system and in the prose that describes it: "2500 and above is Silver".
+ * The exclusive variant was the accident, not the intent, and it differed from
+ * this one at exactly three scores.
+ *
+ * Ordered high to low so `tierForScore` can return the first match.
+ */
+export const TIER_FLOORS: readonly { tier: RepIDTier; floor: number }[] = [
+  { tier: 'Platinum', floor: 7500 },
+  { tier: 'Gold', floor: 5000 },
+  { tier: 'Silver', floor: 2500 },
+  { tier: 'Bronze', floor: 0 },
+];
+
+/**
+ * The tier a score sits in. The single implementation.
+ *
+ * A non-finite score is Bronze rather than a throw: this runs on the read path
+ * of a gate, and a gate that throws tends to acquire a `try/catch` returning
+ * the permissive answer. Bronze is the least-privileged tier, so a malformed
+ * score lands in the safest place.
+ */
+export function tierForScore(score: number): RepIDTier {
+  if (typeof score !== 'number' || !Number.isFinite(score)) return 'Bronze';
+  for (const { tier, floor } of TIER_FLOORS) {
+    if (score >= floor) return tier;
+  }
+  return 'Bronze';
+}
+
+/** Per-tier spending limits, in USDC. */
+export const TIER_LIMITS: Readonly<Record<RepIDTier, { daily: number; perTx: number }>> = {
+  Platinum: { daily: 500000, perTx: 100000 },
+  Gold: { daily: 100000, perTx: 50000 },
+  Silver: { daily: 10000, perTx: 5000 },
+  Bronze: { daily: 1000, perTx: 100 },
+};
+
+// ---------------------------------------------------------------------------
+// Weights
+// ---------------------------------------------------------------------------
+
+export interface RepIDWeights {
+  bftAccuracy: number;
+  veritasCatchRate: number;
+  x402SuccessRate: number;
+  latencyOpportunity: number;
+  humanCustodyScore: number;
+}
+
+export const DEFAULT_WEIGHTS: RepIDWeights = {
+  bftAccuracy: 0.4,
+  veritasCatchRate: 0.3,
+  x402SuccessRate: 0.15,
+  latencyOpportunity: 0.1,
+  humanCustodyScore: 0.05,
+};
+
+export const WEIGHT_SUM_TOLERANCE = 0.01;
+
+/**
+ * Are these weights usable?
+ *
+ * CHECKED ON READ, NOT ONLY ON WRITE. The original validated the sum inside
+ * `updateInstitutionWeights` and nowhere else, so weights written straight to
+ * `institution_risk_config` — by a migration, a console, or another service —
+ * were used unvalidated. Weights summing to 5 make `weightedSum` reach 5.0,
+ * which is the one way an agent clears a tier the honest maximum cannot.
+ * A validation that only guards the front door guards nothing.
+ */
+export function weightsProblem(weights: unknown): string | null {
+  if (typeof weights !== 'object' || weights === null) return 'weights are not an object';
+  const w = weights as Record<string, unknown>;
+  const keys: (keyof RepIDWeights)[] = [
+    'bftAccuracy',
+    'veritasCatchRate',
+    'x402SuccessRate',
+    'latencyOpportunity',
+    'humanCustodyScore',
+  ];
+  let sum = 0;
+  for (const key of keys) {
+    const value = w[key];
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return `weight '${key}' is not a finite number`;
+    }
+    if (value < 0) return `weight '${key}' is negative (${value}), which would let a bad metric raise the score`;
+    sum += value;
+  }
+  if (Math.abs(sum - 1) > WEIGHT_SUM_TOLERANCE) {
+    return `weights sum to ${sum.toFixed(4)}, not 1.0 — the score's range depends on this summing to 1`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Normalization
+// ---------------------------------------------------------------------------
+
+export interface RawMetrics {
+  /** Percentage, 0–100. */
+  bftAccuracy: number;
+  /** Percentage, 0–100. */
+  veritasCatchRate: number;
+  /** Percentage, 0–100. */
+  x402SuccessRate: number;
+  latencyMs: number;
+  humanCustody: boolean;
+}
+
+export interface NormalizedMetrics {
+  bft: number;
+  veritas: number;
+  x402: number;
+  latency: number;
+  custody: number;
+}
+
+/**
+ * Clamp into [0, 1].
+ *
+ * CLAMPED AT BOTH ENDS. The original clamped latency at 0 only, so a percentage
+ * recorded above 100 — or a negative latency — pushed a component past 1 and
+ * the weighted sum past its supposed maximum. Non-finite maps to 0, the
+ * least-credit answer, because a metric nobody could compute must not pay.
+ */
+function unitClamp(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}
+
+/** Latency's opportunity score: full credit at 0 ms, none at or beyond 2000 ms. */
+export const LATENCY_ZERO_CREDIT_MS = 2000;
+
+export function normalizeMetrics(raw: RawMetrics): NormalizedMetrics {
+  return {
+    bft: unitClamp(raw.bftAccuracy / 100),
+    veritas: unitClamp(raw.veritasCatchRate / 100),
+    x402: unitClamp(raw.x402SuccessRate / 100),
+    latency: unitClamp(1 - raw.latencyMs / LATENCY_ZERO_CREDIT_MS),
+    custody: raw.humanCustody ? 1 : 0,
+  };
+}
+
+export interface ScoreBreakdown {
+  bftContribution: number;
+  veritasContribution: number;
+  x402Contribution: number;
+  latencyContribution: number;
+  custodyContribution: number;
+}
+
+export function contributionsOf(n: NormalizedMetrics, w: RepIDWeights): ScoreBreakdown {
+  return {
+    bftContribution: n.bft * w.bftAccuracy,
+    veritasContribution: n.veritas * w.veritasCatchRate,
+    x402Contribution: n.x402 * w.x402SuccessRate,
+    latencyContribution: n.latency * w.latencyOpportunity,
+    custodyContribution: n.custody * w.humanCustodyScore,
+  };
+}
+
+export function sumContributions(b: ScoreBreakdown): number {
+  return (
+    b.bftContribution +
+    b.veritasContribution +
+    b.x402Contribution +
+    b.latencyContribution +
+    b.custodyContribution
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The curve, and its ceiling
+// ---------------------------------------------------------------------------
+
+/** Multiplier on the log curve. Named so `reachableCeiling` cannot drift from it. */
+export const SCORE_LOG_MULTIPLIER = 2000;
+export const SCORE_LOG_INPUT_SCALE = 100;
+
+export function scoreFromWeightedSum(weightedSum: number): number {
+  if (typeof weightedSum !== 'number' || !Number.isFinite(weightedSum)) return REPID_MIN;
+  const raw = SCORE_LOG_MULTIPLIER * Math.log10(1 + Math.max(0, weightedSum) * SCORE_LOG_INPUT_SCALE);
+  return Math.min(REPID_MAX, Math.max(REPID_MIN, Math.floor(raw)));
+}
+
+/**
+ * The highest score any agent can actually reach.
+ *
+ * DERIVED, not asserted. With normalized components in [0,1] and weights
+ * summing to 1, the weighted sum's maximum is exactly 1 — so the ceiling is the
+ * curve evaluated there. Computing it from the same constants the curve uses is
+ * what stops this number going stale the moment somebody re-tunes the
+ * multiplier and forgets the docstring.
+ */
+export function reachableCeiling(): number {
+  return scoreFromWeightedSum(1);
+}
+
+/** What the weighted sum would have to be for a score — the inverse of the curve. */
+export function weightedSumRequiredFor(score: number): number {
+  return (10 ** (score / SCORE_LOG_MULTIPLIER) - 1) / SCORE_LOG_INPUT_SCALE;
+}
+
+export interface CoherenceReport {
+  /** VERIFIED when every gate below is reachable; FAILED when one is not. */
+  outcome: 'VERIFIED' | 'FAILED';
+  ceiling: number;
+  /** Gates the score is compared against: tier floors plus the payment threshold. */
+  unreachable: readonly { name: string; floor: number; needsWeightedSum: number }[];
+  detail: string;
+}
+
+/**
+ * Is this configuration internally coherent — can the score reach the gates it
+ * is compared against?
+ *
+ * THE CHECK THAT WOULD HAVE CAUGHT THIS ON DAY ONE, and it is one arithmetic
+ * call. A scoring function whose maximum sits below the threshold it feeds is
+ * not a strict policy, it is a gate that never opens, and nothing in a passing
+ * test suite or a green build says so — the code is correct, the numbers are
+ * plausible, and the payment path is simply dead.
+ *
+ * Reported rather than thrown. Which way to fix an incoherent configuration —
+ * raise the curve or lower the gates — changes what every agent scores, and
+ * that is the operator's call, not this function's.
+ */
+export function describeCoherence(paymentThreshold: number): CoherenceReport {
+  const ceiling = reachableCeiling();
+  const gates = [
+    ...TIER_FLOORS.filter((t) => t.floor > 0).map((t) => ({ name: `tier ${t.tier}`, floor: t.floor })),
+    { name: 'payment threshold', floor: paymentThreshold },
+  ];
+  const unreachable = gates
+    .filter((g) => g.floor > ceiling)
+    .map((g) => ({ ...g, needsWeightedSum: weightedSumRequiredFor(g.floor) }));
+
+  if (unreachable.length === 0) {
+    return {
+      outcome: 'VERIFIED',
+      ceiling,
+      unreachable: [],
+      detail: `every gate is reachable: the highest attainable score is ${ceiling}`,
+    };
+  }
+  return {
+    outcome: 'FAILED',
+    ceiling,
+    unreachable,
+    detail:
+      `the highest attainable score is ${ceiling}, but ${unreachable.length} gate(s) sit above it: ` +
+      unreachable
+        .map((g) => `${g.name} at ${g.floor} would need a weighted sum of ${g.needsWeightedSum.toFixed(2)}`)
+        .join('; ') +
+      '. The weighted sum cannot exceed 1.0, so these can never be met.',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Spend limits
+// ---------------------------------------------------------------------------
+
+export type LimitOutcome = 'VERIFIED' | 'NOT_CHECKED' | 'FAILED';
+
+export interface LimitCheck {
+  outcome: LimitOutcome;
+  /**
+   * `null` when the limit could not be evaluated.
+   *
+   * Three states, because the two-state version is what produced the
+   * fail-open: a boolean forces an unknown to be reported as one of the two
+   * answers, and the convenient one is `true`.
+   */
+  withinLimit: boolean | null;
+  detail: string;
+}
+
+/**
+ * Does this transaction fit under the per-transaction limit?
+ *
+ * Inclusive: an amount exactly equal to the limit is within it. A limit is the
+ * most you may spend, not the least you may not.
+ */
+export function checkPerTxLimit(amountUSDC: number, limit: number): LimitCheck {
+  if (!Number.isFinite(amountUSDC) || amountUSDC < 0) {
+    return { outcome: 'NOT_CHECKED', withinLimit: null, detail: `amount ${amountUSDC} is not a usable number` };
+  }
+  if (!Number.isFinite(limit) || limit < 0) {
+    return { outcome: 'NOT_CHECKED', withinLimit: null, detail: `per-tx limit ${limit} is not a usable number` };
+  }
+  if (amountUSDC > limit) {
+    return {
+      outcome: 'FAILED',
+      withinLimit: false,
+      detail: `amount ${amountUSDC} USDC exceeds the per-transaction limit of ${limit}`,
+    };
+  }
+  return { outcome: 'VERIFIED', withinLimit: true, detail: `amount ${amountUSDC} is within the per-transaction limit of ${limit}` };
+}
+
+/**
+ * Does this transaction fit under the daily limit, given spend so far?
+ *
+ * **`spentSoFar` IS NULLABLE AND NULL MEANS UNKNOWN.** This is the whole fix
+ * for the fail-open: the caller could not read the spend history, and an
+ * unreadable history is not an empty one. Returning NOT_CHECKED forces the
+ * caller to decide what to do about a limit it could not evaluate, where the
+ * previous shape — a bare number that quietly became 0 — decided for it, in
+ * the permissive direction, silently.
+ */
+export function checkDailyLimit(
+  amountUSDC: number,
+  spentSoFar: number | null,
+  limit: number
+): LimitCheck {
+  if (spentSoFar === null) {
+    return {
+      outcome: 'NOT_CHECKED',
+      withinLimit: null,
+      detail:
+        'the daily spend history could not be read, so the daily limit was not evaluated. ' +
+        'An unreadable history is not an empty one — treating it as zero spend would grant ' +
+        'the full daily allowance during a database outage.',
+    };
+  }
+  if (!Number.isFinite(spentSoFar) || spentSoFar < 0) {
+    return { outcome: 'NOT_CHECKED', withinLimit: null, detail: `spend so far (${spentSoFar}) is not a usable number` };
+  }
+  if (!Number.isFinite(amountUSDC) || amountUSDC < 0) {
+    return { outcome: 'NOT_CHECKED', withinLimit: null, detail: `amount ${amountUSDC} is not a usable number` };
+  }
+  if (!Number.isFinite(limit) || limit < 0) {
+    return { outcome: 'NOT_CHECKED', withinLimit: null, detail: `daily limit ${limit} is not a usable number` };
+  }
+  const total = spentSoFar + amountUSDC;
+  if (total > limit) {
+    return {
+      outcome: 'FAILED',
+      withinLimit: false,
+      detail: `daily limit would be exceeded: ${spentSoFar} already spent + ${amountUSDC} = ${total} > ${limit}`,
+    };
+  }
+  return {
+    outcome: 'VERIFIED',
+    withinLimit: true,
+    detail: `${spentSoFar} spent + ${amountUSDC} = ${total}, within the daily limit of ${limit}`,
+  };
+}
+
+/**
+ * Is this a real ZKP proof reference?
+ *
+ * Exists because the absence of a proof was being papered over with a
+ * manufactured string — `ZKP_STUB_<agent>_VERIFIED` — which is non-empty,
+ * truthy, and contains the word VERIFIED. Every consumer testing for presence
+ * saw a proof. A placeholder that reads as its own success is worse than no
+ * placeholder.
+ */
+export function isPlaceholderProofCid(cid: unknown): boolean {
+  if (typeof cid !== 'string' || cid.trim() === '') return true;
+  return /^ZKP_STUB_/.test(cid.trim());
+}

@@ -78,6 +78,7 @@ headroom.db
 .bft-judge-check-*/
 .handoff-check-*/
 .did-compare-check-*/
+.repid-scoring-check-*/
 
 # temp compile dir for check:custody-shadow
 .custody-shadow-check-*/

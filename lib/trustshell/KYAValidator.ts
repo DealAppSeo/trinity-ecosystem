@@ -3,17 +3,50 @@
 
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import type { AgentKYAProfile, KYAComplianceResult } from './types';
+import {
+  TIER_LIMITS,
+  checkDailyLimit,
+  checkPerTxLimit,
+  tierForScore,
+  REPID_MIN,
+  REPID_MAX,
+} from './repid-scoring';
 
 export class KYAValidator {
   private get supabase() { return getSupabaseAdmin(); }
 
-  async getAgentProfile(agentName: string): Promise<AgentKYAProfile | null> {
+  /**
+   * Look up an agent, distinguishing ABSENT from UNREADABLE.
+   *
+   * The original returned `null` for both, and `validate` rendered that as
+   * "Agent X not found in KYA registry" — a false statement about the registry
+   * whenever the real cause was a database error, written into a compliance
+   * receipt as the reason for a denial. Both still deny; only one of them is
+   * true. `unreadable` is what lets the caller say which.
+   */
+  async lookupAgent(
+    agentName: string
+  ): Promise<{ profile: AgentKYAProfile | null; unreadable: string | null }> {
     const { data, error } = await this.supabase
       .from('agent_kya_registry')
       .select('*')
       .eq('agent_name', agentName)
       .single();
-    if (error || !data) return null;
+    // PostgREST reports "no rows" as an error too, so absence and failure have
+    // to be told apart by code rather than by the presence of `error`.
+    if (error && error.code !== 'PGRST116') {
+      return { profile: null, unreadable: `the KYA registry could not be read: ${error.message}` };
+    }
+    if (!data) return { profile: null, unreadable: null };
+    return { profile: this.toProfile(data), unreadable: null };
+  }
+
+  async getAgentProfile(agentName: string): Promise<AgentKYAProfile | null> {
+    return (await this.lookupAgent(agentName)).profile;
+  }
+
+  private toProfile(data: Record<string, any>): AgentKYAProfile {
+    const _unused = data;
     return {
       agentName:            data.agent_name,
       repidScore:           data.repid_score,
@@ -22,28 +55,64 @@ export class KYAValidator {
       spendingLimitPerTx:   data.spending_limit_per_tx,
       insuranceCoverage:    data.insurance_coverage,
       collateralStaked:     data.collateral_staked,
-      zkpProofCID:          data.zkp_proof_cid || `ZKP_STUB_${agentName}_VERIFIED`,
+      // NO FABRICATED FALLBACK. This was
+      // `data.zkp_proof_cid || \`ZKP_STUB_${agentName}_VERIFIED\``, which turned
+      // a missing proof into a non-empty, truthy string containing the word
+      // VERIFIED — so every consumer testing for presence saw a proof that does
+      // not exist. An absent proof is the empty string, and
+      // `isPlaceholderProofCid` is how a caller asks.
+      zkpProofCID:          data.zkp_proof_cid ?? '',
       humanCustodyVerified: data.human_custody_verified,
       vaultAccessPermitted: data.vault_access_permitted,
     };
   }
 
-  async getDailySpend(agentName: string): Promise<number> {
+  /**
+   * Spend in the last 24h, or NULL when the history could not be read.
+   *
+   * The original discarded the query error and returned `(data || []).reduce(…)`,
+   * so a database failure produced 0 — indistinguishable from "has spent
+   * nothing" — and the daily-limit check then PASSED. A DB outage granted the
+   * full daily allowance, silently, on the payment path.
+   *
+   * Absent is not zero. The nullable return is what forces the caller to have
+   * an opinion about a limit it could not evaluate.
+   */
+  async getDailySpend(agentName: string): Promise<number | null> {
     const since = new Date(Date.now() - 86_400_000).toISOString();
-    const { data } = await this.supabase
+    const { data, error } = await this.supabase
       .from('kya_compliance_receipts')
       .select('payment_amount_usdc')
       .eq('agent_name', agentName)
       .eq('bft_passed', true)
       .gte('created_at', since);
-    return (data || []).reduce((s, r) => s + Number(r.payment_amount_usdc), 0);
+    if (error || !data) return null;
+    let total = 0;
+    for (const row of data) {
+      const amount = Number(row.payment_amount_usdc);
+      // A row whose amount will not parse makes the TOTAL unknown, not smaller.
+      if (!Number.isFinite(amount)) return null;
+      total += amount;
+    }
+    return total;
   }
 
+  /**
+   * Decide whether this payment may proceed.
+   *
+   * EVERY DENIAL PATH STATES ONLY WHAT IT CHECKED. The original asserted
+   * `withinDailyLimit: true` inside the per-transaction denial — a branch that
+   * returns before the spend history is ever read. That field went into a
+   * compliance receipt as a fact about a limit nobody had evaluated, which is
+   * the house defect in the one artifact whose whole purpose is being evidence.
+   * Unevaluated limits are now `null`.
+   */
   async validate(
     agentName: string,
     amountUSDC: number
   ): Promise<KYAComplianceResult> {
-    const profile = await this.getAgentProfile(agentName);
+    const { profile, unreadable } = await this.lookupAgent(agentName);
+
     if (!profile) {
       return {
         agentName,
@@ -52,14 +121,19 @@ export class KYAValidator {
         repidTier:         'Bronze',
         humanCustodyBound: false,
         zkpProofCID:       '',
-        withinDailyLimit:  false,
-        withinTxLimit:     false,
+        withinDailyLimit:  null,
+        withinTxLimit:     null,
         insuranceCoverage: 0,
-        denialReason:      `Agent ${agentName} not found in KYA registry`,
+        // Denies either way, but says which is true. A registry that could not
+        // be read has not told us the agent is absent.
+        denialReason:      unreadable
+          ? `${unreadable} — this is NOT CHECKED, not a finding that ${agentName} is unregistered`
+          : `Agent ${agentName} not found in KYA registry`,
       };
     }
 
-    if (amountUSDC > profile.spendingLimitPerTx) {
+    const txCheck = checkPerTxLimit(amountUSDC, profile.spendingLimitPerTx);
+    if (txCheck.outcome !== 'VERIFIED') {
       return {
         agentName,
         kya_verified:      false,
@@ -67,15 +141,20 @@ export class KYAValidator {
         repidTier:         profile.repidTier,
         humanCustodyBound: profile.humanCustodyVerified,
         zkpProofCID:       profile.zkpProofCID,
-        withinDailyLimit:  true,
-        withinTxLimit:     false,
+        // NOT `true`. This branch never read the spend history.
+        withinDailyLimit:  null,
+        withinTxLimit:     txCheck.withinLimit,
         insuranceCoverage: profile.insuranceCoverage,
-        denialReason:      `Amount ${amountUSDC} USDC exceeds per-tx limit ${profile.spendingLimitPerTx} for ${profile.repidTier} tier`,
+        denialReason:      `${txCheck.detail} (${profile.repidTier} tier)`,
       };
     }
 
-    const dailySpend = await this.getDailySpend(agentName);
-    if (dailySpend + amountUSDC > profile.spendingLimitDaily) {
+    const dailyCheck = checkDailyLimit(
+      amountUSDC,
+      await this.getDailySpend(agentName),
+      profile.spendingLimitDaily
+    );
+    if (dailyCheck.outcome !== 'VERIFIED') {
       return {
         agentName,
         kya_verified:      false,
@@ -83,10 +162,10 @@ export class KYAValidator {
         repidTier:         profile.repidTier,
         humanCustodyBound: profile.humanCustodyVerified,
         zkpProofCID:       profile.zkpProofCID,
-        withinDailyLimit:  false,
+        withinDailyLimit:  dailyCheck.withinLimit,
         withinTxLimit:     true,
         insuranceCoverage: profile.insuranceCoverage,
-        denialReason:      `Daily limit would be exceeded: ${dailySpend + amountUSDC} > ${profile.spendingLimitDaily}`,
+        denialReason:      dailyCheck.detail,
       };
     }
 
@@ -108,24 +187,22 @@ export class KYAValidator {
     delta:            number,  // positive = reward, negative = penalty
     reason:           string
   ): Promise<void> {
-    const profile = await this.getAgentProfile(agentName);
+    // A reputation update for an agent we cannot resolve is DROPPED, and it
+    // used to be dropped in silence — including when the cause was an
+    // unreadable registry rather than an unknown agent. Throwing lets the
+    // caller decide; returning quietly decided for it.
+    const { profile, unreadable } = await this.lookupAgent(agentName);
+    if (unreadable) {
+      throw new Error(`refusing to update RepID for ${agentName}: ${unreadable}`);
+    }
     if (!profile) return;
 
-    const newScore = Math.max(0, Math.min(10000, profile.repidScore + delta));
-    const newTier: any =
-      newScore > 7500 ? 'Platinum' :
-      newScore > 5000 ? 'Gold'     :
-      newScore > 2500 ? 'Silver'   : 'Bronze';
-
-    const newDailyLimit =
-      newTier === 'Platinum' ? 500000 :
-      newTier === 'Gold'     ? 100000 :
-      newTier === 'Silver'   ? 10000  : 1000;
-
-    const newTxLimit =
-      newTier === 'Platinum' ? 100000 :
-      newTier === 'Gold'     ? 50000  :
-      newTier === 'Silver'   ? 5000   : 100;
+    // ONE tier ladder. This used `>` while RepIDConfig used `>=` over the same
+    // thresholds, so at exactly 2500, 5000 and 7500 the two disagreed about the
+    // tier — and the tier decides the spending limits.
+    const newScore = Math.max(REPID_MIN, Math.min(REPID_MAX, profile.repidScore + delta));
+    const newTier = tierForScore(newScore);
+    const { daily: newDailyLimit, perTx: newTxLimit } = TIER_LIMITS[newTier];
 
     await this.supabase
       .from('agent_kya_registry')
