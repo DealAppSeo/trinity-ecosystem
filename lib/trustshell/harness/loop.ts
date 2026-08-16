@@ -1145,6 +1145,24 @@ async function runEvaluation(args: {
  * DIDs are trimmed before comparison. A trailing space would make an identity
  * differ from itself, which is a one-character bypass of the single invariant
  * every other guarantee in this design rests on.
+ *
+ * ── THIS IS A SECOND IMPLEMENTATION, AND THAT IS NOT AN OVERSIGHT ───────────
+ *
+ * `identity/did.ts` exports `compareDids`/`sameDid`, and the nine other
+ * enforcement sites in this system use them. **The kernel cannot**: importing
+ * outside this directory is what `harness-portability-check.mjs` forbids, and
+ * that constraint is the reason the kernel ships standalone at all.
+ *
+ * So the duplication is forced, and this file's own doctrine says what forced
+ * duplication costs — "a second copy of an authorization rule is a second thing
+ * to get wrong, and the two copies disagree silently." The word that matters is
+ * SILENTLY. `scripts/did-comparison-test.mjs` drives this kernel through
+ * `runAgentLoop` over the same adversarial corpus the helper is tested against
+ * and requires the two to agree pair for pair, so a drift is loud instead.
+ *
+ * If you change the normalization here, change it there, and that suite will
+ * tell you if you did not — it is mutation-tested against exactly this
+ * function, including the trim.
  */
 function assessIndependence(
   doerDid: string | undefined,

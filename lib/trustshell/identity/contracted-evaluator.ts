@@ -48,7 +48,7 @@
 // a threshold from data is a later change with data behind it; choosing one now
 // would be a guess wearing a policy's clothes.
 
-import { sign, type Did } from './did';
+import { compareDids, sign, type Did } from './did';
 import {
   contractPayload,
   issueVerdict,
@@ -199,7 +199,7 @@ export function createContractedEvaluator(input: ContractedEvaluatorInput): {
       // THE DOER MUST BE THE ONE THE CONTRACT NAMES. Without this, a valid
       // contract could be used to certify work done by somebody else entirely —
       // every signature checks out and the verdict vouches for the wrong agent.
-      if (request.doerDid && request.doerDid.trim() !== contract.doerDid.trim()) {
+      if (compareDids(request.doerDid, contract.doerDid) === 'different') {
         return {
           verdicts: request.criteria.map((c) => ({
             criterionId: c.id,
