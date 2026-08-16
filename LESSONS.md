@@ -1127,3 +1127,51 @@ is honest about what it ran, not about what CI will.
 Also, from the same incident: the fast suite now duplicates the e2e's own
 regexes (`check:repid-scoring`, 'THE DENIAL WORDING IS A CONTRACT'), so the next
 break shows up in seconds rather than after a build and a server boot.
+
+---
+
+## A20 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
+
+**[VERIFIED] — `curl` to the REST endpoint returns 403; the MCP tool returns the
+same runs successfully, seconds apart.**
+
+An agent session watching its own PR wrote the obvious poll:
+
+```bash
+until out=$(curl -s ".../commits/$SHA/check-runs" | python3 -c "
+  d=json.load(sys.stdin)
+  runs=[r for r in d.get('check_runs',[]) if ...]
+  if runs and all(completed): print(...)"); [ -n "$out" ]; do sleep 30; done
+```
+
+It never fired. Not once, across four PRs and a whole night.
+
+```
+$ curl -s -w '%{http_code}' .../check-runs
+403 {"message": "Resource not accessible by integration"}
+```
+
+**The session's GitHub token cannot read `/check-runs` over REST.** The MCP
+tool (`pull_request_read` with `method: get_check_runs`) reads the same data
+fine — different auth path. So the capability exists; only that route is closed.
+
+**Why it survived a whole night undetected.** `d.get('check_runs', [])` turns a
+403 body into an empty list. Empty list → no completed runs → print nothing →
+the `until` loop treats it as "not finished yet" and sleeps. **A poll with two
+states — fired / not yet — silently absorbs a third: cannot look.** Which is
+this repository's founding defect, committed inside the tooling built to verify
+this repository.
+
+The tell was available and ignored: the watchers ran to their full timeout
+*every time*, and CI results only ever arrived via webhook wake events. A poll
+that has never once fired is not a slow poll.
+
+**The rules.**
+
+1. **Read CI status through the MCP tool, not `curl`.** REST `/check-runs` is
+   403 from a session.
+2. **A poll loop must distinguish "not ready" from "could not read".** Check the
+   HTTP status; a non-200 is NOT_CHECKED and must be surfaced, never slept on.
+   `.get(key, [])` on an unparsed error body is the exact line that hides it.
+3. **A watcher that has never fired is evidence about the watcher.** Silence
+   from a check is not a result.
