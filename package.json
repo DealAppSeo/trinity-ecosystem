@@ -76,6 +76,7 @@
     "check:runner": "node scripts/check-runner-test.mjs",
     "check:probes": "node scripts/check-probes-selftest.mjs && node scripts/check-probes.mjs",
     "mutate": "node scripts/mutate.mjs",
+    "check:hal-accuracy": "node scripts/hal-accuracy-test.mjs",
     "check:hal-receipt": "node scripts/check-hal-receipt.mjs",
     "check:throughput": "node scripts/check-throughput.mjs",
     "check:spine-reachable": "node scripts/spine-reachable-test.mjs",

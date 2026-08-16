@@ -521,6 +521,56 @@ export const MUTATIONS = [
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
   {
+    id: 'hal-accuracy-pools-incomparable-modes',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'the refusal to compute an accuracy figure across hal_modes. hal_score means a ' +
+      'different thing in each: mock is a 50-90 scale with zero positives, real a 0.26-0.42 ' +
+      'band with zero positives, and every labelled hallucination lives in fact-check-s2 on ' +
+      '0-1. Pooled, the corpus reports AUC 0.484 — worse than chance — for a detector that ' +
+      'scores 0.958 within its own mode. Without the refusal a naive caller publishes that ' +
+      'HAL is broken',
+    find: `export function rocAuc(rows: readonly ScoredRow[]): number | null {
+  requireSingleMode(rows);`,
+    replace: 'export function rocAuc(rows: readonly ScoredRow[]): number | null {',
+  },
+  {
+    id: 'hal-accuracy-undefined-reported-as-chance',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'AUC is NULL, not 0.5, when a class is absent. mock and real carry no positive labels ' +
+      'at all, so AUC is undefined on them. Reporting 0.5 collapses "we could not measure ' +
+      'this" into "it scored at chance" — the two-outcome mistake this repo keeps paying for',
+    find: '  if (pos.length === 0 || neg.length === 0) return null;',
+    replace: '  if (pos.length === 0 || neg.length === 0) return 0.5;',
+  },
+  {
+    id: 'hal-accuracy-ties-get-full-credit',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'tied scores get HALF credit in the Mann-Whitney statistic. This corpus piles scores ' +
+      'on 0.0 and 1.0, so tie handling moves the number materially — a min-rank SQL rank() ' +
+      'reported 0.8351 for a corpus whose true AUC is 0.9579. The mutant inflates instead, ' +
+      'which is the same class of error in the other direction',
+    find: '      else if (p === n) wins += 0.5;',
+    replace: '      else if (p === n) wins += 1;',
+  },
+  {
+    id: 'hal-accuracy-charges-hal-for-provider-outages',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'rows where generation FAILED are excluded from detection metrics. There was no answer ' +
+      'to judge, so the detector was never asked a question; counting those 69 rows charges ' +
+      "HAL for a provider outage and moves every headline number — the ceiling F1, the AUC " +
+      'and the realized confusion all shift',
+    find: '  return rows.filter((r) => !r.genFailed);',
+    replace: '  return rows.slice();',
+  },
+  {
     id: 'auditor-grant-analysed-against-a-different-map',
     suite: 'check:spine-reachable',
     file: 'lib/trustshell/identity/spine.ts',
