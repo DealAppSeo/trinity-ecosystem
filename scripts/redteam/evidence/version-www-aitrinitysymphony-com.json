@@ -1,0 +1,21 @@
+{
+  "surface": "www.aitrinitysymphony.com",
+  "url": "https://www.aitrinitysymphony.com/api/version",
+  "collectedAt": "2026-08-16T17:16:21.245Z",
+  "collectedBy": "claude-code session claude/trust-layer-red-team-ujpq6a",
+  "collectedVia": "supabase pg_net net.http_get from project qnnpjhlxljtqyigedwkb, net._http_response id 5096",
+  "statusCode": 200,
+  "body": {
+    "commit": "6e00ae01d6d90ab3b9543eb87369c25a1b58f632",
+    "commit_short": "6e00ae0",
+    "platform": "vercel",
+    "environment": "production",
+    "region": "iad1",
+    "responded_at": "2026-08-16T17:16:21.245Z",
+    "config": {
+      "secrets": { "TRUSTRAILS_HMAC_SECRET": "abandoned_default" },
+      "ready": false,
+      "blocking": ["TRUSTRAILS_HMAC_SECRET"]
+    }
+  }
+}

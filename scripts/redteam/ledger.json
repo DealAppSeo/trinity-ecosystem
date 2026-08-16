@@ -1,0 +1,43 @@
+{
+  "_readme": [
+    "Triaged red team findings. An entry here means: the attack still succeeds, somebody owns it,",
+    "and there is a date by which it will be fixed or re-argued. It does NOT mean the finding is closed.",
+    "",
+    "Every entry needs `owner`, `reason` and `reviewBy`, and `scripts/check-redteam.mjs` refuses to run",
+    "without all three. Past `reviewBy` the run FAILS — a caveat is a debt and this file is where the",
+    "debts are recorded, not where they are forgiven. Removing an entry whose probe still breaches just",
+    "turns the finding back into a NEW_FINDING on the next run, and a probe that starts HOLDING while its",
+    "entry is still here fails too, so the record cannot rot in either direction.",
+    "",
+    "To close a finding: fix the code, watch the probe go HELD, then delete the entry."
+  ],
+  "findings": [
+    {
+      "id": "PAY-001",
+      "owner": "Sean",
+      "severity": "High",
+      "reason": "The dual-signature gate on the payment path counts distinct caller-supplied role strings and verifies no cryptographic material. Accepted for now because (a) both live surfaces currently FAIL CLOSED on receipt minting (LIVE-001), so the path is not issuing receipts, and (b) the fix changes a live authorization gate, which is Sean-gated by the preflight fences. The repo already ships the primitive the fix needs — countersignContract in lib/trustshell/identity/work-contract.ts is a two-party signature over canonical bytes, which is exactly the shape a CFO/CTO co-signature is.",
+      "reviewBy": "2026-09-15",
+      "firstSeen": "2026-08-16",
+      "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
+    },
+    {
+      "id": "HAL-001",
+      "owner": "unassigned",
+      "severity": "Medium",
+      "reason": "verifyHalChain returns outcome=VERIFIED for a truncated window and signals the truncation only in the separate boolean windowStartUnverifiable, which the human-readable `detail` never mentions. Measured by exhaustive search: no input produces VERIFIED with windowStartUnverifiable=false, so EVERY VERIFIED it can emit is over a window whose start is unexaminable. Accepted short-term because the verifier has no production caller yet — nothing currently reads `outcome` to make a decision — which is exactly why fixing it now is cheap. Deliberately left `unassigned` rather than defaulted to Sean: the fix is a library change, not a Sean-gated one, and a false owner is worse than a visibly missing one.",
+      "reviewBy": "2026-09-15",
+      "firstSeen": "2026-08-16",
+      "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
+    },
+    {
+      "id": "RCPT-001",
+      "owner": "unassigned",
+      "severity": "Low",
+      "reason": "requireAuditSecret compares against the abandoned default with an exact-string equality after trim, so case variants of the same published constant are accepted. No live surface holds a variant today (LIVE-001 evidence, 2026-08-16). One-line fix: normalise case before comparing.",
+      "reviewBy": "2026-09-15",
+      "firstSeen": "2026-08-16",
+      "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
+    }
+  ]
+}

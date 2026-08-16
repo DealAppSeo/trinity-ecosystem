@@ -1,0 +1,21 @@
+{
+  "surface": "app.aitrinitysymphony.com",
+  "url": "https://app.aitrinitysymphony.com/api/version",
+  "collectedAt": "2026-08-16T17:16:20.979Z",
+  "collectedBy": "claude-code session claude/trust-layer-red-team-ujpq6a",
+  "collectedVia": "supabase pg_net net.http_get from project qnnpjhlxljtqyigedwkb, net._http_response id 5097",
+  "statusCode": 200,
+  "body": {
+    "commit": "4a999bc4f4eb1943df6b3e08224bd47a3f9e4272",
+    "commit_short": "4a999bc",
+    "platform": "railway",
+    "environment": "production",
+    "region": "us-east4-eqdc4a",
+    "responded_at": "2026-08-16T17:16:20.979Z",
+    "config": {
+      "secrets": { "TRUSTRAILS_HMAC_SECRET": "missing" },
+      "ready": false,
+      "blocking": ["TRUSTRAILS_HMAC_SECRET"]
+    }
+  }
+}
