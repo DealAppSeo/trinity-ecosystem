@@ -64,6 +64,7 @@
     "check:receipt": "node scripts/check-receipt.mjs",
     "trustshell:receipt": "node scripts/trustshell-receipt.mjs",
     "check:receipt-audit": "node scripts/check-receipt-audit.mjs",
+    "check:config-readiness": "node scripts/check-config-readiness.mjs",
     "check:receipt-verifier": "node scripts/check-receipt-verifier.mjs",
     "trustshell:verify": "node scripts/trustshell-verify-receipt.mjs",
     "check:claims": "node scripts/check-claims.mjs",

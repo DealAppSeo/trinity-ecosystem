@@ -915,6 +915,68 @@ export const MUTATIONS = [
       '        return {\n' +
       "          status: 'unreadable',",
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/config-readiness.ts — a PUBLIC presence report
+  //
+  // Registered in the same commit as the code. Leaving new code unmutated is
+  // the defect this branch already found in its own gate once.
+  // -------------------------------------------------------------------------
+  {
+    id: 'config-abandoned-default-reads-ok',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      'the abandoned default is NOT `ok`. It is 26 characters, so it clears the length ' +
+      'bound - a length-first classification reports the one KNOWN-FORGEABLE value as fine, ' +
+      'and pasting that constant is the likeliest repair for a missing variable',
+    find: "  if (rule.rejectValue !== undefined && value.trim() === rule.rejectValue) {",
+    replace: "  if (rule.rejectValue !== undefined && value.trim() === '\u0000never-matches') {",
+  },
+  {
+    id: 'config-empty-string-is-not-missing',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      'an EMPTY or whitespace-only variable is `missing`, not merely short. A platform that ' +
+      'stores an empty string for an unset variable would otherwise report `too_short`, ' +
+      'sending an operator to lengthen a secret that is not there at all',
+    find: "  if (value === undefined || value.trim() === '') return 'missing';",
+    replace: "  if (value === undefined) return 'missing';",
+  },
+  {
+    id: 'config-ready-ignores-blocking',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      '`ready` is true ONLY when every allowlisted secret is ok. A readiness flag that is ' +
+      'always true is precisely the unearned green this whole branch exists to remove, in ' +
+      'the one report whose job is to be honest about configuration',
+    find: '  return { secrets, ready: blocking.length === 0, blocking };',
+    replace: '  return { secrets, ready: true, blocking };',
+  },
+  {
+    id: 'config-enumerates-the-environment',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      'the environment is NEVER enumerated - the allowlist is hardcoded, so adding a variable ' +
+      'to a platform cannot make it appear on a PUBLIC endpoint. This is the rule ' +
+      'app/api/version/route.ts states about itself, and this mutant breaks it',
+    find: '  const secrets: Record<string, ConfigStatus> = {};',
+    replace: "  const secrets: Record<string, ConfigStatus> = Object.fromEntries(Object.keys(env).map((k) => [k, 'ok' as ConfigStatus]));",
+  },
+  {
+    id: 'config-length-boundary-off-by-one',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      'a secret EXACTLY at the minimum length is acceptable. The fifth `<` vs `<=` boundary ' +
+      'in this branch, and here it would disagree with requireAuditSecret - the report would ' +
+      'call a surface unready that mints perfectly well',
+    find: '  if (value.trim().length < rule.minLength) return \'too_short\';',
+    replace: '  if (value.trim().length <= rule.minLength) return \'too_short\';',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
