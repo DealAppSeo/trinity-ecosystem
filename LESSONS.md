@@ -171,6 +171,81 @@ already hold the server key.
 Safe, but anything client-side that ever needs it will get empty results rather
 than an error.
 
+**S1 UPDATE — CLOSED 2026-08-16.** Both tables now carry `{authenticated}`
+policies rather than `{anon}`. Verified against `pg_policies`, not against a
+migration file.
+
+---
+
+### SECURITY FINDINGS — 2026-08-16
+
+**S3. 196 tables are world-readable, not two.**
+
+`CLAUDE.md` said "two tables are currently `USING (true)` for `anon`", reading
+S1 above as a statement about the database. S1 audited exactly two tables and
+said nothing about the rest. Measured against `pg_policies` on 2026-08-16:
+
+    198 policies over 196 distinct tables in `public`
+    role anon or PUBLIC, cmd SELECT or ALL, qual literally `true`
+
+Combined with the publishable key shipping in the browser bundle, every row and
+column of all 196 is readable by anyone who views source — not merely the
+aggregates a UI renders.
+
+**Severity, measured rather than assumed.** The alarming name is the safe one:
+
+| table | rows | what is exposed |
+|---|---|---|
+| `user_keys` (`grok_key_enc`, `claude_key_enc`, `chatgpt_key_enc`, `trinity_api_key`) | **0** | nothing today — a loaded gun with no round in it |
+| `trustex_identities` | **5** | `proof_of_life_email` on all 5, plus phone, biometric and `wallet_address` |
+| `trustchat_sessions` | **57** | `user_message`, `llm_response`, `user_ip_hash` |
+| `waitlist` | **9** | signup rows |
+| `customer_feedback`, `staking_deposits`, `staking_withdrawals` | 0 | nothing today |
+
+So the live exposure is **~71 rows of real PII and user conversation content**,
+not a credential leak. `user_keys` is empty and `trinity_api_key` — the one
+column without an `_enc` suffix — has zero non-null values. That is the
+difference between an incident and a hazard, and it is worth stating precisely
+in both directions: nothing has leaked, and the policy that would leak it is
+live right now.
+
+**Values were never read.** This finding is built from `pg_policies`,
+`pg_attribute` and `count(*)`. Column names and row counts establish severity
+without pulling secrets into an agent transcript, which is the same class of
+mistake as the key that started `docs/KEY-ROTATION.md`.
+
+**The remediation is DROP, not add.** `service_role` has `rolbypassrls = true`,
+so server-side callers keep working by bypassing RLS — adding a `service_role`
+policy grants nothing. **NOT EXECUTED — destructive DDL is Sean-gated.** Ready
+to run, highest severity first:
+
+```sql
+-- The rows that actually exist. Reads route through API routes holding the server key.
+drop policy if exists "trustchat_sessions_anon_select" on public.trustchat_sessions;
+drop policy if exists "trustex_identities_anon_select" on public.trustex_identities;
+drop policy if exists "waitlist_read_all"              on public.waitlist;
+-- Empty today, and the one that must never populate while readable.
+drop policy if exists "Anon read user_keys"            on public.user_keys;
+```
+
+Then re-run the census and expect the count to fall by four:
+
+```sql
+select count(*) from pg_policies where schemaname='public'
+  and (roles::text like '%anon%' or roles::text like '%public%')
+  and cmd in ('SELECT','ALL') and coalesce(qual,'') in ('true','(true)');
+```
+
+**Why the other 192 are not in that block.** Most are agent telemetry and public
+registry data where `anon` read may be intended. Dropping 196 policies blind
+would break every client read at once and is the same failure shape as wiring an
+unmeasured gate — the four above are the ones with rows, PII, or credential
+columns. The rest need a per-table decision, not a sweep.
+
+**The rule.** A security claim in ground truth is a measurement with a date, or
+it is not a claim. This one was inherited, generalised, and then re-read as fact
+for four days by every agent that opened `CLAUDE.md`.
+
 ---
 
 ### WHAT ACTUALLY CAUGHT THINGS
