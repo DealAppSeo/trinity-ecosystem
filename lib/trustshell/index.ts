@@ -136,3 +136,167 @@ export type {
   LoopResult,
   RunAgentLoopInput,
 } from './harness/loop';
+
+// ---------------------------------------------------------------------------
+// The verification spine.
+//
+// Exported 2026-08-16 because it was NOT, and the comment above `runAgentLoop`
+// had already written down why that matters: "a module absent from the barrel
+// is unreachable to every consumer that imports from '@/lib/trustshell', which
+// is all of them." The rule was stated and then not applied here — the kernel
+// was exported with its Evaluator port open, and every module that could fill
+// that port was left out of the barrel. A consumer could start a loop and had
+// no reachable way to have the work judged.
+//
+// Measured before this change, on 3a0890b: 0 of 10 spine modules exported;
+// `assigned-contract`, `staged-judge`, `verdict-envelope`,
+// `outcome-to-reputation`, `auditor-grant` and `handoff` had zero importers in
+// lib/ + app/. `npm run check:spine-reachable` fails the build if that
+// regresses.
+//
+// Several names are aliased. `Outcome`, `ToolEffect` and `Evaluation` each
+// already mean something else in this barrel, and two unrelated things under
+// one name is how a consumer imports the wrong one and finds out at runtime —
+// the same reasoning that aliased `Observation` above.
+// ---------------------------------------------------------------------------
+
+/** The whole chain as one call. See `identity/spine.ts`. */
+export { runContractedWork } from './identity/spine';
+export type {
+  ContractedWorkInput,
+  ContractedWorkResult,
+  AssignmentInput,
+} from './identity/spine';
+
+export {
+  CONTRACT_DOMAIN,
+  VERDICT_DOMAIN,
+  contractPayload,
+  proposeContract,
+  countersignContract,
+  verifyContract,
+  verdictPayload,
+  issueVerdict,
+  verifyVerdict,
+  veritasSignal,
+} from './identity/work-contract';
+export type {
+  Outcome as ContractOutcome,
+  ContractCriterion,
+  UnsignedContract,
+  WorkContract,
+  ContractVerification,
+  CriterionScore,
+  UnsignedVerdict,
+  Verdict,
+  VerdictVerification,
+  GroundTruthSource,
+  GroundTruthObservation,
+} from './identity/work-contract';
+
+export {
+  ASSIGNMENT_DOMAIN,
+  eligiblePool,
+  assignChecker,
+  verifyAssignment,
+  commitAssignmentRequest,
+  commitPool,
+} from './identity/checker-assignment';
+export type {
+  Qualification,
+  CheckerCandidate,
+  QualificationRequirement,
+  EligiblePool,
+  AssignmentProof,
+  AssignmentVerification,
+} from './identity/checker-assignment';
+
+export {
+  CRITERIA_DRAW_DOMAIN,
+  commitBank,
+  drawCriteria,
+  verifyDraw,
+} from './identity/criteria-draw';
+export type {
+  BankCriterion,
+  CriteriaDrawProof,
+  CriteriaDrawVerification,
+} from './identity/criteria-draw';
+
+export {
+  assembleAssignedContract,
+  verifyAssignedContract,
+} from './identity/assigned-contract';
+export type {
+  AssignedContract,
+  AssignedContractVerification,
+} from './identity/assigned-contract';
+
+export {
+  createContractedEvaluator,
+  renderEvidence,
+  evidenceDigest,
+  attestCheckerAuthority,
+} from './identity/contracted-evaluator';
+export type {
+  JudgeRequest,
+  JudgeOpinion,
+  Judge,
+  CriterionVerdict,
+  EvaluationRequest,
+  Evaluation as EvaluatorEvaluation,
+  ContractedEvaluatorInput,
+  ContractedEvaluation,
+} from './identity/contracted-evaluator';
+
+export { createStagedJudge } from './identity/staged-judge';
+export type { JudgeTier, TierDecision, StagedJudge } from './identity/staged-judge';
+
+export {
+  ENVELOPE_DOMAIN,
+  packEnvelope,
+  verifyEnvelope,
+} from './identity/verdict-envelope';
+export type { TrustEnvelope, EnvelopeVerification } from './identity/verdict-envelope';
+
+export {
+  SIGNAL_KIND,
+  isProgress,
+  reputationForVerdict,
+  partitionByProgress,
+  assertPartitionTotal,
+} from './identity/outcome-to-reputation';
+export type {
+  ProgressKind,
+  WithheldSignal,
+  ReputationOutcome,
+  VerdictReputationInput,
+} from './identity/outcome-to-reputation';
+
+export { analyseReadOnly, delegateAuditorGrant } from './identity/auditor-grant';
+export type {
+  ToolCapabilityMap,
+  ToolEffect as GrantToolEffect,
+  ToolEffectMap,
+  WriteReach,
+  ReadOnlyAnalysis,
+  AuditorGrantInput,
+  AuditorGrant,
+} from './identity/auditor-grant';
+
+export {
+  HANDOFF_DOMAIN,
+  handoffPayload,
+  signHandoff,
+  verifyHandoff,
+} from './identity/handoff';
+export type {
+  Checkpoint,
+  FailureRecord,
+  UnsignedHandoff,
+  Handoff,
+  CheckpointCapReason,
+  CheckpointVerification,
+  HandoffVerification,
+  VerifyHandoffInput,
+} from './identity/handoff';

@@ -486,6 +486,40 @@ export const MUTATIONS = [
     find: "      if (Date.parse(d.reviewBy) < Date.parse(now)) {",
     replace: '      if (false) {',
   },
+  {
+    id: 'spine-unreachable-from-barrel',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/index.ts',
+    protects:
+      'the spine stays REACHABLE. Every module below was correct, mutation-tested and ' +
+      'green while being importable by nobody — measured 2026-08-16, 0 of 10 exported ' +
+      'from the barrel. No unit suite can see this, because a test imports by path, ' +
+      'which is exactly the access a real consumer does not have',
+    find:
+      "export { analyseReadOnly, delegateAuditorGrant } from './identity/auditor-grant';\n" +
+      'export type {\n' +
+      '  ToolCapabilityMap,\n' +
+      '  ToolEffect as GrantToolEffect,\n' +
+      '  ToolEffectMap,\n' +
+      '  WriteReach,\n' +
+      '  ReadOnlyAnalysis,\n' +
+      '  AuditorGrantInput,\n' +
+      '  AuditorGrant,\n' +
+      "} from './identity/auditor-grant';",
+    replace: '// MUTANT: auditor-grant dropped from the barrel',
+  },
+  {
+    id: 'spine-substitutes-a-checker-it-can-sign-as',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/identity/spine.ts',
+    protects:
+      'a drawn checker this harness cannot act as is REFUSED, never substituted. The ' +
+      'tempting repair — fall back to a key we do hold — is checker-shopping arriving ' +
+      'as error handling, and this mutant signs the verdict with the DOER\'s own key, ' +
+      'which every signature check downstream would still call valid',
+    find: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid);',
+    replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
