@@ -1310,6 +1310,13 @@ names — *suspect the sample before the measurement* — and the third caused
 specifically by an unexamined assumption about the **shape** of the data rather
 than its values.
 
+**Follow-up, same session: A21 left one sub-stratum NOT EXPLAINED, and the
+explanation turned out to be A22 below.** The residual was not noise and not
+benchmark difficulty. Chasing an unexplained caveat rather than shipping around
+it is what found it.
+
+---
+
 ---
 
 ## A22 — the credential scanner could not see binary files, and the speed fix is what found it (2026-08-16)
@@ -1371,3 +1378,87 @@ One `Date.now()` around a `fetch` cost three seconds and saved a wrong change.
 result.* The instinct is to reconcile it away as a bug in the new code. Here the
 new code was right and the old gate had been under-reporting for as long as it
 had existed.
+
+---
+
+## A23 — 41 vetoes fired on rows where the detector called no provider (2026-08-16)
+
+**[VERIFIED] — 59 rows in `hal_runner_results` have an EMPTY `hal_providers_used`,
+carry a `hal_score` anyway, and 41 of them have `hal_vetoed = true`. Measured
+2026-08-16; detail in `docs/HAL-AUC-STRATIFICATION-2026-08-16.md` §5.**
+
+A21 closed with an honest loose end: within the valid stratum, `hal_test_cases`
+scored AUC 0.5940 against `t12-overnight`'s 0.9757, and the document said so and
+called it NOT EXPLAINED. Investigating that caveat found the real defect.
+
+It was never about the benchmarks. Same `gen_provider`, same `gen_model`, same
+`hal_threshold`. **In 59 of 71 `hal_test_cases` rows, HAL called no verification
+provider at all** — and still wrote a score. Split the stratum on execution
+rather than on benchmark:
+
+```
+HAL ran (>=1 provider)     n=169/167   AUC 0.9746  [0.9574, 0.9917]
+HAL did NOT run (empty)    n=28/31     AUC 0.5150  [0.3662, 0.6637]
+```
+
+`benchmark_source` was a proxy. The real variable is whether the detector
+executed. The no-provider rows sit at chance because **the score cannot depend on
+evidence that was never gathered** — class medians 0.2567 and 0.2781, a
+separation of 0.0074.
+
+**The metric contamination is the lesser half.** 41 of those rows set
+`hal_vetoed`. HAL emitted an actionable verdict — a veto — having consulted
+nothing. That is this repository's founding defect, *a system reporting a result
+it has not earned*, sitting inside the component built to catch exactly that, and
+it was invisible because the row looks complete: it has a score, a latency, a
+veto flag, and a label.
+
+Latency was the tell, available the whole time: **947 ms mean against ~3,100 ms**
+when a provider is actually called. A third of the work, a full-looking row.
+
+**The rules.**
+
+1. **"Produced a number" is not "ran".** Before a row enters any denominator,
+   check the column that records whether the work happened — provider list, call
+   count, cost. A NULL result is loud; a **default** result is silent, and a
+   default that looks plausible is the worst case.
+2. **A verdict must not outlive its evidence.** If the provider list is empty,
+   the correct output is NOT_CHECKED — not a score, and certainly not a veto.
+   Three outcomes, at the point of writing, not only at the point of reading.
+3. **Chase the caveat you wrote down.** A21's own NOT EXPLAINED line was the
+   thread that led here. Two of this repo's retractions were caught by caveats
+   their authors had written and then ignored; this is the first one caught by a
+   caveat somebody actually pulled.
+4. **Non-empty is not valid.** 12 rows carry the literal string `used:2` in
+   `hal_providers_used` where names belong. A count written into a name field
+   means an "is it non-empty" check can still pass on garbage. Still OPEN.
+
+### The same rows read as a feature by a second lane
+
+The sharpest part of this arrived from outside. Working independently, the
+grok-code lane (PR #55) measured the same corpus, found the same three-mode
+trap, computed the same AUC 0.9579, caught the same tie-handling error — and
+built the better artefact, a `PooledModes` refusal in code where this lane had
+only written a recommendation. It also recorded:
+
+> *"HAL's veto is not a threshold: 41 rows vetoed below 0.43, zero above it
+> escaping."*
+
+**Those 41 are exactly the no-provider rows** — the partition is exact, 41 of 41
+sub-threshold vetoes from empty-provider rows, 0 from rows where a provider ran.
+Read from the veto side it looks like a bonus detection path lifting recall from
+0.807 to 0.904. Read from the provider side it is 41 vetoes cast with nothing
+consulted: 19 landed on hallucinations (67.9% of that group's positives), 22 on
+clean answers (71.0% of its negatives). **It fires slightly more often on the
+clean ones.**
+
+**The lesson is not that the other lane was careless — it was not.** It is that
+the *same rows* support a capability reading and a defect reading, and the column
+that separates them (`hal_providers_used`) is in neither the metric nor the veto
+flag. Two competent measurements of the same table disagreed about what HAL
+*does*, and only joining on execution resolved it.
+
+Corollary for this lane: when a second measurement of your subject exists, **read
+it before publishing yours.** The cross-check cost one query and changed a
+headline; not doing it would have left two documents on `main` describing the
+same 41 rows in opposite terms.
