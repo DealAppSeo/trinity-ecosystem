@@ -80,13 +80,16 @@ function throws(fn, needle, m) {
 const fixture = JSON.parse(
   readFileSync('lib/hal/fixtures/runner-results-2026-08-16.json', 'utf8')
 );
-const ALL = fixture.rows.map(([mode, score, y, gf, v, thr]) => ({
+const ALL = fixture.rows.map(([mode, score, y, gf, v, thr, src]) => ({
   mode,
   score: Number(score),
   isHallucination: y === 1,
   genFailed: gf === 1,
   vetoed: v === 1,
   threshold: Number(thr),
+  // Extra field, ignored by every function in accuracy.ts. Carried so the
+  // suite can assert the SUB-stratum split below.
+  benchmarkSource: src,
 }));
 
 // ── A. the corpus is what we think it is ────────────────────────────────────
@@ -217,6 +220,47 @@ await check("REALIZED: what HAL's own veto decision achieves", async () => {
   eq(r.tn, 169, 'tn');
   near(r.f1, 0.881188, 0.000001, 'realized F1');
   near(r.recall, 0.9036, 0.0001, 'realized recall');
+});
+
+await check('0.9579 IS A BLEND — the sub-strata disagree, so never quote it flat', async () => {
+  // Found by a sibling lane re-deriving this measurement independently, and
+  // confirmed here against the same rows. Partitioning by mode was necessary
+  // but NOT sufficient: inside `fact-check-s2` the two benchmark sources are
+  // themselves heterogeneous, and one of them is barely above chance.
+  const bySource = new Map();
+  for (const r of FC) {
+    const list = bySource.get(r.benchmarkSource);
+    if (list) list.push(r);
+    else bySource.set(r.benchmarkSource, [r]);
+  }
+  eq([...bySource.keys()].sort().join(','), 'hal_test_cases,t12-overnight-2026-06', 'the two sources');
+
+  const weak = bySource.get('hal_test_cases');
+  const strong = bySource.get('t12-overnight-2026-06');
+  eq(weak.length, 71, 'weak stratum size');
+  eq(strong.length, 324, 'strong stratum size');
+  near(A.rocAuc(weak), 0.594, 0.001, 'hal_test_cases AUC — barely above chance');
+  near(A.rocAuc(strong), 0.9757, 0.0001, 't12-overnight AUC');
+
+  // 82% of the usable corpus is the strong stratum, so the headline number is
+  // mostly a property of ONE benchmark source. That is a composition fact, not
+  // a detector fact.
+  truthy(strong.length / FC.length > 0.8, 'the blend is dominated by one source');
+  truthy(
+    A.rocAuc(strong) - A.rocAuc(weak) > 0.35,
+    'the gap between sources is larger than most effects anyone would tune for — ' +
+      'and it is NOT EXPLAINED'
+  );
+
+  // And the failed generations are not spread evenly either: every one of them
+  // is in the weak stratum, so "drop gen_failed" silently reweights the blend.
+  const allFc = A.partitionByMode(ALL).get('fact-check-s2');
+  eq(allFc.filter((r) => r.genFailed && r.benchmarkSource === 'hal_test_cases').length, 69, 'all 69');
+  eq(
+    allFc.filter((r) => r.genFailed && r.benchmarkSource === 't12-overnight-2026-06').length,
+    0,
+    'none in the strong stratum'
+  );
 });
 
 await check('THE HEADROOM IS 1% — tuning the threshold is NOT where the win is', async () => {

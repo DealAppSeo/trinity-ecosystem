@@ -486,6 +486,340 @@ export const MUTATIONS = [
     find: "      if (Date.parse(d.reviewBy) < Date.parse(now)) {",
     replace: '      if (false) {',
   },
+  // -------------------------------------------------------------------------
+  // lib/trustshell/repid-scoring.ts — the gate that could not open
+  //
+  // These three modules had ad-hoc mutation runs during the 2026-08-16 build
+  // and were then NOT registered here, so `npm run mutate` was green over a set
+  // that excluded every line of them. That is this repo's defining defect
+  // wearing the mutation gate's own clothes: a green badge for work it never
+  // examined. Registering them is what makes those runs repeatable rather than
+  // shell history — the same reason mutate.mjs itself exists.
+  //
+  // Each entry below restores an ACTUAL defect that shipped, one at a time.
+  // -------------------------------------------------------------------------
+  {
+    id: 'repid-tier-ladder-exclusive',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'ONE tier ladder, with inclusive floors. KYAValidator used `>` and RepIDConfig used ' +
+      '`>=` over the same thresholds, so at exactly 2500/5000/7500 the two disagreed about ' +
+      'the tier — and the tier decides the spending limits',
+    find: '    if (score >= floor) return tier;',
+    replace: '    if (score > floor) return tier;',
+  },
+  {
+    id: 'repid-coherence-never-fails',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'a gate above the reachable ceiling is FAILED. This is the one arithmetic call that ' +
+      'would have caught the original finding on day one — a score whose maximum was 4008 ' +
+      'against a payment threshold of 5000, so the payment path was dead for everyone, ' +
+      'permanently, while the code was correct and the numbers looked plausible',
+    find: '    .filter((g) => g.floor > ceiling)',
+    replace: '    .filter(() => false)',
+  },
+  {
+    id: 'repid-negative-weight-allowed',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'a negative weight is refused. It still lets the set sum to 1.0, so the sum check ' +
+      'alone passes it, while the metric it weights now RAISES the score by getting worse',
+    find: "    if (value < 0) return `weight '${key}' is negative",
+    replace: "    if (false) return `weight '${key}' is negative",
+  },
+  {
+    id: 'repid-weight-sum-unchecked',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      "weights are validated ON READ, not only on write. The score's whole range depends on " +
+      'them summing to 1; weights summing to 5 make the weighted sum reach 5.0, which is ' +
+      'the one way an agent clears a tier the honest maximum cannot',
+    find: '  if (Math.abs(sum - 1) > WEIGHT_SUM_TOLERANCE) {',
+    replace: '  if (false) {',
+  },
+  {
+    id: 'repid-normalize-unbounded-above',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'normalization clamps at BOTH ends. The original clamped at 0 only, so an accuracy ' +
+      'recorded as 150% — or a negative latency — pushed a component past 1 and the ' +
+      'weighted sum past its own supposed maximum',
+    find: '  return Math.min(1, Math.max(0, value));',
+    replace: '  return Math.max(0, value);',
+  },
+  {
+    id: 'repid-unreadable-spend-passes',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'an UNREADABLE spend history is NOT_CHECKED, never within-limit. getDailySpend ' +
+      'discarded the query error and returned 0 — indistinguishable from "has spent ' +
+      'nothing" — so the daily-limit check PASSED and a database outage granted the full ' +
+      'daily allowance. Absent is not zero, in the place where it costs money',
+    find:
+      "      outcome: 'NOT_CHECKED',\n      withinLimit: null,\n      detail:\n" +
+      "        'the daily spend history could not be read",
+    replace:
+      "      outcome: 'VERIFIED',\n      withinLimit: true,\n      detail:\n" +
+      "        'the daily spend history could not be read",
+  },
+  {
+    id: 'repid-pertx-limit-exclusive',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'the per-tx limit is INCLUSIVE — an amount exactly equal to the limit is within it. ' +
+      'A limit is the most you may spend, not the least you may not. A `<` vs `<=` boundary ' +
+      'has been the defect four separate times in this branch alone',
+    find: '  if (amountUSDC > limit) {',
+    replace: '  if (amountUSDC >= limit) {',
+  },
+  {
+    id: 'repid-denial-wording-drifts',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'the denial reason is an OBSERVABLE CONTRACT, not prose. It lands in a compliance ' +
+      "receipt's `denialReason`, and run-e2e.mjs matches /exceeds per-tx limit/i against it " +
+      'over HTTP. Rewording it to read better turned CI red while `npm run check` reported ' +
+      '52 VERIFIED — LESSONS A19. The fast suite pins the regex so the next break surfaces ' +
+      'in seconds instead of in a server boot',
+    find: '      detail: `Amount ${amountUSDC} USDC exceeds per-tx limit ${limit}`,',
+    replace: '      detail: `Amount ${amountUSDC} USDC exceeds the per-transaction limit of ${limit}`,',
+  },
+  {
+    id: 'repid-placeholder-proof-accepted',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'a manufactured proof id is recognised as absent. `ZKP_STUB_<agent>_VERIFIED` is ' +
+      'non-empty, truthy, and contains the word VERIFIED, so every consumer testing for ' +
+      'presence saw a proof that does not exist. A placeholder that reads as its own ' +
+      'success is worse than no placeholder',
+    find: '  return /^ZKP_STUB_/.test(cid.trim());',
+    replace: '  return false;',
+  },
+  {
+    id: 'repid-stored-zero-becomes-default',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'a stored threshold of ZERO is a configured policy — "no RepID minimum" — not an ' +
+      'absent value. `|| 5000` rewrote it to the second-strictest gate in the ladder, and ' +
+      'because coherence() used `??` while calculate() used `||`, the check written to ' +
+      'catch a gate that never opens was reporting on a number the gate did not use',
+    find: '  if (stored === undefined || stored === null) {',
+    replace: '  if (!stored) {',
+  },
+  {
+    id: 'repid-unreadable-threshold-defaults',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'an UNREADABLE institution config is NOT_CHECKED. Substituting the default re-rates ' +
+      'every agent against a number nobody configured, and for an institution that stored ' +
+      'a stricter threshold it LOWERS the bar — a fail-open on the payment gate reached by ' +
+      'an outage rather than by any input',
+    find: '  if (!readable) {',
+    replace: '  if (!readable && false) {',
+  },
+  {
+    id: 'repid-malformed-threshold-passes',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'a NON-FINITE stored threshold is refused rather than passed through. NaN compares ' +
+      'false against everything, so it neither meets nor fails a gate — it just silently ' +
+      'denies, and nothing says why',
+    find: "  if (typeof stored !== 'number' || !Number.isFinite(stored) || stored < 0) {",
+    replace: "  if (typeof stored !== 'number') {",
+  },
+  {
+    id: 'repid-coherence-accepts-nonfinite',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'describeCoherence REFUSES a threshold it cannot compare. The unreachability test is ' +
+      '`floor > ceiling` and every comparison against NaN is false, so a garbage threshold ' +
+      'was never reported unreachable and fell through to "every gate is reachable" — a ' +
+      'coherence check that cannot tell "I compared them" from "I could not"',
+    find: '  if (typeof paymentThreshold !== \'number\' || !Number.isFinite(paymentThreshold)) {',
+    replace: '  if (false) {',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/hal-chain.ts — 102,934 links, not one ever verified
+  // -------------------------------------------------------------------------
+  {
+    id: 'hal-partial-chain-reads-verified',
+    suite: 'check:hal-chain',
+    file: 'lib/trustshell/hal-chain.ts',
+    protects:
+      'a PARTIALLY verified chain is not a verified one. Some links recomputed and the rest ' +
+      'unchecked is NOT_CHECKED — collapsing it to VERIFIED is the two-outcome defect this ' +
+      'file exists to close',
+    find: "    outcome: linksNotChecked > 0 ? 'NOT_CHECKED' : 'VERIFIED',",
+    replace: "    outcome: 'VERIFIED',",
+  },
+  {
+    id: 'hal-verified-unreachable',
+    suite: 'check:hal-chain',
+    file: 'lib/trustshell/hal-chain.ts',
+    protects:
+      "VERIFIED is REACHABLE. The window's first entry points at a predecessor outside the " +
+      'window — a boundary, not a gap. Counting it as unchecked made VERIFIED impossible, ' +
+      'since every window has exactly one: the same never-opening-gate defect found in the ' +
+      'RepID curve three hours earlier, reappearing inside the verifier written to catch it',
+    find: '      windowStartUnverifiable = true;\n      continue;',
+    replace: '      windowStartUnverifiable = true;\n      linksNotChecked += 1;\n      continue;',
+  },
+  {
+    id: 'hal-break-after-cutover-ignored',
+    suite: 'check:hal-chain',
+    file: 'lib/trustshell/hal-chain.ts',
+    protects:
+      'a null link AFTER the cutover is a BREAK, not adoption. Without the boundary the ' +
+      'verifier cannot tell 44,769 legitimate pre-chaining rows from a live chain losing a ' +
+      'link — and a check that reports 44,769 defects is a check that gets switched off',
+    find: '      if (!Number.isNaN(at) && at >= cutover) {',
+    replace: '      if (false) {',
+  },
+  {
+    id: 'hal-fork-ignored',
+    suite: 'check:hal-chain',
+    file: 'lib/trustshell/hal-chain.ts',
+    protects:
+      'two entries claiming the same predecessor is a FORK. All 102,934 live links were ' +
+      'measured distinct; the assertion that says so has to be able to fail',
+    find: '    if (firstSeenAt !== undefined) {',
+    replace: '    if (false) {',
+  },
+  {
+    id: 'hal-throwing-hasher-counts-as-match',
+    suite: 'check:hal-chain',
+    file: 'lib/trustshell/hal-chain.ts',
+    protects:
+      'a hasher that THREW has not told us the link is right. Scoring an exception as a ' +
+      'verified link is the credential-check-green-with-no-credential shape, one layer down',
+    find:
+      '    } catch {\n      // A hasher that threw has not told us the link is wrong.\n' +
+      '      linksNotChecked += 1;\n      continue;\n    }',
+    replace: '    } catch {\n      linksVerified += 1;\n      continue;\n    }',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/receipt-audit.ts — the audit hash anyone could forge
+  // -------------------------------------------------------------------------
+  {
+    id: 'receipt-secret-falls-back',
+    suite: 'check:receipt-audit',
+    file: 'lib/trustshell/receipt-audit.ts',
+    protects:
+      'a MISSING HMAC secret refuses to mint. The old code fell back to a constant printed ' +
+      'in the source with TRUSTRAILS_HMAC_SECRET unset, so every audit hash was forgeable ' +
+      'by anyone holding the repo — tamper-evident to nobody, and indistinguishable from ' +
+      'success at every layer above',
+    find: '  const secret = env.TRUSTRAILS_HMAC_SECRET;',
+    replace: "  const secret = env.TRUSTRAILS_HMAC_SECRET || 'a-quietly-reintroduced-fallback';",
+  },
+  {
+    id: 'receipt-abandoned-default-accepted',
+    suite: 'check:receipt-audit',
+    file: 'lib/trustshell/receipt-audit.ts',
+    protects:
+      'the abandoned default is refused BY NAME. It is 26 characters, so it clears the ' +
+      'length rule, and the most likely way this weakness returns is somebody "fixing" the ' +
+      'missing variable by pasting the constant the old fallback used',
+    find: '  if (isAbandonedDefaultSecret(secret)) {',
+    replace: '  if (false) {',
+  },
+  {
+    id: 'receipt-short-secret-accepted',
+    suite: 'check:receipt-audit',
+    file: 'lib/trustshell/receipt-audit.ts',
+    protects:
+      'a SHORT secret is refused. A one-character key yields a perfectly valid-looking ' +
+      'HMAC, so length is the only thing standing between "configured" and "configured ' +
+      'badly", and neither is visible in the output',
+    // NOT `if (false)`. That made the block unreachable, and TypeScript stops
+    // applying control-flow narrowing inside unreachable code — so `secret`
+    // reverted to `string | undefined` and the mutant failed to COMPILE. An
+    // uncompilable mutant is not evidence (PRIOR-WORK-INDEX rule 4); the runner
+    // scored it INVALID rather than CAUGHT, which is the whole reason that
+    // fourth outcome exists. Weakening the bound keeps a valid program.
+    find: '  if (secret.trim().length < MIN_AUDIT_SECRET_LENGTH) {',
+    replace: '  if (secret.trim().length < 0) {',
+  },
+  {
+    id: 'receipt-secret-silently-trimmed',
+    suite: 'check:receipt-audit',
+    file: 'lib/trustshell/receipt-audit.ts',
+    protects:
+      'the secret is returned VERBATIM. Trimming for the length check is not the same as ' +
+      'trimming the key — silently altering a secret produces audit hashes nobody else can ' +
+      'reproduce, which reads downstream as tampering',
+    find: '  return secret;\n}',
+    replace: '  return secret.trim();\n}',
+  },
+  {
+    id: 'receipt-txhash-sentinel-returns',
+    suite: 'check:receipt-audit',
+    file: 'lib/trustshell/receipt-audit.ts',
+    protects:
+      'an ABSENT tx hash is not the string "no_tx". The old sentinel encoding gave a payment ' +
+      'that was never broadcast and one whose tx hash IS "no_tx" byte-identical preimages — ' +
+      'one audit hash over two materially different receipts. An audit hash that is not ' +
+      'injective over its inputs does not bind them',
+    find: '    JSON.stringify(input.solanaTxHash),',
+    replace: "    input.solanaTxHash ?? 'no_tx',",
+  },
+  {
+    id: 'receipt-domain-tag-dropped',
+    suite: 'check:receipt-audit',
+    file: 'lib/trustshell/receipt-audit.ts',
+    protects:
+      'the domain tag leads the preimage, so the payment and HAL preimage spaces cannot ' +
+      'collide and one audit hash cannot come to cover two different kinds of event',
+    find: '    JSON.stringify(PAYMENT_AUDIT_DOMAIN),',
+    replace: "    '',",
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/schema/decoys.ts — from #53 on main. 623 tables, 501 empty,
+  // and seven empties named almost exactly like the table that matters.
+  // -------------------------------------------------------------------------
+  {
+    id: 'decoy-matcher-never-fires',
+    suite: 'check:schema-names',
+    file: 'lib/trustshell/schema/decoys.ts',
+    protects:
+      'a real query against an empty decoy table is caught. A query against an empty ' +
+      'table returns [] with no error, so it reads as "the data does not exist" rather ' +
+      'than "I asked the wrong table" — the exact confusion recorded in LESSONS.md',
+    find: '  return tableUsagePatterns(table).some((re) => re.test(line));',
+    replace: '  return false;',
+  },
+  {
+    id: 'decoy-matcher-flags-prose',
+    suite: 'check:schema-names',
+    file: 'lib/trustshell/schema/decoys.ts',
+    protects:
+      'prose is NOT flagged, only queries. Every current mention of a decoy in this repo ' +
+      'is documentation ABOUT the problem; failing those would force someone to delete ' +
+      'the record of a correction in order to get a green build',
+    find: '  return tableUsagePatterns(table).some((re) => re.test(line));',
+    replace: '  return line.includes(table);',
+  },
+
+  // -------------------------------------------------------------------------
+  // From #52 on main. The spine reachability pair and the silent-empty guard.
+  // -------------------------------------------------------------------------
   {
     id: 'spine-unreachable-from-barrel',
     suite: 'check:spine-reachable',
@@ -662,14 +996,26 @@ export const MUTATIONS = [
       'RLS denial silently became the single most permissive answer the function can ' +
       'give. `(null || []).reduce(...)` is 0, and nothing downstream could tell that ' +
       'apart from a genuinely quiet day',
-    // `&& false`, not `if (false)`, so `error` stays referenced and the mutant
-    // cannot fail for an unused-variable reason instead of the real one.
-    find:
-      '    if (error) {\n' +
-      '      throw new Error(',
-    replace:
-      "    if (error && error.code === 'NEVER_MATCHES') {\n" +
-      '      throw new Error(',
+    // RETARGETED IN THE #52 MERGE. This mutant originally broke the `throw`
+    // that main added. Both lanes fixed this fail-open independently — main by
+    // throwing, this branch by returning `number | null` — and the merge kept
+    // the nullable return, so the throw the mutant edited no longer exists and
+    // the entry would have gone DRIFT. It now restores the same defect against
+    // the same fixture: an unreadable ledger reporting a confident 0.
+    find: '    if (error || !data) return null;',
+    replace: '    if (error || !data) return 0;',
+  },
+  {
+    id: 'spend-total-drops-an-unparseable-row',
+    suite: 'check:loud-errors',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'a row whose amount will not parse makes the TOTAL unknown, not SMALLER. The hole ' +
+      'capturing the query error does not close: `reduce((s, r) => s + Number(...), 0)` ' +
+      'folds one bad row to NaN, and `NaN > limit` is false — so the unparseable row ' +
+      'PASSES the limit it broke. Skipping it is the same bug with a tidier total',
+    find: '      if (!Number.isFinite(amount)) return null;',
+    replace: '      if (!Number.isFinite(amount)) continue;',
   },
   {
     id: 'risk-weights-silently-default-when-unreadable',
@@ -700,6 +1046,68 @@ export const MUTATIONS = [
       "      if (error && error.code === 'NEVER_MATCHES') {\n" +
       '        return {\n' +
       "          status: 'unreadable',",
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/config-readiness.ts — a PUBLIC presence report
+  //
+  // Registered in the same commit as the code. Leaving new code unmutated is
+  // the defect this branch already found in its own gate once.
+  // -------------------------------------------------------------------------
+  {
+    id: 'config-abandoned-default-reads-ok',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      'the abandoned default is NOT `ok`. It is 26 characters, so it clears the length ' +
+      'bound - a length-first classification reports the one KNOWN-FORGEABLE value as fine, ' +
+      'and pasting that constant is the likeliest repair for a missing variable',
+    find: "  if (rule.rejectValue !== undefined && value.trim() === rule.rejectValue) {",
+    replace: "  if (rule.rejectValue !== undefined && value.trim() === '\u0000never-matches') {",
+  },
+  {
+    id: 'config-empty-string-is-not-missing',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      'an EMPTY or whitespace-only variable is `missing`, not merely short. A platform that ' +
+      'stores an empty string for an unset variable would otherwise report `too_short`, ' +
+      'sending an operator to lengthen a secret that is not there at all',
+    find: "  if (value === undefined || value.trim() === '') return 'missing';",
+    replace: "  if (value === undefined) return 'missing';",
+  },
+  {
+    id: 'config-ready-ignores-blocking',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      '`ready` is true ONLY when every allowlisted secret is ok. A readiness flag that is ' +
+      'always true is precisely the unearned green this whole branch exists to remove, in ' +
+      'the one report whose job is to be honest about configuration',
+    find: '  return { secrets, ready: blocking.length === 0, blocking };',
+    replace: '  return { secrets, ready: true, blocking };',
+  },
+  {
+    id: 'config-enumerates-the-environment',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      'the environment is NEVER enumerated - the allowlist is hardcoded, so adding a variable ' +
+      'to a platform cannot make it appear on a PUBLIC endpoint. This is the rule ' +
+      'app/api/version/route.ts states about itself, and this mutant breaks it',
+    find: '  const secrets: Record<string, ConfigStatus> = {};',
+    replace: "  const secrets: Record<string, ConfigStatus> = Object.fromEntries(Object.keys(env).map((k) => [k, 'ok' as ConfigStatus]));",
+  },
+  {
+    id: 'config-length-boundary-off-by-one',
+    suite: 'check:config-readiness',
+    file: 'lib/trustshell/config-readiness.ts',
+    protects:
+      'a secret EXACTLY at the minimum length is acceptable. The fifth `<` vs `<=` boundary ' +
+      'in this branch, and here it would disagree with requireAuditSecret - the report would ' +
+      'call a surface unready that mints perfectly well',
+    find: '  if (value.trim().length < rule.minLength) return \'too_short\';',
+    replace: '  if (value.trim().length <= rule.minLength) return \'too_short\';',
   },
 ];
 

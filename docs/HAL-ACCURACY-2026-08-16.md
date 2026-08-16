@@ -3,7 +3,7 @@
 **Date:** 2026-08-16
 **Corpus:** `hal_runner_results` @ Supabase `qnnpjhlxljtqyigedwkb`, 1,709 scored
 rows exported to `lib/hal/fixtures/runner-results-2026-08-16.json`
-**Guard:** `npm run check:hal-accuracy` — 14 assertions, 4 mutations
+**Guard:** `npm run check:hal-accuracy` — 15 assertions, 4 mutations
 
 ---
 
@@ -15,7 +15,8 @@ band*, and no entry anywhere stated a precision, a recall or an AUC. The data to
 compute all three had been sitting in `hal_runner_results` since 2026-05-05.
 Measured: **AUC 0.9579**, realized **F1 0.8812**, against a best-possible
 **0.8905** — HAL is at **98.95% of the ceiling any threshold on this score can
-reach**. The threshold is not where the remaining win is.
+reach**. The threshold is not where the remaining win is. That AUC is a **blend
+of two disagreeing benchmark sources** and must never be quoted flat — §3a.
 
 ---
 
@@ -82,7 +83,34 @@ answer to judge — counting those charges HAL for a provider outage): **395 row
 | **live: 0.43 + extra veto paths** | **0.8812** | 0.860 | 0.904 | 178 / 29 / 19 |
 | best possible cut @ 0.2554 | 0.8905 | 0.873 | 0.909 | 179 / 26 / 18 |
 
-**AUC 0.9579.**
+**AUC 0.9579 — but see §3a. Do not quote it flat.**
+
+### 3a. Partitioning by mode was necessary and NOT sufficient
+
+A sibling lane re-derived this measurement independently before publication and
+found what this pass had missed: **inside `fact-check-s2` the two benchmark
+sources are themselves heterogeneous.**
+
+| `benchmark_source` | usable rows | positives | AUC |
+|---|---|---|---|
+| `hal_test_cases` | 71 | 35 | **0.5940** — barely above chance |
+| `t12-overnight-2026-06` | 324 | 162 | **0.9757** |
+
+Confirmed here against the same rows. **82% of the usable corpus is the strong
+stratum**, so the headline 0.9579 is largely a property of *one benchmark
+source* — a composition fact, not a detector fact. The gap between the two is
+larger than any effect a threshold change could produce, and it is **NOT
+EXPLAINED**.
+
+**Every one of the 69 failed generations is in the weak stratum** (69 of its
+140 rows; zero in `t12-overnight`). So "drop `gen_failed`" — correct on its own
+terms — silently reweights the blend toward the strong source. Both facts are
+now asserted in `check:hal-accuracy`.
+
+The rule this produces: **quote 0.9579 with its composition attached, never as
+"HAL's accuracy" flat.** Cross-lane companion measurement, with confidence
+intervals and the pooled-vs-stratified derivation:
+`docs/HAL-AUC-STRATIFICATION-2026-08-16.md`.
 
 ### HAL's veto is not a threshold
 
@@ -161,7 +189,8 @@ during this pass.
 | item | why not checked | what would settle it |
 |---|---|---|
 | **HAL accuracy on live traffic** | the fleet has been down since 2026-07-17; the corpus ends 2026-06-24 | a redeploy (**Sean**), then re-export and re-run `check:hal-accuracy` |
-| **Whether 0.9579 generalises** | 395 rows, 2 benchmark sources, one 7-week window | a second corpus from a different source and period |
+| **Whether 0.9579 generalises** | 395 rows, 2 benchmark sources, one 7-week window — and the two sources disagree by 0.38 AUC (§3a) | a second corpus from a different source and period |
+| **WHY the two sources disagree** | `hal_test_cases` scores 0.5940 against `t12-overnight`'s 0.9757 and nothing explains it; the weak stratum also holds every failed generation | inspecting what distinguishes the two prompt sets — until then the blend must be quoted with its composition |
 | **The numeric/date proposal** | 16 rows, and the rule producing `proposed_verdict` is not derivable from the view's columns | the generating logic, then a sweep over the full corpus |
 | **`hal_score`'s own ceiling** | AUC 0.9579 bounds every threshold, but not every *rescoring* | an ablation over `signals` / `hal_diagnostics`, which `hal_ablation_results` is shaped for and holds **0 rows** |
 | **Whether `category` being constant is a defect** | no consumer of that column was traced | find the reader of `hal_classifications.category` and check what it branches on |
@@ -174,6 +203,6 @@ during this pass.
   modes; returns `null` (not 0.5) where a class is absent; tie-aware AUC.
 - `lib/hal/fixtures/runner-results-2026-08-16.json` — the 1,709-row corpus, so
   the number is reproducible in CI with no database.
-- `scripts/hal-accuracy-test.mjs` — **14 assertions**.
+- `scripts/hal-accuracy-test.mjs` — **15 assertions**, including the sub-stratum split of §3a.
 - **4 mutations** registered: pooling refusal removed, undefined-as-chance,
   ties-full-credit, and counting failed generations. All CAUGHT (43 → 47).

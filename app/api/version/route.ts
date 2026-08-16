@@ -35,6 +35,7 @@
 //   www.aitrinitysymphony.com  -> Vercel
 
 import { NextResponse } from 'next/server';
+import { describeConfigReadiness } from '@/lib/trustshell/config-readiness';
 
 // Never prerendered and never cached. A version endpoint that can be served
 // from an edge cache can report the previous deployment's SHA, which is worse
@@ -83,6 +84,18 @@ export async function GET() {
       region: process.env.VERCEL_REGION ?? process.env.RAILWAY_REPLICA_REGION ?? null,
       // Answered-at, not built-at. Do not read this as a build timestamp.
       responded_at: new Date().toISOString(),
+      // Required configuration, as STATUS WORDS — never values, never lengths,
+      // never an enumeration of the environment. Same rule as the fields above.
+      //
+      // Added because PR #54 made receipt minting throw without
+      // TRUSTRAILS_HMAC_SECRET and then merged with that blocker still open,
+      // and there was no way to ask a running surface whether the secret was
+      // set. The only check available was to POST a payment to production and
+      // see whether it threw, which is not a check. This surface and the other
+      // one carry SEPARATE environment variables (CLAUDE.md, deployment
+      // topology), so each must be asked in turn — which is why this rides on
+      // the endpoint that already names which platform answered.
+      config: describeConfigReadiness(process.env),
     },
     {
       status: 200,

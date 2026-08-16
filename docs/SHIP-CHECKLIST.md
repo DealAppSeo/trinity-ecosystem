@@ -37,7 +37,7 @@ Already required, confirm they are present:
 | `SUPABASE_SECRET_KEY` | An `sb_secret_…` key. Legacy names still read, but **delete them** — a stale `SUPABASE_SERVICE_ROLE_KEY` on one host silently wins there and nowhere else. |
 | `NEXT_PUBLIC_SUPABASE_URL` | |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | An `sb_publishable_…` key. `NEXT_PUBLIC_*` is inlined at build time, so **changing it requires a redeploy**, not just an env edit. |
-| `TRUSTRAILS_HMAC_SECRET` | Signs the receipt audit hash. Falls back to a shared default if unset — set it. |
+| `TRUSTRAILS_HMAC_SECRET` | Signs the receipt audit hash (HMAC-SHA256). **REQUIRED — minting throws without it.** The old shared-default fallback was removed 2026-08-16: it made every audit hash forgeable by anyone holding the repo, and this line's own caveat was the debt that let it survive. Must be ≥16 chars, and the abandoned default `trinity-default-sbt-secret` is refused by name. |
 | `LITELLM_URL`, `LITELLM_MASTER_KEY` | The BFT panel's three providers route through here. Without them every evaluation fails and rows park after 3 attempts. |
 | `AGENT_SOPHIA_SECRET_BYTES` | Solana signing key, as a JSON byte array. Devnet. |
 | `SOLANA_RPC_URL`, `USDC_DEVNET_MINT` | Both have devnet defaults. |

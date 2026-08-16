@@ -1087,3 +1087,150 @@ provider downtime as human referrals would bury the referral rate in
 infrastructure noise. **A signal that fires for everything measures nothing.**
 Both omissions are asserted, not assumed: `check:panel-tier` fails if truncation
 or an outage ever claims a referral.
+
+---
+
+## A19 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
+
+**[VERIFIED] — the run is in CI: `check` green, `test:e2e` red, same commit.**
+
+`npm run check` — the repo's own comprehensive gate, the one `check-all.mjs`
+discovers 52 suites for — reported **52 VERIFIED, 0 NOT_CHECKED, 0 FAILED**.
+The same commit failed CI.
+
+The workflow runs three things, and `check` is only the first:
+
+```
+npm run check        # 52 suites  <- the one everybody runs
+npx next build
+npm run test:e2e     # 37 steps over HTTP against a real server
+```
+
+The failure was a **denial reason reworded**. `checkPerTxLimit` said "exceeds
+the per-transaction limit of 100" where the original said "exceeds per-tx limit
+100", and `scripts/e2e/run-e2e.mjs:356` matches `/exceeds per-tx limit/i`
+against it **over HTTP**. Nothing in the 52 suites touches that string, because
+none of them starts a server.
+
+**Why it is the house defect and not a slip.** The reworded string is a
+`denialReason` written into a compliance receipt — an artifact whose entire
+purpose is being evidence. Its wording is an observable contract, and it was
+edited as though it were prose, in a commit whose subject was *fixing* unearned
+claims. Confidence came from a green run that structurally could not see the
+break.
+
+**The rule.** *Before claiming a change is green, run what CI runs — all of it.*
+`npm run check && npx next build && npm run test:e2e`. A suite that does not
+start a server cannot see an HTTP contract, and `check-all.mjs`'s summary line
+is honest about what it ran, not about what CI will.
+
+Also, from the same incident: the fast suite now duplicates the e2e's own
+regexes (`check:repid-scoring`, 'THE DENIAL WORDING IS A CONTRACT'), so the next
+break shows up in seconds rather than after a build and a server boot.
+
+---
+
+## A20 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
+
+**[VERIFIED] — `curl` to the REST endpoint returns 403; the MCP tool returns the
+same runs successfully, seconds apart.**
+
+An agent session watching its own PR wrote the obvious poll:
+
+```bash
+until out=$(curl -s ".../commits/$SHA/check-runs" | python3 -c "
+  d=json.load(sys.stdin)
+  runs=[r for r in d.get('check_runs',[]) if ...]
+  if runs and all(completed): print(...)"); [ -n "$out" ]; do sleep 30; done
+```
+
+It never fired. Not once, across four PRs and a whole night.
+
+```
+$ curl -s -w '%{http_code}' .../check-runs
+403 {"message": "Resource not accessible by integration"}
+```
+
+**The session's GitHub token cannot read `/check-runs` over REST.** The MCP
+tool (`pull_request_read` with `method: get_check_runs`) reads the same data
+fine — different auth path. So the capability exists; only that route is closed.
+
+**Why it survived a whole night undetected.** `d.get('check_runs', [])` turns a
+403 body into an empty list. Empty list → no completed runs → print nothing →
+the `until` loop treats it as "not finished yet" and sleeps. **A poll with two
+states — fired / not yet — silently absorbs a third: cannot look.** Which is
+this repository's founding defect, committed inside the tooling built to verify
+this repository.
+
+The tell was available and ignored: the watchers ran to their full timeout
+*every time*, and CI results only ever arrived via webhook wake events. A poll
+that has never once fired is not a slow poll.
+
+**The rules.**
+
+1. **Read CI status through the MCP tool, not `curl`.** REST `/check-runs` is
+   403 from a session.
+2. **A poll loop must distinguish "not ready" from "could not read".** Check the
+   HTTP status; a non-200 is NOT_CHECKED and must be surfaced, never slept on.
+   `.get(key, [])` on an unparsed error body is the exact line that hides it.
+3. **A watcher that has never fired is evidence about the watcher.** Silence
+   from a check is not a result.
+
+---
+
+## A21 — a detector scored as anti-predictive because two modes use different scales (2026-08-16)
+
+**[VERIFIED] — pooled AUC 0.4493 [0.4075, 0.4911]; the same score on the only
+stratum where the comparison is defined gives 0.9579 [0.9375, 0.9784]. Full
+measurement and reproduction SQL in `docs/HAL-AUC-STRATIFICATION-2026-08-16.md`.**
+
+HAL detection accuracy was being computed over "1,825 labelled rows" and coming
+out at roughly 0.46 — *below* chance, which says a detector is reliably
+**anti**-predictive. Caught before publication.
+
+Two properties of `hal_runner_results` explain the whole thing:
+
+- **All 197 labelled hallucinations live in one `hal_mode`** (`fact-check-s2`).
+  The other two modes contribute 1,163 negatives and zero positives.
+- **`mock` mode writes `hal_score` on a 0–100 scale** — minimum 50.055, median
+  70.503 — while `real` and `fact-check-s2` write 0–1.
+
+AUC is the probability a random positive outranks a random negative. Pool those
+and 653 mock negatives outrank **every** positive before HAL's behaviour is
+consulted. The pooled statistic answers *"do mock rows score higher than
+fact-check rows?"* — yes, by definition of the scale.
+
+**The near-miss is the point.** 0.46 is not an absurd number. It is close enough
+to 0.5 to read as "the detector is weak", which is a publishable-sounding,
+narratively satisfying, completely wrong conclusion — and the real answer is the
+opposite of it. The detector is strong.
+
+**The second tell, available without any stratification.** The pooled figure
+crosses the chance line depending on which defensible filter is applied: nulls
+scored as 0 gives 0.5206, scored-rows-only 0.4839, scored-and-generation-
+succeeded 0.4493. Only the last separates from 0.5, and it is the cleanest-
+looking of the three. *A quantity whose sign depends on which reasonable filter
+you pick is not yet a measurement*, and that was visible before anyone looked at
+`hal_mode`.
+
+**The rules.**
+
+1. **Before pooling a score across groups, check that the score means the same
+   thing in each.** One `select min, median, max ... group by mode` would have
+   ended this. Different units in one column is not exotic; it is what happens
+   when a mock path and a real path are written months apart.
+2. **A stratum with zero positives cannot inform a ranking metric — it can only
+   dilute it.** Check class support per group before pooling, not after the
+   number looks wrong.
+3. **Below-chance AUC is a sample bug until proven otherwise.** A genuinely
+   inverted detector is rare; an incomparable sample is common. Treat it as a
+   shape question first.
+4. **Average ranks within ties.** `hal_score` has 730 distinct values over 1,710
+   rows, so ties are dense. Naive tie-breaking on a near-constant score produces
+   an AUC just below 0.5 on its own — a second independent route to the same
+   wrong conclusion, and one that would have survived fixing the scale problem.
+
+This is the fourth instance of the failure class the prior-work index already
+names — *suspect the sample before the measurement* — and the third caused
+specifically by an unexamined assumption about the **shape** of the data rather
+than its values.
