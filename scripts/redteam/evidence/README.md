@@ -46,6 +46,38 @@ nothing about the other.
 (14) is `NOT_CHECKED`, never a pass. A configuration reading from three weeks
 ago describes a deployment that may no longer exist.
 
+## `bundle-<surface>.json` — deployed browser-bundle recon (judged by `LIVE-002`)
+
+Same provenance fields, plus an `observations` object recording what the shipped
+JS bundle contains. The key facts `LIVE-002` judges:
+
+```json
+{
+  "surface": "trustshell.dev",
+  "collectedAt": "…", "collectedBy": "…", "collectedVia": "…",
+  "observations": {
+    "backendHostsInBundle": ["https://<ref>.supabase.co", "…"],
+    "supabaseKey": {
+      "format": "legacy_jwt",              // or "sb_publishable"
+      "isNewPublishableOrSecret": false,
+      "claims": { "iss": "supabase", "ref": "<ref>", "role": "anon", "iat": 0, "exp": 0 }
+    },
+    "liveAuthTest": {
+      "url": "https://<ref>.supabase.co/rest/v1/",
+      "statusCode": 401,
+      "serverMessage": "Legacy API keys are disabled …"
+    }
+  }
+}
+```
+
+**Do not store the raw token.** For an `anon` key it is public by design and
+would trip `check:secrets` for no gain; the decoded `claims` plus the
+`liveAuthTest` result are the observation the probe needs. If a collector ever
+finds a **`service_role`** token in a bundle, record the decoded `role` and the
+auth-test status — still not the raw token — and treat it as Critical: a
+privileged key in a browser is rotated, not filed.
+
 ## What may be committed here
 
 `/api/version` is public, uncached, and reports secret **status words** only —

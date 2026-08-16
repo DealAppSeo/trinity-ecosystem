@@ -38,6 +38,15 @@
       "reviewBy": "2026-09-15",
       "firstSeen": "2026-08-16",
       "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
+    },
+    {
+      "id": "LIVE-002",
+      "owner": "Sean",
+      "severity": "Medium",
+      "reason": "trustshell.dev's client bundle embeds a LEGACY anon Supabase JWT (project qnnpjhlxljtqyigedwkb) that is disabled project-wide — a live PostgREST test with the embedded token returned 401 'Legacy API keys are disabled' (2026-08-16). Fails CLOSED, so nothing leaks and nothing forges: the anon key is public by design and the key is dead. The finding is availability + hygiene — any Supabase-backed feature on trustshell.dev is silently broken, same root cause as the 217-day-dead aitrinitysymphony lead form. Fix is a redeploy of DealAppSeo/trustshell with NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY set to a current sb_publishable_ key; the repo is not attached to this session and the redeploy is Sean's. Whether the site actually calls Supabase at runtime is post-hydration and NOT CHECKED — if it does not, this drops to Low/Informational.",
+      "reviewBy": "2026-09-15",
+      "firstSeen": "2026-08-16",
+      "report": "docs/RED-TEAM-TRUSTSHELL-DEV-2026-08-16.md"
     }
   ]
 }
