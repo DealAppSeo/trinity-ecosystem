@@ -19,7 +19,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # scan-secrets.mjs --history walks every commit reachable from any ref.
           # A shallow clone would make it report a clean history it never read.
@@ -39,7 +39,7 @@ jobs:
       # first thing here to run a real client, and it failed on Node 20 within
       # 36 seconds. npm ci had been printing EBADENGINE for seven packages
       # requiring >=22 on every run, and it was read as noise.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -74,9 +74,105 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
 
+      # The history scan is O(commits reachable from any ref) — `fetch-depth: 0`
+      # above means every branch, not just this one — and it re-derived the same
+      # answer from scratch on every run. Measured 2026-08-15: 7m28s of a 9m19s
+      # job, 80% of the wall clock, inside a step that by design cannot fail it.
+      #
+      # History is append-only: a commit already searched under the same rules
+      # cannot produce a different result later. The state file carries those
+      # per-commit results across runs so only NEW commits are searched. A cache
+      # miss is a full scan — the old behaviour — and the scanner discards the
+      # state outright if its own source changed, so an edited pattern is never
+      # applied to just the new commits.
+      #
+      # restore/save as an explicit pair rather than actions/cache, because this
+      # step runs under `if: always()` and the save has to happen on a failed job
+      # too; otherwise a red run throws the work away and the next one pays full
+      # price. Caches saved on main are readable from every PR, so a PR restores
+      # main's state and searches only its own commits.
+      # The save key is unique per run *attempt*, so a save can never collide
+      # with an existing key. That matters because the alternative — letting a
+      # duplicate-key save fail and adding continue-on-error — is a step allowed
+      # to fail silently, which TF-08 rejects by name. The exact `key` here
+      # therefore never hits; the prefix in restore-keys is what restores the
+      # most recent state.
+      # On a pull request, scan only the commits the PR itself adds. Measured
+      # 2026-08-15: the full graph is 652 commits and 423 of them (65%) are
+      # reachable only from four abandoned branches this change has nothing to do
+      # with. Bounded work whatever the cache holds, which is the point — the
+      # cached full scan below is fast when warm and 7+ minutes when cold, and a
+      # PR should not be where that bill lands.
+      #
+      # A range rather than skipping the PR path entirely: a credential added in
+      # one commit of a PR and deleted in a later one is in that PR's history but
+      # NOT in its working tree, so the working-tree scan in `npm run check` would
+      # not see it and a skip would let it through to main unremarked. The scan
+      # prints the range it covered, because "0 usable in history" over four
+      # commits is a different claim from the same words over the whole graph.
+      - name: report credentials added by this PR
+        if: always() && github.event_name == 'pull_request'
+        run: node scripts/scan-secrets.mjs --history --since ${{ github.event.pull_request.base.sha }} || true
+
+      # On main, the whole graph — the authoritative answer, reusing per-commit
+      # results across runs so it is paid for once per new commit rather than
+      # once per run.
+      - name: restore history scan state
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/cache/restore@v4
+        with:
+          path: .secret-history-state.json
+          key: secret-history-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: secret-history-
+
       # History hits cannot be removed by a commit, so this never fails the run —
       # it reports credentials that need rotating. Failing here would make the
       # job permanently red and therefore ignored.
       - name: report credentials in git history
-        if: always()
-        run: node scripts/scan-secrets.mjs --history || true
+        if: always() && github.event_name != 'pull_request'
+        run: node scripts/scan-secrets.mjs --history --state .secret-history-state.json || true
+
+      - name: save history scan state
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        with:
+          path: .secret-history-state.json
+          key: secret-history-${{ github.run_id }}-${{ github.run_attempt }}
+
+  # A SEPARATE JOB, deliberately.
+  #
+  # `mutate` breaks each invariant on purpose and requires the suite that claims
+  # to protect it to go red. It re-runs a suite per mutation, so folding it into
+  # `check` above would add minutes to the gate everyone waits on. Run in
+  # parallel, it costs nothing anybody notices.
+  #
+  # WHY IT IS A GATE AND NOT A REPORT. A surviving mutation means an assertion
+  # is missing, or is asserted over a situation no fixture reaches. The second
+  # kind is invisible from a green run — this repo shipped one on 2026-08-15,
+  # inside the suite for the tool built to catch exactly that class. A report
+  # nobody reads would not have caught it; a red build does.
+  #
+  # No `continue-on-error` and no `|| true`: this job is allowed to fail the run.
+  mutate:
+    runs-on: ubuntu-latest
+    steps:
+      # v7, not v4, deliberately — PRs #39 and #40 bump the `check` job's pins
+      # from v4 and are open right now. A new job landing on v4 would reintroduce
+      # exactly what they remove, dependabot would reopen them, and while both
+      # versions coexisted in this file each `uses: actions/checkout@v4` line
+      # would be an ambiguous target for their one-line diff. v4 also emits the
+      # Node-20 deprecation warning already visible in this workflow's logs.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      # The runner restores every mutated file in a `finally`, on any signal, and
+      # verifies the restore byte-for-byte. `git diff --exit-code` afterwards is
+      # the independent check on that claim — a mutation run that leaves the tree
+      # dirty has corrupted the thing it was measuring.
+      - name: mutation gate
+        run: npm run mutate
+      - name: sources restored
+        run: git diff --exit-code

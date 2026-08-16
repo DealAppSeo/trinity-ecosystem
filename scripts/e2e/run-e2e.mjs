@@ -166,6 +166,14 @@ try {
     // fake. Keep these obviously non-credential.
     SUPABASE_SECRET_KEY: 'e2e-stub-key-unchecked-by-postgrest-stub',
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'e2e-stub-publishable-unchecked',
+    // REQUIRED now, not optional. The receipt audit hash is an HMAC and
+    // `requireAuditSecret` refuses to mint without a secret — it used to fall
+    // back to a constant printed in ComplianceReceipt.ts, which made every
+    // audit hash forgeable by anyone holding the repo. An explicit test secret
+    // here is the point: the e2e must not silently share whatever production
+    // uses, and it must not re-enable the abandoned default (which is refused
+    // by name).
+    TRUSTRAILS_HMAC_SECRET: 'e2e-audit-hmac-secret-not-a-real-one',
     // Left unset on purpose, and asserted below:
     //   AGENT_SOPHIA_SECRET_BYTES -> SolanaExecutor must report simulated
     //   BFT_ENFORCEMENT_MODE      -> observe mode, verdict NOT CHECKED

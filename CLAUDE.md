@@ -273,6 +273,13 @@ initiative.**
 
 ## Repo gotchas
 
+- **Adding a check suite: add a `"check:name"` script to `package.json`, and
+  nothing else.** `npm run check` is `scripts/check-all.mjs`, which discovers
+  every `check:*` and runs it. Do NOT reintroduce a hand-maintained chain — it
+  was one shared line that five PRs had to resolve conflicts over in a single
+  night, and it silently kept 5 suites (145 assertions) out of CI because adding
+  one meant editing that line. See LESSONS A16. Exit codes carry the verdict:
+  **0 VERIFIED, 2 NOT_CHECKED, anything else FAILED.**
 - `tsconfig.tsbuildinfo` is a build artefact. Every `tsc` run rewrites it, which
   makes `git stash`/`pop` around a typecheck conflict — and a failed `pop` is
   silent if you redirect its output. Never redirect `git stash pop`.

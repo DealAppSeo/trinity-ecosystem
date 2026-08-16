@@ -148,10 +148,22 @@ carries all four corrections in place:
 2. **§8's `@hyperdag/proof-verifier` cannot verify a receipt.** It is a Plonky3
    STARK verifier for `{agent_id, repid_score, threshold, tier}`. Handed a receipt
    it returns `deser: io error`. [VERIFIED — installed and invoked.]
+
+   [PROBED 2026-08-15: `@hyperdag/proof-verifier@0.2.0` — installed and invoked.
+   Plonky3 STARK verifier; public statement is `{agent_id, repid_score, threshold,
+   tier}`. Handed anything else it returns `verify failed: deser: io error`. It
+   cannot verify a session receipt.]
 3. **§9's package table was wrong twice.** `@hyperdag/trustshell@1.3.0` is the
    HAL/RepID SDK against a live backend — zero occurrences of `transcript`,
    `audit_hash`, `session_receipt` in `dist/`. Its `verify` command already means
    something else, so the spec's `trustshell verify <session>` would collide.
+
+   [PROBED 2026-08-15: `@hyperdag/trustshell@1.3.0` and `@hyperdag/trustshell-mcp@1.0.0`
+   — installed and inspected. Both are the HAL/RepID SDK against a live backend.
+   Searching the published `dist/` of both for `transcript`, `audit_hash` and
+   `session_receipt` returns zero occurrences of any of the three. `trustshell`
+   already ships a `verify` that means something incompatible, so the CLI name the
+   spec proposed would have collided. Neither is the receipt library §9 described.]
 4. **§4.3's T1 cried wolf.** See the measurement below.
 
 **§12 Q1, Q2 and Q3 are now decided** (local SQLite; per-developer key;
@@ -1188,3 +1200,106 @@ npm run check:deps                  # expect 5 VERIFIED — read BEFORE any audi
 # when a new deploy fails — a healthy page is compatible with week-old code:
 #   select net.http_get(url := 'https://www.aitrinitysymphony.com/api/version');
 ```
+
+---
+
+# SESSION SUMMARY — 2026-08-16 (claude-opus-5, cloud/scheduled)
+
+Surface = **cloud/scheduled** (Claude Code Remote, ephemeral container).
+Access = GitHub **yes** (MCP + push, verified), Supabase **yes** (MCP, verified),
+Railway **no** (`repid-engine-production.up.railway.app` proxy-denied),
+`DealAppSeo/repid-engine` **no** (not in session scope).
+
+Preflight: `v_agent_preflight` → **verdict=GO, global_pause=false**, 18 open Sean
+gates, 23,113 orphaned claims. **No task claimed** — all work user-requested.
+Fleet, from `v_fleet_truth` only (protocol §3): **3 live of 12** [VERIFIED].
+
+Branch `claude/zkrepid-agentic-os-jfbi18`, **PR #54** (draft, open).
+
+## Accomplished
+
+**RepID.** The score could not reach the gate it feeds — a flawless agent capped
+at 4008 against a payment threshold of 5000, so Gold, Platinum and the whole
+payment path were unreachable for everyone, permanently. Escalated rather than
+re-tuned unilaterally; Sean chose multiplier 5000. Plus: two disagreeing tier
+ladders unified, then a third and a **fourth** found and removed (the fourth in
+`app/api/trustrails/pay/route.ts`, handing Silver and Bronze agents Gold's per-tx
+figure as the BFT panel's brief); an unreadable spend history that read as zero;
+a fabricated `ZKP_STUB__VERIFIED` proof id; normalization unbounded above.
+
+**The coherence check was grading a threshold the gate does not use.**
+`RepIDConfig` read `min_repid_payment` twice — `??` in `coherence()`, `||` in
+`calculate()` — which agree on every value except a stored **0**. Measured
+against the live table rather than asserted: the unreadable-config path was
+**LIVE** (`amina-conservative` stores 7500, so an outage drops its bar to 5000);
+a **negative** threshold is storable (no CHECK) and opened the gate for everyone;
+the stored-zero divergence is **LATENT**; a non-finite threshold is
+**UNREACHABLE** from an `integer` column and that guard is defensive only.
+
+**HAL.** `verifyHalChain` driven over **live rows** for the first time
+(ids 44764–44779, straddling the cutover): NOT_CHECKED with no hasher, FAILED
+with 9 × `link_mismatch` under a wrong one, **VERIFIED 9/9** under an oracle.
+VERIFIED is reachable on production rows, not only fixtures. Rows NOT committed
+(fences); outcome recorded in `LIVE_RUN_2026_08_16`.
+
+**Receipts.** The payment audit hash was an HMAC whose secret fell back to a
+constant printed in the source, with `TRUSTRAILS_HMAC_SECRET` unset — forgeable
+by anyone holding the repo. Its preimage also collided: an absent tx hash and the
+literal string `"no_tx"` produced identical bytes.
+
+**Mutation gate 38 → 68.** It had been green over a set excluding every line of
+new code; my earlier mutation runs were real but lived in shell history.
+
+**Two forward-merges of main** (#52, #53), both conflicting on the tail of the
+one shared `MUTATIONS` array — LESSONS A17 in a new file.
+
+## REAL vs STUB
+
+- **REAL**: every number above is measured. RepID ceiling by computation; HAL
+  chain and the threshold severities against the live tables; CI verdicts via the
+  GitHub MCP tool.
+- **STUB / NOT_CHECKED and named as such**: the live HAL chain is still
+  unverified — the oracle proves the verifier works, not that the links are
+  right; that needs the producer's formula, which is not in this repo. e2e
+  carries 4 NOT CHECKED (Solana devnet, live Supabase schema, cross-instance
+  nonce replay, BFT panel), all proxy- or config-gated.
+- **Claim gate**: `on_chain_receipts = 0` — no BFT-receipt capability claimed.
+
+## BLOCKED_FOR_SEAN
+
+1. **`TRUSTRAILS_HMAC_SECRET` in Railway and Vercel** — ≥16 chars, NOT
+   `trinity-default-sbt-secret` (refused by name). Receipt minting throws without
+   it on both paths. **PR #54 must not merge until this is set.**
+2. **RepID ZK proof stub scores** — `repid_zkp_proofs` holds **21,965 rows that
+   assert `is_real=true` over a score of 500/1000 that was never computed**
+   (21,958 from the 2026-06-16/17 backfill, 7 recent). Largely corrected in
+   current code (272/279 computed in the 07-31/08-01 era), **not fully**, and the
+   table has received nothing since 2026-08-01 — 15 days. The writer is in
+   `repid-engine`, outside this session's push scope. Sharpens the existing
+   sean_action "statement.repid_score is hard-coded 1000" (p84): CONFIRMED at
+   scale, LARGELY FIXED, NOT fully fixed. New view
+   `v_repid_proof_claim_integrity` (changelog #139, `rollback_sql` recorded)
+   separates honest absence from false assertion — the pre-existing
+   `v_repid_proof_score_audit` cannot.
+3. **Poseidon2 parameters + test vectors** from the XAI/repid-engine lane. Not
+   implemented unilaterally, by standing instruction.
+4. **Leaked Base Sepolia deployer key rotation** — local only. No agent session
+   should run it; it needs the live key in a transcripted context, which is how
+   it leaked.
+5. **`getDailySpend` merge resolution** — #52 made it throw, this branch returns
+   `number | null`, and I kept null and edited #52's assertion to match.
+   Reasoning is in the code and PR #54. A judgement call between two correct
+   fixes; cheap to flip if that lane disagrees.
+
+## Next 3 commands
+
+```
+npm run check && npx next build && npm run test:e2e && npm run mutate
+git fetch origin main && git merge-tree --write-tree origin/main HEAD; echo $?
+psql> select * from public.v_repid_proof_claim_integrity;
+```
+
+**Deferred deliberately**: make `scripts/mutations.mjs` discovery-based, the way
+`npm run check` discovers `check:*`. Both merge conflicts this session were the
+tail of that one shared array. Doing it while two lanes have open PRs against the
+file causes exactly the conflict it fixes — do it when main is quiet.

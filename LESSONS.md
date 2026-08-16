@@ -856,3 +856,322 @@ automated remediation, diff the proposed versions against the installed ones and
 check the **direction**. An advisory count is a proxy; a proxy that can be
 improved by making the code worse is not a measurement, and "0 vulnerabilities"
 is a claim like any other — it needs the same three outcomes as everything else.
+
+## A17 — one line that five pull requests had to fight over (2026-08-15)
+
+**[VERIFIED] — five hand-resolutions of the same conflict in one night, across
+four PRs, none of which needed a judgement.**
+
+`npm run check` was a single ~400-character line naming every suite:
+
+```
+"check": "npm run check:secrets && npm run check:auth && … && npx tsc --noEmit"
+```
+
+Every lane that adds a suite must edit that line. Git resolves by line, and
+there is only one, so **any two concurrent PRs adding suites collide by
+construction.** Over 2026-08-14/15 that conflict was resolved by hand five
+times, in PRs #28, #30, #31 and #33. Every resolution was "keep both". Nothing
+about any of them required a person.
+
+**The tell is the uniformity.** A conflict that always has the same answer is
+not a disagreement between authors — it is a data-structure problem wearing a
+merge conflict's clothes. One shared mutable line is a lock, and five lanes were
+queuing on it.
+
+**Fix:** `npm run check` is now `node scripts/check-all.mjs`, which DISCOVERS
+`check:*` from `package.json`. Adding a suite means adding an independent
+`"check:name": "…"` line, and two lanes adding two suites touch two different
+lines and merge cleanly.
+
+### What the discovery version can get wrong, and what stops it
+
+A runner that finds its own work has a failure the hardcoded list did not:
+**discover nothing, run nothing, exit 0** — the house defect, in the one place
+that would mask every other suite at once.
+
+- `MINIMUM_SUITES` is a floor, not a count. Below it the run FAILS as a
+  discovery failure rather than passing over checks that never ran.
+- An unparseable `package.json` exits 1. There is no "assume it is fine" path.
+- Every discovered suite is printed before anything runs, and named in the
+  summary with its outcome.
+- `scripts/check-runner-test.mjs` asserts all of the above, and mutation testing
+  killed 9 of 10 mutants against it. The survivor is documented in place: the
+  null-status branch is unreachable because `npm run` converts a SIGKILLed child
+  to exit **137** (measured), and 137 is covered.
+
+### The thing the refactor found
+
+Five suites — `harness-aggregate`, `harness-escalate`, `harness-reputation`,
+`harness-timeout`, `harness-transform` — were **defined but absent from the
+chain**, so CI had never run them. Discovery picked them up: **145 assertions
+that had been written, committed, and never executed by any gate.** All five
+pass. Nobody excluded them on purpose; they were simply forgotten at the point
+where adding one meant editing the shared line.
+
+That is the second cost of the one-line design, and the more expensive one: it
+made the gate set easy to under-populate and impossible to audit at a glance.
+
+### Three outcomes, taken from the exit code
+
+The suites already encoded it and nothing read it: **0 = VERIFIED, 2 =
+NOT_CHECKED, anything else = FAILED.** `check-legacy-key` exits 2 when the
+network is denied, and four other scripts use the same signal. The old `&&`
+chain collapsed 2 into failure, which is why that suite was kept out of the
+chain — a correct check, excluded because the runner could not express its
+answer. It now runs, and its NOT_CHECKED is reported rather than hidden or
+promoted.
+
+**The rule.** When the same merge conflict resolves the same way more than twice,
+stop resolving it and change the shape that produces it. And when a runner
+starts discovering its own work, the first thing to test is what it does having
+discovered nothing.
+
+---
+
+## A18 — three commits with no gate, on a PR whose checks looked green (2026-08-15)
+
+**[VERIFIED by observation; mechanism is documented GitHub behaviour, not
+measured here.]**
+
+Three consecutive pushes to PR #36 — `38d1544`, `0300ff9`, `666a0ba` — produced
+**no `check` workflow run at all.** Not queued, not failed. No run existed. The
+next push, `f69b654`, produced one **two seconds** after the push.
+
+The difference between them: the first three landed while the PR had **merge
+conflicts with `main`**; `f69b654` was the merge that resolved them.
+
+**Why this is the house defect and not a CI curiosity.** The PR page did not
+say "no checks ran". It showed the checks that *do* run on a conflicted PR —
+Vercel's deployment status and its preview-comments check — both green. A
+reviewer glancing at it sees a PR with passing checks. So did the author. Three
+commits carrying an authorization port, a signing module and a verdict pipeline
+sat with **`npm run check` never having executed against them in CI**, behind a
+green tick that was describing something else entirely.
+
+The local run was green, which is what made it comfortable. A local green and a
+CI green are different facts, and this is exactly the gap the three-outcome rule
+exists to keep open: the honest status of those three commits was NOT CHECKED,
+and nothing on the page said so.
+
+**The mechanism.** `pull_request`-triggered workflows run against
+`refs/pull/N/merge` — the *merge* of head into base, not the head commit. GitHub
+cannot construct that ref for a PR it cannot merge, so the event produces no
+run. This is documented behaviour and it is not a bug; the defect is that
+nothing surfaces it as an absence.
+
+**What was NOT established.** PR #38 was also conflicted at the time of writing
+and *does* show a passing `check` run — which looks like a counter-example and
+is not one. That run is from 06:22 UTC, when `main` was still `3c70330`; the
+conflict arrived with `b7c7177`/`849e181` at 07:04–07:32 UTC, and #38 has not
+been pushed to since. There has been no event to suppress. So #38 neither
+confirms nor refutes this, and it is recorded here as untested rather than as
+supporting evidence.
+
+**The rule.** *A conflicted PR is NOT CHECKED, whatever its checks say.*
+Before reading a PR's status, confirm it is mergeable — `git merge-tree
+--write-tree origin/main HEAD` answers it locally in one command, and
+`grep -c CONFLICT` on that output does **not**, because SQL `ON CONFLICT` and
+prose both match. Merge `main` in before trusting a green tick, and treat
+"no run exists" as a distinct outcome from "the run passed".
+
+## A19 — the documented rule that was enforced in one directory (2026-08-15)
+
+**[VERIFIED by reproduction: the defect was introduced, caught by CI, fixed, and
+the guard re-run against a deliberate reintroduction.]**
+
+`work-contract.ts` has said it since it was written: *"Written as an escape,
+never as a raw byte. A literal U+001F in source has landed here twice and both
+times was caught by a byte scan rather than by reading — it is invisible in every
+editor and survives review."*
+
+It landed a **third** time, in `checker-assignment.ts`, written by the agent that
+had read that warning **in the same session**. The separator was authored as an
+escape and arrived on disk as the character itself.
+
+**What caught it, and what did not.** `check:identity` caught it in CI and turned
+the PR red — it already runs exactly this scan over `lib/trustshell/identity/`.
+The guard worked. What did **not** catch it: the module's own 15 assertions, a
+9-of-10 mutation run, `tsc --noEmit`, and reading the diff. The local signal was
+an accident — a `grep` printed `const SEP = ` followed by two quotes with nothing
+visible between them, and the empty-looking quotes were the only tell.
+
+**The finding that mattered more than the fix.** The scan existed only for
+`identity/`. Running the same scan repo-wide found the defect **still live
+elsewhere**: two raw U+001F in the kernel (`loop.ts`, in the tool-call and
+observation fingerprints) and **four raw NUL bytes in `agreement.ts`**, in the
+pair key two agents compare.
+
+Those four are not a new discovery. They are the incident `work-contract.ts`
+already describes — *"four raw NUL bytes once sat in this repo's wire formats …
+and the interop spec handed to the other lane was wrong because of it"* — sitting
+untouched, in live wire-format code, believed fixed for months. **The rule was
+documented, the incident was written up, and the enforcement covered one
+directory out of the tree.**
+
+All eleven are now escapes. Behaviour is identical, because the escape and the
+character compile to the same string; six suites stayed green across the change,
+which is what makes it a source-representation edit rather than a wire-format
+one.
+
+**The rule.** *A rule that has been violated three times is not a rule, it is a
+wish — and a guard that covers one directory does not cover the repository.*
+When an incident is worth writing into a header, it is worth a `check:` script
+with the scope of the hazard rather than the scope of the file it was found in.
+`npm run check:raw-bytes` now scans every `.ts`, `.tsx`, `.mjs`, `.js` and `.sql`
+under `lib/`, `scripts/`, `app/` and `supabase/`.
+
+**How this entry was nearly written wrong, twice.** The first draft of the guard
+claimed *"nothing caught it"*, which was false — `check:identity` did, in CI.
+And the shell refused the command that would have appended this very lesson,
+because the text quoting the hazard contained the hazard. Both are the same
+shape as the defect itself: a claim about bytes, made without looking at them.
+
+**A second-order note, from the same night.** Two mutation readings during this
+work were artifacts rather than evidence — one scored an unregistered npm
+script's "missing script" exit as a killed mutant, and one reported a survivor
+whose mutation never applied because bash had mangled the anchor. Both looked
+exactly like the result being sought. **A non-zero exit is not automatically the
+failure you were looking for**, and a mutation harness must prove the mutation
+landed before it reports on what the mutation did.
+
+## A20 — two correct components, one value, two meanings (2026-08-15)
+
+`bft-judge.ts` and `staged-judge.ts` were built in separate lanes. Both were
+unit-tested, both mutation-tested, both correct. Their composition was wrong, and
+neither suite could see it.
+
+The shared value is `Outcome.NOT_CHECKED`, and each lane gave it a meaning:
+
+- `bft-judge` returns it for a fired Pythagorean veto, meaning **"the panel's
+  unanimity is itself the warning sign — a HUMAN must look"**.
+- `staged-judge` reads it as **"this tier could not decide — ASK THE NEXT
+  TIER"**.
+
+Both readings are defensible in isolation. Composed, the second silently consumes
+the first: measured on the first run, a vetoing panel placed anywhere but **last**
+had its referral escalated to a single model, which said VERIFIED. Every unit test
+stayed green. Every signature in the chain verified. The verdict was wrong and
+nothing in the system said so.
+
+**It was worse than losing a signal — it inverted one.** The panel's entire claim
+is that *more model agreement is the problem here*. The staged judge's repair was
+to ask one more model. The remedy was the disease.
+
+**Why no unit suite could have caught it.** Each unit is self-consistent under its
+own reading. A suite written from inside one lane asserts that lane's meaning and
+passes. **The bug lives in the gap between two vocabularies, and a gap has no
+owner** — the same shape as `repid_score_events.event_type` versus
+`ReputationSignal`, and the same shape as the two Vercel projects named after
+domains they do not serve. This repo keeps producing it.
+
+**The rule.** *When two components exchange a value from a small enumeration,
+write a suite that belongs to neither and run it before trusting the composition.*
+The question it must ask is not "does each side handle every case" — both did —
+but **"does each side mean the same thing by each case".**
+
+**The fix that was rejected, and why it matters more than the one built.** The
+zero-code option was to document the ordering constraint: *put the panel last*.
+That is not a fix. It leaves a **config file** standing between a vetoed run and
+a false pass, and tier order is data — a correctness property that holds for one
+ordering is not a property. The built fix makes the judge state which
+`NOT_CHECKED` it meant (`referToHuman`), so position stops mattering; one
+assertion now pins the whole thing, checking that a vetoing panel yields the same
+outcome at every position.
+
+**And the part that is easy to get wrong in the other direction.** Not every
+`NOT_CHECKED` is a referral. `bft-judge`'s truncated-evidence case is genuinely
+resolvable by a judge with a bigger window, so it deliberately does **not** set
+the flag, and an outage is recorded as `referredToHuman: false` — counting
+provider downtime as human referrals would bury the referral rate in
+infrastructure noise. **A signal that fires for everything measures nothing.**
+Both omissions are asserted, not assumed: `check:panel-tier` fails if truncation
+or an outage ever claims a referral.
+
+---
+
+## A19 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
+
+**[VERIFIED] — the run is in CI: `check` green, `test:e2e` red, same commit.**
+
+`npm run check` — the repo's own comprehensive gate, the one `check-all.mjs`
+discovers 52 suites for — reported **52 VERIFIED, 0 NOT_CHECKED, 0 FAILED**.
+The same commit failed CI.
+
+The workflow runs three things, and `check` is only the first:
+
+```
+npm run check        # 52 suites  <- the one everybody runs
+npx next build
+npm run test:e2e     # 37 steps over HTTP against a real server
+```
+
+The failure was a **denial reason reworded**. `checkPerTxLimit` said "exceeds
+the per-transaction limit of 100" where the original said "exceeds per-tx limit
+100", and `scripts/e2e/run-e2e.mjs:356` matches `/exceeds per-tx limit/i`
+against it **over HTTP**. Nothing in the 52 suites touches that string, because
+none of them starts a server.
+
+**Why it is the house defect and not a slip.** The reworded string is a
+`denialReason` written into a compliance receipt — an artifact whose entire
+purpose is being evidence. Its wording is an observable contract, and it was
+edited as though it were prose, in a commit whose subject was *fixing* unearned
+claims. Confidence came from a green run that structurally could not see the
+break.
+
+**The rule.** *Before claiming a change is green, run what CI runs — all of it.*
+`npm run check && npx next build && npm run test:e2e`. A suite that does not
+start a server cannot see an HTTP contract, and `check-all.mjs`'s summary line
+is honest about what it ran, not about what CI will.
+
+Also, from the same incident: the fast suite now duplicates the e2e's own
+regexes (`check:repid-scoring`, 'THE DENIAL WORDING IS A CONTRACT'), so the next
+break shows up in seconds rather than after a build and a server boot.
+
+---
+
+## A20 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
+
+**[VERIFIED] — `curl` to the REST endpoint returns 403; the MCP tool returns the
+same runs successfully, seconds apart.**
+
+An agent session watching its own PR wrote the obvious poll:
+
+```bash
+until out=$(curl -s ".../commits/$SHA/check-runs" | python3 -c "
+  d=json.load(sys.stdin)
+  runs=[r for r in d.get('check_runs',[]) if ...]
+  if runs and all(completed): print(...)"); [ -n "$out" ]; do sleep 30; done
+```
+
+It never fired. Not once, across four PRs and a whole night.
+
+```
+$ curl -s -w '%{http_code}' .../check-runs
+403 {"message": "Resource not accessible by integration"}
+```
+
+**The session's GitHub token cannot read `/check-runs` over REST.** The MCP
+tool (`pull_request_read` with `method: get_check_runs`) reads the same data
+fine — different auth path. So the capability exists; only that route is closed.
+
+**Why it survived a whole night undetected.** `d.get('check_runs', [])` turns a
+403 body into an empty list. Empty list → no completed runs → print nothing →
+the `until` loop treats it as "not finished yet" and sleeps. **A poll with two
+states — fired / not yet — silently absorbs a third: cannot look.** Which is
+this repository's founding defect, committed inside the tooling built to verify
+this repository.
+
+The tell was available and ignored: the watchers ran to their full timeout
+*every time*, and CI results only ever arrived via webhook wake events. A poll
+that has never once fired is not a slow poll.
+
+**The rules.**
+
+1. **Read CI status through the MCP tool, not `curl`.** REST `/check-runs` is
+   403 from a session.
+2. **A poll loop must distinguish "not ready" from "could not read".** Check the
+   HTTP status; a non-200 is NOT_CHECKED and must be surfaced, never slept on.
+   `.get(key, [])` on an unparsed error body is the exact line that hides it.
+3. **A watcher that has never fired is evidence about the watcher.** Silence
+   from a check is not a result.

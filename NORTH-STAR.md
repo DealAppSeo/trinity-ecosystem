@@ -46,14 +46,32 @@ this was written. That is the reason things get forgotten — not discipline.
 
 ## The gap that matters
 
-**The substrate is alive. The product surface is four months stale.**
+**⚠ SUPERSEDED 2026-08-15 — the substrate is no longer alive. Read the update
+below before acting on this section.**
 
-HAL classifies and RepID scores every single day, in the tens of thousands per
-month. But `kya_compliance_receipts` — TrustShell's own output, the artifact
+~~**The substrate is alive. The product surface is four months stale.**~~
+
+~~HAL classifies and RepID scores every single day, in the tens of thousands per
+month.~~ But `kya_compliance_receipts` — TrustShell's own output, the artifact
 the whole harness exists to produce — was last written **2026-04-01**.
 
-TrustShell is not under-built. **It is disconnected from its own live
-substrate.** Closing that is the v1.
+**What changed.** The Trinity fleet went down on Railway at **2026-07-17 22:18
+UTC** and has not come back. `trinity_tasks` fell 6,972/day → **4**; HAL events
+fell ~2,650/day → 1–2/day, and those are one nightly smoke test
+(`e2e_smoke_nightly`, `15 9 * * *`), which is why they all land at 09:15 UTC.
+The fleet has been alerting *"Manual redeploy required. Autonomous redeploy
+disabled"* every three minutes for 29 days — 9,280 alerts in the last week
+alone. Root cause and the four ruled-out candidates:
+`docs/GROK-CODE-VERIFICATION-2026-08-15.md` §3a.
+
+**So the gap doubled.** TrustShell is disconnected from its substrate **and the
+substrate is switched off.** The redeploy is the precondition for measuring
+anything live; the disconnection is still the v1. Build order and lane
+parallelism: `docs/PARALLEL-SPRINT-PLAN-2026-08-15.md`.
+
+**This is a live-data claim in a file that grades docs and database only.**
+Re-run `npm run north` before trusting either half — if HAL and RepID read LIVE
+again, the redeploy landed and this box should be rewritten, not argued with.
 
 ## Claims vs. built
 

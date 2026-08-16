@@ -226,6 +226,12 @@ await check('the two failure kinds drive DIFFERENT loop outcomes', async () => {
         maxIterations: 3, noProgressAbortAfter: 3, toolsAllowed: ['t1'],
         irreversibleRequiresHuman: [], untrustedOutputSources: [],
         maxWritesPerSession: 5, toolEffects: { t1: 'read' },
+        // Explicit, because the kernel's default is ON: an unevaluated run is
+        // capped at NOT_CHECKED. Correct in production and wrong here — this
+        // assertion is about whether a TOOL ERROR caps the claim, and leaving
+        // the evaluator requirement on would cap it for an unrelated reason and
+        // the test would pass while measuring nothing.
+        requireIndependentEvaluation: false,
       },
       model: {
         calls: 0,

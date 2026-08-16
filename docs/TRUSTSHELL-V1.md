@@ -443,6 +443,15 @@ decision. It is not on the v1 critical path, but it is the best demo asset here.
 
 ## 9. Package layout
 
+[PROBED 2026-08-15: `@hyperdag/trustshell@1.3.0` — installed from npm. HAL cross-LLM verification, portable RepID, A2A service purchase, against a LIVE BACKEND. CLI: `verify | repid | proof | badge | version`. **Zero** occurrences of `transcript`, `audit_hash` or `session_receipt` in `dist/`. Its `verify` already means "verify an LLM output".]
+
+[PROBED 2026-08-15: `@hyperdag/trustshell-mcp@1.0.0` — installed from npm. Registers `verify_output`, `get_repid`, `present_proof`, `verify_proof`, `buy_service`, `list_services`. Same product as `@hyperdag/trustshell`; zero transcript/receipt content in `dist/`.]
+
+[PROBED 2026-08-15: `@hyperdag/proof-verifier@0.2.0` — installed and invoked. A Plonky3 STARK verifier; public statement `{agent_id, repid_score, threshold, tier}`. Handed anything else it returns `verify failed: deser: io error`. It cannot verify a session receipt.]
+
+[PROBED 2026-08-15: `@hyperdag/trust-demo@0.1.0` — `npm view` returns **E404, not in the registry**. This CONFIRMS the "packed, unpublished" status rather than refuting it; the version is unburned and still publishable.]
+
+
 | Package | State | v1 role |
 | :-- | :-- | :-- |
 | `@hyperdag/trustshell` | published 1.3.0 | **NOT this product** — see below |

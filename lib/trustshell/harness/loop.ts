@@ -38,6 +38,30 @@
 // this directory. The kernel stays shippable as a package, and the same kernel
 // runs under a different trust system by supplying a different adapter.
 //
+// `Evaluator` is the second port, for the same reason and one more: it must be
+// switchable, because whether a three-provider BFT panel beats a single tuned
+// evaluator at judging agent work is an open measurement, and a design that
+// cannot be switched off cannot be A/B'd.
+//
+// ── WHAT THE CEILING CANNOT SEE ──────────────────────────────────────────────
+//
+// The ceiling is arithmetic and therefore incorruptible, which is also its
+// limit: every call can succeed, every budget hold, and the work still be a
+// stub that returns the expected shape. No count catches that. The `Evaluator`
+// port supplies the judgement the arithmetic cannot, and the kernel constrains
+// the judge in the two ways a judge can be wrong in our favour — it compares
+// DIDs rather than trusting a claim of independence
+// (`verification.checker_must_not_be_doer`), and it enforces per-criterion
+// floors itself, so a lenient evaluator cannot pass work under its own floor.
+//
+// ── SPEND IS INSTRUMENTED, AND NEVER JUDGES ──────────────────────────────────
+//
+// `SpendSummary` measures the run and imposes nothing on it. An unreported cost
+// is UNKNOWN, never zero — a run that looks free because nothing measured it is
+// this file's own defect with a different unit — but how well we measured cost
+// is not evidence about the task, so no part of the spend accounting touches
+// the ceiling.
+//
 // ── TWO GATES, DELIBERATELY REDUNDANT ────────────────────────────────────────
 //
 // Every tool call passes BOTH a policy gate (this file: allowlist, write
@@ -93,6 +117,22 @@ export function weakerOutcome(a: Outcome, b: Outcome): Outcome {
   return CLAIM_STRENGTH[a] <= CLAIM_STRENGTH[b] ? a : b;
 }
 
+/**
+ * What one call cost, as reported by whoever made it.
+ *
+ * ALWAYS OPTIONAL, AND ITS ABSENCE IS NOT ZERO. A port that does not report
+ * usage has not told us the call was free — it has told us nothing. Summing
+ * absent usage as 0 would produce a run that looks costless because nothing
+ * measured it, which is this codebase's defining defect wearing an accountant's
+ * hat. `Figure` carries the distinction; see `SpendSummary`.
+ */
+export interface Usage {
+  inputTokens?: number;
+  outputTokens?: number;
+  /** Cost in USD, when the caller can price it. Absent is not free. */
+  costUsd?: number;
+}
+
 // ---------------------------------------------------------------------------
 // What the model may propose
 // ---------------------------------------------------------------------------
@@ -126,6 +166,8 @@ export interface ModelTurn {
   handoff?: TypedHandoff;
   /** Free text. Recorded for the transcript, never interpreted. */
   note?: string;
+  /** What this turn cost the model client. Absent is UNKNOWN, not free. */
+  usage?: Usage;
 }
 
 export interface Observation {
@@ -178,6 +220,8 @@ export interface DispatchResult {
    * credential rotation in this repo's history.
    */
   unavailable?: boolean;
+  /** What this call cost the dispatcher. Absent is UNKNOWN, not free. */
+  usage?: Usage;
 }
 
 export interface ToolDispatcher {
@@ -238,6 +282,122 @@ export interface Authorizer {
 }
 
 // ---------------------------------------------------------------------------
+// Evaluation — the second port, and the one the ceiling cannot replace
+// ---------------------------------------------------------------------------
+//
+// WHY A SEPARATE PORT RATHER THAN MORE CEILING LOGIC. The claim ceiling is
+// arithmetic over recorded events: it catches denials, unreachable tools and
+// exhausted budgets without a model in the loop, and it is not fooled by
+// anything the agent says. What it structurally CANNOT see is a stubbed
+// feature, a test that asserts nothing, or code that runs and is wrong — every
+// call succeeded, every budget held, and the run is worthless. That needs
+// judgement, and judgement needs an independent judge.
+//
+// `verification.checker_must_not_be_doer` has been constitutional since it was
+// written and has never had a consumer. It gets one here, and it is enforced by
+// comparing DIDs rather than by trusting a flag: an adapter that reported its
+// own independence would be self-certifying the one property the whole design
+// rests on.
+//
+// The port is OPTIONAL so it can be A/B'd and switched off — a single tuned
+// evaluator against the BFT panel is an open measurement
+// (docs/TRUST-HARNESS-DESIGN-2026-08-15.md §4.3), and a design that cannot be
+// switched off cannot be compared. Switching it off is not free: with
+// `requireIndependentEvaluation` the run's ceiling drops to NOT_CHECKED, so an
+// unevaluated run is visibly unevaluated rather than quietly certified.
+
+/**
+ * One thing that must be true for the work to count.
+ *
+ * Agreed BEFORE the work (the pre-execution contract, build order step 3), not
+ * asserted after it. This kernel does not yet negotiate the contract; it
+ * enforces the half that exists — the criteria are an input to the run, so they
+ * cannot be chosen once the outcome is known.
+ */
+export interface Criterion {
+  id: string;
+  /** What must hold. Prose: the evaluator reads it, this kernel never interprets it. */
+  statement: string;
+  /**
+   * A hard floor in [0, 1], when this criterion is scored.
+   *
+   * HARD, AND ENFORCED HERE RATHER THAN BY THE EVALUATOR. A lenient evaluator
+   * that returns VERIFIED with a score under the floor is overruled — otherwise
+   * the floor is only as strong as the judge it was meant to constrain. There
+   * is no averaging across criteria: one criterion below its floor fails the
+   * unit of work, because a mean lets a strong result pay for a broken one.
+   */
+  minScore?: number;
+}
+
+export interface EvaluationRequest {
+  taskId: string;
+  criteria: readonly Criterion[];
+  /** The full record of what happened. The evaluator judges evidence, not narration. */
+  turns: readonly TurnRecord[];
+  /** What the agent claimed, as context. Supplied for calibration, never as the answer. */
+  claimed?: Outcome;
+  /**
+   * The doer's identity, when the caller knows it.
+   *
+   * Passed so the evaluator can refuse to judge itself, and — more importantly —
+   * so the kernel can check independence without asking either party.
+   */
+  doerDid?: string;
+}
+
+export interface CriterionVerdict {
+  criterionId: string;
+  outcome: Outcome;
+  /**
+   * The evaluator's score in [0, 1], when it scored this criterion.
+   *
+   * ABSENT IS NOT A PASS. A criterion carrying a `minScore` with no score is
+   * NOT_CHECKED: the floor was never tested. That is the whole three-outcome
+   * rule applied one level down.
+   */
+  score?: number;
+  detail: string;
+}
+
+export interface Evaluation {
+  verdicts: readonly CriterionVerdict[];
+  /**
+   * The evaluator's own DID.
+   *
+   * Absent means independence CANNOT BE ESTABLISHED, which is not the same as
+   * independence being absent — and is treated as NOT_CHECKED, not as a pass.
+   */
+  evaluatorDid?: string;
+  /** What the evaluation cost. Absent is UNKNOWN, not free. */
+  usage?: Usage;
+  detail: string;
+}
+
+export interface Evaluator {
+  evaluate(request: EvaluationRequest): Promise<Evaluation>;
+}
+
+/** What the evaluation contributed, and whether it was entitled to contribute it. */
+export interface EvaluationRecord {
+  /** False when no evaluator was configured, or there was nothing to evaluate. */
+  ran: boolean;
+  evaluation?: Evaluation;
+  /**
+   * Whether checker ≠ doer was ESTABLISHED.
+   *
+   * `null` is a third state and it matters: it means one of the two DIDs was
+   * missing, so the question was never answered. Collapsing it to `false` would
+   * report a violation that may not have happened; collapsing it to `true`
+   * would certify the constitutional invariant on no evidence.
+   */
+  independent: boolean | null;
+  /** The ceiling this evaluation imposes on the run. */
+  outcome: Outcome;
+  detail: string;
+}
+
+// ---------------------------------------------------------------------------
 // Policy
 // ---------------------------------------------------------------------------
 
@@ -273,6 +433,96 @@ export interface LoopPolicy {
    * Unlisted names are `unknown`.
    */
   toolEffects: Readonly<Record<string, ToolEffect>>;
+  /**
+   * `verification.requires_independent_evaluation`. **Absent means TRUE.**
+   *
+   * The polarity is deliberate and is the opposite of the convenient one.
+   * Forgetting this setting must give the strict behaviour, because the failure
+   * mode of the lenient default is a run that self-certifies VERIFIED with no
+   * judge and no sign that anything is missing — which is indistinguishable, in
+   * the record, from a run that was properly evaluated.
+   *
+   * Turning it off is legitimate (A/B against a single tuned evaluator, or a
+   * kernel embedded somewhere the evaluator lives upstream). It is an explicit
+   * `false`, in the record, attributable to whoever wrote it.
+   */
+  requireIndependentEvaluation?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Spend
+// ---------------------------------------------------------------------------
+//
+// Instrumentation, not enforcement. Nothing in this section may lower the run's
+// ceiling: how well we measured cost is not evidence about the task. A run
+// whose model client reports no token counts is a run we cannot cost — it is
+// not a run that failed, and conflating the two would make the instrumentation
+// a source of false verdicts, which is a strictly worse trade than not
+// measuring at all.
+//
+// Baseline first, per build order step 1. Cost-per-verified-outcome is the
+// number docs/TRUST-HARNESS-DESIGN-2026-08-15.md §4.4 says we do not have, and
+// Anthropic's 8.3%-on-$124.70 figure is theirs, not ours. `SpendSummary` beside
+// `LoopResult.outcome` is one run's worth of ours.
+
+/**
+ * One measured quantity, with the coverage that makes it readable.
+ *
+ * `total` ALONE IS A LIE and the other fields are what stop it being one. A
+ * `costUsd.total` of 12.50 over `reported: 3, missing: 40` is not "the run cost
+ * $12.50" — it is "3 of 43 events cost $12.50 between them and the rest are
+ * unknown." Reporting the sum without the coverage is the accountant's version
+ * of a skipped test scored as a pass.
+ */
+export interface Figure {
+  /** Sum across events that reported a usable value. */
+  total: number;
+  /** Events that reported a usable value. */
+  reported: number;
+  /** Events that reported nothing for this field. Their true value is UNKNOWN. */
+  missing: number;
+  /**
+   * Events whose reported value was unusable — NaN, Infinity, negative, or not
+   * a number.
+   *
+   * Counted separately from `missing` because it is worse. An absent figure
+   * says nothing; a malformed one asserts something false, and summing a single
+   * NaN turns the whole total into NaN with no indication of which event did
+   * it. Malformed values are REJECTED, never summed.
+   */
+  malformed: number;
+}
+
+/** What one phase of the run cost. */
+export interface PhaseSpend {
+  /** Events attributed to this phase: model turns, tool calls, evaluations. */
+  events: number;
+  inputTokens: Figure;
+  outputTokens: Figure;
+  costUsd: Figure;
+}
+
+export interface SpendSummary {
+  /** Model turns — the agent thinking. */
+  model: PhaseSpend;
+  /** Tool dispatch — the agent acting. */
+  tools: PhaseSpend;
+  /** Evaluation — the overhead the accountable verifier costs. */
+  evaluation: PhaseSpend;
+  /** The three above, added. Same coverage caveats. */
+  total: PhaseSpend;
+  /**
+   * The quality of the MEASUREMENT, not of the work.
+   *
+   * VERIFIED — every event reported every figure.
+   * NOT_CHECKED — something did not report, so the total understates by an
+   *   unknown amount.
+   * FAILED — a figure arrived malformed. The measurement is not merely
+   *   incomplete, it is wrong, and that is a defect in a port rather than a
+   *   gap in coverage.
+   */
+  outcome: Outcome;
+  detail: string;
 }
 
 /**
@@ -307,7 +557,7 @@ function canonical(value: unknown): string {
 }
 
 function callFingerprint(call: ToolCall): string {
-  return `${call.name}${canonical(call.args)}`;
+  return `${call.name}\u001f${canonical(call.args)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -320,6 +570,13 @@ export interface CallRecord {
   verdict: AuthorizationVerdict;
   /** Absent when the call was refused before dispatch. */
   observation?: Observation;
+  /**
+   * As reported by the dispatcher. Absent on a refused call because nothing
+   * ran — that is the one absence here that genuinely IS zero, and it is the
+   * reason denied calls are excluded from the tool phase's event count rather
+   * than counted as unreported.
+   */
+  usage?: Usage;
 }
 
 export interface TurnRecord {
@@ -332,6 +589,8 @@ export interface TurnRecord {
   /** False when this turn changed nothing observable. */
   madeProgress: boolean;
   progressReason: string;
+  /** As reported by the model client. Absent is UNKNOWN, not free. */
+  usage?: Usage;
 }
 
 export type StopReason =
@@ -356,6 +615,17 @@ export interface LoopResult {
   downgradedBecause?: string;
   turns: TurnRecord[];
   session: SessionCounters;
+  /**
+   * What the run cost, per phase.
+   *
+   * Always present, even when nothing reported anything — a run with no spend
+   * data has a `SpendSummary` saying so, which is the readable form of "we did
+   * not measure". Omitting the field on an unmeasured run would make
+   * unmeasured and free look the same to every consumer.
+   */
+  spend: SpendSummary;
+  /** Present whenever an evaluator was configured — including when it refused or threw. */
+  evaluation?: EvaluationRecord;
   /** From the injected clock, like `RoutingDecision.decidedAt`. */
   endedAt: number;
   detail: string;
@@ -378,11 +648,36 @@ export interface RunAgentLoopInput {
    * green test run.
    */
   authorizer: Authorizer;
+  /**
+   * OPTIONAL, unlike the authorizer, and the asymmetry is the point.
+   *
+   * A missing authorizer would fail OPEN — every call permitted, invisibly. A
+   * missing evaluator fails CLOSED: `requireIndependentEvaluation` defaults on,
+   * so the run's ceiling drops to NOT_CHECKED and the absence is named in the
+   * result. An absence that costs something is an absence somebody notices.
+   */
+  evaluator?: Evaluator;
+  /**
+   * What the work must satisfy, fixed before the run.
+   *
+   * An empty or absent list is NOT a pass. Evaluating against nothing
+   * establishes nothing, and treating it as success would make "forget the
+   * criteria" the cheapest way past the judge.
+   */
+  criteria?: readonly Criterion[];
+  /**
+   * The doer's DID, for the checker-must-not-be-doer comparison.
+   *
+   * Absent means the comparison cannot be made, and the run is capped at
+   * NOT_CHECKED for that reason alone when independent evaluation is required.
+   */
+  doerDid?: string;
   clock: Clock;
 }
 
 export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult> {
-  const { taskId, model, tools, authorizer, clock } = input;
+  const { taskId, model, tools, authorizer, evaluator, clock } = input;
+  const criteria = input.criteria ?? [];
 
   // Copied and frozen at entry, and every collection snapshotted. This is what
   // makes "untrusted tool output cannot widen authority" a structural property
@@ -460,6 +755,10 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult
         madeProgress: false,
         progressReason: 'the model client threw',
       });
+      // No `usage` on this turn, and that is honest rather than tidy: a client
+      // that threw may still have burned tokens, and we do not know how many.
+      // Recording a zero here would be the one place a real cost is provably
+      // understated.
       break;
     }
 
@@ -510,6 +809,10 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult
           untrusted: false,
         };
         observations.push(denial);
+        // No `usage`: the dispatcher was never reached, so this call really did
+        // cost nothing. `accruePhase` is given only dispatched calls, so a
+        // denial does not inflate the unreported count and make coverage look
+        // worse than it is.
         records.push({ call, effect, verdict, observation: denial });
         continue;
       }
@@ -541,7 +844,7 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult
         untrusted: untrustedSources.has(call.name),
       };
       observations.push(observation);
-      records.push({ call, effect, verdict, observation });
+      records.push({ call, effect, verdict, observation, usage: result.usage });
     }
 
     const { madeProgress, progressReason } = assessProgress({
@@ -558,6 +861,7 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult
       handoff: proposed.handoff,
       madeProgress,
       progressReason,
+      usage: proposed.usage,
     });
 
     if (proposed.handoff) {
@@ -592,6 +896,28 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult
     );
   }
 
+  // ── Evaluation ───────────────────────────────────────────────────────────
+  //
+  // Runs on EVERY path that reaches here, including no-progress and
+  // model_error, and that is deliberate. Evaluating only the runs that ended in
+  // a confident handoff would mean the evidence base consists exclusively of
+  // work the agent felt good about — a selection bias built into the record,
+  // and precisely backwards for a system whose purpose is catching claims that
+  // outrun their evidence. Failed runs are where the useful verdicts are.
+  const evaluation = evaluator
+    ? await runEvaluation({ evaluator, taskId, criteria, turns, claimed: handoff?.outcome, doerDid: input.doerDid })
+    : undefined;
+
+  if (evaluation) {
+    lowerCeiling(evaluation.outcome, evaluation.detail);
+  } else if (policy.requireIndependentEvaluation !== false) {
+    lowerCeiling(
+      'NOT_CHECKED',
+      'no evaluator was configured and verification.requires_independent_evaluation is on, ' +
+        'so nothing independent examined the work'
+    );
+  }
+
   const claimed = handoff?.outcome;
   const outcome = claimed === undefined ? ceiling : weakerOutcome(claimed, ceiling);
   const downgraded = claimed !== undefined && outcome !== claimed;
@@ -604,6 +930,12 @@ export async function runAgentLoop(input: RunAgentLoopInput): Promise<LoopResult
     downgradedBecause: downgraded ? ceilingReason : undefined,
     turns,
     session: counters(),
+    // ATTEMPTED, not succeeded. An evaluator that threw may still have burned
+    // tokens, so the event is counted with unknown cost rather than dropped —
+    // dropping it would price a failed evaluation at exactly zero, which is the
+    // one thing we know it might not be.
+    spend: summariseSpend(turns, evaluation?.evaluation?.usage, evaluator !== undefined && criteria.length > 0),
+    evaluation,
     endedAt: clock.now(),
     detail: describe(stopReason, claimed, outcome, ceilingReason),
   };
@@ -724,7 +1056,7 @@ function assessProgress(args: {
   for (const record of records) {
     if (!record.observation) continue;
     const key = callFingerprint(record.call);
-    const fingerprint = `${record.observation.outcome}${record.observation.content}`;
+    const fingerprint = `${record.observation.outcome}\u001f${record.observation.content}`;
     const previous = lastResultFor.get(key);
     lastResultFor.set(key, fingerprint);
     if (previous === undefined) {
@@ -741,6 +1073,297 @@ function assessProgress(args: {
     madeProgress: false,
     progressReason: 'every call repeated an earlier call and returned the identical result',
   };
+}
+
+// ---------------------------------------------------------------------------
+// Evaluation
+// ---------------------------------------------------------------------------
+
+async function runEvaluation(args: {
+  evaluator: Evaluator;
+  taskId: string;
+  criteria: readonly Criterion[];
+  turns: readonly TurnRecord[];
+  claimed?: Outcome;
+  doerDid?: string;
+}): Promise<EvaluationRecord> {
+  const { evaluator, taskId, criteria, turns, claimed, doerDid } = args;
+
+  // Judging against nothing establishes nothing. If an empty criteria list read
+  // as a pass, "forget to write the contract" would be the cheapest route past
+  // the judge, and it would look identical in the record to a clean run.
+  if (criteria.length === 0) {
+    return {
+      ran: false,
+      independent: null,
+      outcome: 'NOT_CHECKED',
+      detail:
+        'an evaluator was configured but no criteria were agreed, so there was nothing to judge against',
+    };
+  }
+
+  let evaluation: Evaluation;
+  try {
+    evaluation = await evaluator.evaluate({ taskId, criteria, turns, claimed, doerDid });
+  } catch (e) {
+    // `reliability.harness_error_marks_not_checked`. A judge that crashed has
+    // said nothing about the work, and reading its crash as a verdict would
+    // make an outage look like a defect in the code under test.
+    return {
+      ran: false,
+      independent: null,
+      outcome: 'NOT_CHECKED',
+      detail: `the evaluator threw, so the work was never judged: ${(e as Error).message}`,
+    };
+  }
+
+  const independence = assessIndependence(doerDid, evaluation.evaluatorDid);
+  const judged = scoreCriteria(criteria, evaluation.verdicts);
+
+  // SELF-EVALUATION CAN CONDEMN BUT CANNOT CERTIFY, and this one line is where
+  // that holds. Capping at NOT_CHECKED leaves a FAILED verdict intact —
+  // `weakerOutcome(FAILED, NOT_CHECKED)` is FAILED — while a VERIFIED from a
+  // judge that is the doer becomes NOT_CHECKED. The asymmetry is right:
+  // an agent marking its own work bad is credible in a way that an agent
+  // marking its own work good is not.
+  const outcome =
+    independence.independent === true ? judged.outcome : weakerOutcome(judged.outcome, 'NOT_CHECKED');
+
+  return {
+    ran: true,
+    evaluation,
+    independent: independence.independent,
+    outcome,
+    detail: `${judged.detail} ${independence.reason}.`,
+  };
+}
+
+/**
+ * `verification.checker_must_not_be_doer`, checked cryptographically rather
+ * than by policy — the thing a third party can verify without trusting us.
+ *
+ * DIDs are trimmed before comparison. A trailing space would make an identity
+ * differ from itself, which is a one-character bypass of the single invariant
+ * every other guarantee in this design rests on.
+ *
+ * ── THIS IS A SECOND IMPLEMENTATION, AND THAT IS NOT AN OVERSIGHT ───────────
+ *
+ * `identity/did.ts` exports `compareDids`/`sameDid`, and the nine other
+ * enforcement sites in this system use them. **The kernel cannot**: importing
+ * outside this directory is what `harness-portability-check.mjs` forbids, and
+ * that constraint is the reason the kernel ships standalone at all.
+ *
+ * So the duplication is forced, and this file's own doctrine says what forced
+ * duplication costs — "a second copy of an authorization rule is a second thing
+ * to get wrong, and the two copies disagree silently." The word that matters is
+ * SILENTLY. `scripts/did-comparison-test.mjs` drives this kernel through
+ * `runAgentLoop` over the same adversarial corpus the helper is tested against
+ * and requires the two to agree pair for pair, so a drift is loud instead.
+ *
+ * If you change the normalization here, change it there, and that suite will
+ * tell you if you did not — it is mutation-tested against exactly this
+ * function, including the trim.
+ */
+function assessIndependence(
+  doerDid: string | undefined,
+  evaluatorDid: string | undefined
+): { independent: boolean | null; reason: string } {
+  const doer = doerDid?.trim();
+  const judge = evaluatorDid?.trim();
+
+  if (!doer || !judge) {
+    const missing = !doer && !judge ? 'neither party' : !doer ? 'the doer' : 'the evaluator';
+    return {
+      independent: null,
+      reason:
+        `checker-must-not-be-doer could not be established because ${missing} supplied a DID, ` +
+        'so independence is unproven rather than absent',
+    };
+  }
+  if (doer === judge) {
+    return {
+      independent: false,
+      reason:
+        `the evaluator and the doer are the same identity (${doer}), which ` +
+        'verification.checker_must_not_be_doer forbids — this evaluation may condemn but may not certify',
+    };
+  }
+  return {
+    independent: true,
+    reason: `the evaluator (${judge}) is a different identity from the doer (${doer})`,
+  };
+}
+
+/** A usable score: a real number inside [0, 1]. Anything else is untested, not passed. */
+function usableScore(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+/**
+ * Fold per-criterion verdicts into one outcome.
+ *
+ * NO AVERAGING. One criterion below its floor fails the unit of work, because a
+ * mean lets a strong result pay for a broken one — which is the arithmetic form
+ * of shipping a feature with its security check stubbed out and calling it 90%
+ * done.
+ */
+function scoreCriteria(
+  criteria: readonly Criterion[],
+  verdicts: readonly CriterionVerdict[]
+): { outcome: Outcome; detail: string } {
+  // On duplicate ids, KEEP THE WEAKER. An evaluator that emits both FAILED and
+  // VERIFIED for one criterion has contradicted itself, and last-write-wins
+  // would make the outcome depend on array order.
+  const byId = new Map<string, CriterionVerdict>();
+  for (const verdict of verdicts) {
+    const existing = byId.get(verdict.criterionId);
+    if (!existing || weakerOutcome(verdict.outcome, existing.outcome) === verdict.outcome) {
+      byId.set(verdict.criterionId, verdict);
+    }
+  }
+
+  let worst: Outcome = 'VERIFIED';
+  const notes: string[] = [];
+
+  for (const criterion of criteria) {
+    const verdict = byId.get(criterion.id);
+    if (!verdict) {
+      worst = weakerOutcome(worst, 'NOT_CHECKED');
+      notes.push(`'${criterion.id}' was not judged at all`);
+      continue;
+    }
+
+    // The floor is enforced HERE, not by the evaluator. A lenient judge that
+    // returns VERIFIED with a score under the floor is overruled — otherwise
+    // the floor is only ever as strong as the judge it exists to constrain.
+    let floorOutcome: Outcome = 'VERIFIED';
+    if (criterion.minScore !== undefined) {
+      if (!usableScore(verdict.score)) {
+        floorOutcome = 'NOT_CHECKED';
+        notes.push(
+          `'${criterion.id}' carries a floor of ${criterion.minScore} but no usable score, ` +
+            'so the floor was never tested'
+        );
+      } else if (verdict.score < criterion.minScore) {
+        floorOutcome = 'FAILED';
+        notes.push(
+          `'${criterion.id}' scored ${verdict.score}, below its hard floor of ${criterion.minScore}`
+        );
+      }
+    }
+
+    const combined = weakerOutcome(verdict.outcome, floorOutcome);
+    if (verdict.outcome !== 'VERIFIED') {
+      notes.push(`'${criterion.id}' was judged ${verdict.outcome}: ${verdict.detail}`);
+    }
+    worst = weakerOutcome(worst, combined);
+  }
+
+  if (worst === 'VERIFIED') {
+    return {
+      outcome: 'VERIFIED',
+      detail: `all ${criteria.length} agreed criteria were judged VERIFIED and met their floors;`,
+    };
+  }
+  return { outcome: worst, detail: `evaluation returned ${worst} — ${notes.join('; ')};` };
+}
+
+// ---------------------------------------------------------------------------
+// Spend
+// ---------------------------------------------------------------------------
+
+function emptyFigure(): Figure {
+  return { total: 0, reported: 0, missing: 0, malformed: 0 };
+}
+
+function emptyPhase(): PhaseSpend {
+  return {
+    events: 0,
+    inputTokens: emptyFigure(),
+    outputTokens: emptyFigure(),
+    costUsd: emptyFigure(),
+  };
+}
+
+/**
+ * Typed `unknown` on purpose. These values cross a port boundary, and the
+ * compiler's `number` is a claim about a JavaScript caller that may not be
+ * compiled at all. A single NaN summed here poisons the total with no record of
+ * which event produced it.
+ */
+function accrueFigure(figure: Figure, value: unknown): void {
+  if (value === undefined || value === null) {
+    figure.missing += 1;
+    return;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    figure.malformed += 1;
+    return;
+  }
+  figure.total += value;
+  figure.reported += 1;
+}
+
+function accruePhase(phase: PhaseSpend, usage: Usage | undefined): void {
+  phase.events += 1;
+  accrueFigure(phase.inputTokens, usage?.inputTokens);
+  accrueFigure(phase.outputTokens, usage?.outputTokens);
+  accrueFigure(phase.costUsd, usage?.costUsd);
+}
+
+function summariseSpend(
+  turns: readonly TurnRecord[],
+  evaluationUsage: Usage | undefined,
+  evaluationAttempted: boolean
+): SpendSummary {
+  const model = emptyPhase();
+  const tools = emptyPhase();
+  const evaluation = emptyPhase();
+  const total = emptyPhase();
+
+  for (const turn of turns) {
+    accruePhase(model, turn.usage);
+    accruePhase(total, turn.usage);
+    for (const record of turn.calls) {
+      // Refused calls never reached the dispatcher, so they are not events with
+      // an unknown cost — they are events with no cost. Counting them would
+      // report worse coverage than the run actually has.
+      if (!record.verdict.allowed) continue;
+      accruePhase(tools, record.usage);
+      accruePhase(total, record.usage);
+    }
+  }
+
+  if (evaluationAttempted) {
+    accruePhase(evaluation, evaluationUsage);
+    accruePhase(total, evaluationUsage);
+  }
+
+  const figures = [total.inputTokens, total.outputTokens, total.costUsd];
+  const malformed = figures.reduce((n, f) => n + f.malformed, 0);
+  const missing = figures.reduce((n, f) => n + f.missing, 0);
+
+  let outcome: Outcome;
+  let detail: string;
+  if (malformed > 0) {
+    outcome = 'FAILED';
+    detail =
+      `${malformed} reported figure(s) were not usable numbers and were rejected rather than ` +
+      'summed. A malformed figure is worse than an absent one: it asserts something false.';
+  } else if (total.events === 0) {
+    outcome = 'NOT_CHECKED';
+    detail = 'no priced events occurred, so there was nothing to measure.';
+  } else if (missing > 0) {
+    outcome = 'NOT_CHECKED';
+    detail =
+      `${missing} of ${total.events * 3} figures were never reported, so every total here ` +
+      'understates the run by an unknown amount. It is not evidence that the run was cheap.';
+  } else {
+    outcome = 'VERIFIED';
+    detail = `all ${total.events} priced events reported complete usage.`;
+  }
+
+  return { model, tools, evaluation, total, outcome, detail };
 }
 
 // ---------------------------------------------------------------------------

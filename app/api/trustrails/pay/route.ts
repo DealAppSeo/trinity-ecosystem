@@ -10,6 +10,7 @@ import {
 import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
 import { EarnedMetricsRepository } from '@/lib/trustshell/EarnedMetricsRepo';
 import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
+import { TIER_LIMITS, tierForScore } from '@/lib/trustshell/repid-scoring';
 
 export async function POST(req: NextRequest) {
   const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();
@@ -61,6 +62,23 @@ export async function POST(req: NextRequest) {
       institution
     );
 
+    // THE THRESHOLD MUST BE KNOWN BEFORE THE GATE IS APPLIED.
+    //
+    // `threshold` is nullable because an unreadable institution config used to
+    // become 5000 silently — which for an institution that had stored a
+    // stricter number LOWERS the bar, a fail-open reached by an outage rather
+    // than by any input. Denying here is the same trade the daily-limit check
+    // makes: a limit that could not be evaluated is not a limit that passed.
+    if (repidResult.threshold === null || repidResult.meetsThreshold === null) {
+      return NextResponse.json({
+        approved: false,
+        stage: 'repid_threshold',
+        message: `RepID payment threshold NOT_CHECKED: ${repidResult.thresholdDetail}`,
+        repidScore: repidResult.repidScore,
+        thresholdSource: repidResult.thresholdSource,
+      }, { status: 503 });
+    }
+
     // Addendum 2: KYA commitment. NOT a zero-knowledge proof — it never was.
     // The object used to carry proofSystem 'groth16' over a SHA-256 of a
     // timestamp; it now reports proven=false and binds the decision to a
@@ -103,7 +121,14 @@ export async function POST(req: NextRequest) {
     const paymentId = crypto.randomUUID();
     const ruleHash  = await sha256(`${agentName}:${amountUSDC}:${recipientAddress}:${purpose}`);
 
-    const maxWithdrawal = kyaResult.repidScore > 7500 ? 100000 : 50000;
+    // A FOURTH tier ladder lived here: `repidScore > 7500 ? 100000 : 50000`.
+    // Exclusive where TIER_FLOORS is inclusive, so an agent at exactly 7500 was
+    // Platinum by the ladder and Gold by this line — and every Silver and
+    // Bronze agent was handed Gold's per-transaction figure, 50000 against a
+    // real Bronze limit of 100. The panel weighs this number, so a wrong one is
+    // a wrong brief. Same defect as the two disagreeing ladders, third
+    // recurrence; same fix, which is to delete the second implementation.
+    const maxWithdrawal = TIER_LIMITS[tierForScore(kyaResult.repidScore)].perTx;
 
     // The panel needs the actual decision context, not just an amount — the
     // recipient, the stated purpose and the agent's standing are what a

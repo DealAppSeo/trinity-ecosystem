@@ -48,8 +48,17 @@ export interface KYAComplianceResult {
   repidTier:         RepIDTier;
   humanCustodyBound: boolean;
   zkpProofCID:       string;
-  withinDailyLimit:  boolean;
-  withinTxLimit:     boolean;
+  /**
+   * `null` when the limit was NOT EVALUATED — not when it failed.
+   *
+   * Three states, because two forced a guess: the per-transaction denial path
+   * returns before the spend history is read, and with a bare boolean it
+   * asserted `withinDailyLimit: true` about a check that never ran. The
+   * database columns are nullable and SQL NULL already means unknown, so this
+   * stores faithfully.
+   */
+  withinDailyLimit:  boolean | null;
+  withinTxLimit:     boolean | null;
   insuranceCoverage: number;
   denialReason?:     string;
 }
@@ -65,8 +74,9 @@ export interface ComplianceReceipt {
   zkpProofCID:        string;
   humanCustodyBound:  boolean;
   bftProof:           BFTConsensusProof;
-  withinDailyLimit:   boolean;
-  withinTxLimit:      boolean;
+  /** `null` when not evaluated. See `KYAComplianceResult`. */
+  withinDailyLimit:   boolean | null;
+  withinTxLimit:      boolean | null;
   ruleHash:           string;
   insuranceCoverage:  number;
   solanaExplorerUrl:  string | null;   // null when nothing was broadcast

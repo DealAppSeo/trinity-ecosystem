@@ -45,9 +45,30 @@ export interface EarnedMetricsLoad {
   truncated: boolean;
 }
 
+/**
+ * What resolving an agent name can honestly conclude.
+ *
+ * `unreadable` exists so a permissions or transport failure cannot be spelled
+ * the same way as a genuinely unregistered agent. The union is discriminated
+ * so the compiler, not a reviewer, is what forces the caller to handle it.
+ */
+export type AgentResolution =
+  | { status: 'found'; id: string; name: string }
+  | { status: 'absent' }
+  | { status: 'unreadable'; detail: string };
+
 export class EarnedMetricsRepository {
+  /**
+   * Optional injected client, for tests that need to drive the failure paths.
+   *
+   * Still LAZY — the fallback is evaluated per access, never at construction,
+   * so this keeps the module-scope rule in lib/CLAUDE.md. Nothing constructs a
+   * client here.
+   */
+  constructor(private readonly injectedClient?: ReturnType<typeof getSupabaseAdmin>) {}
+
   private get supabase() {
-    return getSupabaseAdmin();
+    return this.injectedClient ?? getSupabaseAdmin();
   }
 
   /**
@@ -58,17 +79,38 @@ export class EarnedMetricsRepository {
    * nothing. All 12 registered agents resolve through the `trinity-` prefix.
    * Exact match is tried first so non-Trinity agents still work.
    */
-  async resolveAgent(agentName: string): Promise<{ id: string; name: string } | null> {
+  /**
+   * THREE OUTCOMES, because two collapse "we could not look" into "there is
+   * nothing there".
+   *
+   * This method used to destructure only `data`. An RLS denial, an expired key
+   * or a transport fault all produced `data === null`, which fell through both
+   * candidates and returned "no such agent" — and `load()` then reported the
+   * agent as having no track record. That is a *plausible wrong answer* about
+   * an agent's reputation produced by a permissions failure, which is the exact
+   * shape `load()` twelve lines below already refuses for its own read:
+   * "a failed read is not an absence of evidence".
+   */
+  async resolveAgent(agentName: string): Promise<AgentResolution> {
     const candidates = [agentName, `trinity-${agentName.toLowerCase()}`];
     for (const candidate of candidates) {
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('repid_agents')
         .select('id, agent_name')
         .eq('agent_name', candidate)
         .maybeSingle();
-      if (data?.id) return { id: data.id, name: data.agent_name };
+
+      // Loud, and it stops here: trying the next candidate after a failed read
+      // would turn one unreadable table into "no match", which is the bug.
+      if (error) {
+        return {
+          status: 'unreadable',
+          detail: `could not read repid_agents for "${candidate}": ${error.message}`,
+        };
+      }
+      if (data?.id) return { status: 'found', id: data.id, name: data.agent_name };
     }
-    return null;
+    return { status: 'absent' };
   }
 
   async load(agentName: string, opts: { now?: string; domain?: string } = {}): Promise<EarnedMetricsLoad> {
@@ -82,7 +124,29 @@ export class EarnedMetricsRepository {
       latencyMs: unmeasured(`no agent in repid_agents matches "${agentName}" — ${LATENCY_SPARSE}`),
     });
 
-    if (!resolved) {
+    // An unreadable registry is NOT_CHECKED, not "no track record". Same
+    // reasoning as the observations read below, and it must carry the
+    // database's own message or the operator cannot tell an RLS denial from a
+    // genuinely unregistered agent.
+    if (resolved.status === 'unreadable') {
+      const unreadable = (): EarnedMetricSet => ({
+        bftAccuracy: unmeasured(resolved.detail),
+        veritasCatchRate: unmeasured(resolved.detail),
+        x402SuccessRate: unmeasured(resolved.detail),
+        latencyMs: unmeasured(resolved.detail),
+      });
+      const metrics = unreadable();
+      return {
+        requestedAgent: agentName,
+        resolvedAgent: null,
+        agentId: null,
+        metrics,
+        evidence: describeEvidence(metrics),
+        truncated: false,
+      };
+    }
+
+    if (resolved.status === 'absent') {
       const metrics = noSuchAgent();
       return {
         requestedAgent: agentName,

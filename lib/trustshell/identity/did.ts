@@ -29,6 +29,82 @@ const MULTIBASE_BASE58BTC = 'z';
 
 export type Did = string;
 
+// ---------------------------------------------------------------------------
+// Comparison
+// ---------------------------------------------------------------------------
+//
+// WHY THIS IS A FUNCTION AND NOT `a === b`. Every place in this system that
+// enforces `checker_must_not_be_doer` does it by comparing two DIDs, which
+// makes a string comparison the whole of a constitutional invariant. It was
+// written inline nine times, and mutation testing found the same one-character
+// bypass — a DID with a trailing space is not equal to itself — in FOUR of
+// them, on four separate days. Each was fixed locally. The fifth was going to
+// happen too.
+//
+// The other half is subtler and had no bug yet only because every caller
+// happened to guard for it: **two ABSENT DIDs must not compare equal, and must
+// not compare unequal either.** `undefined === undefined` is true, so a naive
+// check turns "neither party identified itself" into "they are the same
+// identity" — a spurious constitutional violation. Flipping it to `!==` turns
+// the same input into "they are provably different", which certifies
+// independence on no evidence. Both readings are wrong, which is why the
+// primitive below has three outcomes rather than two.
+
+/**
+ * What a DID comparison can conclude.
+ *
+ * `indeterminate` is the load-bearing one, and it is not a nicety: it is the
+ * only honest answer when a DID is missing, and neither boolean is safe to
+ * substitute for it.
+ */
+export type DidComparison = 'same' | 'different' | 'indeterminate';
+
+/**
+ * Normalize for comparison.
+ *
+ * Trim only. **Case is NOT folded**: `did:key` is base58btc, which is
+ * case-sensitive, so two DIDs differing in case are two different keys and
+ * folding them would silently merge distinct identities — the exact opposite of
+ * this module's job. No Unicode normalization either: a valid did:key is ASCII,
+ * where NFC is a no-op, so it would buy nothing on well-formed input while
+ * potentially merging malformed input that ought to stay distinct.
+ */
+function normalizeDid(did: string | undefined | null): string | null {
+  if (typeof did !== 'string') return null;
+  const trimmed = did.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * Compare two DIDs, with an explicit third outcome for "cannot tell".
+ *
+ * Use this when the question is *"are these independent?"* — where an unknown
+ * must stay unknown. Use `sameDid` when the question is *"must I refuse?"*.
+ */
+export function compareDids(a: string | undefined | null, b: string | undefined | null): DidComparison {
+  const left = normalizeDid(a);
+  const right = normalizeDid(b);
+  if (left === null || right === null) return 'indeterminate';
+  return left === right ? 'same' : 'different';
+}
+
+/**
+ * Are these certainly the same identity?
+ *
+ * FALSE WHEN EITHER IS ABSENT, which is the safe polarity for the way this is
+ * actually used: every caller asks it in order to REFUSE something. Returning
+ * true on absent DIDs would refuse legitimate work; the residual risk — failing
+ * to refuse when identity is unknown — belongs to `compareDids`, whose
+ * `indeterminate` the caller must then handle rather than coerce.
+ *
+ * Never write `!sameDid(a, b)` to mean "different". Absent is not different,
+ * and that expression is exactly how an unknown becomes a certified
+ * independence claim.
+ */
+export function sameDid(a: string | undefined | null, b: string | undefined | null): boolean {
+  return compareDids(a, b) === 'same';
+}
+
 export interface KeyPair {
   did: Did;
   publicKey: CryptoKey;
