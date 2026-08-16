@@ -644,6 +644,56 @@ export const MUTATIONS = [
     find: '  if (cited) return true;',
     replace: '  if (true) return true;',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/alerts/digest.ts — 142,560 rows nobody ever read.
+  // -------------------------------------------------------------------------
+  {
+    id: 'digest-repeats-do-not-collapse',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'repeats collapse. Without number-stripping, "Time Down: 42314 minutes" and ' +
+      '"42317 minutes" are different alerts and 40,236 rows become 40,236 digests — ' +
+      'a consumer that achieves nothing while appearing to work. Measured on live ' +
+      'data the real ratio is 188:1',
+    find: "    .replace(/\\b\\d[\\d,._]*\\b/g, '<n>')",
+    replace: '    .replace(/\\b(?!)\\b/g, "<n>")',
+  },
+  {
+    id: 'digest-backlog-pages-everyone',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'a five-month-old condition never notified does NOT page. Staleness is checked ' +
+      'BEFORE first-notice, or the first run floods the channel with a backlog reaching ' +
+      'back to January and buries whatever is actually live',
+    find: "  if (ageDays > policy.staleAfterDays) return 'SUPPRESS_STALE';",
+    replace: '  if (false) return \'SUPPRESS_STALE\';',
+  },
+  {
+    id: 'digest-invents-a-subject',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'a subject is parsed only for the shape actually measured, never guessed. A wrong ' +
+      'subject routes a human to the wrong agent — the name-matching failure this repo ' +
+      'has already paid for twice. api_auth_attempt carries an EMPTY message, so a ' +
+      'guessing parser would silently emit blanks and look like it worked',
+    find: '  return null;\n}\n\nexport function digestRows',
+    replace: "  return message.split(' ')[0] ?? null;\n}\n\nexport function digestRows",
+  },
+  {
+    id: 'digest-drops-corroboration',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'distinct reporters are retained. Three agents independently reporting one agent ' +
+      'DOWN is stronger evidence than one, and collapsing them without the count throws ' +
+      'that away',
+    find: '    if (r.agent && !d.reporters.includes(r.agent)) d.reporters.push(r.agent);',
+    replace: '    // mutated: reporters no longer accumulated',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
