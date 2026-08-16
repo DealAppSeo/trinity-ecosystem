@@ -588,7 +588,7 @@ export const MUTATIONS = [
       'the denial reason is an OBSERVABLE CONTRACT, not prose. It lands in a compliance ' +
       "receipt's `denialReason`, and run-e2e.mjs matches /exceeds per-tx limit/i against it " +
       'over HTTP. Rewording it to read better turned CI red while `npm run check` reported ' +
-      '52 VERIFIED — LESSONS A19. The fast suite pins the regex so the next break surfaces ' +
+      '52 VERIFIED — LESSONS A21. The fast suite pins the regex so the next break surfaces ' +
       'in seconds instead of in a server boot',
     find: '      detail: `Amount ${amountUSDC} USDC exceeds per-tx limit ${limit}`,',
     replace: '      detail: `Amount ${amountUSDC} USDC exceeds the per-transaction limit of ${limit}`,',
@@ -1013,6 +1013,62 @@ export const MUTATIONS = [
       'that away',
     find: '    if (r.agent && !d.reporters.includes(r.agent)) d.reporters.push(r.agent);',
     replace: '    // mutated: reporters no longer accumulated',
+  },
+
+  // ── check:lesson-ids ──────────────────────────────────────────────────────
+  //
+  // These four are caught by the SELF-TEST, not by the scan of LESSONS.md, and
+  // that is the whole point. The tree currently has no duplicate IDs, so a
+  // detector that cannot fire produces the same green line as a clean file. If
+  // any of these four survived, `check:lesson-ids` would be decorative.
+  {
+    id: 'lesson-duplicate-detector-never-fires',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'the duplicate detector actually fires. On 2026-08-16 LESSONS.md carried two `A19` ' +
+      'headings and two `A20` headings on unrelated failures, with three live citations ' +
+      'pointing at those tokens — the ID is the entire reference, so following one was a ' +
+      'coin flip. Off by one in this comparison and the check passes over the exact ' +
+      'defect it was written for',
+    find: '    if (sites.length > 1) dupes.push({ id, sites });',
+    replace: '    if (sites.length > 2) dupes.push({ id, sites });',
+  },
+  {
+    id: 'lesson-series-letter-dropped-from-id',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'the series letter is part of the ID. `A19` is an agent error and `S19` would be a ' +
+      'security finding; keying on the number alone reports them as the same entry and ' +
+      'demands a renumber that would be wrong. This is the same defect as LESSONS A12 — ' +
+      'two different things agreeing on a name',
+    find: "      defs.push({ id: `${heading[1]}${heading[2]}`, line: i + 1, title: heading[3].trim() });",
+    replace: "      defs.push({ id: `${heading[2]}`, line: i + 1, title: heading[3].trim() });",
+  },
+  {
+    id: 'lesson-ambiguous-collapsed-into-nothing',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'a citation pointing at a duplicated ID is reported. A duplicate heading with no ' +
+      'citation is untidy; a duplicate heading WITH citations is a reference that resolves ' +
+      'two ways, which is the part that costs time. Returning empty here leaves the ' +
+      'duplicate report standing while hiding who is affected by it',
+    find: '  return citations.filter((c) => dupeIds.has(c.id));',
+    replace: '  return [];',
+  },
+  {
+    id: 'lesson-heading-anchor-dropped',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'a heading is only a definition at the start of a line. Without the anchor, an ID ' +
+      'quoted inside a table cell or a fenced block registers as a second definition of an ' +
+      'entry that is in fact defined once — the check then demands a renumber to fix a ' +
+      'duplicate that does not exist, which is how a suite loses the reader',
+    find: 'const HEADING_DEF = /^#{2,4}\\s+([A-Z])(\\d+)\\s*[—–-]\\s*(.*)$/;',
+    replace: 'const HEADING_DEF = /#{2,4}\\s+([A-Z])(\\d+)\\s*[—–-]\\s*(.*)/;',
   },
 ];
 

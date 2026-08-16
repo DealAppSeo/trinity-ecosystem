@@ -1090,7 +1090,7 @@ or an outage ever claims a referral.
 
 ---
 
-## A19 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
+## A21 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
 
 **[VERIFIED] — the run is in CI: `check` green, `test:e2e` red, same commit.**
 
@@ -1130,7 +1130,7 @@ break shows up in seconds rather than after a build and a server boot.
 
 ---
 
-## A20 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
+## A22 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
 
 **[VERIFIED] — `curl` to the REST endpoint returns 403; the MCP tool returns the
 same runs successfully, seconds apart.**
