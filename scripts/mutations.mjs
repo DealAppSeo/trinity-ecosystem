@@ -595,6 +595,55 @@ export const MUTATIONS = [
       '        return {\n' +
       "          status: 'unreadable',",
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/priorwork/open-index.ts — the gate against re-deriving work
+  // that is already filed. Earned 2026-08-16, at the cost of most of a session.
+  // -------------------------------------------------------------------------
+  {
+    id: 'openwork-advisory-entries-fire',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'scope is OPT-IN: an entry with no [scope:] marker can NEVER fail a build. If ' +
+      'unscoped entries matched, every diff would fire on every open item — and a gate ' +
+      'that cries wolf is one people route around, which is exactly how check:prior-work ' +
+      'came to enforce only its mechanical half',
+    find: '    (e) => e.scope.length > 0 && e.scope.some((t) => scopeMatches(t, change))',
+    replace: '    (e) => e.scope.some((t) => scopeMatches(t, change)) || e.scope.length === 0',
+  },
+  {
+    id: 'openwork-token-matches-longer-name',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'a scope token matches a WHOLE word, so `repid_events` does not match ' +
+      '`trinity_repid_events` and send somebody to the wrong entry — the same near-name ' +
+      'trap check:schema-names exists for, and this repo has already paid for twice',
+    find: '  return word.test(change.diffText);',
+    replace: '  return change.diffText.includes(token);',
+  },
+  {
+    id: 'openwork-parses-closed-and-retracted',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'ONLY the OPEN section is parsed. CLOSED and RETRACTED share the table shape; ' +
+      'closed work is meant to be built on, and retracted figures are check:prior-work\'s ' +
+      'job. Pulling them in would make this fire on everything',
+    find: '    if (/^##\\s/.test(lines[i])) { end = i; break; }',
+    replace: '    if (false) { end = i; break; }',
+  },
+  {
+    id: 'openwork-everything-acknowledged',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'acknowledgement requires naming THIS entry — a blanket pass would be a rubber ' +
+      'stamp, which is worse than no gate because it looks like diligence',
+    find: '  if (cited) return true;',
+    replace: '  if (true) return true;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
