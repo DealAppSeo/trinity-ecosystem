@@ -61,6 +61,7 @@ const {
   tierForScore, weightsProblem, normalizeMetrics, contributionsOf, sumContributions,
   scoreFromWeightedSum, reachableCeiling, weightedSumRequiredFor, describeCoherence,
   checkPerTxLimit, checkDailyLimit, isPlaceholderProofCid,
+  resolvePaymentThreshold, DEFAULT_PAYMENT_THRESHOLD,
 } = m;
 
 let passed = 0;
@@ -332,6 +333,106 @@ check('the placeholder was TRUTHY — which is why presence checks failed', () =
   truthy(Boolean(fabricated), 'the fabricated value passes a truthiness test');
   truthy(fabricated.includes('VERIFIED'), 'and reads as its own success');
   eq(isPlaceholderProofCid(fabricated), true, 'so presence must be asked, not assumed');
+});
+
+// ── the threshold, resolved once ────────────────────────────────────────────
+
+check('A STORED ZERO IS A POLICY, NOT AN ABSENT VALUE', () => {
+  // The defect: RepIDConfig read min_repid_payment twice, `??` in coherence()
+  // and `||` in calculate(). They agree on every value except 0 — an operator
+  // saying "no RepID minimum" — which the coherence check reported on as 0
+  // while the gate silently enforced 5000. Demonstrated against both
+  // expressions before the fix, not inferred.
+  const zero = resolvePaymentThreshold(0, true);
+  eq(zero.outcome, 'VERIFIED', 'zero is usable');
+  eq(zero.threshold, 0, 'and survives as zero');
+  eq(zero.source, 'stored', 'recorded as configured, not defaulted');
+  // The `||` form, for contrast. This is what it used to do.
+  truthy((0 || DEFAULT_PAYMENT_THRESHOLD) !== zero.threshold,
+     'precondition: `|| default` really did rewrite a stored zero');
+});
+
+check('ABSENT USES THE DEFAULT, and SAYS it defaulted', () => {
+  for (const absent of [undefined, null]) {
+    const r = resolvePaymentThreshold(absent, true);
+    eq(r.outcome, 'VERIFIED', `${absent} resolves`);
+    eq(r.threshold, DEFAULT_PAYMENT_THRESHOLD, 'to the default');
+    eq(r.source, 'default', 'and is labelled as such');
+  }
+  // The label is the whole value here: `threshold: 5000` alone cannot tell a
+  // reader whether an operator chose it or nobody did.
+  truthy(resolvePaymentThreshold(5000, true).source !== resolvePaymentThreshold(null, true).source,
+     'a stored 5000 and a defaulted 5000 must be distinguishable');
+});
+
+check('AN UNREADABLE CONFIG IS NOT_CHECKED — it can LOWER the bar', () => {
+  // Both call sites did `const { data } = await …` and discarded the error, so
+  // an outage substituted 5000. For an institution that had stored 8000 that
+  // is a fail-open reached by an outage rather than by any input.
+  const r = resolvePaymentThreshold(8000, false);
+  eq(r.outcome, 'NOT_CHECKED', 'unreadable is not evaluated');
+  eq(r.threshold, null, 'and yields no number to compare against');
+  eq(r.source, 'unreadable', 'labelled');
+  match(r.detail, /LOWER the bar|UNKNOWN/, 'and says what the substitution would cost');
+  // The stored value must not leak through when the read failed.
+  truthy(r.threshold !== 8000, 'a failed read reports nothing, not the value it did not read');
+});
+
+check('A MALFORMED THRESHOLD IS REFUSED, not defaulted', () => {
+  for (const bad of [NaN, Infinity, -1, '5000', {}, true]) {
+    const r = resolvePaymentThreshold(bad, true);
+    // String(), NOT JSON.stringify() — `JSON.stringify(NaN)` is the string
+    // "null", so a mutation-run failure here reported "null is refused" for a
+    // NaN input and pointed the reader at the wrong case entirely. A test's
+    // diagnostic is read exactly once, by someone who does not yet know what
+    // broke.
+    eq(r.outcome, 'FAILED', `a stored ${String(bad)} is refused`);
+    eq(r.threshold, null, `a stored ${String(bad)} yields no substituted number`);
+    eq(r.source, 'malformed', `a stored ${String(bad)} is labelled malformed`);
+  }
+  // Refusing rather than defaulting is deliberate: a threshold nobody can
+  // evaluate must not quietly become one that can be.
+  truthy(resolvePaymentThreshold(NaN, true).threshold !== DEFAULT_PAYMENT_THRESHOLD,
+     'malformed must NOT fall back to the default');
+});
+
+check('THE TWO READERS CANNOT DISAGREE — one resolver, every input', () => {
+  // The generic form of the defect. Whatever is stored, coherence() and
+  // calculate() now compare against the same number by construction, because
+  // there is only one function that produces it.
+  for (const stored of [undefined, null, 0, 1, 2500, 5000, 8000, 15000, NaN, -1]) {
+    const a = resolvePaymentThreshold(stored, true);
+    const b = resolvePaymentThreshold(stored, true);
+    eq(a.threshold, b.threshold, `stored ${JSON.stringify(stored)} resolves identically`);
+    eq(a.outcome, b.outcome, `and to one outcome`);
+  }
+});
+
+check('describeCoherence REFUSES a non-finite threshold', () => {
+  // The unreachability test is `floor > ceiling`, and every comparison against
+  // NaN is false — so a garbage threshold was never reported unreachable and
+  // fell through to "every gate is reachable". A coherence check that cannot
+  // tell "I compared them" from "I could not compare them" is the exact defect
+  // it exists to detect.
+  truthy(!(NaN > 10000), 'precondition: NaN never compares greater, so it never looks unreachable');
+  for (const bad of [NaN, Infinity, -Infinity]) {
+    const r = describeCoherence(bad);
+    eq(r.outcome, 'NOT_CHECKED', `${bad} is not checkable`);
+    eq(r.unreachable.length, 0, 'nothing is claimed unreachable');
+    eq(r.gatesConsidered.length, 0, 'and nothing is claimed examined');
+  }
+  // A finite threshold still gets a real verdict, in both directions.
+  eq(describeCoherence(5000).outcome, 'VERIFIED', 'a reachable gate still verifies');
+  eq(describeCoherence(15000).outcome, 'FAILED', 'and an unreachable one still fails');
+});
+
+check('a stored ZERO threshold is COHERENT, not merely tolerated', () => {
+  // The end-to-end of the first assertion: 0 reaches describeCoherence intact
+  // and every gate is reachable under it.
+  const r = describeCoherence(resolvePaymentThreshold(0, true).threshold);
+  eq(r.outcome, 'VERIFIED', 'no minimum is a coherent policy');
+  truthy(r.gatesConsidered.some((g) => g.name === 'payment threshold' && g.floor === 0),
+     'and the zero threshold is among the gates examined');
 });
 
 rmSync(outDir, { recursive: true, force: true });

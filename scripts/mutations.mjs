@@ -605,6 +605,53 @@ export const MUTATIONS = [
     find: '  return /^ZKP_STUB_/.test(cid.trim());',
     replace: '  return false;',
   },
+  {
+    id: 'repid-stored-zero-becomes-default',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'a stored threshold of ZERO is a configured policy — "no RepID minimum" — not an ' +
+      'absent value. `|| 5000` rewrote it to the second-strictest gate in the ladder, and ' +
+      'because coherence() used `??` while calculate() used `||`, the check written to ' +
+      'catch a gate that never opens was reporting on a number the gate did not use',
+    find: '  if (stored === undefined || stored === null) {',
+    replace: '  if (!stored) {',
+  },
+  {
+    id: 'repid-unreadable-threshold-defaults',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'an UNREADABLE institution config is NOT_CHECKED. Substituting the default re-rates ' +
+      'every agent against a number nobody configured, and for an institution that stored ' +
+      'a stricter threshold it LOWERS the bar — a fail-open on the payment gate reached by ' +
+      'an outage rather than by any input',
+    find: '  if (!readable) {',
+    replace: '  if (!readable && false) {',
+  },
+  {
+    id: 'repid-malformed-threshold-passes',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'a NON-FINITE stored threshold is refused rather than passed through. NaN compares ' +
+      'false against everything, so it neither meets nor fails a gate — it just silently ' +
+      'denies, and nothing says why',
+    find: "  if (typeof stored !== 'number' || !Number.isFinite(stored) || stored < 0) {",
+    replace: "  if (typeof stored !== 'number') {",
+  },
+  {
+    id: 'repid-coherence-accepts-nonfinite',
+    suite: 'check:repid-scoring',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'describeCoherence REFUSES a threshold it cannot compare. The unreachability test is ' +
+      '`floor > ceiling` and every comparison against NaN is false, so a garbage threshold ' +
+      'was never reported unreachable and fell through to "every gate is reachable" — a ' +
+      'coherence check that cannot tell "I compared them" from "I could not"',
+    find: '  if (typeof paymentThreshold !== \'number\' || !Number.isFinite(paymentThreshold)) {',
+    replace: '  if (false) {',
+  },
 
   // -------------------------------------------------------------------------
   // lib/trustshell/hal-chain.ts — 102,934 links, not one ever verified

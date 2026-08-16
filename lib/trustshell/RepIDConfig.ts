@@ -7,12 +7,15 @@ import {
   contributionsOf,
   describeCoherence,
   normalizeMetrics,
+  reachableCeiling,
+  resolvePaymentThreshold,
   scoreFromWeightedSum,
   sumContributions,
   tierForScore,
   weightsProblem,
   type CoherenceReport,
   type RepIDWeights,
+  type ThresholdResolution,
 } from './repid-scoring';
 
 export type { RepIDWeights };
@@ -22,8 +25,13 @@ export interface RepIDCalculationResult {
   repidTier:       string;
   weightsApplied:  RepIDWeights;
   institutionId:   string;
-  meetsThreshold:  boolean;
-  threshold:       number;
+  /** `null` when the threshold could not be resolved — NOT_CHECKED, not false. */
+  meetsThreshold:  boolean | null;
+  /** `null` for the same reason. Never a substituted default. */
+  threshold:       number | null;
+  /** Where the threshold came from, so a reader can tell configured from assumed. */
+  thresholdSource: ThresholdResolution['source'];
+  thresholdDetail: string;
   breakdown: {
     bftContribution:        number;
     veritasContribution:    number;
@@ -61,18 +69,52 @@ export class RepIDCalculator {
   }
 
   /**
-   * Can the score reach the gates it is compared against?
+   * The payment threshold for an institution — the ONE read.
    *
-   * Exposed so an operator can ask without running a payment. It is one
-   * arithmetic call and it answers the question a green test suite cannot.
+   * `coherence()` and `calculate()` both come through here. They used to read
+   * `min_repid_payment` separately, with `??` in one and `||` in the other, so
+   * a stored **0** made the coherence report describe a threshold of 0 while
+   * the gate enforced 5000. See `resolvePaymentThreshold` for the whole story.
+   *
+   * THE QUERY ERROR IS CAPTURED, not discarded. Both call sites previously did
+   * `const { data } = await …`, so an unreadable config silently became 5000 —
+   * which LOWERS the bar for any institution that had stored a stricter one.
    */
-  async coherence(institutionId = 'default'): Promise<CoherenceReport> {
-    const { data } = await this.supabase
+  private async readPaymentThreshold(institutionId: string): Promise<ThresholdResolution> {
+    const { data, error } = await this.supabase
       .from('institution_risk_config')
       .select('min_repid_payment')
       .eq('institution_id', institutionId)
       .single();
-    return describeCoherence(data?.min_repid_payment ?? 5000);
+
+    // PGRST116 is "no rows", which is a legitimately absent configuration, not
+    // a failed read. Anything else means we could not look.
+    const readable = !error || error.code === 'PGRST116';
+    return resolvePaymentThreshold(data?.min_repid_payment, readable);
+  }
+
+  /**
+   * Can the score reach the gates it is compared against?
+   *
+   * Exposed so an operator can ask without running a payment. It is one
+   * arithmetic call and it answers the question a green test suite cannot.
+   *
+   * Reports on the SAME threshold `calculate()` will enforce, which is the
+   * point — a coherence report about a different number than the gate uses is
+   * worse than no report, because it reads as reassurance.
+   */
+  async coherence(institutionId = 'default'): Promise<CoherenceReport> {
+    const resolved = await this.readPaymentThreshold(institutionId);
+    if (resolved.threshold === null) {
+      return {
+        outcome: 'NOT_CHECKED',
+        ceiling: reachableCeiling(),
+        gatesConsidered: [],
+        unreachable: [],
+        detail: `coherence was not evaluated: ${resolved.detail}`,
+      };
+    }
+    return describeCoherence(resolved.threshold);
   }
 
   async calculate(
@@ -95,21 +137,21 @@ export class RepIDCalculator {
     const repidScore = scoreFromWeightedSum(weightedSum);
     const repidTier = tierForScore(repidScore);
 
-    const { data: config } = await this.supabase
-      .from('institution_risk_config')
-      .select('min_repid_payment')
-      .eq('institution_id', institutionId)
-      .single();
-
-    const threshold = config?.min_repid_payment || 5000;
+    const resolved = await this.readPaymentThreshold(institutionId);
 
     return {
       repidScore,
       repidTier,
       weightsApplied: weights,
       institutionId,
-      meetsThreshold: repidScore >= threshold,
-      threshold,
+      // `null` when the threshold could not be resolved. A boolean here would
+      // force an unknown to be reported as one of the two answers, and the
+      // convenient one is `true` — the same shape as `withinDailyLimit`, on the
+      // same payment path.
+      meetsThreshold: resolved.threshold === null ? null : repidScore >= resolved.threshold,
+      threshold: resolved.threshold,
+      thresholdSource: resolved.source,
+      thresholdDetail: resolved.detail,
       breakdown,
     };
   }

@@ -291,9 +291,119 @@ export function weightedSumRequiredFor(score: number): number {
   return (10 ** (score / SCORE_LOG_MULTIPLIER) - 1) / SCORE_LOG_INPUT_SCALE;
 }
 
+/**
+ * The payment threshold used when an institution has not stored one.
+ *
+ * Named because it was written as a bare `5000` in three places, and two of
+ * them reached it by different routes — see `resolvePaymentThreshold`.
+ */
+export const DEFAULT_PAYMENT_THRESHOLD = 5000;
+
+export interface ThresholdResolution {
+  /** VERIFIED: usable. NOT_CHECKED: could not be read. FAILED: read, unusable. */
+  outcome: LimitOutcome;
+  /** `null` whenever the outcome is not VERIFIED. Never a guessed number. */
+  threshold: number | null;
+  source: 'stored' | 'default' | 'unreadable' | 'malformed';
+  detail: string;
+}
+
+/**
+ * The payment threshold, resolved ONCE so two readers cannot disagree.
+ *
+ * ── WHY THIS EXISTS ────────────────────────────────────────────────────────
+ *
+ * `RepIDConfig` read `min_repid_payment` in two places with two different
+ * operators:
+ *
+ *   coherence():  describeCoherence(data?.min_repid_payment ?? 5000)   // ??
+ *   calculate():  const threshold = config?.min_repid_payment || 5000  // ||
+ *
+ * They agree on every value except the two that matter. A stored **0** — an
+ * operator saying "no RepID minimum, pay everyone" — was reported on as 0 by
+ * the coherence check and silently enforced as 5000 by the gate. So the report
+ * written specifically to catch a gate that never opens was **checking a number
+ * the gate does not use**, and answering VERIFIED about it. Demonstrated
+ * against both expressions before this was written, not inferred.
+ *
+ * That is the original finding of this branch — a gate whose stated rule and
+ * enforced rule differ — reappearing inside the checker built to catch it. It
+ * is also the same one-rule-two-implementations defect as the two tier ladders
+ * and the loop kernel's DID comparison. Three times now, so the fix is the same
+ * one: delete the second implementation.
+ *
+ * ── ABSENT, ZERO, UNREADABLE AND MALFORMED ARE FOUR DIFFERENT THINGS ───────
+ *
+ * `||` collapses the first two; discarding the query error collapses the third
+ * into whichever of the first two the caller wrote. An unreadable config is the
+ * dangerous one: both sites did `const { data } = await …` with no `error`, so
+ * a database outage substituted 5000 — and for an institution that had stored
+ * **8000**, that LOWERS the bar. A fail-open on the payment gate, reached by an
+ * outage rather than by any input.
+ *
+ * `readable` is a required argument with no default. The caller must state
+ * whether the read succeeded, because a signature that let them omit it is
+ * exactly how the error came to be discarded in the first place.
+ */
+export function resolvePaymentThreshold(stored: unknown, readable: boolean): ThresholdResolution {
+  if (!readable) {
+    return {
+      outcome: 'NOT_CHECKED',
+      threshold: null,
+      source: 'unreadable',
+      detail:
+        'the institution configuration could not be read, so the payment threshold is ' +
+        'UNKNOWN. Substituting the default would silently re-rate every agent against a ' +
+        'number nobody configured — and for an institution that stored a stricter ' +
+        'threshold it would LOWER the bar during an outage.',
+    };
+  }
+  if (stored === undefined || stored === null) {
+    return {
+      outcome: 'VERIFIED',
+      threshold: DEFAULT_PAYMENT_THRESHOLD,
+      source: 'default',
+      detail: `no threshold is stored; using the default of ${DEFAULT_PAYMENT_THRESHOLD}`,
+    };
+  }
+  if (typeof stored !== 'number' || !Number.isFinite(stored) || stored < 0) {
+    return {
+      outcome: 'FAILED',
+      threshold: null,
+      source: 'malformed',
+      detail:
+        `the stored payment threshold ${JSON.stringify(stored)} is not a usable number. ` +
+        'Refusing to substitute a default: a threshold nobody can evaluate must not ' +
+        'quietly become one that can be.',
+    };
+  }
+  // ZERO IS A REAL VALUE and reaches here intact. It means "no RepID minimum",
+  // which is a policy an operator may legitimately set. `|| 5000` turned it
+  // into the strictest-but-one gate in the ladder without saying so.
+  return {
+    outcome: 'VERIFIED',
+    threshold: stored,
+    source: 'stored',
+    detail:
+      stored === 0
+        ? 'the stored threshold is 0 — no RepID minimum. This is a configured policy, not an absent value.'
+        : `using the stored threshold of ${stored}`,
+  };
+}
+
 export interface CoherenceReport {
-  /** VERIFIED when every gate below is reachable; FAILED when one is not. */
-  outcome: 'VERIFIED' | 'FAILED';
+  /**
+   * VERIFIED when every gate below is reachable; FAILED when one is not;
+   * NOT_CHECKED when the threshold itself was not a number this could compare.
+   *
+   * THREE OUTCOMES, added after the two-outcome version answered VERIFIED for a
+   * non-finite threshold: the unreachability test is `floor > ceiling`, and
+   * `NaN > 10000` is `false`, so a garbage threshold was never reported
+   * unreachable and fell through to "every gate is reachable". A coherence
+   * check that cannot tell "I compared them and they are fine" from "I could
+   * not compare them" is the exact defect it exists to detect.
+   */
+  outcome: LimitOutcome;
   ceiling: number;
   /**
    * Every gate that was compared against the ceiling, reachable or not.
@@ -327,6 +437,24 @@ export interface CoherenceReport {
  */
 export function describeCoherence(paymentThreshold: number): CoherenceReport {
   const ceiling = reachableCeiling();
+
+  // The threshold is compared with `>`, and EVERY comparison against NaN is
+  // false — so without this, a non-finite threshold is silently never
+  // unreachable and the report reads VERIFIED. "I could not compare these" is
+  // not "these are fine".
+  if (typeof paymentThreshold !== 'number' || !Number.isFinite(paymentThreshold)) {
+    return {
+      outcome: 'NOT_CHECKED',
+      ceiling,
+      gatesConsidered: [],
+      unreachable: [],
+      detail:
+        `the payment threshold ${JSON.stringify(paymentThreshold)} is not a finite number, so it ` +
+        `could not be compared against the reachable ceiling of ${ceiling}. Nothing here was ` +
+        'checked — reporting VERIFIED would assert a comparison that never happened.',
+    };
+  }
+
   const gates = [
     ...TIER_FLOORS.filter((t) => t.floor > 0).map((t) => ({ name: `tier ${t.tier}`, floor: t.floor })),
     { name: 'payment threshold', floor: paymentThreshold },
