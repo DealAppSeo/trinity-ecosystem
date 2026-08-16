@@ -8,30 +8,21 @@
 // signed verdict and a real envelope. This file is HTTP: parse, resolve
 // configuration, call, map outcomes to status codes.
 //
-// ── WHY THIS RETURNS 503 TODAY, AND WHY THAT IS THE HONEST ANSWER ────────────
+// ── WHAT IT CAN CONCLUDE, WHICH DEPENDS ON CONFIGURATION ─────────────────────
 //
-// There is NO `Judge` implementation in this repository. `staged-judge.ts`
-// composes tiers and `contracted-evaluator.ts` consumes one, but nothing
-// implements the port — measured 2026-08-16, the only matches for a judge
-// implementation are the port and the composer themselves.
+// Two judge tiers, cheapest first (`lib/trustshell/review/judges.ts`).
 //
-// So the chain is complete except for the thing that forms an opinion. The
-// options were: ship a stub tier that returns VERIFIED, ship one that returns
-// NOT_CHECKED, or refuse.
+// The MECHANICAL tier is unconditional and may never return VERIFIED — it can
+// detect the absence of quality, never establish its presence. So with it alone
+// this surface can REJECT work (empty submissions, and work whose own text says
+// it is unfinished) and can NEVER sign anything off. That is a gate, not a
+// review, and the response says so in `canAccept` rather than leaving a caller
+// waiting for an acceptance that cannot arrive.
 //
-//   * VERIFIED would be a review surface that signs off on everything — a
-//     receipt-shaped artifact asserting an auditor approved work no auditor
-//     read. That is the defect this repo is built against, at its worst.
-//   * NOT_CHECKED runs the whole chain honestly and then reports REVISE,
-//     because with no rejections and no acceptances the loop simply runs out of
-//     submissions. A caller reads "revise" and rewrites work nobody judged.
-//   * Refusing says the true thing: the surface is wired, and it is not
-//     configured to conclude.
-//
-// The refusal is 503 SERVICE UNAVAILABLE rather than 501 or 500: the endpoint
-// exists and is correct, and it will work the moment a judge is supplied. When
-// one lands, it is passed to `runReviewSession({ tiers })` and this branch goes
-// away — nothing else here changes.
+// The MODEL tier appears only when TRUSTSHELL_JUDGE_ENDPOINT, _API_KEY and
+// _MODEL are all set. Partial configuration adds no tier and names what is
+// missing: a half-configured judge fails per criterion as NOT_CHECKED, which
+// escalates, which is indistinguishable from a model that could not decide.
 //
 // ── WHAT THIS ENDPOINT DOES NOT DO ───────────────────────────────────────────
 //
@@ -53,7 +44,7 @@ import {
   type ReviewRequest,
   type SubmittedAttempt,
 } from '@/lib/trustshell/review/session';
-import type { JudgeTier } from '@/lib/trustshell/identity/staged-judge';
+import { judgeTiersFrom } from '@/lib/trustshell/review/judges';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,16 +66,6 @@ const BANK = [
   { id: 'consistent', statement: 'It matches the conventions of the surrounding work.', minScore: 0.9 },
   { id: 'complete', statement: 'Nothing required by the specification is missing.', minScore: 0.9 },
 ];
-
-/**
- * Judge tiers, cheapest first.
- *
- * EMPTY, and that is a measurement rather than an oversight — see the header.
- * `runReviewSession` is not called with an empty list; the handler refuses
- * first, because a staged judge with no tiers returns NOT_CHECKED for every
- * criterion and a caller cannot tell that from a judge that ran and abstained.
- */
-const TIERS: readonly JudgeTier[] = [];
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
@@ -146,30 +127,16 @@ export async function POST(request: Request) {
     throw err;
   }
 
-  if (TIERS.length === 0) {
-    return NextResponse.json(
-      {
-        error:
-          'no Judge is configured, so this surface cannot conclude a review. The ' +
-          'contract, the draw, the signing and the envelope are all wired and ' +
-          'asserted (npm run check:review-session); what is missing is an ' +
-          'implementation of the Judge port. Refusing rather than returning a ' +
-          'verdict nobody formed.',
-        configured: false,
-        // Named so a caller can distinguish this from missing seeds without
-        // parsing prose.
-        missing: 'judge',
-      },
-      { status: 503 }
-    );
-  }
+  // Assembled per request, from the environment, inside the handler — same
+  // reason as the config above.
+  const judges = judgeTiersFrom(process.env);
 
   let outcome;
   try {
     outcome = await runReviewSession({
       request: b as ReviewRequest,
       config,
-      tiers: TIERS,
+      tiers: judges.tiers,
       bank: BANK,
       observedAt: new Date().toISOString(),
     });
@@ -188,6 +155,13 @@ export async function POST(request: Request) {
   // a malformed request.
   return NextResponse.json({
     status: outcome.status,
+    // A capability statement, not a detail. FALSE means only the mechanical
+    // tier is configured, so ACCEPTED is unreachable and every clean
+    // submission escalates to NOT_CHECKED. A caller that does not read this
+    // will wait for a sign-off that cannot happen.
+    canAccept: judges.canAccept,
+    judgeTiers: judges.tiers.map((t) => t.name),
+    missingForAcceptance: judges.missing,
     awaitingRevision: outcome.awaitingRevision,
     auditorDid: outcome.auditorDid,
     rounds: outcome.rounds,

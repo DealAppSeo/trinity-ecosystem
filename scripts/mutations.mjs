@@ -1251,6 +1251,54 @@ export const MUTATIONS = [
     replace:
       '      const submitted = request.attempts[Math.min(round, request.attempts.length - 1)];',
   },
+
+  // ── check:judges ──────────────────────────────────────────────────────────
+  {
+    id: 'mechanical-judge-can-say-verified',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      'THE rule of the mechanical tier: it may never return VERIFIED. It detects the ABSENCE ' +
+      'of quality and cannot establish its PRESENCE — a scan finding no TODO has learned that ' +
+      'there is no TODO, not that the work is correct. Letting it pass turns the review ' +
+      'surface into a rubber stamp that signs off on anything clean-looking, and the stamp ' +
+      'arrives wearing a contract-bound verdict',
+    find: "      return {\n        outcome: 'NOT_CHECKED',\n        detail:\n          'no mechanically decidable defect;",
+    replace: "      return {\n        outcome: 'VERIFIED',\n        score: 1,\n        detail:\n          'no mechanically decidable defect;",
+  },
+  {
+    id: 'judge-outage-condemns-the-work',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      'an unreachable model is NOT_CHECKED, never FAILED. staged-judge escalates NOT_CHECKED ' +
+      'and treats FAILED as final, so scoring an outage as FAILED lets an API error fail an ' +
+      "agent's work — and under the acceptance loop three of them reach EXHAUSTED on work no " +
+      'judge ever read',
+    find: "        return {\n          outcome: 'NOT_CHECKED',\n          detail:\n            `${label} judge was unreachable:",
+    replace: "        return {\n          outcome: 'FAILED',\n          detail:\n            `${label} judge was unreachable:",
+  },
+  {
+    id: 'judge-verified-without-a-score-accepted',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      "JudgeOpinion.score says it outright — absent is not a pass. A VERIFIED with no score " +
+      "cannot be measured against the criterion's floor, so accepting it lets a model pass " +
+      'work by asserting success without ever expressing confidence in it',
+    find: "  if (outcome === 'VERIFIED' && score === undefined) return null;",
+    replace: '  // mutated: an unscored VERIFIED is accepted',
+  },
+  {
+    id: 'judge-out-of-range-score-clamped',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      'an out-of-range score is malformed, not clamped. Clamping 4.7 to 1 invents a confidence ' +
+      'the model never expressed and turns a broken response into a maximal pass',
+    find: '      return null;\n    }\n    score = o.score;',
+    replace: '      score = Math.min(1, Math.max(0, Number(o.score) || 0));\n    }\n    score = score ?? o.score;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

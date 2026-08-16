@@ -24,17 +24,19 @@ const ROOT = process.cwd();
 const outDir = mkdtempSync(join(ROOT, '.review-session-check-'));
 process.on('exit', () => rmSync(outDir, { recursive: true, force: true }));
 
-let session, did;
+let session, judges, did;
 try {
   execFileSync(
     localTsc(),
-    ['lib/trustshell/review/session.ts', '--outDir', outDir, '--rootDir', 'lib',
+    ['lib/trustshell/review/session.ts', 'lib/trustshell/review/judges.ts',
+     '--outDir', outDir, '--rootDir', 'lib',
      '--module', 'commonjs', '--target', 'es2022', '--lib', 'es2022,dom',
      '--moduleResolution', 'node', '--esModuleInterop', '--strict'],
     { stdio: 'pipe' }
   );
   const base = join(outDir, 'trustshell');
   session = await import(pathToFileURL(join(base, 'review', 'session.js')).href);
+  judges = await import(pathToFileURL(join(base, 'review', 'judges.js')).href);
   did = await import(pathToFileURL(join(base, 'identity', 'did.js')).href);
 } catch (err) {
   console.error(
@@ -284,6 +286,68 @@ await refuses(
   'at least one submission',
   'a review with no attempts refuses'
 );
+
+// ── THE REAL JUDGE, DRIVING THE REAL COMPOSITION ────────────────────────────
+//
+// Everything above injects a fake reviewer to exercise the loop's shapes. These
+// use `judgeTiersFrom` — the exact tiers the route assembles — so the thing
+// asserted is that a genuine judge, wired the genuine way, reaches a genuine
+// verdict. A suite that only ever ran fake judges would prove the loop works
+// and say nothing about whether a judge was ever connected to it.
+{
+  const realTiers = judges.judgeTiersFrom({}).tiers;
+
+  // Work that says it is unfinished is REJECTED — mechanically, no model needed.
+  const rejected = await run(
+    baseRequest([{ deliverable: 'function pay() { // TODO: implement', digest: 'sha256:todo' }],
+      'review-real-todo'),
+    realTiers
+  );
+  eq(rejected.rounds[0]?.verdict, 'REJECTED',
+    'the REAL mechanical judge rejects work whose own text says it is unfinished');
+  eq(rejected.status, 'REVISE', 'and the surface asks for a revision');
+  eq(rejected.envelope, undefined, 'nothing is signed off');
+
+  // An EMPTY submission is refused before a review runs. It cannot be caught by
+  // the judge: `evidence` is the rendered trace, and a trace of "presented an
+  // empty submission" is not itself empty, so the vacuity check finds no defect
+  // and empty work would escalate as if it were merely hard to judge.
+  await refuses(
+    () => run(baseRequest([{ deliverable: '', digest: 'sha256:empty' }], 'review-real-empty'),
+      realTiers),
+    'nothing to review',
+    'an empty deliverable is refused rather than reviewed'
+  );
+
+  // AND THE LIMIT, ASSERTED. Clean work cannot be accepted by the mechanical
+  // tier alone — it escalates to NOT_CHECKED, so ACCEPTED is unreachable. This
+  // is the property `canAccept: false` reports, held still.
+  const clean = await run(
+    baseRequest([{ deliverable: 'a complete implementation with error handling',
+      digest: 'sha256:clean' }], 'review-real-clean'),
+    realTiers
+  );
+  eq(clean.rounds[0]?.verdict, 'NOT_CHECKED',
+    'clean work escalates rather than passing — the mechanical tier never signs off');
+  truthy(clean.status !== 'ACCEPTED',
+    'ACCEPTED is UNREACHABLE without a model tier, which is what canAccept:false means');
+
+  // With a model tier, the same clean work CAN be accepted. Same composition,
+  // one more tier — so the escalation path is what was missing, not the loop.
+  const withModel = [
+    ...realTiers,
+    { name: 'model:test', judge: judges.modelJudge({
+      client: { async complete() { return '{"outcome":"VERIFIED","score":0.96,"detail":"meets it"}'; } },
+    }) },
+  ];
+  const accepted = await run(
+    baseRequest([{ deliverable: 'a complete implementation with error handling',
+      digest: 'sha256:clean' }], 'review-real-model'),
+    withModel
+  );
+  eq(accepted.status, 'ACCEPTED', 'the same clean work IS accepted once a model tier can escalate to it');
+  truthy(accepted.envelope, 'and it produces a portable envelope');
+}
 
 if (failures.length > 0) {
   console.error(`\ncheck:review-session — FAILED. ${failures.length} of ${passed + failures.length}:\n`);

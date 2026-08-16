@@ -91,7 +91,8 @@
     "check:lesson-ids": "node scripts/check-lesson-ids.mjs",
     "check:replay-plan": "node scripts/check-replay-plan.mjs",
     "check:acceptance-loop": "node scripts/check-acceptance-loop.mjs",
-    "check:review-session": "node scripts/check-review-session.mjs"
+    "check:review-session": "node scripts/check-review-session.mjs",
+    "check:judges": "node scripts/check-judges.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

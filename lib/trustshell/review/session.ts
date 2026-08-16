@@ -195,6 +195,29 @@ export async function runReviewSession(input: {
     throw new ReviewConfigError('attempts must contain at least one submission');
   }
 
+  // An EMPTY deliverable is refused here rather than reviewed.
+  //
+  // It cannot be caught downstream: the judge sees `evidence`, which is the
+  // rendered TRACE, and a trace of "presented an empty submission" is not
+  // itself empty. So `mechanicalJudge`'s vacuity check — which asks whether
+  // anything was RECORDED — correctly says no defect, and empty work escalates
+  // as if it were merely hard to judge. Found by asserting it end to end.
+  //
+  // Refusing is also the right shape: there is no review to run on nothing, and
+  // spending a drawn auditor and a signed verdict on it would produce a
+  // perfectly valid rejection of a request that should never have been made.
+  for (const [i, a] of request.attempts.entries()) {
+    if (a.deliverable.trim().length === 0) {
+      throw new ReviewConfigError(
+        `attempts[${i}].deliverable is empty. There is nothing to review; this is a ` +
+          'malformed submission rather than work that fails its criteria.'
+      );
+    }
+    if (a.digest.trim().length === 0) {
+      throw new ReviewConfigError(`attempts[${i}].digest is empty`);
+    }
+  }
+
   const doer = await keyPairFromSeed(config.doerSeed);
   const auditors = await Promise.all(config.auditorSeeds.map((s) => keyPairFromSeed(s)));
   const keyFor = new Map(auditors.map((a) => [a.did, a.privateKey]));
@@ -237,7 +260,7 @@ export async function runReviewSession(input: {
       if (!submitted) return null;
       return {
         submissionDigest: submitted.digest,
-        execution: handoffOnly(submitted.deliverable, input.now ?? (() => new Date())),
+        execution: submissionExecution(submitted.deliverable, input.now ?? (() => new Date())),
       };
     },
   });
@@ -257,56 +280,88 @@ export async function runReviewSession(input: {
 }
 
 /**
- * A kernel execution that submits the caller's deliverable and nothing else.
+ * A kernel execution that puts the submitted artefact in front of the judge.
  *
- * No tools, no writes, one turn. This surface reviews work that already exists;
- * giving the model a tool budget here would let a review request perform side
- * effects, which is a capability nobody asked this endpoint for.
+ * ── WHY THE DELIVERABLE ARRIVES AS A TOOL OBSERVATION ───────────────────────
  *
- * The dispatcher and authorizer are DENY-ALL rather than absent. With an empty
- * allowlist the kernel refuses every call before dispatch, so neither should
- * ever run — and a permissive stub sitting behind an empty allowlist is one
- * config edit away from being the thing that executes. A stub that would grant
- * if reached is not unreachable code, it is a latent grant.
+ * The first version of this handed the deliverable off as the agent's `summary`
+ * and made no tool calls. It ran, it signed, it produced envelopes — and the
+ * judge never saw the submission. `renderEvidence` renders TOOL CALLS ONLY, and
+ * `JudgeRequest.evidence` says exactly why: *"Evidence, never the agent's
+ * summary."* So the mechanical judge was reading a one-line trace with no
+ * content in it, returning NOT_CHECKED for work that plainly declared itself
+ * unfinished.
+ *
+ * That was caught by running the REAL judge through the REAL composition, not
+ * by reading: every unit assertion passed, because they all injected a reviewer
+ * that ignored its input.
+ *
+ * The architecture was right and the surface was wrong. An agent's own summary
+ * is not evidence of anything; a recorded observation is. So the submission
+ * enters as the observation of one read-only call, which is what it actually is
+ * — an artefact the harness ingested.
+ *
+ * MARKED UNTRUSTED, deliberately. The submission is written by the party being
+ * judged, so `untrustedOutputSources` includes it and the rendered evidence
+ * carries `[untrusted source]`. The judge is told, in the material itself, that
+ * this text is not an instruction source.
+ *
+ * ONE call, `read` effect, zero write budget. The review still cannot cause a
+ * side effect; it can now see what it is reviewing.
  */
-function handoffOnly(deliverable: string, now: () => Date) {
+const SUBMISSION_TOOL = 'submission';
+
+function submissionExecution(deliverable: string, now: () => Date) {
   return {
     policy: {
-      maxIterations: 1,
-      noProgressAbortAfter: 1,
-      toolsAllowed: [] as string[],
+      maxIterations: 2,
+      noProgressAbortAfter: 2,
+      toolsAllowed: [SUBMISSION_TOOL],
       irreversibleRequiresHuman: [] as string[],
-      untrustedOutputSources: [] as string[],
+      // The artefact is authored by the examinee. Saying so is the whole point.
+      untrustedOutputSources: [SUBMISSION_TOOL],
       maxWritesPerSession: 0,
-      toolEffects: {} as Record<string, 'read'>,
+      toolEffects: { [SUBMISSION_TOOL]: 'read' } as Record<string, 'read'>,
     },
     model: {
+      calls: 0,
       async turn() {
+        this.calls += 1;
+        if (this.calls === 1) {
+          return { calls: [{ id: 's1', name: SUBMISSION_TOOL, args: {} }] };
+        }
         return {
           calls: [],
           handoff: {
             outcome: 'VERIFIED' as const,
-            summary: deliverable,
+            summary: 'submission presented for review',
             evidence: [] as string[],
           },
         };
       },
     },
     tools: {
-      async call() {
-        throw new Error(
-          'the review surface dispatches no tools: it judges work that already ' +
-            'exists. Reaching this means the allowlist was widened without ' +
-            'anyone deciding what a review endpoint should be able to do.'
-        );
+      async call(call: { name?: string }) {
+        if (call?.name !== SUBMISSION_TOOL) {
+          // Not reachable through the allowlist, and it refuses rather than
+          // returning something: a dispatcher that answers an unexpected name
+          // is one allowlist edit away from being a general-purpose tool.
+          throw new Error(
+            `the review surface dispatches only ${SUBMISSION_TOOL}; got ${String(call?.name)}`
+          );
+        }
+        return { content: deliverable };
       },
     },
     authorizer: {
-      async authorize() {
+      async authorize(request: { call?: { name?: string } }) {
+        if (request?.call?.name === SUBMISSION_TOOL) {
+          return { allowed: true as const, reason: 'presenting the submission for review' };
+        }
         return {
           allowed: false as const,
           kind: 'not_in_allowlist' as const,
-          reason: 'the review surface authorizes no tool calls',
+          reason: 'the review surface authorizes nothing but presenting the submission',
         };
       },
     },
