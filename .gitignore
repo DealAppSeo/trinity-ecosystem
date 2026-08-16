@@ -79,6 +79,7 @@ headroom.db
 .handoff-check-*/
 .did-compare-check-*/
 .repid-scoring-check-*/
+.hal-chain-check-*/
 
 # temp compile dir for check:custody-shadow
 .custody-shadow-check-*/

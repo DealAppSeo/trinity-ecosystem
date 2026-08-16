@@ -355,10 +355,16 @@ export function checkPerTxLimit(amountUSDC: number, limit: number): LimitCheck {
     return {
       outcome: 'FAILED',
       withinLimit: false,
-      detail: `amount ${amountUSDC} USDC exceeds the per-transaction limit of ${limit}`,
+      // WORDING IS PART OF THE CONTRACT. This string lands in a compliance
+      // receipt's `denialReason` and `scripts/e2e/run-e2e.mjs` matches
+      // /exceeds per-tx limit/i against it over HTTP. An earlier draft said
+      // "the per-transaction limit of", which reads better and broke the
+      // assertion — a denial reason that is evidence is an observable surface,
+      // not prose to tidy.
+      detail: `Amount ${amountUSDC} USDC exceeds per-tx limit ${limit}`,
     };
   }
-  return { outcome: 'VERIFIED', withinLimit: true, detail: `amount ${amountUSDC} is within the per-transaction limit of ${limit}` };
+  return { outcome: 'VERIFIED', withinLimit: true, detail: `amount ${amountUSDC} is within the per-tx limit of ${limit}` };
 }
 
 /**
@@ -400,7 +406,7 @@ export function checkDailyLimit(
     return {
       outcome: 'FAILED',
       withinLimit: false,
-      detail: `daily limit would be exceeded: ${spentSoFar} already spent + ${amountUSDC} = ${total} > ${limit}`,
+      detail: `Daily limit would be exceeded: ${spentSoFar} already spent + ${amountUSDC} = ${total} > ${limit}`,
     };
   }
   return {

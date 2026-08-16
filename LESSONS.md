@@ -1087,3 +1087,43 @@ provider downtime as human referrals would bury the referral rate in
 infrastructure noise. **A signal that fires for everything measures nothing.**
 Both omissions are asserted, not assumed: `check:panel-tier` fails if truncation
 or an outage ever claims a referral.
+
+---
+
+## A19 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
+
+**[VERIFIED] — the run is in CI: `check` green, `test:e2e` red, same commit.**
+
+`npm run check` — the repo's own comprehensive gate, the one `check-all.mjs`
+discovers 52 suites for — reported **52 VERIFIED, 0 NOT_CHECKED, 0 FAILED**.
+The same commit failed CI.
+
+The workflow runs three things, and `check` is only the first:
+
+```
+npm run check        # 52 suites  <- the one everybody runs
+npx next build
+npm run test:e2e     # 37 steps over HTTP against a real server
+```
+
+The failure was a **denial reason reworded**. `checkPerTxLimit` said "exceeds
+the per-transaction limit of 100" where the original said "exceeds per-tx limit
+100", and `scripts/e2e/run-e2e.mjs:356` matches `/exceeds per-tx limit/i`
+against it **over HTTP**. Nothing in the 52 suites touches that string, because
+none of them starts a server.
+
+**Why it is the house defect and not a slip.** The reworded string is a
+`denialReason` written into a compliance receipt — an artifact whose entire
+purpose is being evidence. Its wording is an observable contract, and it was
+edited as though it were prose, in a commit whose subject was *fixing* unearned
+claims. Confidence came from a green run that structurally could not see the
+break.
+
+**The rule.** *Before claiming a change is green, run what CI runs — all of it.*
+`npm run check && npx next build && npm run test:e2e`. A suite that does not
+start a server cannot see an HTTP contract, and `check-all.mjs`'s summary line
+is honest about what it ran, not about what CI will.
+
+Also, from the same incident: the fast suite now duplicates the e2e's own
+regexes (`check:repid-scoring`, 'THE DENIAL WORDING IS A CONTRACT'), so the next
+break shows up in seconds rather than after a build and a server boot.

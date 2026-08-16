@@ -145,7 +145,7 @@ export class KYAValidator {
         withinDailyLimit:  null,
         withinTxLimit:     txCheck.withinLimit,
         insuranceCoverage: profile.insuranceCoverage,
-        denialReason:      `${txCheck.detail} (${profile.repidTier} tier)`,
+        denialReason:      `${txCheck.detail} for ${profile.repidTier} tier`,
       };
     }
 

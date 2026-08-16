@@ -77,6 +77,7 @@
     "check:probes": "node scripts/check-probes-selftest.mjs && node scripts/check-probes.mjs",
     "mutate": "node scripts/mutate.mjs",
     "check:repid-scoring": "node scripts/check-repid-scoring.mjs",
+    "check:hal-chain": "node scripts/check-hal-chain.mjs",
     "check:hal-receipt": "node scripts/check-hal-receipt.mjs",
     "check:throughput": "node scripts/check-throughput.mjs"
   },

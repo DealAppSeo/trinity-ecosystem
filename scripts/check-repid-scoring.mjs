@@ -248,6 +248,16 @@ check('the daily limit is INCLUSIVE at the boundary', () => {
   eq(checkDailyLimit(101, 900, 1000).outcome, 'FAILED', 'one over is not');
 });
 
+check('THE DENIAL WORDING IS A CONTRACT, not prose', () => {
+  // These strings land in a compliance receipt's denialReason and are matched
+  // over HTTP by scripts/e2e/run-e2e.mjs. Rewording one to read better is what
+  // broke CI on this very change: `npm run check` was 52 VERIFIED while
+  // `npm run test:e2e` — a separate step — went red. The regexes below are the
+  // e2e's own, duplicated here so the break shows up in the fast suite too.
+  match(checkPerTxLimit(5000, 100).detail, /exceeds per-tx limit/i, 'e2e run-e2e.mjs:356 matches this');
+  match(checkDailyLimit(900, 900, 1000).detail, /daily limit would be exceeded/i, 'the daily counterpart');
+});
+
 check('the per-tx limit is INCLUSIVE at the boundary', () => {
   eq(checkPerTxLimit(5000, 5000).outcome, 'VERIFIED', 'exactly at the limit is within it');
   eq(checkPerTxLimit(5001, 5000).outcome, 'FAILED', 'one over is not');
