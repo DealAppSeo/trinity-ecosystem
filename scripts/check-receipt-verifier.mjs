@@ -200,7 +200,27 @@ await tamper('marker upgraded to VERIFIED', (r) => { r.marker = 'VERIFIED'; }, '
 }
 {
   const bad = JSON.parse(JSON.stringify(signed));
-  bad.attestation.signature = bad.attestation.signature.slice(0, -2) + 'aa';
+  // A TAMPER TEST WHOSE TAMPER CAN BE A NO-OP PROVES NOTHING.
+  //
+  // This was `slice(0, -2) + 'aa'`, which is the IDENTITY on any signature that
+  // already ends in 'aa'. The keypair is generated fresh every run (`dev` above),
+  // so the signature is different each time and that case comes up on its own
+  // schedule — rarely, and therefore as a flaky red build rather than an obvious
+  // bug. It failed exactly once in CI on 2026-08-16 with the signature verifying
+  // and this assertion reading "NOT CHECKED": the verifier was handed an
+  // untampered receipt and correctly found nothing wrong with it.
+  //
+  // The conditional makes the change total — the last two characters always
+  // differ from what was there — so the receipt handed to the verifier is
+  // guaranteed to be tampered.
+  //
+  // No mutation is registered for this in `mutations.mjs` on purpose: a mutation
+  // restoring the old line would only turn this suite red on the rare signature
+  // that ends in 'aa', so it would SURVIVE almost every run and fail the gate.
+  // A non-deterministic mutation is the INVALID category that gate already
+  // refuses, and it is the same non-determinism being fixed here.
+  const sig = bad.attestation.signature;
+  bad.attestation.signature = sig.slice(0, -2) + (sig.endsWith('aa') ? 'bb' : 'aa');
   const r = await runVerifier(bad, transcriptPath);
   ok('tamper caught: mangled signature', overallOf(r.out) === 'FAILED' || /⚠ signature: cannot check/.test(r.out), r.out);
 }
