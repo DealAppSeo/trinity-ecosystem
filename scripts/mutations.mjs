@@ -427,6 +427,65 @@ export const MUTATIONS = [
     find: '    JSON.stringify(c.category),',
     replace: "    (c.category ?? 'null'),",
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/throughput/ledger.ts — the instrument that has to fire on an
+  // outage three dashboards missed for 29 days.
+  // -------------------------------------------------------------------------
+  {
+    id: 'throughput-canary-counts-as-output',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a synthetic probe NEVER counts as production. This is the exact bug that hid ' +
+      'the 2026-07-17 outage for four weeks: one identical prompt per day kept every ' +
+      'liveness check answering "yes, something happened recently"',
+    find: '  const producing = o.rows > 0;',
+    replace: '  const producing = o.rows + o.syntheticRows > 0;',
+  },
+  {
+    id: 'throughput-degradation-never-fires',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a running producer well below its own baseline is loud. Silence-only alerting ' +
+      'fires on 07-18; the degradation rule fires on 07-16, two days earlier, while ' +
+      'the fleet was still alive and the cause was still recoverable',
+    find: '  const degradedBelow = d.degradedBelow ?? 0.5;',
+    replace: '  const degradedBelow = d.degradedBelow ?? 0;',
+  },
+  {
+    id: 'throughput-thin-baseline-passes',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'too little history is NOT_CHECKED, never OK — two outcomes would collapse ' +
+      '"we could not judge" into "it passed", which is this repo\'s defining defect',
+    find: '  if (o.baselineDays < minDays || o.baseline <= 0) {',
+    replace: '  if (false) {',
+  },
+  {
+    id: 'throughput-off-but-spending-goes-quiet',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a producer declared off but still writing rows is LOUD — it is spend nobody ' +
+      'budgeted, and it is the case least likely to be noticed because nobody ' +
+      'inspects things they believe are switched off',
+    find: '    if (producing) {\n      return out(\n        \'UNDECLARED_ACTIVITY\',',
+    replace: '    if (false) {\n      return out(\n        \'UNDECLARED_ACTIVITY\',',
+  },
+  {
+    id: 'throughput-expired-pause-stays-quiet',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a cost pause past its review date is LOUD — without an expiry, "off for a week ' +
+      'to save money" silently becomes a year, which is the drift this ledger exists ' +
+      'to make impossible',
+    find: "      if (Date.parse(d.reviewBy) < Date.parse(now)) {",
+    replace: '      if (false) {',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
