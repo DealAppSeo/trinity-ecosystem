@@ -12,6 +12,13 @@
 
 import { useEffect, useState } from 'react';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
+import {
+  applySessionProbe,
+  applySignInResult,
+  applySignOutResult,
+  SIGNED_OUT,
+  type SessionView,
+} from '@/lib/auth-session';
 
 const BG = '#020817';
 const PANEL = '#0f172a';
@@ -22,57 +29,45 @@ const MUTED = '#64748b';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [status, setStatus] = useState<'idle' | 'working' | 'signed-in'>('idle');
-  const [error, setError] = useState<string | null>(null);
-  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
+  // One view, not three loose pieces of state. The transitions live in
+  // `lib/auth-session.ts` so they can be gated — see that file's header for why
+  // a client component was the wrong place for them.
+  const [view, setView] = useState<SessionView>(SIGNED_OUT);
+  const { status, error, email: currentEmail } = view;
 
   useEffect(() => {
     getSupabaseBrowser()
       .auth.getSession()
-      .then(({ data }) => {
-        if (data.session?.user?.email) {
-          setCurrentEmail(data.session.user.email);
-          setStatus('signed-in');
-        }
-      })
-      // A missing/misconfigured Supabase key throws here. Show it rather than
-      // rendering a login form that cannot possibly work.
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+      .then((result) => setView(applySessionProbe(result)))
+      // A missing/misconfigured Supabase key THROWS rather than returning an
+      // error. Routed through the same transition so a broken deployment does
+      // not render as a merely logged-out one.
+      .catch((e: unknown) =>
+        setView(applySessionProbe({ error: { message: e instanceof Error ? e.message : String(e) } }))
+      );
   }, []);
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();
-    setError(null);
-    setStatus('working');
+    setView({ status: 'working', email: null, error: null });
     try {
-      const { data, error: signInError } = await getSupabaseBrowser().auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInError) throw signInError;
-      setCurrentEmail(data.user?.email ?? email);
-      setStatus('signed-in');
+      const result = await getSupabaseBrowser().auth.signInWithPassword({ email, password });
+      setView(applySignInResult(result, email));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setStatus('idle');
+      setView(applySignInResult({ error: { message: e instanceof Error ? e.message : String(e) } }, email));
     }
   }
 
   async function signOut() {
-    // The UI must not claim you are signed out until the session is actually
-    // gone. The previous version cleared the state unconditionally, so a failed
-    // sign-out rendered "signed out" over a session that was still live — the
-    // same shape as the silent `{ data }` reads fixed in lib/, and worse here
-    // because the false state is the reassuring one. A user on a shared machine
-    // who reads "signed out" and walks away is the case this protects.
-    setError(null);
-    const { error: signOutError } = await getSupabaseBrowser().auth.signOut();
-    if (signOutError) {
-      setError(`Sign-out failed, you are still signed in: ${signOutError.message}`);
-      return;
+    // On failure this KEEPS the signed-in view, because that is still true. See
+    // `applySignOutResult` — the tidy answer and the honest one differ here.
+    try {
+      setView(applySignOutResult(await getSupabaseBrowser().auth.signOut(), view));
+    } catch (e) {
+      setView(
+        applySignOutResult({ error: { message: e instanceof Error ? e.message : String(e) } }, view)
+      );
     }
-    setCurrentEmail(null);
-    setStatus('idle');
   }
 
   return (
@@ -110,6 +105,23 @@ export default function LoginPage() {
             <p style={{ color: '#86efac', fontSize: 13.5, margin: '0 0 18px' }}>
               Signed in as <strong>{currentEmail}</strong>
             </p>
+            {/* A failed sign-out leaves status 'signed-in', so the error has to
+                render HERE too. The form branch below is unreachable in that
+                state — which is how this message would have been set and never
+                shown, replacing a false "signed out" with a silent one. */}
+            {error && (
+              <p
+                style={{
+                  color: '#fca5a5',
+                  fontSize: 12.5,
+                  margin: '-8px 0 18px',
+                  lineHeight: 1.5,
+                  wordBreak: 'break-word',
+                }}
+              >
+                {error}
+              </p>
+            )}
             <div style={{ display: 'flex', gap: 10 }}>
               <a
                 href="/dashboard"

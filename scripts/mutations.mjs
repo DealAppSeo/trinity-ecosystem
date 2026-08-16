@@ -855,6 +855,46 @@ export const MUTATIONS = [
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
   {
+    id: 'sign-out-claims-success-it-did-not-earn',
+    suite: 'check:auth-session',
+    file: 'lib/auth-session.ts',
+    protects:
+      'a FAILED sign-out keeps you signed IN. This is the defect the module was extracted ' +
+      'for: the component discarded the result and cleared the UI unconditionally, so the ' +
+      'reassuring reading was the false one. Someone on a shared machine who reads ' +
+      '"signed out" and walks away is the case it protects',
+    find: `    return {
+      ...current,
+      error: \`Sign-out failed, you are still signed in: \${result.error.message}\`,
+    };`,
+    replace: '    return { ...SIGNED_OUT, error: result.error.message };',
+  },
+  {
+    id: 'session-probe-hides-a-broken-deployment',
+    suite: 'check:auth-session',
+    file: 'lib/auth-session.ts',
+    protects:
+      'a THROWN session probe is not a signed-out user. A missing or misconfigured Supabase ' +
+      'key throws here, and dropping the error renders a login form that cannot possibly ' +
+      'work with nothing said — a broken deployment made to look like an ordinary session end',
+    find: `  if (result.error) {
+    return { status: 'idle', email: null, error: result.error.message };
+  }
+  const email = result.data?.session?.user?.email ?? null;`,
+    replace: '  const email = result.data?.session?.user?.email ?? null;',
+  },
+  {
+    id: 'safely-signed-out-becomes-the-naive-predicate',
+    suite: 'check:auth-session',
+    file: 'lib/auth-session.ts',
+    protects:
+      "`isSafelySignedOut` is not `status !== 'signed-in'`. The two differ exactly where it " +
+      'matters — a failed sign-out, and a cleared view still carrying an error — which is ' +
+      'why the predicate has a name instead of being inlined at a call site',
+    find: "  return view.status === 'idle' && view.email === null && view.error === null;",
+    replace: "  return view.status !== 'signed-in';",
+  },
+  {
     id: 'earned-metrics-shrinks-toward-the-fleet-mean',
     suite: 'check:hal-repid-linkage',
     file: 'lib/trustshell/EarnedMetrics.ts',
