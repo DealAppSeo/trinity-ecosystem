@@ -1303,3 +1303,69 @@ psql> select * from public.v_repid_proof_claim_integrity;
 `npm run check` discovers `check:*`. Both merge conflicts this session were the
 tail of that one shared array. Doing it while two lanes have open PRs against the
 file causes exactly the conflict it fixes — do it when main is quiet.
+
+---
+
+## 2026-08-16 — Constructive red team capability (PR #66)
+
+Branch `claude/trust-layer-red-team-ujpq6a`. Surface = cloud/remote CC.
+Access: GitHub **yes**, Supabase **yes**, Railway **no**. Preflight verdict GO,
+`global_pause` false.
+
+### Accomplished (REAL, all executed)
+
+- **Skill** `.claude/skills/trust-red-team/SKILL.md` — directs a campaign; encodes
+  the fences, the reachability matrix, per-component threat model, report format.
+- **Suite** `npm run check:redteam` (`scripts/check-redteam.mjs`, auto-discovered
+  by `check-all.mjs`; 60 `check:*` scripts now). Three outcomes
+  HELD/BREACHED/NOT_CHECKED; exit 0/2/1 per repo convention.
+- **7 probes**, all executed against compiled production modules or real source:
+  PAY-001, PAY-002, HAL-001, RCPT-001, RCPT-002, REPID-001, LIVE-001.
+- **Ledger** `scripts/redteam/ledger.json` — owner + reason + `reviewBy` required;
+  expires in **both** directions (a stale entry over a now-HELD probe also fails).
+- **Charter** `docs/RED-TEAM-CHARTER.md` — paste-ready brief for XAI/Grok/Gemini.
+  Collection is split from judgement: external agents write observations into
+  `scripts/redteam/evidence/`, probes here judge them.
+- **Baseline report** `docs/RED-TEAM-BASELINE-2026-08-16.md`; 3 entries added to
+  `docs/PRIOR-WORK-INDEX.md`.
+
+### Findings — 4 HELD, 3 open
+
+| id | sev | state |
+|---|---|---|
+| PAY-001 | High | OPEN — dual-sig gate verifies no cryptographic material. **Source-derived**; live confirmation not possible from an agent session. |
+| HAL-001 | Medium | OPEN — `verifyHalChain` returns VERIFIED for a truncated chain; by exhaustive search no input yields VERIFIED with `windowStartUnverifiable: false`. |
+| RCPT-001 | Low | OPEN — abandoned-HMAC-default guard is case-sensitive. |
+| PAY-002 / RCPT-002 / REPID-001 / LIVE-001 | — | HELD under full batteries with anchors intact. |
+
+### Measured, live [VERIFIED 2026-08-16 17:16 UTC via pg_net]
+
+- `www` (Vercel `6e00ae0`) `TRUSTRAILS_HMAC_SECRET=abandoned_default`;
+  `app` (Railway `4a999bc`) `missing`. **Both FAIL CLOSED** — `requireAuditSecret`
+  refuses both, so receipt minting is unavailable on both surfaces. Availability
+  finding, not forgery. Surfaces are on **different commits**.
+- RepID `reachableCeiling()` = **10,000**, agreeing with the scoring path.
+  **Supersedes the earlier 4008 figure.** Zero-behaviour + self-asserted
+  `humanCustody` scores 613 → Bronze.
+
+### BLOCKED_FOR_SEAN
+
+1. **PAY-001 fix** — wire the dual-signature gate to `countersignContract` and
+   check signer DIDs against registered role holders. Changes a live
+   authorization gate; not applied. Ledgered, owner Sean, review 2026-09-15.
+2. **Set `TRUSTRAILS_HMAC_SECRET`** on both surfaces (Vercel `trustrails` project
+   env, Railway env). Until then no surface can mint a receipt. Note `www`
+   currently holds the abandoned in-source default — replace, do not keep.
+
+### Next 3 commands
+
+```bash
+npm run check:redteam -- --json          # current campaign state
+npm run check:redteam -- --probe HAL-001 # the cheapest open fix (no prod caller yet)
+node scripts/check-redteam.mjs --probe PAY-001   # HELD once a verifier is reachable
+```
+
+Next campaign, priority order: BFT panel veto semantics under composition; x402
+settlement replay/double-settle; anon RLS regression probe; live confirmation of
+PAY-001 (needs a collector with network reach); prompt injection into the
+evaluate wrapper via Garak (hand to an external agent — needs egress).
