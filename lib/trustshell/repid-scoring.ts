@@ -344,6 +344,36 @@ export interface ThresholdResolution {
  * `readable` is a required argument with no default. The caller must state
  * whether the read succeeded, because a signature that let them omit it is
  * exactly how the error came to be discarded in the first place.
+ *
+ * ── WHAT IS LIVE AND WHAT IS LATENT ────────────────────────────────────────
+ *
+ * Measured against `institution_risk_config` on 2026-08-16 — 3 rows, and the
+ * column is `integer NULL DEFAULT 5000` with **no CHECK constraint** and a
+ * UNIQUE `institution_id` (so `.single()` cannot see the multi-row form of
+ * PGRST116, and mapping that code to "absent" is sound):
+ *
+ *   amina-conservative   7500
+ *   default              5000
+ *   portfolio-balanced   4000
+ *
+ * Stated separately because they are not equally severe, and saying so is the
+ * difference between a finding and an alarm:
+ *
+ * - **The unreadable-config path is LIVE.** `amina-conservative` stores 7500;
+ *   substituting the default drops its bar to 5000. A real institution's gate
+ *   loosens by 2500 points during a database outage. This one was reachable
+ *   today, without anyone changing a row.
+ * - **The stored-zero divergence is LATENT.** No row stores 0. Nothing
+ *   prevents one — there is no CHECK — so it is one `update` away, and the
+ *   coherence report would then describe a threshold the gate does not use.
+ *   It was not firing.
+ * - **A NEGATIVE threshold is storable and was a fail-open.** No CHECK bounds
+ *   the column, and `-1` is truthy, so BOTH old expressions passed it through
+ *   intact; `repidScore >= -1` is then true for every agent and the payment
+ *   gate always opens. Refused as malformed here.
+ * - **A non-finite threshold cannot come from this column** — it is `integer`.
+ *   The guard in `describeCoherence` is defensive, for callers that reach it
+ *   directly, and is NOT evidence of a reachable production path.
  */
 export function resolvePaymentThreshold(stored: unknown, readable: boolean): ThresholdResolution {
   if (!readable) {

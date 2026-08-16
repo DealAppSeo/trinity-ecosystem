@@ -378,6 +378,19 @@ check('AN UNREADABLE CONFIG IS NOT_CHECKED — it can LOWER the bar', () => {
   truthy(r.threshold !== 8000, 'a failed read reports nothing, not the value it did not read');
 });
 
+check('A NEGATIVE threshold was a FAIL-OPEN under both old expressions', () => {
+  // The column is `integer NULL DEFAULT 5000` with NO CHECK constraint
+  // [measured 2026-08-16], so a negative value is storable. `-1` is truthy, so
+  // `||` passed it through and so did `??` — and `repidScore >= -1` is true for
+  // every agent, opening the payment gate unconditionally.
+  truthy(Boolean(-1), 'precondition: a negative threshold is truthy, so `|| default` never fired');
+  eq((-1 || DEFAULT_PAYMENT_THRESHOLD), -1, 'precondition: it survived the old `||` intact');
+  truthy(0 >= -1, 'precondition: every score, including 0, clears a negative threshold');
+  const r = resolvePaymentThreshold(-1, true);
+  eq(r.outcome, 'FAILED', 'so a negative threshold must be refused');
+  eq(r.threshold, null, 'and yield no number for the gate to compare against');
+});
+
 check('A MALFORMED THRESHOLD IS REFUSED, not defaulted', () => {
   for (const bad of [NaN, Infinity, -1, '5000', {}, true]) {
     const r = resolvePaymentThreshold(bad, true);
