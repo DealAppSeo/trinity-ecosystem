@@ -1250,3 +1250,65 @@ that has never once fired is not a slow poll.
    `.get(key, [])` on an unparsed error body is the exact line that hides it.
 3. **A watcher that has never fired is evidence about the watcher.** Silence
    from a check is not a result.
+
+---
+
+## A17 — the credential scanner could not see binary files, and the speed fix is what found it (2026-08-16)
+
+**This started as a performance sprint and ended as a security one.** Both halves
+matter, and the order matters more.
+
+**The measurement.** `npm run check` takes 171.7s locally across 58 suites, and
+one suite was **29.7s of it — 17%**. `check:legacy-key`, the gate that hunts
+legacy Supabase JWTs in git history.
+
+**The first hypothesis was wrong, and cheap to disprove.** The suite ends in
+`NOT MEASURED` because the sandbox proxy denies `*.supabase.co`, so the obvious
+reading was five probes each burning a 15s timeout. A patch was written to
+short-circuit them. It saved nothing — the probes were never slow. Timed
+directly: **390ms, 10ms, 4ms**. The proxy answers 403 immediately; the fetch
+resolves, so the timeout path never runs.
+
+The cost was `collectLegacyJwts`: **one `git grep` subprocess per commit, 710
+commits**, each re-reading every file in that commit's tree. A file unchanged
+for 700 commits was scanned 700 times.
+
+**The fix, and the surprise.** Scanning **unique blobs** instead — 5,553 of them,
+each read once — took **0.97s**. But it returned **six** tokens where the
+per-commit scan returned **five**.
+
+A difference is not a win until it is explained. The extra token lives in
+`trinity-science/app/__pycache__/anfis_router.cpython-313.pyc`, a committed
+compiled-Python file. **`git grep` skips binary files by default.**
+
+**That is the finding.** The scanner had a blind spot the width of an entire file
+class, and it reported clean about a place it never looked. This particular token
+is `role=anon`, and every legacy key on this project is disabled, so it is inert
+— exactly like the `service_role` JWT in `docs/KEY-ROTATION.md`. The severity is
+not this key. It is that a `service_role` token committed inside **any** binary —
+a `.pyc`, a build artifact, a bundled archive, a compiled test fixture — would
+have been equally invisible, and the gate would have gone green.
+
+**Result: 28.9s → 1.3s, and 5 keys → 6.** Faster and more complete, which is
+usually a sign the old thing was doing unnecessary work rather than careful work.
+
+**Mutation tested** by capping blob reads at zero bytes (finds nothing, proving
+it reads blobs rather than inferring) and by breaking the size-based frame
+parsing (result changes rather than silently degrading).
+
+**HANDOFF — `scan-secrets.mjs` has the same blind spot.** It scans history with
+`git grep` in 64-commit batches, so it inherits the binary skip. It was not
+changed here: it is the supply lane's file, its history mode is deliberately
+non-failing, and one gate at a time is the whole point of one-advisory-per-change.
+Its working-tree mode is unaffected.
+
+**Two rules.**
+
+*Measure where the time is before optimising it.* The plausible story — five
+network timeouts — was wrong, and a patch had already been written against it.
+One `Date.now()` around a `fetch` cost three seconds and saved a wrong change.
+
+*When a faster implementation returns a different answer, the difference is the
+result.* The instinct is to reconcile it away as a bug in the new code. Here the
+new code was right and the old gate had been under-reporting for as long as it
+had existed.
