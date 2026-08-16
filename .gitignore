@@ -80,6 +80,7 @@ headroom.db
 .did-compare-check-*/
 .repid-scoring-check-*/
 .hal-chain-check-*/
+.receipt-audit-check-*/
 
 # temp compile dir for check:custody-shadow
 .custody-shadow-check-*/
