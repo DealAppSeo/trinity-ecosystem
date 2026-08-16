@@ -1070,6 +1070,59 @@ export const MUTATIONS = [
     find: 'const HEADING_DEF = /^#{2,4}\\s+([A-Z])(\\d+)\\s*[—–-]\\s*(.*)$/;',
     replace: 'const HEADING_DEF = /#{2,4}\\s+([A-Z])(\\d+)\\s*[—–-]\\s*(.*)/;',
   },
+
+  // ── check:replay-plan ─────────────────────────────────────────────────────
+  //
+  // Every one of these lives on the resume path, which a successful first run
+  // never touches. The corpus is 147,704 rows behind a partial unique index, so
+  // a wrong first pass cannot be re-minted — these are the decisions that have
+  // to be right before the run, not after it.
+  {
+    id: 'replay-fatal-error-read-as-duplicate',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'only SQLSTATE 23505 is benign. Treating an unrecognised error as a duplicate turns a ' +
+      'permission denial or a constraint violation into a silent skip, and a skip leaves no ' +
+      'trace — the corpus goes short and the run still prints a completion line. This is the ' +
+      'house defect applied to 147,704 rows',
+    find: "  if (error.code === UNIQUE_VIOLATION) return 'duplicate';\n  return 'fatal';",
+    replace: "  if (error.code === UNIQUE_VIOLATION) return 'duplicate';\n  return 'duplicate';",
+  },
+  {
+    id: 'replay-cursor-runs-backwards',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'the cursor is a high-water mark and only ever rises. Moving it backwards on an ' +
+      'out-of-order batch makes a resumed run re-read rows it already attempted, which is ' +
+      'harmless only because of the unique index — remove that index and it double-mints',
+    find: '  for (const id of attemptedIds) if (id > max) max = id;',
+    replace: '  for (const id of attemptedIds) if (id < max) max = id;',
+  },
+  {
+    id: 'replay-interrupted-run-reads-as-verified',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'an interrupted run is NOT_CHECKED. Dropping this line collapses three outcomes into ' +
+      'two: a run that reached 40,000 of 147,704 rows and stopped reports VERIFIED, which is ' +
+      '"we did not look" printed as "it passed" — the exact substitution CLAUDE.md names as ' +
+      'the recurring defect in this codebase',
+    find: "  if (counts.remaining > 0) return 'NOT_CHECKED';",
+    replace: '  // mutated: incompleteness no longer reported',
+  },
+  {
+    id: 'replay-batch-clamps-to-zero',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'the batch floor. A batch of 0 makes the reader return no rows, the cursor never ' +
+      'advances, and the loop exits immediately with minted 0 — a run that terminates ' +
+      'cleanly having done nothing, which reads as an already-complete corpus',
+    find: '  if (n < MIN_BATCH) return MIN_BATCH;',
+    replace: '  if (n < MIN_BATCH) return n;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

@@ -88,7 +88,8 @@
     "why:open": "node scripts/check-open-work.mjs",
     "check:open-index": "node scripts/check-open-index.mjs",
     "check:alert-digest": "node scripts/check-alert-digest.mjs",
-    "check:lesson-ids": "node scripts/check-lesson-ids.mjs"
+    "check:lesson-ids": "node scripts/check-lesson-ids.mjs",
+    "check:replay-plan": "node scripts/check-replay-plan.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",
