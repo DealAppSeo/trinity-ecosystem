@@ -75,13 +75,16 @@ again, the redeploy landed and this box should be rewritten, not argued with.
 
 ## Claims vs. built
 
-Audited 2026-08-12 against the database, not against the docs. Re-check with
+Audited 2026-08-12 against the database, not against the docs. **The first two
+rows were re-measured 2026-08-16** and both had gone false — they were written
+five days before the fleet stopped, and the table outlived the fact. Every other
+row still carries its 08-12 verdict and has NOT been re-measured. Re-check with
 `npm run north`; the verdicts are here, the counts are not.
 
 | Claim | Where claimed | Verdict |
 | :-- | :-- | :-- |
-| HAL hallucination filtering | npm, README, sites | **LIVE** — the strongest thing here, by far |
-| Portable RepID score | everywhere | **LIVE** — scored daily |
+| HAL hallucination filtering | npm, README, sites | **STOPPED 2026-07-18** — re-measured 2026-08-16. Monthly rows: Jun **70,005** → Jul **39,080** → Aug **33**. The cliff is one night: 07-17 **1,360** → 07-18 **2**, and it has not recovered in 30 days. The 1–2/day since are the nightly smoke test. The corpus is real and large; the producer is off. See the superseded section above |
+| Portable RepID score | everywhere | **STOPPED, same event** — `repid_score_events` monthly: Jun **70,415** → Jul **39,453** → Aug **114**. Scores are therefore FROZEN, not merely unscored: `EarnedMetrics` decay is time-dependent, so every score reads stale-high the longer this runs |
 | Refused trades as the killer feature | HyperDAG README ("160+ refused") | **UNDERSTATED** — the log holds far more refusals than claimed |
 | ZKP Postcard proof | HyperDAG README | **BUILT, COOLING** — large proof corpus, but the rate has fallen off |
 | x402 settlement | HyperDAG README, handoff | **REAL BUT THIN** — genuine on-chain settlements, low volume |

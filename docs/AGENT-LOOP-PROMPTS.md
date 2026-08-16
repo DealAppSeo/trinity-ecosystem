@@ -60,9 +60,34 @@ The verify lane has no permanent owner on purpose: its only requirement is that
 the agent running it did not write the thing it is checking. Rotating it costs
 nothing and removes the one bias that matters.
 
-Two paths are **shared and therefore append-only**: `docs/PRIOR-WORK-INDEX.md`
-and `docs/SPRINT-LOG.md`. Add your entry at the end of the relevant section;
-never reflow or reorder someone else's. That keeps the merge textual.
+### Shared surfaces — append at the end, never reflow
+
+These belong to no lane, and **every** merge conflict on 2026-08-16 came from
+one of them. Add your entry at the **end** of the relevant list or section;
+never reorder, regroup or reflow someone else's. That is the whole rule, and it
+turns a manual resolution into a textual merge.
+
+| path | why it collides |
+|---|---|
+| `docs/PRIOR-WORK-INDEX.md` | every lane adds a row when it finishes |
+| `docs/SPRINT-LOG.md` | every lane appends a dated entry |
+| `scripts/mutations.mjs` | every new gate brings mutants — another agent called it *"a conflict magnet"* in a commit title, and it conflicted on two consecutive PRs |
+| `package.json`, the `check:*` block | every new suite adds a script; `npm run check` discovers them, so **only** the block collides |
+
+**Both sides of a `mutations.mjs` conflict usually end on an unclosed object**,
+closed by a shared `},` below the marker. Taking both halves verbatim gives a
+syntax error; the union needs a `},` inserted between them. Resolve it as a
+union — never pick a side, because each side is a different lane's gate, and
+dropping one silently removes a guard while the build stays green.
+
+**`npm run mutate` is how you check a resolution.** A union that quietly lost
+one lane's mutant shows up as a survivor. On 2026-08-16 that check confirmed two
+merges at 43/43 and 68/68 caught, 0 survived.
+
+Generated files are **not** in this category, because they have one author: the
+generator. `next-env.d.ts` and `tsconfig.json` are rewritten by `next build`, and
+two lanes committed opposite values of `jsx` past each other before the repo
+started holding what the generator writes.
 
 `CLAUDE.md`, `NORTH-STAR.md` and `NEXT.md` are **read-only to every lane** except
 by explicit instruction. They are the shared ground truth; an agent editing its
