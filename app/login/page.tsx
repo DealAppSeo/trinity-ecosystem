@@ -59,7 +59,18 @@ export default function LoginPage() {
   }
 
   async function signOut() {
-    await getSupabaseBrowser().auth.signOut();
+    // The UI must not claim you are signed out until the session is actually
+    // gone. The previous version cleared the state unconditionally, so a failed
+    // sign-out rendered "signed out" over a session that was still live — the
+    // same shape as the silent `{ data }` reads fixed in lib/, and worse here
+    // because the false state is the reassuring one. A user on a shared machine
+    // who reads "signed out" and walks away is the case this protects.
+    setError(null);
+    const { error: signOutError } = await getSupabaseBrowser().auth.signOut();
+    if (signOutError) {
+      setError(`Sign-out failed, you are still signed in: ${signOutError.message}`);
+      return;
+    }
     setCurrentEmail(null);
     setStatus('idle');
   }
