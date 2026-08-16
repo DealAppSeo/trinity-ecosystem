@@ -588,7 +588,7 @@ export const MUTATIONS = [
       'the denial reason is an OBSERVABLE CONTRACT, not prose. It lands in a compliance ' +
       "receipt's `denialReason`, and run-e2e.mjs matches /exceeds per-tx limit/i against it " +
       'over HTTP. Rewording it to read better turned CI red while `npm run check` reported ' +
-      '52 VERIFIED — LESSONS A23. The fast suite pins the regex so the next break surfaces ' +
+      '52 VERIFIED — LESSONS A25. The fast suite pins the regex so the next break surfaces ' +
       'in seconds instead of in a server boot',
     find: '      detail: `Amount ${amountUSDC} USDC exceeds per-tx limit ${limit}`,',
     replace: '      detail: `Amount ${amountUSDC} USDC exceeds the per-transaction limit of ${limit}`,',
