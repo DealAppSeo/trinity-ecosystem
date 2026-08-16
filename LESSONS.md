@@ -1234,3 +1234,62 @@ This is the fourth instance of the failure class the prior-work index already
 names — *suspect the sample before the measurement* — and the third caused
 specifically by an unexamined assumption about the **shape** of the data rather
 than its values.
+
+**Follow-up, same session: A21 left one sub-stratum NOT EXPLAINED, and the
+explanation turned out to be A22 below.** The residual was not noise and not
+benchmark difficulty. Chasing an unexplained caveat rather than shipping around
+it is what found it.
+
+---
+
+## A22 — 41 vetoes fired on rows where the detector called no provider (2026-08-16)
+
+**[VERIFIED] — 59 rows in `hal_runner_results` have an EMPTY `hal_providers_used`,
+carry a `hal_score` anyway, and 41 of them have `hal_vetoed = true`. Measured
+2026-08-16; detail in `docs/HAL-AUC-STRATIFICATION-2026-08-16.md` §5.**
+
+A21 closed with an honest loose end: within the valid stratum, `hal_test_cases`
+scored AUC 0.5940 against `t12-overnight`'s 0.9757, and the document said so and
+called it NOT EXPLAINED. Investigating that caveat found the real defect.
+
+It was never about the benchmarks. Same `gen_provider`, same `gen_model`, same
+`hal_threshold`. **In 59 of 71 `hal_test_cases` rows, HAL called no verification
+provider at all** — and still wrote a score. Split the stratum on execution
+rather than on benchmark:
+
+```
+HAL ran (>=1 provider)     n=169/167   AUC 0.9746  [0.9574, 0.9917]
+HAL did NOT run (empty)    n=28/31     AUC 0.5150  [0.3662, 0.6637]
+```
+
+`benchmark_source` was a proxy. The real variable is whether the detector
+executed. The no-provider rows sit at chance because **the score cannot depend on
+evidence that was never gathered** — class medians 0.2567 and 0.2781, a
+separation of 0.0074.
+
+**The metric contamination is the lesser half.** 41 of those rows set
+`hal_vetoed`. HAL emitted an actionable verdict — a veto — having consulted
+nothing. That is this repository's founding defect, *a system reporting a result
+it has not earned*, sitting inside the component built to catch exactly that, and
+it was invisible because the row looks complete: it has a score, a latency, a
+veto flag, and a label.
+
+Latency was the tell, available the whole time: **947 ms mean against ~3,100 ms**
+when a provider is actually called. A third of the work, a full-looking row.
+
+**The rules.**
+
+1. **"Produced a number" is not "ran".** Before a row enters any denominator,
+   check the column that records whether the work happened — provider list, call
+   count, cost. A NULL result is loud; a **default** result is silent, and a
+   default that looks plausible is the worst case.
+2. **A verdict must not outlive its evidence.** If the provider list is empty,
+   the correct output is NOT_CHECKED — not a score, and certainly not a veto.
+   Three outcomes, at the point of writing, not only at the point of reading.
+3. **Chase the caveat you wrote down.** A21's own NOT EXPLAINED line was the
+   thread that led here. Two of this repo's retractions were caught by caveats
+   their authors had written and then ignored; this is the first one caught by a
+   caveat somebody actually pulled.
+4. **Non-empty is not valid.** 12 rows carry the literal string `used:2` in
+   `hal_providers_used` where names belong. A count written into a name field
+   means an "is it non-empty" check can still pass on garbage. Still OPEN.

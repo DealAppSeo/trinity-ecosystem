@@ -1,12 +1,27 @@
 # HAL detection AUC — the pooled number is a scale artifact
 
-**Headline: pooled AUC 0.4493 [0.4075, 0.4911] is not a measurement of HAL.
-Stratified to the only rows where the comparison is defined, AUC is 0.9579
-[0.9375, 0.9784].** The pooled figure measures the fact that one `hal_mode`
-writes `hal_score` on a 0–100 scale while the others write 0–1.
+**Headline: pooled AUC 0.4493 [0.4075, 0.4911] is not a measurement of HAL. On
+the rows where HAL actually executed, AUC is 0.9746 [0.9574, 0.9917].** The
+pooled figure measures the fact that one `hal_mode` writes `hal_score` on a
+0–100 scale while the others write 0–1.
+
+Two filters are needed and they are independent. §2 removes the scale mismatch;
+**§5 removes 59 rows on which HAL called no verification provider at all** and
+still emitted a score — and, on 41 of them, a veto.
+
+| sample | n_pos | n_neg | AUC | 95% CI |
+|---|---|---|---|---|
+| pooled across `hal_mode` | 197 | 1361 | 0.4493 | [0.4075, 0.4911] |
+| `fact-check-s2` stratum (§4) | 197 | 198 | 0.9579 | [0.9375, 0.9784] |
+| **…and HAL actually ran (§5)** | **169** | **167** | **0.9746** | **[0.9574, 0.9917]** |
+| …and HAL did **not** run | 28 | 31 | 0.5150 | [0.3662, 0.6637] |
 
 Measured 2026-08-16 against live `public.hal_runner_results` (1,825 rows) via
-the Supabase MCP tools. Every figure below is reproducible from the SQL in §6.
+the Supabase MCP tools. Every figure is reproducible from the SQL in §7.
+
+**Quote the 0.9746 line, with "on rows where HAL executed" attached.** The
+0.9579 in §4 is correct for what it says and is superseded as the headline: it
+silently includes 59 rows on which the detector never ran.
 
 ---
 
@@ -105,12 +120,109 @@ an evaluation set rather than assembled by accident.
 a strong detector**, and the CI clears 0.5 by a wide margin.
 
 The `hal_test_cases` sub-stratum at 0.5940 (n = 71) is materially weaker than
-`t12-overnight` at 0.9757 (n = 324) and is **NOT EXPLAINED** here. It is the
-obvious next question and is left open in §7.
+`t12-overnight` at 0.9757 (n = 324). **That gap is EXPLAINED in §5** — it was
+recorded as NOT EXPLAINED when this document was first published, and the
+explanation moves the headline.
 
 ---
 
-## 5. Three incidental findings
+## 5. Why the sub-strata differ — 83% of one benchmark ran with no provider
+
+**Investigated 2026-08-16, same session, after publication. The gap is not
+benchmark difficulty, engine version, threshold, or noise. In 59 of the 71
+`hal_test_cases` rows, `hal_providers_used` is EMPTY — HAL called no
+verification provider — and it emitted a `hal_score` anyway.**
+
+### 5.1 The gap is real before it is explained
+
+Both sub-strata carry the same `gen_provider` (`corpus`), the same `gen_model`
+(`labeled-claim`) and the same `hal_threshold` (0.43), so it is not a config
+difference. And it is not sample noise — the intervals do not overlap:
+
+| sub-stratum | n_pos | n_neg | AUC | 95% CI |
+|---|---|---|---|---|
+| `hal_test_cases` | 35 | 36 | 0.5940 | [0.4616, 0.7265] |
+| `t12-overnight-2026-06` | 162 | 162 | 0.9757 | [0.9586, 0.9928] |
+
+`hal_test_cases`'s interval **contains 0.5** — on its own it is indistinguishable
+from chance — while `t12-overnight`'s lower bound is 0.9586. 0.7265 < 0.9586, so
+the two do not overlap.
+
+### 5.2 The score distributions differ in kind, not degree
+
+| sub-stratum | class | median | distinct scores |
+|---|---|---|---|
+| `t12-overnight` | negative | 0.0000 | 7 |
+| `t12-overnight` | positive | 0.9875 | 8 |
+| `hal_test_cases` | negative | 0.2567 | 24 |
+| `hal_test_cases` | positive | 0.2781 | 30 |
+
+`t12-overnight` is near-binary and near-separated. `hal_test_cases` is a narrow
+unimodal blob with both classes centred at ~0.26 — **a separation of 0.0074
+between class medians.** That is not a weak detector; it is the shape of a value
+that does not depend on the input.
+
+### 5.3 The cause
+
+```sql
+select benchmark_source,
+       coalesce(nullif(array_to_string(hal_providers_used,','),''),'(EMPTY)') providers,
+       count(*), avg(hal_latency_ms), count(*) filter (where hal_vetoed)
+from hal_runner_results
+where hal_mode='fact-check-s2' and ground_truth_is_hallucination is not null
+  and hal_score is not null and not gen_failed
+group by 1,2;
+```
+
+| `benchmark_source` | providers | n | mean `hal_latency_ms` | vetoed |
+|---|---|---|---|---|
+| `hal_test_cases` | **(EMPTY)** | **59** | **947** | **41** |
+| `hal_test_cases` | `used:2` | 12 | 3864 | 6 |
+| `t12-overnight` | `litellm` | 312 | 3135 | 152 |
+| `t12-overnight` | `gemini,litellm` | 9 | 3333 | 6 |
+| `t12-overnight` | `groq,litellm` | 2 | 2410 | 1 |
+| `t12-overnight` | `groq,gemini,litellm` | 1 | 1933 | 1 |
+
+**All 59 empty-provider rows are in `hal_test_cases`; `t12-overnight` has none.**
+Latency corroborates: 947 ms against ~3,100 ms when a provider is called — the
+empty rows took roughly a third of the time, consistent with a short-circuit.
+
+Split the whole stratum on that one column and the sub-stratum question
+dissolves:
+
+| stratum | n_pos | n_neg | AUC | 95% CI |
+|---|---|---|---|---|
+| **HAL ran (≥1 provider)** | **169** | **167** | **0.9746** | **[0.9574, 0.9917]** |
+| HAL did **not** run (empty) | 28 | 31 | 0.5150 | [0.3662, 0.6637] |
+
+The no-provider rows sit at chance, as they must — the score cannot depend on
+evidence that was never gathered. Where HAL ran, AUC is 0.9746 **regardless of
+which benchmark the row came from**. `benchmark_source` was a proxy; the real
+variable is whether the detector executed.
+
+### 5.4 The part that is not a measurement problem
+
+**41 of the 59 no-provider rows are `hal_vetoed = true`.** HAL emitted a veto —
+an actionable verdict — on rows where it called no verification provider. Being
+counted in an accuracy denominator is the *lesser* issue; the verdict itself was
+unearned. This is the defect class the repo's own `CLAUDE.md` opens with, found
+inside the component built to catch it.
+
+**NOT CHECKED: whether this reaches production.** `hal_production_events` holds
+**5 rows**, dated 2026-04-16 to 2026-04-25, and has an entirely different schema
+with no provider column — so it cannot answer the question either way. That the
+production table is effectively empty is itself worth knowing before anyone
+quotes "HAL in production".
+
+Also flagged, unresolved: 12 rows carry the literal string **`used:2`** in
+`hal_providers_used`, where every other row carries provider names. A count
+written into a name field is a bug somewhere in the writer, and it means
+"non-empty" is not the same as "names a real provider". Those 12 rows are inside
+the 0.9746 figure. **OPEN.**
+
+---
+
+## 6. Three incidental findings
 
 - **"1,825 labelled rows" is not a labelled set.** 1,825 is the row count of
   `hal_runner_results`. `hal_ground_truth_labels` holds **1,579**. The gap is 245
@@ -133,7 +245,7 @@ an AUC at all. Any future accuracy work should not reach for it.
 
 ---
 
-## 6. Reproduce it
+## 7. Reproduce it
 
 Pooled variants with Hanley–McNeil intervals, and the stratified figure:
 
@@ -178,35 +290,55 @@ same wrong conclusion.
 
 ---
 
-## 7. What this does NOT establish
+## 8. What this does NOT establish
 
 - **Nothing about HAL in production.** This is one offline evaluation table.
-  `hal_production_events` (44 columns) was **NOT CHECKED**.
+  `hal_production_events` was checked only for whether it could answer §5.4 and
+  it cannot: **5 rows**, 2026-04-16 to 2026-04-25, different schema, no provider
+  column. Whether the no-provider path reaches production is **NOT CHECKED**,
+  and this table cannot establish it either way.
 - **The labels themselves were not audited.** `labeled_by` was not examined and
-  no label was independently re-derived. If the ground truth is wrong, both the
-  pooled and the stratified figure are wrong together.
-- **Why `hal_test_cases` scores 0.5940 against `t12-overnight`'s 0.9757 is NOT
-  EXPLAINED.** n = 71 is small, but the gap is large enough to matter and could
-  mean the strong result is specific to one benchmark's construction. **Until
-  that is settled, quote the stratum figure 0.9579 with its composition
-  attached, never as "HAL's accuracy" flat.**
+  no label was independently re-derived. If the ground truth is wrong, every
+  figure here is wrong together.
+- **Why the no-provider runs happened is NOT ESTABLISHED.** §5 shows *that* 59
+  rows executed with no provider and what it did to the metric. Whether the
+  cause was provider outage, missing credentials, a deliberate offline mode, or
+  a bug is **not determined here** — it needs the runner code, not the table.
+  `hal_diagnostics` and `signals` (both `jsonb`) were **NOT READ**.
+- **The 12 `used:2` rows are inside the 0.9746 figure.** Non-empty is not the
+  same as "named a real provider", so the executed-stratum count of 169/167 is
+  an upper bound on rows that provably called a provider.
 - **No threshold or operating point is recommended here.** AUC is
-  threshold-free; `hal_threshold` and the veto path were not evaluated.
+  threshold-free. Note this is a live gap: 41 vetoes fired on no-provider rows,
+  and the veto path itself was **not evaluated**.
 - **This is not a claim that any published number is wrong**, because none was
   published. See the §1 caveat on attribution.
 
 ---
 
-## 8. The gate this suggests, and why it is not built here
+## 9. The gate this suggests, and why it is not built here
 
-The mechanical invariant that would have caught this is narrow and real:
-**`hal_score` must not be pooled across `hal_mode` values whose scales differ**,
-and more simply, **`mock`-mode scores are on a 0–100 scale and no other mode
-is.** A check could assert that `hal_score` stays within a declared per-mode
-range and fail when a mode's distribution moves outside it.
+Two invariants, and the second is the one that matters.
 
-It is not built in this change for one honest reason: it requires a live
+**Gate 1 — scale.** `hal_score` must not be pooled across `hal_mode` values whose
+scales differ; `mock` writes 0–100 and no other mode does. A check could assert
+`hal_score` stays inside a declared per-mode range.
+
+**Gate 2 — a verdict requires evidence.** *A row with an empty
+`hal_providers_used` must not carry a `hal_score`, must not set `hal_vetoed`, and
+must never enter an accuracy denominator.* 41 rows violate the middle clause
+today. This one is worth more than Gate 1: Gate 1 protects a metric, Gate 2
+protects a **verdict**, and it is enforceable at the point of writing rather than
+only at analysis time.
+
+Gate 2 also has a form that needs no database and therefore no NOT_CHECKED: the
+runner can refuse to emit a score when the provider list is empty, and a unit
+test can hold it. **That is the recommended fix and it belongs to whoever owns
+the runner** — it is Kernel-lane code, not a Verify-lane change, which is why it
+is written down here rather than implemented.
+
+Neither gate is built in this change. Gate 1 as a data check needs a live
 database, so in CI it would report NOT_CHECKED exactly the way `check:legacy-key`
-does, and a gate that cannot run in the gate is close to no gate. Recording it
-as a recommendation with its cost stated is better than shipping a green tick
-that never executes. **OPEN — owner not assigned.**
+does, and a gate that cannot run in the gate is close to no gate. Recording both
+with their costs stated is better than shipping a green tick that never
+executes. **OPEN — owner not assigned.**
