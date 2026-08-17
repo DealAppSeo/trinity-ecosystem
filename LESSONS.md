@@ -171,6 +171,81 @@ already hold the server key.
 Safe, but anything client-side that ever needs it will get empty results rather
 than an error.
 
+**S1 UPDATE — CLOSED 2026-08-16.** Both tables now carry `{authenticated}`
+policies rather than `{anon}`. Verified against `pg_policies`, not against a
+migration file.
+
+---
+
+### SECURITY FINDINGS — 2026-08-16
+
+**S3. 196 tables are world-readable, not two.**
+
+`CLAUDE.md` said "two tables are currently `USING (true)` for `anon`", reading
+S1 above as a statement about the database. S1 audited exactly two tables and
+said nothing about the rest. Measured against `pg_policies` on 2026-08-16:
+
+    198 policies over 196 distinct tables in `public`
+    role anon or PUBLIC, cmd SELECT or ALL, qual literally `true`
+
+Combined with the publishable key shipping in the browser bundle, every row and
+column of all 196 is readable by anyone who views source — not merely the
+aggregates a UI renders.
+
+**Severity, measured rather than assumed.** The alarming name is the safe one:
+
+| table | rows | what is exposed |
+|---|---|---|
+| `user_keys` (`grok_key_enc`, `claude_key_enc`, `chatgpt_key_enc`, `trinity_api_key`) | **0** | nothing today — a loaded gun with no round in it |
+| `trustex_identities` | **5** | `proof_of_life_email` on all 5, plus phone, biometric and `wallet_address` |
+| `trustchat_sessions` | **57** | `user_message`, `llm_response`, `user_ip_hash` |
+| `waitlist` | **9** | signup rows |
+| `customer_feedback`, `staking_deposits`, `staking_withdrawals` | 0 | nothing today |
+
+So the live exposure is **~71 rows of real PII and user conversation content**,
+not a credential leak. `user_keys` is empty and `trinity_api_key` — the one
+column without an `_enc` suffix — has zero non-null values. That is the
+difference between an incident and a hazard, and it is worth stating precisely
+in both directions: nothing has leaked, and the policy that would leak it is
+live right now.
+
+**Values were never read.** This finding is built from `pg_policies`,
+`pg_attribute` and `count(*)`. Column names and row counts establish severity
+without pulling secrets into an agent transcript, which is the same class of
+mistake as the key that started `docs/KEY-ROTATION.md`.
+
+**The remediation is DROP, not add.** `service_role` has `rolbypassrls = true`,
+so server-side callers keep working by bypassing RLS — adding a `service_role`
+policy grants nothing. **NOT EXECUTED — destructive DDL is Sean-gated.** Ready
+to run, highest severity first:
+
+```sql
+-- The rows that actually exist. Reads route through API routes holding the server key.
+drop policy if exists "trustchat_sessions_anon_select" on public.trustchat_sessions;
+drop policy if exists "trustex_identities_anon_select" on public.trustex_identities;
+drop policy if exists "waitlist_read_all"              on public.waitlist;
+-- Empty today, and the one that must never populate while readable.
+drop policy if exists "Anon read user_keys"            on public.user_keys;
+```
+
+Then re-run the census and expect the count to fall by four:
+
+```sql
+select count(*) from pg_policies where schemaname='public'
+  and (roles::text like '%anon%' or roles::text like '%public%')
+  and cmd in ('SELECT','ALL') and coalesce(qual,'') in ('true','(true)');
+```
+
+**Why the other 192 are not in that block.** Most are agent telemetry and public
+registry data where `anon` read may be intended. Dropping 196 policies blind
+would break every client read at once and is the same failure shape as wiring an
+unmeasured gate — the four above are the ones with rows, PII, or credential
+columns. The rest need a per-table decision, not a sweep.
+
+**The rule.** A security claim in ground truth is a measurement with a date, or
+it is not a claim. This one was inherited, generalised, and then re-read as fact
+for four days by every agent that opened `CLAUDE.md`.
+
 ---
 
 ### WHAT ACTUALLY CAUGHT THINGS
@@ -1090,7 +1165,7 @@ or an outage ever claims a referral.
 
 ---
 
-## A19 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
+## A25 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
 
 **[VERIFIED] — the run is in CI: `check` green, `test:e2e` red, same commit.**
 
@@ -1130,7 +1205,7 @@ break shows up in seconds rather than after a build and a server boot.
 
 ---
 
-## A20 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
+## A24 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
 
 **[VERIFIED] — `curl` to the REST endpoint returns 403; the MCP tool returns the
 same runs successfully, seconds apart.**
@@ -1234,3 +1309,156 @@ This is the fourth instance of the failure class the prior-work index already
 names — *suspect the sample before the measurement* — and the third caused
 specifically by an unexamined assumption about the **shape** of the data rather
 than its values.
+
+**Follow-up, same session: A21 left one sub-stratum NOT EXPLAINED, and the
+explanation turned out to be A22 below.** The residual was not noise and not
+benchmark difficulty. Chasing an unexplained caveat rather than shipping around
+it is what found it.
+
+---
+
+---
+
+## A22 — the credential scanner could not see binary files, and the speed fix is what found it (2026-08-16)
+
+**This started as a performance sprint and ended as a security one.** Both halves
+matter, and the order matters more.
+
+**The measurement.** `npm run check` takes 171.7s locally across 58 suites, and
+one suite was **29.7s of it — 17%**. `check:legacy-key`, the gate that hunts
+legacy Supabase JWTs in git history.
+
+**The first hypothesis was wrong, and cheap to disprove.** The suite ends in
+`NOT MEASURED` because the sandbox proxy denies `*.supabase.co`, so the obvious
+reading was five probes each burning a 15s timeout. A patch was written to
+short-circuit them. It saved nothing — the probes were never slow. Timed
+directly: **390ms, 10ms, 4ms**. The proxy answers 403 immediately; the fetch
+resolves, so the timeout path never runs.
+
+The cost was `collectLegacyJwts`: **one `git grep` subprocess per commit, 710
+commits**, each re-reading every file in that commit's tree. A file unchanged
+for 700 commits was scanned 700 times.
+
+**The fix, and the surprise.** Scanning **unique blobs** instead — 5,553 of them,
+each read once — took **0.97s**. But it returned **six** tokens where the
+per-commit scan returned **five**.
+
+A difference is not a win until it is explained. The extra token lives in
+`trinity-science/app/__pycache__/anfis_router.cpython-313.pyc`, a committed
+compiled-Python file. **`git grep` skips binary files by default.**
+
+**That is the finding.** The scanner had a blind spot the width of an entire file
+class, and it reported clean about a place it never looked. This particular token
+is `role=anon`, and every legacy key on this project is disabled, so it is inert
+— exactly like the `service_role` JWT in `docs/KEY-ROTATION.md`. The severity is
+not this key. It is that a `service_role` token committed inside **any** binary —
+a `.pyc`, a build artifact, a bundled archive, a compiled test fixture — would
+have been equally invisible, and the gate would have gone green.
+
+**Result: 28.9s → 1.3s, and 5 keys → 6.** Faster and more complete, which is
+usually a sign the old thing was doing unnecessary work rather than careful work.
+
+**Mutation tested** by capping blob reads at zero bytes (finds nothing, proving
+it reads blobs rather than inferring) and by breaking the size-based frame
+parsing (result changes rather than silently degrading).
+
+**HANDOFF — `scan-secrets.mjs` has the same blind spot.** It scans history with
+`git grep` in 64-commit batches, so it inherits the binary skip. It was not
+changed here: it is the supply lane's file, its history mode is deliberately
+non-failing, and one gate at a time is the whole point of one-advisory-per-change.
+Its working-tree mode is unaffected.
+
+**Two rules.**
+
+*Measure where the time is before optimising it.* The plausible story — five
+network timeouts — was wrong, and a patch had already been written against it.
+One `Date.now()` around a `fetch` cost three seconds and saved a wrong change.
+
+*When a faster implementation returns a different answer, the difference is the
+result.* The instinct is to reconcile it away as a bug in the new code. Here the
+new code was right and the old gate had been under-reporting for as long as it
+had existed.
+
+---
+
+## A23 — 41 vetoes fired on rows where the detector called no provider (2026-08-16)
+
+**[VERIFIED] — 59 rows in `hal_runner_results` have an EMPTY `hal_providers_used`,
+carry a `hal_score` anyway, and 41 of them have `hal_vetoed = true`. Measured
+2026-08-16; detail in `docs/HAL-AUC-STRATIFICATION-2026-08-16.md` §5.**
+
+A21 closed with an honest loose end: within the valid stratum, `hal_test_cases`
+scored AUC 0.5940 against `t12-overnight`'s 0.9757, and the document said so and
+called it NOT EXPLAINED. Investigating that caveat found the real defect.
+
+It was never about the benchmarks. Same `gen_provider`, same `gen_model`, same
+`hal_threshold`. **In 59 of 71 `hal_test_cases` rows, HAL called no verification
+provider at all** — and still wrote a score. Split the stratum on execution
+rather than on benchmark:
+
+```
+HAL ran (>=1 provider)     n=169/167   AUC 0.9746  [0.9574, 0.9917]
+HAL did NOT run (empty)    n=28/31     AUC 0.5150  [0.3662, 0.6637]
+```
+
+`benchmark_source` was a proxy. The real variable is whether the detector
+executed. The no-provider rows sit at chance because **the score cannot depend on
+evidence that was never gathered** — class medians 0.2567 and 0.2781, a
+separation of 0.0074.
+
+**The metric contamination is the lesser half.** 41 of those rows set
+`hal_vetoed`. HAL emitted an actionable verdict — a veto — having consulted
+nothing. That is this repository's founding defect, *a system reporting a result
+it has not earned*, sitting inside the component built to catch exactly that, and
+it was invisible because the row looks complete: it has a score, a latency, a
+veto flag, and a label.
+
+Latency was the tell, available the whole time: **947 ms mean against ~3,100 ms**
+when a provider is actually called. A third of the work, a full-looking row.
+
+**The rules.**
+
+1. **"Produced a number" is not "ran".** Before a row enters any denominator,
+   check the column that records whether the work happened — provider list, call
+   count, cost. A NULL result is loud; a **default** result is silent, and a
+   default that looks plausible is the worst case.
+2. **A verdict must not outlive its evidence.** If the provider list is empty,
+   the correct output is NOT_CHECKED — not a score, and certainly not a veto.
+   Three outcomes, at the point of writing, not only at the point of reading.
+3. **Chase the caveat you wrote down.** A21's own NOT EXPLAINED line was the
+   thread that led here. Two of this repo's retractions were caught by caveats
+   their authors had written and then ignored; this is the first one caught by a
+   caveat somebody actually pulled.
+4. **Non-empty is not valid.** 12 rows carry the literal string `used:2` in
+   `hal_providers_used` where names belong. A count written into a name field
+   means an "is it non-empty" check can still pass on garbage. Still OPEN.
+
+### The same rows read as a feature by a second lane
+
+The sharpest part of this arrived from outside. Working independently, the
+grok-code lane (PR #55) measured the same corpus, found the same three-mode
+trap, computed the same AUC 0.9579, caught the same tie-handling error — and
+built the better artefact, a `PooledModes` refusal in code where this lane had
+only written a recommendation. It also recorded:
+
+> *"HAL's veto is not a threshold: 41 rows vetoed below 0.43, zero above it
+> escaping."*
+
+**Those 41 are exactly the no-provider rows** — the partition is exact, 41 of 41
+sub-threshold vetoes from empty-provider rows, 0 from rows where a provider ran.
+Read from the veto side it looks like a bonus detection path lifting recall from
+0.807 to 0.904. Read from the provider side it is 41 vetoes cast with nothing
+consulted: 19 landed on hallucinations (67.9% of that group's positives), 22 on
+clean answers (71.0% of its negatives). **It fires slightly more often on the
+clean ones.**
+
+**The lesson is not that the other lane was careless — it was not.** It is that
+the *same rows* support a capability reading and a defect reading, and the column
+that separates them (`hal_providers_used`) is in neither the metric nor the veto
+flag. Two competent measurements of the same table disagreed about what HAL
+*does*, and only joining on execution resolved it.
+
+Corollary for this lane: when a second measurement of your subject exists, **read
+it before publishing yours.** The cross-check cost one query and changed a
+headline; not doing it would have left two documents on `main` describing the
+same 41 rows in opposite terms.

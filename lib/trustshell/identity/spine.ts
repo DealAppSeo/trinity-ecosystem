@@ -66,6 +66,12 @@ import {
   type VerdictReputationInput,
 } from './outcome-to-reputation';
 import {
+  delegateAuditorGrant,
+  type AuditorGrant,
+  type AuditorGrantInput,
+} from './auditor-grant';
+import type { AgentIdentity } from './identity';
+import {
   runAgentLoop,
   type RunAgentLoopInput,
   type LoopResult,
@@ -76,6 +82,29 @@ import {
  * from the module that actually draws the checker and the exam.
  */
 export type AssignmentInput = Parameters<typeof assembleAssignedContract>[0];
+
+/**
+ * What the caller must supply to mint the auditor's grant.
+ *
+ * Mirrors `AuditorGrantInput` minus the three fields this function derives:
+ * `auditor` (the DRAWN checker — a caller that could name it would be choosing
+ * the judge again), `doerDid` (the contract's), and `toolEffects` (the loop's).
+ */
+export interface AuditorGrantRequest {
+  parent: AuditorGrantInput['parent'];
+  delegator: AuditorGrantInput['delegator'];
+  /**
+   * Resolve the DRAWN checker's identity. Returning `undefined` throws — the
+   * same reasoning as `checkerKeyFor`: substituting an auditor we happen to
+   * hold an identity for is checker-shopping wearing an error handler.
+   */
+  auditorIdentityFor: (did: Did) => AgentIdentity | undefined;
+  /** Checked against the tool maps, never trusted. */
+  capabilities: readonly string[];
+  toolCapabilities: AuditorGrantInput['toolCapabilities'];
+  /** Required. An auditor grant that outlives the audit is a standing credential. */
+  ttlSeconds: number;
+}
 
 export interface ContractedWorkInput {
   /** Everything the assigner needs to draw a checker and an exam. */
@@ -104,6 +133,23 @@ export interface ContractedWorkInput {
     RunAgentLoopInput,
     'evaluator' | 'criteria' | 'doerDid' | 'taskId'
   >;
+  /**
+   * Mint a provably read-only ControlProof for the DRAWN checker, and bind its
+   * reference into the verdict.
+   *
+   * OPTIONAL, and the absence is honest rather than convenient: the contracted
+   * evaluator records a missing `controlProofRef` as an *unverified* authority
+   * and never as an authorized one. Supplying this is what turns "we say the
+   * auditor was read-only" into something a third party can recompute.
+   *
+   * NOTE WHAT IS NOT HERE: `toolEffects`. It is taken from
+   * `execution.policy.toolEffects` rather than accepted separately, and that is
+   * the whole point of wiring the grant HERE instead of at the call site. A
+   * grant analysed against a different effect map than the loop enforces is a
+   * proof about a different world — it would verify perfectly and mean nothing.
+   * One map, one source, no way to disagree.
+   */
+  auditorGrant?: AuditorGrantRequest;
   /** Injected so the verdict's timestamp is not an ambient dependency. */
   now?: () => Date;
   /** When reputation was computed. Required — an unstamped observation is unauditable. */
@@ -123,6 +169,12 @@ export interface ContractedWorkResult {
   /** The draw, checked before anyone signed it. */
   assemblyVerification: AssignedContractVerification;
   contract: WorkContract;
+  /**
+   * The auditor's grant, when one was requested. Carries its own
+   * `analysis.readOnly` proof, so a reader need not recompute the reachability
+   * search to know what the checker could touch.
+   */
+  auditorGrant?: AuditorGrant;
   loop: LoopResult;
   /**
    * Absent when the evaluator produced no signed verdict — a judge outage
@@ -209,16 +261,51 @@ export async function runContractedWork(
     checkerKey,
   });
 
-  // 5. Cheap tiers first. FAILED is final; VERIFIED escalates.
+  // 5. The auditor's authority, bounded by cryptography rather than by our
+  //    good behaviour. `delegateAuditorGrant` REFUSES at mint time unless the
+  //    capability set provably cannot reach a write — including tools the
+  //    effect map does not classify, which count as writes because a tool
+  //    nobody labelled is a blast radius nobody measured.
+  let auditorGrant: AuditorGrant | undefined;
+  if (input.auditorGrant) {
+    const req = input.auditorGrant;
+    const auditor = req.auditorIdentityFor(assigned.unsigned.checkerDid);
+    if (!auditor) {
+      throw new Error(
+        `no identity for the drawn checker ${assigned.unsigned.checkerDid}, so no auditor ` +
+          'grant can be minted for it. Refusing to continue: auditing under a different ' +
+          "agent's grant would make the authority chain describe someone who did not judge."
+      );
+    }
+    auditorGrant = await delegateAuditorGrant({
+      parent: req.parent,
+      delegator: req.delegator,
+      auditor,
+      doerDid: assignment.doerDid,
+      capabilities: req.capabilities,
+      toolCapabilities: req.toolCapabilities,
+      // The loop's OWN map — see `auditorGrant` on the input type.
+      toolEffects: execution.policy.toolEffects,
+      ttlSeconds: req.ttlSeconds,
+      now: input.now?.(),
+    });
+  }
+
+  // 6. Cheap tiers first. FAILED is final; VERIFIED escalates.
   const staged = createStagedJudge({ tiers });
   const evaluator = createContractedEvaluator({
     contract,
     checkerKey,
     judge: staged.judge,
+    // The delegate signature identifies THIS delegation uniquely and is
+    // matchable by anyone holding the chain. `DelegatedControlProof` carries no
+    // id field, and inventing one here would put a second identifier for the
+    // same object into a signed artifact.
+    controlProofRef: auditorGrant?.proof.delegateSignature,
     now: input.now,
   });
 
-  // 6. The bounded loop, judged by someone the doer did not choose. The
+  // 7. The bounded loop, judged by someone the doer did not choose. The
   //    contract supplies criteria/doerDid/taskId — not the caller.
   const loop = await runAgentLoop({
     ...execution,
@@ -238,7 +325,7 @@ export async function runContractedWork(
   const verdict = evaluation?.verdict;
 
   if (!verdict) {
-    return { assigned, assemblyVerification, contract, loop };
+    return { assigned, assemblyVerification, contract, auditorGrant, loop };
   }
 
   const verdictVerification = await verifyVerdict({ verdict, contract });
@@ -256,6 +343,7 @@ export async function runContractedWork(
     assigned,
     assemblyVerification,
     contract,
+    auditorGrant,
     loop,
     verdict,
     verdictVerification,

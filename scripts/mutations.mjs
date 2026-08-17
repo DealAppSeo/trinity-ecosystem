@@ -588,7 +588,7 @@ export const MUTATIONS = [
       'the denial reason is an OBSERVABLE CONTRACT, not prose. It lands in a compliance ' +
       "receipt's `denialReason`, and run-e2e.mjs matches /exceeds per-tx limit/i against it " +
       'over HTTP. Rewording it to read better turned CI red while `npm run check` reported ' +
-      '52 VERIFIED — LESSONS A19. The fast suite pins the regex so the next break surfaces ' +
+      '52 VERIFIED — LESSONS A25. The fast suite pins the regex so the next break surfaces ' +
       'in seconds instead of in a server boot',
     find: '      detail: `Amount ${amountUSDC} USDC exceeds per-tx limit ${limit}`,',
     replace: '      detail: `Amount ${amountUSDC} USDC exceeds the per-transaction limit of ${limit}`,',
@@ -855,6 +855,241 @@ export const MUTATIONS = [
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
   {
+    id: 'sign-out-claims-success-it-did-not-earn',
+    suite: 'check:auth-session',
+    file: 'lib/auth-session.ts',
+    protects:
+      'a FAILED sign-out keeps you signed IN. This is the defect the module was extracted ' +
+      'for: the component discarded the result and cleared the UI unconditionally, so the ' +
+      'reassuring reading was the false one. Someone on a shared machine who reads ' +
+      '"signed out" and walks away is the case it protects',
+    find: `    return {
+      ...current,
+      error: \`Sign-out failed, you are still signed in: \${result.error.message}\`,
+    };`,
+    replace: '    return { ...SIGNED_OUT, error: result.error.message };',
+  },
+  {
+    id: 'session-probe-hides-a-broken-deployment',
+    suite: 'check:auth-session',
+    file: 'lib/auth-session.ts',
+    protects:
+      'a THROWN session probe is not a signed-out user. A missing or misconfigured Supabase ' +
+      'key throws here, and dropping the error renders a login form that cannot possibly ' +
+      'work with nothing said — a broken deployment made to look like an ordinary session end',
+    find: `  if (result.error) {
+    return { status: 'idle', email: null, error: result.error.message };
+  }
+  const email = result.data?.session?.user?.email ?? null;`,
+    replace: '  const email = result.data?.session?.user?.email ?? null;',
+  },
+  {
+    id: 'safely-signed-out-becomes-the-naive-predicate',
+    suite: 'check:auth-session',
+    file: 'lib/auth-session.ts',
+    protects:
+      "`isSafelySignedOut` is not `status !== 'signed-in'`. The two differ exactly where it " +
+      'matters — a failed sign-out, and a cleared view still carrying an error — which is ' +
+      'why the predicate has a name instead of being inlined at a call site',
+    find: "  return view.status === 'idle' && view.email === null && view.error === null;",
+    replace: "  return view.status !== 'signed-in';",
+  },
+  {
+    id: 'earned-metrics-shrinks-toward-the-fleet-mean',
+    suite: 'check:hal-repid-linkage',
+    file: 'lib/trustshell/EarnedMetrics.ts',
+    protects:
+      'the shrinkage target is ZERO, so absent evidence costs and never pays. Shrinking ' +
+      'toward a population mean lets a brand-new agent inherit the fleet\'s earned ' +
+      'reputation — the laundering vector the whole design exists to prevent — and this ' +
+      'metric decides whether an agent may move money',
+    find: 'export const PRIOR_VALUE = 0;',
+    replace: 'export const PRIOR_VALUE = 0.5;',
+  },
+  {
+    id: 'earned-metrics-drops-the-shrinkage',
+    suite: 'check:hal-repid-linkage',
+    file: 'lib/trustshell/EarnedMetrics.ts',
+    protects:
+      '`value` is the SHRUNK rate and `rawValue` the bare ratio. Without shrinkage a single ' +
+      'flawless observation scores 1.0 and a cold-start agent reads as a veteran. The two ' +
+      'also behave differently in time — rawValue is invariant, value decays toward the ' +
+      'prior — so collapsing them makes a SQL-derived rate look like the production metric ' +
+      'when it is not',
+    find: '  const value = (successWeight + k * prior) / (weight + k);',
+    replace: '  const value = successWeight / weight;',
+  },
+  {
+    id: 'repid-saturation-band-goes-unfound',
+    suite: 'check:repid-marginal',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'the scan finds the band where score has ALREADY reached REPID_MAX. With a strict `>` ' +
+      'it never fires — the clamp means the score never exceeds the maximum, only equals it — ' +
+      'so saturation reports at weightedSum 1 and the dead band measures zero. The defect ' +
+      'would then be invisible in the very gate written to measure it',
+    find: '    if (scoreFromWeightedSum(ws) >= REPID_MAX) {',
+    replace: '    if (scoreFromWeightedSum(ws) > REPID_MAX) {',
+  },
+  {
+    id: 'repid-overshoot-erased',
+    suite: 'check:repid-marginal',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'the overshoot is REPORTED, because it is the cause. 57200/0.5 evaluates to 10072.42 at ' +
+      'weightedSum 1 against a REPID_MAX of 10000, and those 72 points are what create the ' +
+      'dead band. Zeroing it leaves the band visible with no explanation, which sends the ' +
+      'next reader to reshape the logarithm — the one change that cannot fix it',
+    find: '    overshoot: uncappedAtOne - REPID_MAX,',
+    replace: '    overshoot: 0,',
+  },
+  {
+    id: 'repid-marginal-ignores-the-clamp',
+    suite: 'check:repid-marginal',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'marginal value is measured through the REAL scoring function, clamp included. The ' +
+      'mutant computes the raw curve instead and reports 83.42 at weightedSum 0.99 where the ' +
+      'module actually pays 11 — which is precisely the confusion this gate exists to settle: ' +
+      'the curve is nearly flat, and the collapse at the top belongs to the clamp',
+    find:
+      '  const to = scoreFromWeightedSum(Math.min(1, weightedSum + delta));',
+    replace:
+      '  const to = SCORE_LOG_MULTIPLIER * Math.log10(1 + (weightedSum + delta) * SCORE_LOG_INPUT_SCALE);',
+  },
+  {
+    id: 'zk-build-group-hashes-twice',
+    suite: 'check:zk-cost',
+    file: 'lib/trustshell/identity/nullifier.ts',
+    protects:
+      'a Merkle group over N leaves costs exactly N-1 hashes. Redundant hashing is invisible ' +
+      'to every functional suite — the root still verifies — but in a circuit the constraint ' +
+      'count is dominated by exactly this number, so doubling it doubles the proof',
+    find: '      next.push(i + 1 < cur.length ? await scheme.hashPair(cur[i], cur[i + 1]) : cur[i]);',
+    replace:
+      '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
+  },
+  {
+    id: 'zk-verify-asserts-membership-instead-of-checking-it',
+    suite: 'check:zk-cost',
+    file: 'lib/trustshell/identity/nullifier.ts',
+    protects:
+      'verification WALKS the membership path rather than assuming it. The mutant keeps the ' +
+      'loop, keeps the comparison, and simply sets the node to the claimed root — so every ' +
+      'boolean stays identical and only the hash count betrays it. That is the borrowed-member ' +
+      'attack surface: membership asserted rather than checked',
+    find: `  for (const step of statement.privateWitness.membership) {
+    node = step.left
+      ? await scheme.hashPair(step.hash, node)
+      : await scheme.hashPair(node, step.hash);
+  }`,
+    replace: `  for (const step of statement.privateWitness.membership) {
+    void step;
+  }
+  node = statement.publicInputs.groupRoot;`,
+  },
+  {
+    id: 'zk-cost-counter-measures-itself',
+    suite: 'check:zk-cost',
+    file: 'lib/trustshell/identity/cost.ts',
+    protects:
+      'the counting wrapper DELEGATES to the scheme under test instead of digesting on its ' +
+      'own. A counter that computes its own values keeps reporting cheerfully after the real ' +
+      'scheme starts throwing — measuring itself rather than the subject, which is how a ' +
+      'benchmark comes to describe nothing',
+    find: `      cost.hashPair++;
+      return inner.hashPair(left, right);`,
+    replace: `      cost.hashPair++;
+      return 'h:' + left + right;`,
+  },
+  {
+    id: 'zk-cost-model-stops-being-a-bound',
+    suite: 'check:zk-cost',
+    file: 'lib/trustshell/identity/cost.ts',
+    protects:
+      'COST_MODEL states the OPTIMUM, not a recording of current behaviour. The mutant makes ' +
+      'the model linear in group size; a model that merely echoed the implementation would ' +
+      'ratify exactly that regression the moment somebody re-recorded it',
+    find:
+      '  membershipPathLength: (n: number): number => Math.ceil(Math.log2(Math.max(1, n))),',
+    replace: '  membershipPathLength: (n: number): number => Math.max(0, n - 1),',
+  },
+  {
+    id: 'hal-accuracy-pools-incomparable-modes',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'the refusal to compute an accuracy figure across hal_modes. hal_score means a ' +
+      'different thing in each: mock is a 50-90 scale with zero positives, real a 0.26-0.42 ' +
+      'band with zero positives, and every labelled hallucination lives in fact-check-s2 on ' +
+      '0-1. Pooled, the corpus reports AUC 0.484 — worse than chance — for a detector that ' +
+      'scores 0.958 within its own mode. Without the refusal a naive caller publishes that ' +
+      'HAL is broken',
+    find: `export function rocAuc(rows: readonly ScoredRow[]): number | null {
+  requireSingleMode(rows);`,
+    replace: 'export function rocAuc(rows: readonly ScoredRow[]): number | null {',
+  },
+  {
+    id: 'hal-accuracy-undefined-reported-as-chance',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'AUC is NULL, not 0.5, when a class is absent. mock and real carry no positive labels ' +
+      'at all, so AUC is undefined on them. Reporting 0.5 collapses "we could not measure ' +
+      'this" into "it scored at chance" — the two-outcome mistake this repo keeps paying for',
+    find: '  if (pos.length === 0 || neg.length === 0) return null;',
+    replace: '  if (pos.length === 0 || neg.length === 0) return 0.5;',
+  },
+  {
+    id: 'hal-accuracy-ties-get-full-credit',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'tied scores get HALF credit in the Mann-Whitney statistic. This corpus piles scores ' +
+      'on 0.0 and 1.0, so tie handling moves the number materially — a min-rank SQL rank() ' +
+      'reported 0.8351 for a corpus whose true AUC is 0.9579. The mutant inflates instead, ' +
+      'which is the same class of error in the other direction',
+    find: '      else if (p === n) wins += 0.5;',
+    replace: '      else if (p === n) wins += 1;',
+  },
+  {
+    id: 'hal-accuracy-charges-hal-for-provider-outages',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'rows where generation FAILED are excluded from detection metrics. There was no answer ' +
+      'to judge, so the detector was never asked a question; counting those 69 rows charges ' +
+      "HAL for a provider outage and moves every headline number — the ceiling F1, the AUC " +
+      'and the realized confusion all shift',
+    find: '  return rows.filter((r) => !r.genFailed);',
+    replace: '  return rows.slice();',
+  },
+  {
+    id: 'auditor-grant-analysed-against-a-different-map',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/identity/spine.ts',
+    protects:
+      "the auditor grant is analysed against the LOOP'S OWN toolEffects, not a map supplied " +
+      'beside it. This is the whole reason the grant is minted in the spine rather than at ' +
+      'the call site: a grant proven read-only against a different effect map than the loop ' +
+      'enforces would verify perfectly and describe a different world. The mutant hardcodes ' +
+      'a permissive map, and both refusal cases then mint happily',
+    find: '      toolEffects: execution.policy.toolEffects,',
+    replace: "      toolEffects: { run_tests: 'read', deploy: 'read' },",
+  },
+  {
+    id: 'auditor-grant-minted-but-not-bound',
+    suite: 'check:spine-reachable',
+    file: 'lib/trustshell/identity/spine.ts',
+    protects:
+      'the verdict REFERENCES the authority it was rendered under. A grant that is minted, ' +
+      'checked and then not bound into the signed verdict leaves a third party unable to ask ' +
+      'what the judge could touch — the grant becomes a thing we did rather than a thing ' +
+      'anyone can check, which is the distinction the whole module exists for',
+    find: '    controlProofRef: auditorGrant?.proof.delegateSignature,',
+    replace: '    controlProofRef: undefined,',
+  },
+  {
     id: 'spend-limit-reads-zero-when-unreadable',
     suite: 'check:loud-errors',
     file: 'lib/trustshell/KYAValidator.ts',
@@ -976,6 +1211,63 @@ export const MUTATIONS = [
       'call a surface unready that mints perfectly well',
     find: '  if (value.trim().length < rule.minLength) return \'too_short\';',
     replace: '  if (value.trim().length <= rule.minLength) return \'too_short\';',
+  },
+  // ---------------------------------------------------------------------------
+  // retry.ts — the retry_on predicate. Each of these turns the module into a
+  // plausible-looking backoff helper that has quietly stopped making the one
+  // distinction it exists to make.
+  // ---------------------------------------------------------------------------
+  {
+    id: 'retry-budget-checked-before-predicate',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'the predicate is asked BEFORE the budget. Swapped, a permanent error arriving on ' +
+      'the final attempt reports as `exhausted` — which reads as bad luck and sends the ' +
+      'reader looking for more budget instead of at a request that can never succeed',
+    find: '    if (!this.cfg.retryOn(failure)) {',
+    replace: '    if (failure.attempt < this.cfg.maxAttempts && !this.cfg.retryOn(failure)) {',
+  },
+  {
+    id: 'retry-idle-predicate-ignores-timeout-kind',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'retryIdleTimeoutsOnly consumes the run/idle attribution. Ignoring the kind retries a ' +
+      'run timeout, spending another full budget to arrive at the same wall — and makes the ' +
+      'attribution timeout.ts deliberately preserved worthless to its only consumer',
+    find: "  failure.error instanceof AttemptTimeoutError && failure.error.expiry.kind === 'idle';",
+    replace: '  failure.error instanceof AttemptTimeoutError;',
+  },
+  {
+    id: 'retry-cap-applied-after-jitter',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'maxDelayMs bounds the SCHEDULE, not the pre-jitter input to it. Dropping the cap lets a ' +
+      'jittered delay sit above a ceiling the caller believes is absolute',
+    find: '    const capped = Math.min(raw, this.cfg.maxDelayMs);',
+    replace: '    const capped = raw;',
+  },
+  {
+    id: 'retry-trusts-out-of-range-rng',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'a misbehaving Rng cannot push the delay outside its band. Trusting next() blindly means ' +
+      'the bounded-delay claim silently stops holding for any source not in [0, 1)',
+    find: '    const unit = Math.min(1, Math.max(0, this.rng.next()));',
+    replace: '    const unit = this.rng.next();',
+  },
+  {
+    id: 'retry-maxattempts-off-by-one',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'maxAttempts is a TOTAL including the first try, so maxAttempts:1 never retries. Off by one ' +
+      'and every configured budget silently buys one more attempt than it says',
+    find: '    if (failure.attempt >= this.cfg.maxAttempts) {',
+    replace: '    if (failure.attempt > this.cfg.maxAttempts) {',
   },
 ];
 
