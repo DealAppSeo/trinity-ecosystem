@@ -510,6 +510,52 @@ export const MUTATIONS = [
     replace: '    if (score > floor) return tier;',
   },
   {
+    id: 'floor-decay-skips-the-demonstrated-level',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'INVARIANT 3 — a decayed floor never falls below the level the agent is CURRENTLY ' +
+      'demonstrating. Decay removes a claim the agent has stopped supporting; it must not ' +
+      'contradict one it is supporting right now. Without the stop, a multi-step evaluation ' +
+      'walks an active agent all the way to PROBATIONARY',
+    find: '    if (next <= dbTierFloorFor(state.currentRepid)) {',
+    replace: '    if (next < 0) {',
+  },
+  {
+    id: 'floor-decay-expires-an-active-agent',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'the demonstrated-level check is asked BEFORE the clock. An agent scoring at or above ' +
+      'its floor is demonstrating that level NOW, whatever a timestamp says — ask the clock ' +
+      'first and a live, active agent is decayed for having a stale column',
+    find: '  if (state.currentRepid >= state.floor) {',
+    replace: '  if (state.currentRepid > state.peakRepid) {',
+  },
+  {
+    id: 'floor-decay-unknown-age-reads-as-sound',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'an absent last-demonstration is NOT_CHECKED, not holds. It is the most likely input in ' +
+      'production — most rows carry no such timestamp — and reporting holds says a floor was ' +
+      'examined and found sound when it was never examined at all. The two-outcome mistake in ' +
+      'the reassuring direction, on the mechanism that governs standing',
+    find: "      kind: 'not_checked',",
+    replace: "      kind: 'holds',",
+  },
+  {
+    id: 'floor-decay-steps-by-a-point-not-a-tier',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'INVARIANT 2 — decay steps by TIER, never continuously. A floor at 7,999 is not a fact ' +
+      'anyone can act on, and a continuously drifting floor is unobservable between reads. ' +
+      'One tier boundary at a time is the granularity the ladder already uses',
+    find: '  return below.length === 0 ? 0 : Math.max(...below.map((t) => t.floor));',
+    replace: '  return Math.max(0, floor - 100);',
+  },
+  {
     id: 'ceiling-rewritten-by-reputation-update',
     suite: 'check:ceiling-source',
     file: 'lib/trustshell/KYAValidator.ts',
