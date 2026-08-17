@@ -22,15 +22,6 @@
       "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
     },
     {
-      "id": "HAL-001",
-      "owner": "unassigned",
-      "severity": "Medium",
-      "reason": "verifyHalChain returns outcome=VERIFIED for a truncated window and signals the truncation only in the separate boolean windowStartUnverifiable, which the human-readable `detail` never mentions. Measured by exhaustive search: no input produces VERIFIED with windowStartUnverifiable=false, so EVERY VERIFIED it can emit is over a window whose start is unexaminable. Accepted short-term because the verifier has no production caller yet \u2014 nothing currently reads `outcome` to make a decision \u2014 which is exactly why fixing it now is cheap. Deliberately left `unassigned` rather than defaulted to Sean: the fix is a library change, not a Sean-gated one, and a false owner is worse than a visibly missing one.",
-      "reviewBy": "2026-09-15",
-      "firstSeen": "2026-08-16",
-      "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
-    },
-    {
       "id": "RCPT-001",
       "owner": "unassigned",
       "severity": "Low",

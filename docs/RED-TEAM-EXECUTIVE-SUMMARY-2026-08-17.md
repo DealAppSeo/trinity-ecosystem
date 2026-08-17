@@ -28,9 +28,10 @@ deployer keys that are live on the testnet where the identities exist. **None is
 a break of the core; all are real and worth fixing; none is currently a Critical
 in production.**
 
-**By the numbers:** 7 open findings (**1 High, 4 Medium, 2 Low** — zero open
-Critical), 4 controls held under full attack (all in the Critical-/High-if-broken
-class), 2 Low informational notes, and 1 open question routed to Sean.
+**By the numbers:** 6 open findings (**1 High, 3 Medium, 2 Low** — zero open
+Critical), 5 controls held under full attack (4 in the Critical-/High-if-broken
+class, plus HAL-001 fixed and re-verified 2026-08-17), 2 Low informational notes,
+and 1 open question routed to Sean.
 
 ---
 
@@ -81,7 +82,6 @@ class), 2 Low informational notes, and 1 open question routed to Sean.
 | ERC8004-001 | Med | ERC-8004 on-chain | leaked keys live+funded on Base Sepolia; one minted the identities | open; 1 Sean question pending |
 | LIVE-002 | Med | trustshell.dev | disabled legacy Supabase key in the browser bundle → dead integration | open |
 | REPID-ENG-001 | Med (arguably High) | repid-engine scoring | public score-event path has no auth → unauth *attribution* **and** a live-score drain to the earned floor for 164/176 agents | open; drain magnitude measured (earlier "zero drain" retracted) |
-| HAL-001 | Med | HAL audit chain | `verifyHalChain` returns VERIFIED over an unanchorable (truncatable) window | open; no prod caller yet |
 | RCPT-001 | Low | receipts | abandoned-secret guard is case-sensitive | open; no live surface holds a variant |
 | REPID-ENG-003 | Low | repid-engine ledger | event overstates the applied penalty vs the earned-floor-clamped live score | open; from a good control |
 
@@ -100,6 +100,7 @@ leaked `0xf6eE1768…` or rotated (PR #66, Sean).
 | LIVE-001 | Critical | Neither live surface would mint under a published secret (executes the mint guard against live evidence) |
 | PAY-002 | Critical | Spending limits reject 20 hostile amount/limit inputs; the `NaN > limit` fail-open is **not** present |
 | REPID-001 | High | No self-asserted-only input reaches a funded tier; the reachable ceiling matches the scoring path |
+| HAL-001 | Medium | **Fixed 2026-08-17**, not merely held: `verifyHalChain` no longer reports VERIFIED over a truncated window, and an anchored VERIFIED is now reachable (both re-verified against real production rows, not only fixtures — see `LIVE_RUN_2026_08_17`) |
 
 Also established and held during the campaigns: the RepID score is HAL-computed on
 both score-event paths; penalties require a fact-check quorum + a penalty-guard

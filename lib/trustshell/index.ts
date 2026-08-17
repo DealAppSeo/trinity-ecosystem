@@ -316,7 +316,12 @@ export type {
 // three outcomes and returns NOT_CHECKED for link verification until an
 // `EntryHasher` is supplied, because the producer's hashing formula lives in
 // the fleet rather than here. Structure is checkable today; links are not.
-export { verifyHalChain, CHAIN_CUTOVER_ISO, LIVE_RUN_2026_08_16 } from './hal-chain';
+//
+// VERIFIED itself was fixed 2026-08-17 (HAL-001): it used to be reachable only
+// over a window whose start could not be anchored — exactly the shape of a
+// truncation attack. See LIVE_RUN_2026_08_17 for the live re-verification;
+// LIVE_RUN_2026_08_16 is kept as the superseded record of how it was found.
+export { verifyHalChain, CHAIN_CUTOVER_ISO, LIVE_RUN_2026_08_16, LIVE_RUN_2026_08_17 } from './hal-chain';
 export type {
   HalChainEntry,
   EntryHasher,

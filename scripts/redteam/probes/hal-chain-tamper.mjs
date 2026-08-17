@@ -121,9 +121,10 @@ export default {
         label: 'untampered genesis chain, correct hasher',
         entries: genesis,
         opts: { hasher: oracle },
-        // NOT VERIFIED, and correctly so: entry 0's absent link is one link
-        // that could not be recomputed, and a partially verified chain is not a
-        // verified one. The anchor is that it reports NO DEFECTS.
+        // Post-fix (2026-08-17): this now correctly reaches VERIFIED — entry
+        // 0's absent link is a PROVEN pre-cutover adoption, not a gap, so it no
+        // longer caps the outcome. The anchor here is narrower and unaffected
+        // by that fix either way: NO DEFECTS, whatever the outcome resolves to.
         require: (r) => r.defects.length === 0,
         requireDesc: 'a clean chain must report zero defects',
       },

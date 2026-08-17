@@ -680,15 +680,46 @@ export const MUTATIONS = [
     replace: '      windowStartUnverifiable = true;\n      linksNotChecked += 1;\n      continue;',
   },
   {
+    id: 'hal-proven-genesis-counted-as-gap',
+    suite: 'check:hal-chain',
+    file: 'lib/trustshell/hal-chain.ts',
+    protects:
+      'a proven pre-cutover genesis (null link, dated before chaining began) is NOT a gap. ' +
+      'There is no predecessor to recompute — the row\'s own timestamp is the proof — so ' +
+      'counting it as unchecked caps EVERY genesis-anchored chain at NOT_CHECKED regardless ' +
+      'of how many real links past it match, which was the other half of HAL-001: not just ' +
+      'that an unanchored VERIFIED was reachable, but that an anchored one was NOT.',
+    find: '      // how many real links past it all matched — the defect HAL-001 closes.\n      continue;',
+    replace: '      // how many real links past it all matched — the defect HAL-001 closes.\n      linksNotChecked += 1;\n      continue;',
+  },
+  {
+    id: 'hal-unanchored-window-reads-verified',
+    suite: 'check:hal-chain',
+    file: 'lib/trustshell/hal-chain.ts',
+    protects:
+      'HAL-001. A window whose first entry points at a predecessor OUTSIDE it must not read ' +
+      'VERIFIED, however cleanly every link inside it matches — that shape is indistinguishable ' +
+      'from a truncation attack (delete the head, the tail is still internally consistent). ' +
+      'An exhaustive search on 2026-08-16 found this was the ONLY shape of input that could ' +
+      'ever reach VERIFIED, meaning every VERIFIED the function emitted was over an unanchorable ' +
+      'window. Removing this gate reintroduces exactly that, on real production rows: ' +
+      'LIVE_RUN_2026_08_17 shows the identical chained-tail input flip back to VERIFIED.',
+    find: '  if (windowStartUnverifiable) {',
+    replace: '  if (false && windowStartUnverifiable) {',
+  },
+  {
     id: 'hal-break-after-cutover-ignored',
     suite: 'check:hal-chain',
     file: 'lib/trustshell/hal-chain.ts',
     protects:
       'a null link AFTER the cutover is a BREAK, not adoption. Without the boundary the ' +
       'verifier cannot tell 44,769 legitimate pre-chaining rows from a live chain losing a ' +
-      'link — and a check that reports 44,769 defects is a check that gets switched off',
-    find: '      if (!Number.isNaN(at) && at >= cutover) {',
-    replace: '      if (false) {',
+      'link — and a check that reports 44,769 defects is a check that gets switched off. ' +
+      'Re-pointed 2026-08-17 (HAL-001): the null-link branch now also distinguishes an ' +
+      'unparseable created_at from a proven pre-cutover one, which split this single ' +
+      'condition into an if/else — the invariant this mutation protects did not change.',
+    find: '      } else if (at >= cutover) {',
+    replace: '      } else if (false) {',
   },
   {
     id: 'hal-fork-ignored',

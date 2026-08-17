@@ -124,7 +124,7 @@ against a surface with a valid audit secret, expecting a 403 at
 |---|---|
 | **Component** | HAL / audit chain |
 | **Severity** | Medium |
-| **Status** | Open, ledgered, owner **unassigned**, review by 2026-09-15 |
+| **Status** | **FIXED 2026-08-17** — probe HELD, ledger entry removed. See Resolution below; the description, evidence and recommended fix below are the historical record of what was found and are left as written. |
 
 **Description.** Two related results, both executed against
 `lib/trustshell/hal-chain.ts` over synthetic entries.
@@ -180,6 +180,30 @@ the caveat in the field callers actually read.
 **Re-test.** `npm run check:redteam -- --probe HAL-001`. HELD requires either
 that truncation stops returning `VERIFIED`, or that an anchored `VERIFIED` becomes
 reachable and `detail` names the truncation.
+
+---
+
+**Resolution (2026-08-17).** Both halves fixed in `lib/trustshell/hal-chain.ts`,
+not just the one this report recommended:
+
+- An unanchored window (`windowStartUnverifiable: true`) now caps the outcome at
+  `NOT_CHECKED`, whatever matches inside it — the truncation attack above now
+  reads `NOT_CHECKED`, not `VERIFIED`.
+- A proven pre-cutover genesis (null link, dated before the cutover) is no
+  longer counted as an unrecomputed link — there is nothing behind it to check,
+  and the row's own timestamp is the proof. This closes the *other* half the
+  exhaustive search found: an anchored `VERIFIED` was unreachable for **any**
+  input, not only for the ones this report's battery tried.
+
+Both are covered by dedicated mutation tests (`scripts/mutations.mjs`:
+`hal-unanchored-window-reads-verified`, `hal-proven-genesis-counted-as-gap`) and
+re-verified against real production rows — a wider window (ids 44758–44779) than
+this report's original 16-row pull, chosen specifically to include the true
+genesis. See `LIVE_RUN_2026_08_17` in `lib/trustshell/hal-chain.ts` for the
+numbers: the identical chained-tail input that read `VERIFIED` here now reads
+`NOT_CHECKED`, and the full window (genesis included) reaches a genuinely
+anchored `VERIFIED` for the first time. `npm run check:redteam -- --probe
+HAL-001` now returns HELD.
 
 ---
 
