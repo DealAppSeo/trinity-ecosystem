@@ -1,0 +1,26 @@
+{
+  "surface": "repid-engine-production.up.railway.app",
+  "url": "https://repid-engine-production.up.railway.app/api/v1/agents-external/:id/score-event",
+  "collectedAt": "2026-08-17T02:23:30.000Z",
+  "collectedBy": "claude-code session claude/trust-layer-red-team-ujpq6a",
+  "collectedVia": "supabase pg_net POST (unauthenticated) + service-role SQL for setup/measure/cleanup, project qnnpjhlxljtqyigedwkb",
+  "authorization": "User explicitly authorized a griefing-magnitude test against a throwaway agent (2026-08-17). RoE-compliant: attacked a row created for the test, then removed it.",
+  "protocol": {
+    "setup": "Inserted ONE throwaway agent (id dd7a381e-81e9-4e3d-8bef-4a6150207144, current_repid=1000, tier ESTABLISHED, clearly labelled) via service-role SQL — NOT via the register API, so no wallet/api-key/side-table rows were created.",
+    "attack": "Two UNAUTHENTICATED POSTs (no bearer) to the public /agents-external/:id/score-event, each a confidently-wrong fact-checkable answer, modelling a stranger griefing a foreign agent.",
+    "cleanup": "Deleted both repid_score_events rows + the repid_agents row; verified 0 rows remain across all 83 agent_id tables and the agent row. hal_classifications (hash-chained HAL audit, no agent attribution) deliberately left untouched — deleting a chain entry would break previous_entry_hash continuity."
+  },
+  "results": {
+    "event_1": { "http": 200, "hal_score": 1, "hal_decision": "vetoed", "repid_delta": -10, "old_repid": 1000, "new_repid_reported": 990 },
+    "event_2": { "http": 200, "hal_score": 1, "hal_decision": "vetoed", "repid_delta": -10, "old_repid": 1000, "new_repid_reported": 990 },
+    "live_current_repid_after_both": 1000,
+    "events_attributed_before_cleanup": 2,
+    "score_event_row_1": { "repid_before": 1000, "repid_after": 990, "repid_delta_applied": -10, "event_type": "HAL_SCORE_EVENT" }
+  },
+  "measured_magnitude": {
+    "live_score_drain": "ZERO — current_repid held at 1000 across both events; each event independently read old_repid=1000 (deltas do not accumulate) and the live column never moved despite the event recording repid_after=990. The live score is protected from unauthenticated penalty (consistent with trg_apply_repid_score_event's repid_delta_applied-IS-NOT-NULL short-circuit + the penalty-guard/floor/vesting machinery).",
+    "history_stats_pollution": "REAL and unbounded — each unauth submission wrote a HAL_SCORE_EVENT(hal_score=1, vetoed) attributed to the victim; anything aggregating repid_score_events (hallucination_rate, passport/card decision history) is polluted by decisions the agent never made. Rate limit 60/IP/min.",
+    "ledger_divergence_observation": "Each event row stored repid_after=990 / repid_delta_applied=-10 while live current_repid stayed 1000, and consecutive events did not accumulate. The event ledger claims movements the live score never made. MAY be intended (shadow/floor/vesting 'earned vs applied' split per score-event-guard.ts) rather than a bug — not distinguished by this test.",
+    "cost": "REAL — each POST triggered a live HAL cross-LLM evaluation with no auth."
+  }
+}

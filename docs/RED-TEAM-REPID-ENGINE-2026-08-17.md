@@ -47,6 +47,55 @@ path, and the LLM `/complete` proxy — named in the coverage map as next.
 
 ---
 
+## Griefing-magnitude test — EXECUTED against a throwaway (2026-08-17)
+
+User-authorized, RoE-compliant: I created one throwaway agent, attacked **it**
+(never a real agent), measured, and deleted every row I made. Setup was a direct
+service-role INSERT of a single labelled agent at `current_repid = 1000`
+(ESTABLISHED) — *not* the register API, so no wallet/api-key/side-table rows were
+created and cleanup was exact. The attack was **two unauthenticated** POSTs (no
+bearer) to `/api/v1/agents-external/:id/score-event`, each a confidently-wrong,
+fact-checkable answer — a stranger griefing a foreign agent.
+
+**Result — both events (2/2):** HTTP **200**, `hal_score: 1`,
+`hal_decision: "vetoed"`, `repid_delta: -10`, `old_repid: 1000 → new_repid: 990`
+in the response, and a `HAL_SCORE_EVENT` row written and attributed to the victim.
+
+**But the live score did not move.** `repid_agents.current_repid` held at **1000**
+across both events; each event independently read `old_repid = 1000` (the deltas
+did not even accumulate), and `last_updated` advanced to scoring time while the
+score column stayed put. So the measured magnitudes are:
+
+| axis | magnitude |
+|---|---|
+| **Live-score drain** | **ZERO.** A guard protects `current_repid` from the unauthenticated penalty (consistent with `trg_apply_repid_score_event`'s `repid_delta_applied IS NOT NULL → RETURN` short-circuit plus the penalty-guard / floor / vesting machinery). An attacker **cannot drain a victim's headline score** by this path. |
+| **History / stats pollution** | **REAL, unbounded.** Each unauth submission wrote a `vetoed / hal_score=1` event attributed to the victim. Anything aggregating `repid_score_events` — `hallucination_rate`, the passport/card decision history, the leaderboard — is polluted by decisions the agent never made, at 60/IP/min. |
+| **Cost** | **REAL.** Each POST triggered a live HAL cross-LLM evaluation, with no auth. |
+
+**A ledger divergence surfaced (observation, not a scored finding).** Each event
+row stored `repid_after = 990 / repid_delta_applied = -10` while `current_repid`
+stayed 1000, and consecutive events did not accumulate. The event stream *claims*
+movements the live score never made. This **may be intended** — the "earned vs
+applied" / shadow-floor split that `score-event-guard.ts` and the trustshell
+`earn_gate.would_suppress` copy both describe — so I do **not** score it as a bug;
+distinguishing protective-by-design from a reconciliation defect needs a
+dedicated test (a next-campaign item).
+
+**Cleanup verified:** both `repid_score_events` rows and the `repid_agents` row
+deleted; **0 rows remain** across all 83 `agent_id` tables and the agent row. The
+hash-chained `hal_classifications` audit rows (no agent attribution) were
+deliberately left — deleting a chain entry would break `previous_entry_hash`
+continuity, the exact integrity HAL-001 protects. Evidence:
+`scripts/redteam/evidence/repid-engine-grief-test.json`.
+
+**What this does to REPID-ENG-001's severity:** it **refines** it. The scary
+version — "drain a competitor's RepID to the floor" — is **refuted**: the live
+score is protected. The finding stands at **Medium** on the axes that measured
+real: unauthenticated *attribution* + stats/history pollution + HAL cost-burn.
+The defenders earn the score-protection credit explicitly.
+
+---
+
 ## Findings
 
 ### REPID-ENG-001 — Unauthenticated decision attribution on the public score-event path
