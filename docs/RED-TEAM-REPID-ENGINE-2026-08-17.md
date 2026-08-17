@@ -61,14 +61,19 @@ fact-checkable answer — a stranger griefing a foreign agent.
 `hal_decision: "vetoed"`, `repid_delta: -10`, `old_repid: 1000 → new_repid: 990`
 in the response, and a `HAL_SCORE_EVENT` row written and attributed to the victim.
 
-**But the live score did not move.** `repid_agents.current_repid` held at **1000**
-across both events; each event independently read `old_repid = 1000` (the deltas
-did not even accumulate), and `last_updated` advanced to scoring time while the
-score column stayed put. So the measured magnitudes are:
+**The throwaway's live score did not move — but that measured its floor, not the
+path.** `repid_agents.current_repid` held at **1000** across both events; each read
+`old_repid = 1000` and the deltas did not accumulate. **CORRECTED 2026-08-17:** that
+throwaway sat **exactly on its earned floor** (`peak = current = 1000 =
+tier_lower_bound(1000)`), so its **drainable gap was 0 by construction** — an
+unrepresentative sample (flagged by PR #81's DB map, then measured against live
+`repid_agents`). The clamp `trg_repid_earned_floor` only raises `current_repid`
+**up** to `coalesce(floor_override, tier_lower_bound(peak_repid))`; a penalty
+landing **above** that floor applies in full. So the measured magnitudes are:
 
 | axis | magnitude |
 |---|---|
-| **Live-score drain** | **ZERO.** A guard protects `current_repid` from the unauthenticated penalty (consistent with `trg_apply_repid_score_event`'s `repid_delta_applied IS NOT NULL → RETURN` short-circuit plus the penalty-guard / floor / vesting machinery). An attacker **cannot drain a victim's headline score** by this path. |
+| **Live-score drain** | **BOUNDED, not zero — this RETRACTS the earlier "ZERO".** An unauthenticated caller can drain a targeted agent's `current_repid` **down to its earned floor** (bounded by the drainable gap; it cannot go below the floor and cannot fabricate a high score). VERIFIED against live `repid_agents` 2026-08-17: **164/176 agents (93%) have a drainable gap** (avg **295** pts, max **2000**, 48,438 total drainable points); only **12/176 sit at floor** like the throwaway did. A session with `app.bypass_repid_floor='true'` skips the clamp entirely (confirmed early `RETURN NEW` in the trigger). The at-floor 7% are the only agents for which the drain is genuinely zero. |
 | **History / stats pollution** | **REAL, unbounded.** Each unauth submission wrote a `vetoed / hal_score=1` event attributed to the victim. Anything aggregating `repid_score_events` — `hallucination_rate`, the passport/card decision history, the leaderboard — is polluted by decisions the agent never made, at 60/IP/min. |
 | **Cost** | **REAL.** Each POST triggered a live HAL cross-LLM evaluation, with no auth. |
 
@@ -77,10 +82,11 @@ Each event row stored `repid_after = 990 / repid_delta_applied = -10` while
 `current_repid` stayed 1000. Investigated to root cause and verified: the DB
 trigger `trg_repid_earned_floor` clamps `current_repid` up to
 `tier_lower_bound(peak_repid)`, absorbing the penalty, while the event keeps the
-pre-clamp value. It is **both** a good control (the earned floor is exactly what
-zeroed the live-score griefing) **and** a Low ledger-accuracy defect (the event
-overstates the applied movement). Full mechanism and behavioural proof in the
-finding.
+pre-clamp value. It is **both** a partial control (the earned floor
+**caps** the live-score griefing at the floor — zero drain only for agents already
+sitting on it, a bounded drain for the other 93%) **and** a Low ledger-accuracy
+defect (the event overstates the applied movement). Full mechanism and behavioural
+proof in the finding.
 
 **Cleanup verified:** both `repid_score_events` rows and the `repid_agents` row
 deleted; **0 rows remain** across all 83 `agent_id` tables and the agent row. The
@@ -89,11 +95,15 @@ deliberately left — deleting a chain entry would break `previous_entry_hash`
 continuity, the exact integrity HAL-001 protects. Evidence:
 `scripts/redteam/evidence/repid-engine-grief-test.json`.
 
-**What this does to REPID-ENG-001's severity:** it **refines** it. The scary
-version — "drain a competitor's RepID to the floor" — is **refuted**: the live
-score is protected. The finding stands at **Medium** on the axes that measured
-real: unauthenticated *attribution* + stats/history pollution + HAL cost-burn.
-The defenders earn the score-protection credit explicitly.
+**What this does to REPID-ENG-001's severity:** the first pass **over-credited**
+the defenders. "Drain a competitor's RepID to the floor" is **not refuted — it is
+confirmed for 93% of agents**, bounded to the earned floor rather than to zero. The
+finding stands at **Medium, arguably High**: the drain is unauthenticated,
+widespread (164/176 agents, up to 2000 pts) and a targeted griefing/defamation
+vector; what keeps it below Critical is that it is bounded to the earned floor and
+HAL must actually veto the injected decisions. The score-protection credit is
+**partial**, not full — it protects the ratchet floor, not the headline score
+above it.
 
 ---
 
@@ -221,9 +231,11 @@ wrote 400  (deep penalty)           -> live = 1000   (clamped)
 And the grief-test event: stored `repid_after = 990, repid_delta_applied = -10`
 while live `current_repid = 1000` — **actual movement 0.**
 
-**What this does NOT establish.** It is **not exploitable**, and it arises from a
-**good** control — the earned floor is precisely what made REPID-ENG-001's
-live-score griefing magnitude zero. The reconciliation tripwire
+**What this does NOT establish.** REPID-ENG-003 itself is an audit-accuracy defect,
+**not** independently exploitable. But the earned floor it rests on is only a
+**partial** protection for REPID-ENG-001: it caps a griefing drain at the floor
+(zero only for the 12/176 agents already there), it does **not** make the live
+score unreachable — see the corrected magnitude table above. The reconciliation tripwire
 `appliedScoreReconciles()` does not catch it: it checks the JS decomposition's
 internal consistency, not the JS `after` against the post-trigger live value.
 

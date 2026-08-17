@@ -80,7 +80,7 @@ class), 2 Low informational notes, and 1 open question routed to Sean.
 | PAY-001 | High | TrustShell payments | dual-sig gate counts role strings, verifies no signature | open, mooted by fail-closed minting |
 | ERC8004-001 | Med | ERC-8004 on-chain | leaked keys live+funded on Base Sepolia; one minted the identities | open; 1 Sean question pending |
 | LIVE-002 | Med | trustshell.dev | disabled legacy Supabase key in the browser bundle → dead integration | open |
-| REPID-ENG-001 | Med | repid-engine scoring | public score-event path has no auth → decision *attribution* to any agent | open; griefing magnitude measured |
+| REPID-ENG-001 | Med (arguably High) | repid-engine scoring | public score-event path has no auth → unauth *attribution* **and** a live-score drain to the earned floor for 164/176 agents | open; drain magnitude measured (earlier "zero drain" retracted) |
 | HAL-001 | Med | HAL audit chain | `verifyHalChain` returns VERIFIED over an unanchorable (truncatable) window | open; no prod caller yet |
 | RCPT-001 | Low | receipts | abandoned-secret guard is case-sensitive | open; no live surface holds a variant |
 | REPID-ENG-003 | Low | repid-engine ledger | event overstates the applied penalty vs the earned-floor-clamped live score | open; from a good control |
@@ -103,8 +103,10 @@ leaked `0xf6eE1768…` or rotated (PR #66, Sean).
 
 Also established and held during the campaigns: the RepID score is HAL-computed on
 both score-event paths; penalties require a fact-check quorum + a penalty-guard
-trigger + an earned-tier floor (the griefing test measured a **zero** live-score
-drain); the bearer score-event path enforces ownership; the LLM `/complete` proxy
+trigger + an earned-tier floor (that floor **caps** a griefing drain at the earned
+floor rather than eliminating it — see the REPID-ENG-001 correction below; the
+earlier "zero live-score drain" is retracted); the bearer score-event path enforces
+ownership; the LLM `/complete` proxy
 redacts user API keys from logs and its gate is not IP-spoofable on this
 deployment; the client-side key vault uses AES-256-GCM with PBKDF2-250k.
 
