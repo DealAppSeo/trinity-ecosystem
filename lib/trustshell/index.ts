@@ -345,3 +345,10 @@ export type {
 // so this barrel export is what makes the rule reachable from here.
 export { classify, scoreIssuer, refusesToIssue, STAKE_POINTS } from './issuer-stake';
 export type { IssuedVerdict, VerdictClass, IssuerStanding } from './issuer-stake';
+
+// P3 of docs/SPRINT-DECISIONS-2026-08-17.md — a floor is held, not owned.
+// `effectiveFloor` is the rule; `wouldChange` reports blast radius before a
+// migration runs. The enforcement point is `trg_repid_earned_floor` in the
+// database, so this export is what makes the rule reachable and testable here.
+export { effectiveFloor, wouldChange, FLOOR_HALF_LIFE_DAYS, REATTESTATION_WINDOW_DAYS } from './ratchet-decay';
+export type { FloorInput, FloorDecision, FloorVerdict } from './ratchet-decay';

@@ -152,3 +152,4 @@ lib/**/*.js
 .repid-weight-sim-*/
 .issuer-stake-check-*/
 .proof-contract-check-*/
+.ratchet-decay-check-*/

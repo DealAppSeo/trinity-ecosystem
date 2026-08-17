@@ -75,9 +75,12 @@ A `peak_repid` floor that never decays is the gaming vector. **Credential-style
 re-attestation, not permanent once-standing.**
 
 *Measured (#81): `peak_repid` rises monotonically and `current_repid` is clamped
-**up** to `tier_lower_bound(peak_repid)`. **21 of 176** agents sit exactly on a
-floor, and `trinity-gcm` clears the **medical/finance** gate at exactly 1000
-because of the clamp. Reward for good behaviour is permanent; cost of bad
+**up** to `tier_lower_bound(peak_repid)`. **12** agents are pinned by the ratchet — the widely-quoted "21" counted
+agents on a round number, which is a looser test. Of the 12: **4 are human**,
+**7 are `test_only`**, and **exactly 1 is a real agent** (`trinity-gcm`, which
+clears the **medical/finance** gate at exactly 1000 because of the clamp).
+**And 6 hold a floor having never been observed at all** — which decay cannot
+reach, and which is the larger half of the defect. Reward for good behaviour is permanent; cost of bad
 behaviour is bounded below — precisely backwards.*
 
 ---

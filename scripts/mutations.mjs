@@ -1039,6 +1039,30 @@ export const MUTATIONS = [
       '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
   },
   {
+    id: 'ratchet-decay-lets-a-never-observed-floor-decay-gracefully',
+    suite: 'check:ratchet-decay',
+    file: 'lib/trustshell/ratchet-decay.ts',
+    protects:
+      'ORDER. The mutant checks recency before never-earned, so an agent with zero observations ' +
+      'ever but a surviving last-seen date is treated as merely stale and decays gracefully from a ' +
+      'floor it never earned. That is the state an agent reaches when its observations age out of ' +
+      'the retention window, and the mutant keeps compiling because the null-narrowing survives',
+    find: `  if (observationsEver === 0 || daysSinceLastObservation === null) {`,
+    replace: `  if (daysSinceLastObservation === null) {`,
+  },
+  {
+    id: 'ratchet-decay-demotes-humans',
+    suite: 'check:ratchet-decay',
+    file: 'lib/trustshell/ratchet-decay.ts',
+    protects:
+      'the human exemption. 4 of the 12 pinned agents are human, and compute_tier already exempts ' +
+      'is_human from the counterparty gate for the same reason: a human\'s standing is not earned ' +
+      'through agent observations. The mutant applies an observation-driven decay to them, which ' +
+      'demotes a human for not behaving like a bot',
+    find: `  if (isHuman) {`,
+    replace: `  if (false && isHuman) {`,
+  },
+  {
     id: 'proof-result-claims-privacy-the-provider-does-not-have',
     suite: 'check:proof-provider-contract',
     file: 'lib/trustshell/identity/proof-provider.ts',
