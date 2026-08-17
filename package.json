@@ -95,7 +95,8 @@
     "check:dormancy": "node scripts/check-dormancy-selftest.mjs && node scripts/check-dormancy.mjs",
     "check:lessons-numbering": "node scripts/check-lessons-numbering.mjs",
     "check:durable-ledger": "node scripts/durable-ledger-test.mjs",
-    "check:tmpdir-ignored": "node scripts/check-tmpdir-ignored.mjs"
+    "check:tmpdir-ignored": "node scripts/check-tmpdir-ignored.mjs",
+    "check:poseidon2": "node scripts/check-poseidon2.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

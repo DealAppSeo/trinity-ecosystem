@@ -113,6 +113,10 @@ const DECLARED = new Map([
     'throughput/ledger',
     'the producer-liveness ledger. Its consumer is the runtime lane (T12), which observes rather than imports; a product importer is not the goal.',
   ],
+  [
+    'identity/poseidon2-hash2',
+    'the 2-scalar Poseidon2 hash. Its consumer is `check:poseidon2`, which runs it against Plonky3\'s oracle — the parity IS the product, as with schema/decoys. It stays unwired ON PURPOSE until IBindingScheme can be implemented: the permutation is settled but the string→field and domain-tag encodings are not, and wiring a hash whose input encoding is undecided is exactly how two systems come to persist data under incompatible roots. See docs/POSEIDON2-PARAMETER-REQUEST.md.',
+  ],
 ]);
 
 const results = [];
