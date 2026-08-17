@@ -213,6 +213,15 @@ await check('THE CEILING: the best F1 any threshold on this score can reach', as
 });
 
 await check("REALIZED: what HAL's own veto decision achieves", async () => {
+  // CAVEAT (#65 §5.5, LESSONS A23). 41 of the vetoes inside this figure fired on
+  // rows where HAL called NO provider: 19 on hallucinations, 22 on clean answers
+  // — slightly MORE often on the clean ones, which is what AUC 0.5150 on that
+  // group predicts. They are vetoes HAL genuinely cast, so this remains an
+  // accurate description of its realized behaviour and the numbers below stand.
+  // What is not evidence-backed is the recall they buy: 0.807 -> 0.904 over the
+  // pure cut. Excluding them, realized F1 is the pure cut's 0.8760 — 98.37% of
+  // the bound rather than 98.95%. The threshold conclusion is unchanged either
+  // way, which is why this is a caveat on the meaning and not a correction.
   const r = A.realizedConfusion(FC);
   eq(r.tp, 178, 'tp');
   eq(r.fp, 29, 'fp');
@@ -248,9 +257,18 @@ await check('0.9579 IS A BLEND — the sub-strata disagree, so never quote it fl
   truthy(strong.length / FC.length > 0.8, 'the blend is dominated by one source');
   truthy(
     A.rocAuc(strong) - A.rocAuc(weak) > 0.35,
-    'the gap between sources is larger than most effects anyone would tune for — ' +
-      'and it is NOT EXPLAINED'
+    'the gap between sources is larger than most effects anyone would tune for'
   );
+
+  // EXPLAINED 2026-08-16 — supersedes the "NOT EXPLAINED" this assertion
+  // originally carried (#65, docs/HAL-AUC-STRATIFICATION-2026-08-16.md §5,
+  // LESSONS A23). `benchmark_source` was a PROXY. In 59 of these 71 weak-stratum
+  // rows `hal_providers_used` is EMPTY — HAL called no verification provider and
+  // wrote a hal_score anyway (947ms mean latency against ~3,100ms when one runs).
+  // Split on EXECUTION rather than on source and the gap dissolves: AUC 0.9746
+  // [0.9574, 0.9917] wherever HAL actually ran, 0.5150 [0.3662, 0.6637] where it
+  // did not — the same either side of the benchmark boundary.
+  // This fixture cannot check that. The next assertion pins why.
 
   // And the failed generations are not spread evenly either: every one of them
   // is in the weak stratum, so "drop gen_failed" silently reweights the blend.
@@ -260,6 +278,25 @@ await check('0.9579 IS A BLEND — the sub-strata disagree, so never quote it fl
     allFc.filter((r) => r.genFailed && r.benchmarkSource === 't12-overnight-2026-06').length,
     0,
     'none in the strong stratum'
+  );
+});
+
+await check('this fixture CANNOT audit its own denominator — pinned so it FIRES', async () => {
+  // The defect explained above is invisible here by construction: the export
+  // omits `hal_providers_used`, the one column that separates a verdict HAL
+  // earned from one it emitted having consulted nothing. Every figure in this
+  // suite is therefore computed over a denominator it cannot audit.
+  //
+  // A comment saying so is another unpaid caveat, and this repo has been bitten
+  // by those. So the LIMITATION is pinned instead of described: re-export the
+  // fixture with the provider column and this assertion FAILS by design. That is
+  // the point — it forces whoever re-exports to add the execution assertions
+  // (0.9746 where HAL ran, 0.5150 where it did not, and the 41 unearned vetoes)
+  // rather than silently inheriting a blended figure that now looks auditable.
+  truthy(
+    Array.isArray(fixture._schema) && !fixture._schema.includes('hal_providers_used'),
+    'fixture gained hal_providers_used — assert the execution split (#65 §5.5, ' +
+      'LESSONS A23) and then delete this guard'
   );
 });
 
