@@ -139,7 +139,6 @@ lib/**/*.js
 .loud-errors-check-*/
 .m3-check-*/
 .receipt-check-*/
-.floor-decay-check-*/
 .receipt-cli-*/
 .repid-calibration-check-*/
 .repid-drift-check-*/
