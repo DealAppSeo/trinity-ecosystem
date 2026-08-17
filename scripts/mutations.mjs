@@ -740,7 +740,7 @@ export const MUTATIONS = [
       'the denial reason is an OBSERVABLE CONTRACT, not prose. It lands in a compliance ' +
       "receipt's `denialReason`, and run-e2e.mjs matches /exceeds per-tx limit/i against it " +
       'over HTTP. Rewording it to read better turned CI red while `npm run check` reported ' +
-      '52 VERIFIED — LESSONS A25. The fast suite pins the regex so the next break surfaces ' +
+      '52 VERIFIED — LESSONS A24. The fast suite pins the regex so the next break surfaces ' +
       'in seconds instead of in a server boot',
     find: '      detail: `Amount ${amountUSDC} USDC exceeds per-tx limit ${limit}`,',
     replace: '      detail: `Amount ${amountUSDC} USDC exceeds the per-transaction limit of ${limit}`,',
@@ -1423,6 +1423,393 @@ export const MUTATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // lib/trustshell/priorwork/open-index.ts — the gate against re-deriving work
+  // that is already filed. Earned 2026-08-16, at the cost of most of a session.
+  // -------------------------------------------------------------------------
+  {
+    id: 'openwork-advisory-entries-fire',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'scope is OPT-IN: an entry with no [scope:] marker can NEVER fail a build. If ' +
+      'unscoped entries matched, every diff would fire on every open item — and a gate ' +
+      'that cries wolf is one people route around, which is exactly how check:prior-work ' +
+      'came to enforce only its mechanical half',
+    find: '    (e) => e.scope.length > 0 && e.scope.some((t) => scopeMatches(t, change))',
+    replace: '    (e) => e.scope.some((t) => scopeMatches(t, change)) || e.scope.length === 0',
+  },
+  {
+    id: 'openwork-token-matches-longer-name',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'a scope token matches a WHOLE word, so `repid_events` does not match ' +
+      '`trinity_repid_events` and send somebody to the wrong entry — the same near-name ' +
+      'trap check:schema-names exists for, and this repo has already paid for twice',
+    find: '  return word.test(change.diffText);',
+    replace: '  return change.diffText.includes(token);',
+  },
+  {
+    id: 'openwork-parses-closed-and-retracted',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'ONLY the OPEN section is parsed. CLOSED and RETRACTED share the table shape; ' +
+      'closed work is meant to be built on, and retracted figures are check:prior-work\'s ' +
+      'job. Pulling them in would make this fire on everything',
+    find: '    if (/^##\\s/.test(lines[i])) { end = i; break; }',
+    replace: '    if (false) { end = i; break; }',
+  },
+  {
+    id: 'openwork-everything-acknowledged',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'acknowledgement requires naming THIS entry — a blanket pass would be a rubber ' +
+      'stamp, which is worse than no gate because it looks like diligence',
+    find: '  if (cited) return true;',
+    replace: '  if (true) return true;',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/alerts/digest.ts — 142,560 rows nobody ever read.
+  // -------------------------------------------------------------------------
+  {
+    id: 'digest-repeats-do-not-collapse',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'repeats collapse. Without number-stripping, "Time Down: 42314 minutes" and ' +
+      '"42317 minutes" are different alerts and 40,236 rows become 40,236 digests — ' +
+      'a consumer that achieves nothing while appearing to work. Measured on live ' +
+      'data the real ratio is 188:1',
+    find: "    .replace(/\\b\\d[\\d,._]*\\b/g, '<n>')",
+    replace: '    .replace(/\\b(?!)\\b/g, "<n>")',
+  },
+  {
+    id: 'digest-backlog-pages-everyone',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'a five-month-old condition never notified does NOT page. Staleness is checked ' +
+      'BEFORE first-notice, or the first run floods the channel with a backlog reaching ' +
+      'back to January and buries whatever is actually live',
+    find: "  if (ageDays > policy.staleAfterDays) return 'SUPPRESS_STALE';",
+    replace: '  if (false) return \'SUPPRESS_STALE\';',
+  },
+  {
+    id: 'digest-invents-a-subject',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'a subject is parsed only for the shape actually measured, never guessed. A wrong ' +
+      'subject routes a human to the wrong agent — the name-matching failure this repo ' +
+      'has already paid for twice. api_auth_attempt carries an EMPTY message, so a ' +
+      'guessing parser would silently emit blanks and look like it worked',
+    find: '  return null;\n}\n\nexport function digestRows',
+    replace: "  return message.split(' ')[0] ?? null;\n}\n\nexport function digestRows",
+  },
+  {
+    id: 'digest-drops-corroboration',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'distinct reporters are retained. Three agents independently reporting one agent ' +
+      'DOWN is stronger evidence than one, and collapsing them without the count throws ' +
+      'that away',
+    find: '    if (r.agent && !d.reporters.includes(r.agent)) d.reporters.push(r.agent);',
+    replace: '    // mutated: reporters no longer accumulated',
+  },
+
+  // ── check:lesson-ids ──────────────────────────────────────────────────────
+  //
+  // These four are caught by the SELF-TEST, not by the scan of LESSONS.md, and
+  // that is the whole point. The tree currently has no duplicate IDs, so a
+  // detector that cannot fire produces the same green line as a clean file. If
+  // any of these four survived, `check:lesson-ids` would be decorative.
+  {
+    id: 'lesson-duplicate-detector-never-fires',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'the duplicate detector actually fires. On 2026-08-16 LESSONS.md carried two `A19` ' +
+      'headings and two `A20` headings on unrelated failures, with three live citations ' +
+      'pointing at those tokens — the ID is the entire reference, so following one was a ' +
+      'coin flip. Off by one in this comparison and the check passes over the exact ' +
+      'defect it was written for',
+    find: '    if (sites.length > 1) dupes.push({ id, sites });',
+    replace: '    if (sites.length > 2) dupes.push({ id, sites });',
+  },
+  {
+    id: 'lesson-series-letter-dropped-from-id',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'the series letter is part of the ID. `A19` is an agent error and `S19` would be a ' +
+      'security finding; keying on the number alone reports them as the same entry and ' +
+      'demands a renumber that would be wrong. This is the same defect as LESSONS A12 — ' +
+      'two different things agreeing on a name',
+    find: "      defs.push({ id: `${heading[1]}${heading[2]}`, line: i + 1, title: heading[3].trim() });",
+    replace: "      defs.push({ id: `${heading[2]}`, line: i + 1, title: heading[3].trim() });",
+  },
+  {
+    id: 'lesson-ambiguous-collapsed-into-nothing',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'a citation pointing at a duplicated ID is reported. A duplicate heading with no ' +
+      'citation is untidy; a duplicate heading WITH citations is a reference that resolves ' +
+      'two ways, which is the part that costs time. Returning empty here leaves the ' +
+      'duplicate report standing while hiding who is affected by it',
+    find: '  return citations.filter((c) => dupeIds.has(c.id));',
+    replace: '  return [];',
+  },
+  {
+    id: 'lesson-heading-anchor-dropped',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'a heading is only a definition at the start of a line. Without the anchor, an ID ' +
+      'quoted inside a table cell or a fenced block registers as a second definition of an ' +
+      'entry that is in fact defined once — the check then demands a renumber to fix a ' +
+      'duplicate that does not exist, which is how a suite loses the reader',
+    find: 'const HEADING_DEF = /^#{2,4}\\s+([A-Z])(\\d+)\\s*[—–-]\\s*(.*)$/;',
+    replace: 'const HEADING_DEF = /#{2,4}\\s+([A-Z])(\\d+)\\s*[—–-]\\s*(.*)/;',
+  },
+
+  // ── check:replay-plan ─────────────────────────────────────────────────────
+  //
+  // Every one of these lives on the resume path, which a successful first run
+  // never touches. The corpus is 147,704 rows behind a partial unique index, so
+  // a wrong first pass cannot be re-minted — these are the decisions that have
+  // to be right before the run, not after it.
+  {
+    id: 'replay-fatal-error-read-as-duplicate',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'only SQLSTATE 23505 is benign. Treating an unrecognised error as a duplicate turns a ' +
+      'permission denial or a constraint violation into a silent skip, and a skip leaves no ' +
+      'trace — the corpus goes short and the run still prints a completion line. This is the ' +
+      'house defect applied to 147,704 rows',
+    find: "  if (error.code === UNIQUE_VIOLATION) return 'duplicate';\n  return 'fatal';",
+    replace: "  if (error.code === UNIQUE_VIOLATION) return 'duplicate';\n  return 'duplicate';",
+  },
+  {
+    id: 'replay-cursor-runs-backwards',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'the cursor is a high-water mark and only ever rises. Moving it backwards on an ' +
+      'out-of-order batch makes a resumed run re-read rows it already attempted, which is ' +
+      'harmless only because of the unique index — remove that index and it double-mints',
+    find: '  for (const id of attemptedIds) if (id > max) max = id;',
+    replace: '  for (const id of attemptedIds) if (id < max) max = id;',
+  },
+  {
+    id: 'replay-interrupted-run-reads-as-verified',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'an interrupted run is NOT_CHECKED. Dropping this line collapses three outcomes into ' +
+      'two: a run that reached 40,000 of 147,704 rows and stopped reports VERIFIED, which is ' +
+      '"we did not look" printed as "it passed" — the exact substitution CLAUDE.md names as ' +
+      'the recurring defect in this codebase',
+    find: "  if (counts.remaining > 0) return 'NOT_CHECKED';",
+    replace: '  // mutated: incompleteness no longer reported',
+  },
+  {
+    id: 'replay-batch-clamps-to-zero',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'the batch floor. A batch of 0 makes the reader return no rows, the cursor never ' +
+      'advances, and the loop exits immediately with minted 0 — a run that terminates ' +
+      'cleanly having done nothing, which reads as an already-complete corpus',
+    find: '  if (n < MIN_BATCH) return MIN_BATCH;',
+    replace: '  if (n < MIN_BATCH) return n;',
+  },
+
+  // ── check:acceptance-loop ─────────────────────────────────────────────────
+  {
+    id: 'acceptance-exhausted-reads-as-delivered',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'a spent revision budget is NOT a standard met. This is the house defect in one line: ' +
+      'EXHAUSTED means the process ran out of road, and shipping on it reports an auditor ' +
+      "sign-off that never happened. `isDelivered` exists precisely so callers cannot write " +
+      "`status !== 'REVISE'` and treat running out as done",
+    find: "export function isDelivered(state: AcceptanceState): boolean {\n  return state.status === 'ACCEPTED';",
+    replace:
+      "export function isDelivered(state: AcceptanceState): boolean {\n" +
+      "  return state.status === 'ACCEPTED' || state.status === 'EXHAUSTED';",
+  },
+  {
+    id: 'acceptance-auditor-substitution-unnoticed',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      "the sticky auditor. checker-assignment.ts defeats checker-shopping AT THE DRAW, and " +
+      'both of its defences are properties of a SINGLE draw. Re-drawing per revision ' +
+      'reintroduces the entire attack — "rejected? resubmit for a new auditor" is the re-roll ' +
+      'the deterministic seed exists to prevent, and it arrives disguised as diligence',
+    find: '    if (rounds[i].auditorDid !== first) return { stable: false, at: i };',
+    replace: '    if (rounds[i].auditorDid === first) return { stable: false, at: i };',
+  },
+  {
+    id: 'acceptance-outage-consumes-revision-budget',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'only REJECTED spends budget. staged-judge.ts already holds that "a provider outage is ' +
+      'not a defect report, and must not be able to condemn the work"; one level up, letting ' +
+      "NOT_CHECKED decrement the allowance lets a flaky judge exhaust a correct doer and " +
+      'produce EXHAUSTED on work nobody ever judged',
+    find: "  const rejected = rounds.filter((r) => r.verdict === 'REJECTED');",
+    replace: "  const rejected = rounds.filter((r) => r.verdict !== 'ACCEPTED');",
+  },
+  {
+    id: 'acceptance-stall-never-detected',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'resubmitting identical bytes is its own outcome. Without it a doer that changes ' +
+      'nothing burns the budget to EXHAUSTED, which reads as "we tried" — STALLED separates ' +
+      '"could not fix it" from "did not change it", and only one of those is the doer\'s fault',
+    find: '  if (rejected.length >= 2) {',
+    replace: '  if (rejected.length >= Number.MAX_SAFE_INTEGER) {',
+  },
+  {
+    id: 'acceptance-later-rejection-unaccepts',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'acceptance is final. Scanning only the last round lets a re-review revoke a delivered ' +
+      'result, so a signed-off deliverable could be retroactively withdrawn by running the ' +
+      'auditor again — the reputation events and the envelope have already been issued',
+    find: '  for (const round of rounds) {\n    if (round.verdict === \'ACCEPTED\') {',
+    replace: '  for (const round of rounds.slice(-1)) {\n    if (round.verdict === \'ACCEPTED\') {',
+  },
+  {
+    id: 'acceptance-loop-cannot-terminate-under-an-outage',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'the SECOND bound. maxRejections alone cannot terminate the loop: "NOT_CHECKED never ' +
+      'spends the doer\'s budget" is correct, and combined with "run until terminal" it means ' +
+      'an unavailable judge yields REVISE forever. Both rules are individually right and ' +
+      'jointly non-terminating. This was found by running it — the suite hung for nine ' +
+      'minutes before it was killed — not by reading it',
+    find: '  if (rounds.length >= maxRounds) {',
+    replace: '  if (rounds.length >= Number.MAX_SAFE_INTEGER) {',
+  },
+  {
+    id: 'acceptance-unreadable-verdict-scored-as-a-rejection',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'BOTH readability signals are required. A verdict bound to a different contract is not ' +
+      'the auditor faulting the work, and charging it to the revision budget spends the ' +
+      "doer's allowance on a harness bug. Dropping either half also re-opens the trap that " +
+      'hung this loop once: reading a rejection as unreadable, or an unreadable verdict as a ' +
+      'rejection, are the two ways to get this exactly backwards',
+    find: "  if (input.signatureValid !== true || input.boundToContract !== true) return 'NOT_CHECKED';",
+    replace: "  if (input.signatureValid !== true) return 'NOT_CHECKED';",
+  },
+
+  // ── check:review-session ──────────────────────────────────────────────────
+  {
+    id: 'review-doer-seed-falls-back',
+    suite: 'check:review-session',
+    file: 'lib/trustshell/review/session.ts',
+    protects:
+      'missing configuration throws and names the variable. This is the dummy-fallback defect ' +
+      'lib/CLAUDE.md removed on purpose, in its worst form: a fallback SEED does not fail ' +
+      'visibly like a fallback URL — it produces a perfectly valid Ed25519 signature attesting ' +
+      'to an identity nobody holds, and every layer above reads that as a signed contract',
+    find: '  const doerSeed = env.TRUSTSHELL_DOER_SEED?.trim();',
+    replace: "  const doerSeed = env.TRUSTSHELL_DOER_SEED?.trim() || 'fallback-doer-seed';",
+  },
+  {
+    id: 'review-single-auditor-pool-accepted',
+    suite: 'check:review-session',
+    file: 'lib/trustshell/review/session.ts',
+    protects:
+      'a pool of one is not a draw. The same reasoning as MIN_MEANINGFUL_POOL in ' +
+      'checker-assignment and MIN_MEANINGFUL_GROUP in nullifier: the mechanism runs, the proof ' +
+      'verifies, and it identifies the auditor exactly — "a named checker wearing a ' +
+      "lottery's clothes\". The draw would still be recomputable, which is what makes it " +
+      'convincing and wrong',
+    find: 'export const MIN_AUDITOR_POOL = 2;',
+    replace: 'export const MIN_AUDITOR_POOL = 1;',
+  },
+  {
+    id: 'review-exhausted-attempts-resubmit-the-last',
+    suite: 'check:review-session',
+    file: 'lib/trustshell/review/session.ts',
+    protects:
+      'running out of submissions returns null rather than repeating. Repeating the last ' +
+      'attempt makes the loop judge identical bytes twice and score STALLED — blaming the doer ' +
+      'for failing to revise work it has not yet been told about. Sessions are stateless: the ' +
+      'revision is in the NEXT request, and the honest answer is a non-terminal REVISE',
+    find: '      const submitted = request.attempts[round];',
+    replace:
+      '      const submitted = request.attempts[Math.min(round, request.attempts.length - 1)];',
+  },
+
+  // ── check:judges ──────────────────────────────────────────────────────────
+  {
+    id: 'mechanical-judge-can-say-verified',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      'THE rule of the mechanical tier: it may never return VERIFIED. It detects the ABSENCE ' +
+      'of quality and cannot establish its PRESENCE — a scan finding no TODO has learned that ' +
+      'there is no TODO, not that the work is correct. Letting it pass turns the review ' +
+      'surface into a rubber stamp that signs off on anything clean-looking, and the stamp ' +
+      'arrives wearing a contract-bound verdict',
+    find: "      return {\n        outcome: 'NOT_CHECKED',\n        detail:\n          'no mechanically decidable defect;",
+    replace: "      return {\n        outcome: 'VERIFIED',\n        score: 1,\n        detail:\n          'no mechanically decidable defect;",
+  },
+  {
+    id: 'judge-outage-condemns-the-work',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      'an unreachable model is NOT_CHECKED, never FAILED. staged-judge escalates NOT_CHECKED ' +
+      'and treats FAILED as final, so scoring an outage as FAILED lets an API error fail an ' +
+      "agent's work — and under the acceptance loop three of them reach EXHAUSTED on work no " +
+      'judge ever read',
+    find: "        return {\n          outcome: 'NOT_CHECKED',\n          detail:\n            `${label} judge was unreachable:",
+    replace: "        return {\n          outcome: 'FAILED',\n          detail:\n            `${label} judge was unreachable:",
+  },
+  {
+    id: 'judge-verified-without-a-score-accepted',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      "JudgeOpinion.score says it outright — absent is not a pass. A VERIFIED with no score " +
+      "cannot be measured against the criterion's floor, so accepting it lets a model pass " +
+      'work by asserting success without ever expressing confidence in it',
+    find: "  if (outcome === 'VERIFIED' && score === undefined) return null;",
+    replace: '  // mutated: an unscored VERIFIED is accepted',
+  },
+  {
+    id: 'judge-out-of-range-score-clamped',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      'an out-of-range score is malformed, not clamped. Clamping 4.7 to 1 invents a confidence ' +
+      'the model never expressed and turns a broken response into a maximal pass',
+    find:
+      '    if (typeof o.score !== \'number\' || !Number.isFinite(o.score) || o.score < 0 || o.score > 1) {\n' +
+      '      return null;\n    }\n    score = o.score;',
+    replace:
+      '    if (typeof o.score !== \'number\' || !Number.isFinite(o.score)) {\n' +
+      '      return null;\n    }\n    score = Math.min(1, Math.max(0, o.score));',
+  },
+
   // lib/trustshell/config-readiness.ts — a PUBLIC presence report
   //
   // Registered in the same commit as the code. Leaving new code unmutated is
@@ -1483,6 +1870,55 @@ export const MUTATIONS = [
     find: '  if (value.trim().length < rule.minLength) return \'too_short\';',
     replace: '  if (value.trim().length <= rule.minLength) return \'too_short\';',
   },
+
+  // ── check:throughput — quorum diversity ───────────────────────────────────
+  {
+    id: 'diversity-member-loss-never-detected',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a lost quorum member is reported AT ALL. This is the two days of warning that sat ' +
+      'unread in hal_classifications.model: gemini went 2,653 → 0 on 07-14 while total volume ' +
+      'did NOT move, because the surviving providers absorbed the load. A row count is blind ' +
+      'to it by construction, every liveness check was green, and the earliest volume-based ' +
+      'alarm was 07-16 — two days late',
+    find: '  if (missing.length > 0) {',
+    replace: '  if (missing.length > 99) {',
+  },
+  {
+    id: 'diversity-member-loss-reported-as-quiet',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'MEMBER_LOST wakes a human. A capability loss that is detected and then filed quietly is ' +
+      'the same outcome as not detecting it — 39,788 SURVIVOR ALERTs sat at status pending ' +
+      'because no consumer ever existed',
+    find: "  'CANARY_ONLY',\n  'MEMBER_LOST',\n];",
+    replace: "  'CANARY_ONLY',\n];",
+  },
+  {
+    id: 'diversity-thin-baseline-judged-anyway',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a short baseline refuses to judge. With three days of history a member that was NEVER ' +
+      'seen is indistinguishable from one just lost, and reporting the first as MEMBER_LOST is ' +
+      'a false alarm — a gate that cries wolf is one people route around',
+    find: '  if (o.baselineDays < minDays) {',
+    replace: '  if (o.baselineDays < -1) {',
+  },
+  {
+    id: 'diversity-paused-producer-cries-wolf',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a producer declared OFF is not loud about having no members. A paused producer has no ' +
+      'quorum BY DEFINITION, and reporting that as MEMBER_LOST makes the ledger cry wolf about ' +
+      'its own pause — which is how the cost-pause states lose their meaning',
+    find: "  if (d.state !== 'running') {\n    return out(\n      'EXPECTED_SILENCE',",
+    replace: "  if (d.state === 'running') {\n    return out(\n      'EXPECTED_SILENCE',",
+  },
+
   // ---------------------------------------------------------------------------
   // retry.ts — the retry_on predicate. Each of these turns the module into a
   // plausible-looking backoff helper that has quietly stopped making the one

@@ -10,10 +10,43 @@
 
 name: check
 
+# ── WHY workflow_dispatch IS HERE ────────────────────────────────────────────
+#
+# On 2026-08-16 this workflow did not run on PR #56 for EIGHT HOURS, and nothing
+# said so. Six commits were pushed and reported as verified on the strength of
+# local runs alone.
+#
+# The cause, read from the run record rather than guessed (run 31976719734):
+#
+#   actor:            Copilot   type: Bot   apps/copilot-swe-agent
+#   head_commit.author: copilot-swe-agent[bot]
+#
+# Copilot resolved a merge conflict, so the head commit was bot-authored and the
+# `pull_request` run was attributed to the bot. GitHub held it as
+# `status: completed, conclusion: action_required` — created, never started,
+# waiting for a human to press "Approve and run workflows".
+#
+# THE FAILURE IS THE SILENCE, NOT THE GATE. An unstarted run is invisible in the
+# checks list; a PR with no CI looks the same as a PR whose CI has not finished.
+# The repo's own Vercel check stayed green throughout, which made it look
+# checked. That is the house defect — a system reporting success it has not
+# earned — arriving through CI configuration instead of code.
+#
+# `workflow_dispatch` does not remove the gate, and is not meant to. It gives CI
+# a second door: anyone with write access, human or agent, can start this run on
+# any ref without waiting for an approval nobody was told to give. The real fix
+# is the repository setting under Settings → Actions → General; that is
+# Sean-gated and recorded in LESSONS A28.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      ref_note:
+        description: 'Why this run was started by hand (e.g. "approval gate blocked the PR run")'
+        required: false
+        default: 'manual run — bypassing a blocked pull_request trigger'
 
 jobs:
   check:

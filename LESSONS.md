@@ -1165,7 +1165,7 @@ or an outage ever claims a referral.
 
 ---
 
-## A25 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
+## A24 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
 
 **[VERIFIED] — the run is in CI: `check` green, `test:e2e` red, same commit.**
 
@@ -1205,7 +1205,7 @@ break shows up in seconds rather than after a build and a server boot.
 
 ---
 
-## A24 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
+## A25 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
 
 **[VERIFIED] — `curl` to the REST endpoint returns 403; the MCP tool returns the
 same runs successfully, seconds apart.**
@@ -1591,7 +1591,80 @@ replaced.
 ---
 
 
-## A28 — I retracted a figure, invented its cause, and had to retract that too (2026-08-17)
+## A28 — CI did not run for eight hours, and the PR looked checked (2026-08-16)
+
+**[VERIFIED] — read from the run record, not inferred: run 31976719734 shows
+`actor: Copilot (Bot)`, `conclusion: action_required`, `run_attempt: 1`,
+`updated_at` equal to `created_at`.**
+
+Copilot was asked to resolve a merge conflict on PR #56. It did, correctly. The
+head commit was therefore authored by `copilot-swe-agent[bot]`, so the
+`pull_request` workflow run was attributed to a Bot — and GitHub held it for
+manual approval.
+
+A held run is `status: completed, conclusion: action_required`. It was created
+and never started. **Six commits were pushed onto that head and every one of
+them was reported as verified on the strength of local runs alone.**
+
+### Why it took eight hours to notice
+
+Three things each looked fine on their own:
+
+- **The PR had a green check.** Vercel's preview deploy passed throughout. A
+  green tick on the PR is what people read as "checked"; nothing distinguishes
+  a deploy check from a test suite at a glance.
+- **The checks API showed one entry, not a failure.** A run that never starts
+  produces no check run, so `get_check_runs` returned only Vercel. Absence, not
+  red.
+- **Actions were healthy everywhere else.** `main` and three sibling branches
+  ran normally in the same window, which rules out the first thing anyone would
+  suspect.
+
+### Two wrong causes, stated before the evidence
+
+**The merge conflict was blamed first.** The PR was conflicted, `pull_request`
+workflows run against the merge ref, and a conflicted PR has no merge ref — a
+tidy explanation that fit the timeline and was wrong. It was tested by Copilot
+resolving the conflicts: `mergeable_state` went to `unstable` and **CI still did
+not run**. The hypothesis died on contact with the fix.
+
+**Then approval was assumed to have been granted.** After the first "approved
+it", the runs still read `action_required` with `updated_at` unchanged from
+`created_at` — an approval that had landed would have moved them to `queued` or
+created `run_attempt: 2`. The right check was the run's own timestamps, not the
+report that a button had been pressed.
+
+Only `actions_get(get_workflow_run)` settled it, because it is the one call that
+names the actor.
+
+### The rule
+
+**A workflow run has more than two states, and the interesting one is invisible.**
+`success` and `failure` are what everybody looks for. `action_required` means
+*created and never started*, and it does not appear as a check, does not appear
+as red, and does not appear at all in the place people look. Before reading a
+PR as verified, look at the RUN, not the checks list — and compare
+`updated_at` against `created_at` to tell a run that finished from a run that
+never began.
+
+The corollary is the recurring one in this file: **the failure was the silence,
+not the gate.** The gate is a reasonable security control and should stay. What
+cost the day is that nothing anywhere said "this PR has no CI".
+
+### What was done
+
+- `workflow_dispatch` added to `check.yml` and `prior-work.yml`, so a blocked
+  run has a second door that any write-access actor can open without waiting on
+  an approval nobody was told to give. It does not remove the gate.
+- The repository setting that governs bot-attributed runs
+  (Settings → Actions → General) is **Sean-gated and NOT CHANGED** — no tool in
+  this session can read or write Actions permissions, so claiming it was fixed
+  would be the defect this entry is about.
+
+---
+
+
+## A29 — I retracted a figure, invented its cause, and had to retract that too (2026-08-17)
 
 Two lanes built the same P3 decay module in parallel. Consolidating them, I
 re-measured the census my version rested on. One number did not reproduce.
@@ -1684,7 +1757,7 @@ prove it resolves the uuid, a new consumer cannot appear undeclared, and no code
 may key recency off `last_active_at`. The mutation swaps the resolved uuid for
 the agent name and is CAUGHT.
 
-## A29 — a migration that was live three and a half hours before it existed anywhere (2026-08-17)
+## A30 — a migration that was live three and a half hours before it existed anywhere (2026-08-17)
 
 Investigating whether the no-provider-veto defect (A23/P1) also inflates the
 *subject* agent's own earned score, I found `v_agent_earned_observations` had a
@@ -1746,4 +1819,4 @@ by **10–12 percentage points** upward for every one of them — not a rounding
 effect, the single largest swing available in that metric today. Reported on
 PR #94 rather than fixed here: that lane owns `verdict-provenance.ts`, is
 already mid-flight on this exact view, and duplicating the consumer-side fix in
-parallel would recreate tonight's P3 collision (A28) one gate over.
+parallel would recreate tonight's P3 collision (A29) one gate over.

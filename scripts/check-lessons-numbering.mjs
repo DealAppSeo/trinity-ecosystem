@@ -16,7 +16,7 @@
 //
 // A citation that resolves to two different findings is worse than a broken
 // one: a broken link announces itself, and an ambiguous link quietly hands the
-// reader the wrong lesson. The 08-16 pair was renumbered A23/A24 and its one
+// reader the wrong lesson. The 08-16 pair was renumbered A24/A25 and its one
 // citation updated.
 //
 // WHAT THIS DOES NOT DO. It does not require a contiguous sequence. A gap is
@@ -31,6 +31,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const LESSONS = 'LESSONS.md';
+const SKIP_CITATION_FILES = new Set([
+  LESSONS,
+  'scripts/check-lessons-numbering.mjs',
+  // This file's self-test fixtures deliberately cite `LESSONS+A99` and a duplicated
+  // id. Scanning it as ordinary source makes this checker fail on another
+  // checker's proof material rather than on a real broken reference.
+  'scripts/check-lesson-ids.mjs',
+]);
 
 // THREE CONVENTIONS, ALL LIVE. The file grew them in order, and a parser that
 // knows only the newest reports the oldest entries as missing — which is exactly
@@ -113,7 +121,7 @@ function walk(dir, out = []) {
 const missing = [];
 const ambiguous = [];
 for (const file of walk('.')) {
-  if (file.endsWith(LESSONS)) continue; // its own headings are not citations
+  if (SKIP_CITATION_FILES.has(file)) continue;
   let body;
   try {
     body = readFileSync(file, 'utf8');

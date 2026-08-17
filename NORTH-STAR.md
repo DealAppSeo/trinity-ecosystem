@@ -19,7 +19,7 @@ of hand-copied counts is how the last nine planning surfaces died.
 
 **HyperDAG Protocol is the portable, weighted + earned trust harness:
 HAL decides whether the agent is telling the truth, RepID turns that history
-into a score, a ZK proof makes the score checkable without revealing it, and
+into a score, zkRepID makes the score checkable without revealing it, and
 x402 + ERC-8004 make it spendable and recordable on someone else's rails.**
 
 **Three of those four links do not yet hold, and saying so is the point of this
@@ -34,13 +34,74 @@ If a piece of work does not make that sentence more true, it is not the work.
 ## The spine — four links, in order
 
 ```
-  HAL ──────────► RepID ──────────► ZKP Postcard ──────────► x402 / ERC-8004
-  is it true?     what's it worth?  prove it privately       spend + record it
+  HAL ──────────► RepID ──────────► zkRepID ──────────► x402 / ERC-8004
+  is it true?     what's it worth?  prove it privately  spend + record it
 ```
+
+**zkRepID is canonical as of 2026-08-17** (Sean's decision; `DECISIONS.md` §9 and
+`docs/ZKREPID.md` in repid-engine). This link was called "ZKP Postcard" until
+then, and the name now points at real code — `src/zkrepid/` in repid-engine, with
+the boundary enumerated in `boundary.ts` and pinned by tests.
+
+**The boundary is narrower than "the ZK code".** zkRepID names the six
+RepID-specific modules. Poseidon2, Plonky3, hash-agnostic Merkle and the
+`zkp-vault` crate stay `zkp` — they are general zero-knowledge machinery that
+zkRepID uses, and calling them zkRepID would make the vocabulary worse.
 
 Each link is only as good as the one before it. A ZK proof of a RepID that no
 HAL run produced is a proof of nothing — which is the failure mode this whole
 codebase keeps re-learning.
+
+**And a fourth failure mode, measured 2026-08-17: a faithful proof of a score
+that rewards the wrong thing.** zkRepID is faithful to whatever number RepID
+produces, so "the proof verifies" is not evidence that the incentives work. The
+reward-bearing path *did* pay inversely to quality — a strategy tuning its prose
+just under HAL's flag threshold beat every honest strategy at every detector
+accuracy, and no HAL improvement could fix it because the defect was in the reward
+curve. **FIXED 2026-08-17** (the clean branch now consumes quality): honesty wins
+at every swept combination, and the guard is a test rather than a note. Full
+measurement, the fix, and two things it did NOT resolve — throughput now dominates
+the top of the table, and ZK statements over pre-fix deltas will no longer verify:
+`reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` in repid-engine (`npm run repid:sim`).
+That second item is now **partly measured**: **10,627** stored deltas fail a
+recompute (7.0% of the ledger, not all of it), and **0** carry an EAS attestation,
+so nothing on-chain asserts a stale delta. The ZK exposure itself is **NOT
+CHECKABLE** — `repid_score_events.zk_proof_id` resolves to no proof row (uuid vs
+bigint, and the one linking column is NULL for all 79,062 proof rows), which
+independently agrees with #83 above. `reports/2026-08-17/LEDGER-VERDICT-REACHABILITY.md`.
+**Never report link 3 working as link 2 working.**
+
+## The target vocabulary — five terms, with status
+
+**Added 2026-08-17 because these words appeared in almost none of the docs the lanes read.**
+Measured before writing: *earned trust*, *issuer-staked* and *decay-unless-re-earned* appeared
+in **zero** docs across both repos; *selective disclosure* in two. Parallel lanes pulling from
+these files would not have found them at all.
+
+The status column is the point. Several of these name nothing yet, and a table that read as
+though they were all shipped is precisely how four numbers came to be retracted here before.
+
+| Term | What it means | Status |
+| :-- | :-- | :-- |
+| **Earned trust** (weighted + earned) | *Earned* = what the agent did, scored per event. *Weighted* = how much that evidence counts, given who observed it and what they had at stake. | **PARTIAL** — earned is live; weighting unimplemented |
+| **Issuer-staked reputation** | Whoever issues an attestation stakes on it, so vouching carries downside and cheap vouching cannot inflate a score. | **TARGET** — no issuer-stake in repid-engine (measured) |
+| **Decay-unless-re-earned ratchet** | Reputation decays with inactivity and must be *re-earned*, not restored: a lapse costs work to undo, so a high score always describes recent behaviour. | **PARTIAL** — activity decay is live; the ratchet is not built |
+| **Selective disclosure** (threshold proof, **not** confession) | The holder proves a predicate — "RepID ≥ X" — revealing neither the score, the events, nor their identity. Nothing is disclosed in order to be believed. | **TARGET** — the ZKP path attests a delta/score range, not a holder-chosen threshold |
+| **Dual-auth** | An action needs two independent authorities, so neither a compromised agent nor a compromised host acts alone. | **PARTIAL** — `ControlProof` verifies; gates nothing yet |
+
+**Weighted is not the same as earned, and conflating them is the trap.** Weighting changes how
+much an observation counts; earning changes what the agent is owed. A knob that silently moves
+the first while looking like the second is the exact shape of the defect measured on 2026-08-17
+— reward that responded to *presentation* rather than to *truth*. Related and measured the same
+day: a **user-settable risk tolerance is worth +73 RepID on byte-identical work, and penalises
+the cautious user by −83**, so preference may govern a user's own experience but must never
+govern the thresholds that mint portable RepID. `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md`
+in repid-engine.
+
+**And the constraint that falls out of it for zkRepID:** anything that changes *how* a score is
+earned — the formula, the gate thresholds, the weighting — must be **inside the proof's
+commitment**, and versioned. Otherwise "RepID ≥ 8000" is unfalsifiable, because a verifier
+cannot know which regime produced it.
 
 ## Where the priorities actually live
 
@@ -102,10 +163,11 @@ row still carries its 08-12 verdict and has NOT been re-measured. Re-check with
 | HAL hallucination filtering | npm, README, sites | **STOPPED 2026-07-18** — re-measured 2026-08-16. Monthly rows: Jun **70,005** → Jul **39,080** → Aug **33**. The cliff is one night: 07-17 **1,360** → 07-18 **2**, and it has not recovered in 30 days. The 1–2/day since are the nightly smoke test. The corpus is real and large; the producer is off. See the superseded section above |
 | Portable RepID score | everywhere | **STOPPED, same event** — `repid_score_events` monthly: Jun **70,415** → Jul **39,453** → Aug **114**. Scores are therefore FROZEN, not merely unscored: `EarnedMetrics` decay is time-dependent, so every score reads stale-high the longer this runs |
 | Refused trades as the killer feature | HyperDAG README ("160+ refused") | **UNDERSTATED** — the log holds far more refusals than claimed |
-| ZKP Postcard proof | HyperDAG README | **BUILT, COOLING** — large proof corpus, but the rate has fallen off |
+| zkRepID proof (was "ZKP Postcard") | HyperDAG README | **BUILT, COOLING** — large proof corpus, but the rate has fallen off. Name canonicalised 2026-08-17 |
+| RepID rewards good behaviour | everywhere, implicitly | **TRUE as of 2026-08-17, and measured** — it was FALSE when first measured the same day (the best-grounded claim was penalised; a truthful strategy tuned to HAL's flag boundary won at every detector accuracy). Fixed by making the clean branch consume quality: honesty now wins at all ten swept combinations, honest-expert goes −143 → **+574**, and a regression guard composes the real functions on every test run. Two open items: throughput now dominates the top of the table, and pre-fix deltas fail ZK re-verification — now measured at **10,627 rows failing a recompute, 0 on-chain attestations, and ZK exposure NOT CHECKABLE** (`zk_proof_id` resolves to no proof row). The realised harm was also measured: **407 clean answers cost 12 agents 1 RepID each**, 406 of them at risk exactly 0. `reports/2026-08-17/LEDGER-VERDICT-REACHABILITY.md`, `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` |
 | x402 settlement | HyperDAG README, handoff | **REAL BUT THIN** — genuine on-chain settlements, low volume |
 | ERC-8004 reputation writes | README, badges | **REAL BUT THIN** — genuine writes, low volume |
-| Peer verification mesh | handoff | **STOPPED 2026-07-21** — died with the fleet freeze, not a code fault |
+| Peer verification mesh | handoff | **STOPPED 2026-07-17 22:18Z** — *not* the fleet freeze. Corrected 2026-08-17: all 12 heartbeats stopped four days **before** the pause was set, so the pause cannot be the cause. Throughput had already fallen ~3× on 07-16 ~05:00Z. Cause of neither event is established; no error rows and no deployment events were logged for either |
 | BFT consensus authorizes every transaction | README | **WIRED, NEVER EXECUTED** against real providers |
 | Compliance receipts via IPFS + Solana | one-pager | **OVERSTATED** — Solana yes, IPFS no; none issued since April |
 | Insurance proportional to RepID | README | **NOT MEASURED** |
