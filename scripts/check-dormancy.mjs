@@ -81,7 +81,7 @@ const DECLARED = new Map([
   ],
   [
     'persistence/supabase-reputation-store',
-    'the durable adapter behind the reputation history. Nothing writes that history from a product surface yet; wiring the producer is the decided change, not this adapter.',
+    'the durable adapter behind the reputation history. The JOINT now exists — persistence/durable-ledger.ts binds a ReputationLedger to any ReputationStore and refuses to save one that never loaded — and it takes the INTERFACE, so this implementation still has no importer. What remains is a caller choosing it, which is the product surface Stage B Half A needs and the fleet being off makes worthless. See docs/STAGE-B-SCOPE-2026-08-17.md.',
   ],
   [
     'receipt/store-sqlite',
