@@ -283,15 +283,19 @@ export class EarnedMetricsRepository {
  * not `test_only`, so this module has no basis to exclude it, and inventing
  * one unilaterally would be the same defect this file exists to avoid.
  *
- * A LARGER FIGURE WAS PROPOSED FIRST AND IS WRONG. PR #93 measured "~44,995
- * rows, 10-12pp inflation" for what reads as the same question. That number
- * matches the COUNT of ALL rows lacking `quorum_providers_used` regardless of
- * `success` — which is the defect this module's own header already retracted
- * once: reading absence-of-provenance as exclusion-worthy on its own drops the
- * clean evidence along with the accusations. The correct population is the
- * actionable-and-unproven intersection, which is two orders of magnitude
- * smaller. Not a disagreement about the goal — about which rows the goal
- * actually names.
+ * A LARGER FIGURE WAS PROPOSED FIRST (PR #93: "~44,995 rows, 10-12pp
+ * inflation, 16-19% of decayed weight"). ITS MEASUREMENT IS CONFIRMED, ITS
+ * CONCLUSION IS NOT. Independently re-measured: 20.05%-45.46% of decayed
+ * integrity weight across the 12 real agents genuinely lacks
+ * `quorum_providers_used` — #93's number is real, and in the same range.
+ * But cross-tabulating that weight by `success` shows almost all of it is
+ * CLEAN: the actionable-and-unproven share — the only slice provenanceOf
+ * says to exclude — is 0.02%-0.18% of decayed weight, three orders of
+ * magnitude smaller. Treating "lacks provenance" as "should be discounted"
+ * without splitting on actionability is the defect this module's own header
+ * already retracted once: it would discount the positive evidence, not the
+ * accusations. Not a disagreement about the goal — about which rows within
+ * the measured population the goal actually names.
  */
 export function integrityObservations(
   rows: readonly { signal: string; observed_at: unknown; success: unknown; domain: unknown; quorum_providers_used: unknown }[]
