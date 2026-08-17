@@ -141,6 +141,7 @@ lib/**/*.js
 .receipt-check-*/
 .receipt-cli-*/
 .repid-calibration-check-*/
+.repid-drift-check-*/
 .repid-marginal-check-*/
 .spine-e2e-check-*/
 .spine-reachable-check-*/

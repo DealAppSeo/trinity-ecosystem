@@ -510,6 +510,40 @@ export const MUTATIONS = [
     replace: '    if (score > floor) return tier;',
   },
   {
+    id: 'repid-drift-headroom-from-stored-tier',
+    suite: 'check:repid-registry-drift',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'penaltyHeadroom is measured from the LOWEST floor that still sustains the stored ' +
+      'limit, not from the stored tier\'s own floor. Anchoring on the wrong floor understates ' +
+      'the headroom by a whole tier — TORCH\'s real 5,100 reported as 2,600, which is the ' +
+      'error the first SQL pass at this actually made',
+    find: '  const sustaining = ascending.find((t) => TIER_LIMITS[t.tier].daily >= storedDaily);',
+    replace: '  const sustaining = ascending.find((t) => TIER_LIMITS[t.tier].daily > storedDaily);',
+  },
+  {
+    id: 'repid-drift-unreadable-score-agrees',
+    suite: 'check:repid-registry-drift',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'an unreadable score is NOT_CHECKED. `tierForScore` answers Bronze for a non-finite ' +
+      'score — correct for a gate — so without this guard a garbage score silently AGREES ' +
+      'with any row storing Bronze, and the drift report asserts a comparison it never made',
+    find: "  if (typeof storedScore !== 'number' || !Number.isFinite(storedScore)) {",
+    replace: "  if (typeof storedScore !== 'number') {",
+  },
+  {
+    id: 'repid-drift-limit-mismatch-ignored',
+    suite: 'check:repid-registry-drift',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'the stored TIER and the stored LIMIT are separate columns and either can drift. ' +
+      '`validate()` enforces the NUMBER, so a row carrying the right word and the wrong ' +
+      'number is the dangerous half — dropping this check passes it as agreement',
+    find: '  const limitAgrees = storedDaily === ladderDaily;',
+    replace: '  const limitAgrees = true;',
+  },
+  {
     id: 'repid-coherence-never-fails',
     suite: 'check:repid-scoring',
     file: 'lib/trustshell/repid-scoring.ts',
