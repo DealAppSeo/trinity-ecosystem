@@ -58,7 +58,8 @@ try {
   process.exit(1);
 }
 
-const { assess, undeclared, validateDeclaration, isLoud, DECLARED_STATES, LOUD } = mod;
+const { assess, undeclared, validateDeclaration, isLoud, DECLARED_STATES, LOUD,
+        assessDiversity, lostMembers, gainedMembers } = mod;
 
 let pass = 0;
 const failures = [];
@@ -269,6 +270,95 @@ ok('there are exactly four declared states',
   DECLARED_STATES.length === 4, `got ${DECLARED_STATES.length}`);
 ok('every loud verdict is a real verdict, not a typo',
   LOUD.every((v) => typeof v === 'string' && v === v.toUpperCase()));
+
+// ---------------------------------------------------------------------------
+// QUORUM DIVERSITY — the 2026-07-14 signature
+// ---------------------------------------------------------------------------
+//
+// Measured: gemini 2,653 -> 0 overnight while TOTAL VOLUME DID NOT MOVE
+// (2,683 -> 2,689). A row count is blind to that by construction. These
+// assertions are the incident, and if they fail the ledger has lost the two
+// days of warning that were sitting in `hal_classifications.model`.
+
+const RUN = { producer: 'hal_quorum', state: 'running' };
+const DIV = (seen, baselineSeen, baselineDays = 14) =>
+  ({ producer: 'hal_quorum', seen, baselineSeen, baselineDays });
+
+const FIVE = ['gemini', 'qwen', 'llama', 'glm', 'mistral'];
+
+const dv = (name, decl, obs, want) => {
+  const a = assessDiversity(decl, obs, NOW);
+  ok(name, a.verdict === want, `got ${a.verdict} (${a.detail}), want ${want}`);
+  return a;
+};
+
+dv('a full quorum is OK', RUN, DIV(FIVE, FIVE), 'OK');
+
+// THE LOAD-BEARING ONE.
+dv(
+  'THE 07-14 SIGNATURE: gemini absent is MEMBER_LOST even though row volume is untouched',
+  RUN,
+  DIV(['qwen', 'llama', 'glm', 'mistral'], FIVE),
+  'MEMBER_LOST'
+);
+dv(
+  'the 07-15 state — gemini AND qwen gone — is still MEMBER_LOST',
+  RUN,
+  DIV(['llama', 'glm', 'mistral'], FIVE),
+  'MEMBER_LOST'
+);
+ok(
+  'the missing members are NAMED, not counted — "1 provider missing" sends nobody anywhere',
+  (() => {
+    const a = assessDiversity(RUN, DIV(['qwen', 'llama', 'glm', 'mistral'], FIVE), NOW);
+    return a.missing.length === 1 && a.missing[0] === 'gemini' && a.detail.includes('gemini');
+  })()
+);
+ok('MEMBER_LOST is LOUD', isLoud('MEMBER_LOST'));
+ok(
+  'the detail warns that row volume may look fine — the trap that cost two days',
+  assessDiversity(RUN, DIV(['llama', 'glm', 'mistral'], FIVE), NOW)
+    .detail.includes('Row volume may be unaffected')
+);
+
+// A gain is reported, never faulted.
+ok(
+  'a NEW member is reported and is not a fault',
+  (() => {
+    const a = assessDiversity(RUN, DIV([...FIVE, 'claude'], FIVE), NOW);
+    return a.verdict === 'OK' && a.gained.includes('claude');
+  })()
+);
+
+// Declared-off mirrors `assess`, or the ledger cries wolf about its own pause.
+for (const st of ['paused_cost', 'not_wired', 'decommissioned']) {
+  dv(
+    `a ${st} producer is EXPECTED_SILENCE on diversity, not MEMBER_LOST`,
+    { producer: 'hal_quorum', state: st, reason: 'r', reviewBy: '2099-01-01' },
+    DIV([], FIVE),
+    'EXPECTED_SILENCE'
+  );
+}
+
+// Refusing to judge, in the two cases where judging would be a guess.
+dv(
+  'a short baseline is NOT_CHECKED — it cannot tell a lost member from one never seen',
+  RUN, DIV(['llama'], FIVE, 3), 'NOT_CHECKED'
+);
+dv(
+  'an empty baseline is NOT_CHECKED, never OK',
+  RUN, DIV(['llama'], [], 30), 'NOT_CHECKED'
+);
+ok('NOT_CHECKED on diversity is not loud', !isLoud('NOT_CHECKED'));
+
+// The set comparison itself.
+ok('lostMembers finds the absentee', lostMembers(['a','b'], ['a','b','c']).join() === 'c');
+ok('lostMembers is empty when nothing is lost', lostMembers(['a','b','c'], ['a','b']).length === 0);
+ok('lostMembers follows baseline order, so a report reads the same twice',
+  lostMembers([], ['x','y','z']).join() === 'x,y,z');
+ok('gainedMembers finds the newcomer', gainedMembers(['a','b'], ['a']).join() === 'b');
+ok('a total wipeout loses every member',
+  lostMembers([], FIVE).length === 5);
 
 // ---------------------------------------------------------------------------
 

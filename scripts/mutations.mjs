@@ -1599,6 +1599,54 @@ export const MUTATIONS = [
     find: '  if (value.trim().length < rule.minLength) return \'too_short\';',
     replace: '  if (value.trim().length <= rule.minLength) return \'too_short\';',
   },
+
+  // ── check:throughput — quorum diversity ───────────────────────────────────
+  {
+    id: 'diversity-member-loss-never-detected',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a lost quorum member is reported AT ALL. This is the two days of warning that sat ' +
+      'unread in hal_classifications.model: gemini went 2,653 → 0 on 07-14 while total volume ' +
+      'did NOT move, because the surviving providers absorbed the load. A row count is blind ' +
+      'to it by construction, every liveness check was green, and the earliest volume-based ' +
+      'alarm was 07-16 — two days late',
+    find: '  if (missing.length > 0) {',
+    replace: '  if (missing.length > 99) {',
+  },
+  {
+    id: 'diversity-member-loss-reported-as-quiet',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'MEMBER_LOST wakes a human. A capability loss that is detected and then filed quietly is ' +
+      'the same outcome as not detecting it — 39,788 SURVIVOR ALERTs sat at status pending ' +
+      'because no consumer ever existed',
+    find: "  'CANARY_ONLY',\n  'MEMBER_LOST',\n];",
+    replace: "  'CANARY_ONLY',\n];",
+  },
+  {
+    id: 'diversity-thin-baseline-judged-anyway',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a short baseline refuses to judge. With three days of history a member that was NEVER ' +
+      'seen is indistinguishable from one just lost, and reporting the first as MEMBER_LOST is ' +
+      'a false alarm — a gate that cries wolf is one people route around',
+    find: '  if (o.baselineDays < minDays) {',
+    replace: '  if (o.baselineDays < -1) {',
+  },
+  {
+    id: 'diversity-paused-producer-cries-wolf',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a producer declared OFF is not loud about having no members. A paused producer has no ' +
+      'quorum BY DEFINITION, and reporting that as MEMBER_LOST makes the ledger cry wolf about ' +
+      'its own pause — which is how the cost-pause states lose their meaning',
+    find: "  if (d.state !== 'running') {\n    return out(\n      'EXPECTED_SILENCE',",
+    replace: "  if (d.state === 'running') {\n    return out(\n      'EXPECTED_SILENCE',",
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

@@ -104,6 +104,22 @@ export type Verdict =
   | 'STALE_PAUSE'
   /** Producing, but every row matched the synthetic filter. Loud. */
   | 'CANARY_ONLY'
+  /**
+   * A quorum member present in the baseline is ABSENT from the window. Loud.
+   *
+   * SEPARATE FROM DEGRADATION ON PURPOSE — this is the verdict the ledger did
+   * not have on 2026-07-14. Gemini went 2,653 → 0 overnight while total volume
+   * did NOT move (2,683 → 2,689), because the surviving providers absorbed the
+   * load. A row count cannot see that: there is nothing wrong with the row
+   * count. Volume only fell on 07-16 and the containers stopped on 07-17, so
+   * the earliest volume-based alarm was already two days late and every
+   * liveness check was four days late and green throughout.
+   *
+   * Losing a member is a CAPABILITY loss, not a throughput loss. A five-model
+   * quorum degraded to three still produces rows; it just produces weaker
+   * evidence, silently, and nothing in a count says so.
+   */
+  | 'MEMBER_LOST'
   /** Not enough history to judge, or the measurement itself failed. */
   | 'NOT_CHECKED';
 
@@ -114,6 +130,7 @@ export const LOUD: readonly Verdict[] = [
   'UNDECLARED_ACTIVITY',
   'STALE_PAUSE',
   'CANARY_ONLY',
+  'MEMBER_LOST',
 ];
 
 export function isLoud(v: Verdict): boolean {
@@ -296,4 +313,154 @@ export function validateDeclaration(d: Declaration): string[] {
     errs.push('degradedBelow must be in (0, 1]');
   }
   return errs;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quorum diversity — the leg a row count cannot cover
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// WHY THIS EXISTS, MEASURED RATHER THAN IMAGINED.
+//
+// `hal_classifications.model` encodes which providers took part in each
+// fact-check. Measured 2026-08-17 over the days before the fleet stopped:
+//
+//   day     total   gemini   qwen   fact-check-partial
+//   07-13   2,683    2,653  1,799        0
+//   07-14   2,683        0    177      259     <- members lost, VOLUME FLAT
+//   07-15   2,689        0      0      479
+//   07-16   1,707        0      0      177     <- volume finally moves
+//   07-17   1,360        0      0      139
+//   07-17 22:18 — containers stop
+//
+// The row-count ledger fires on 07-16 at the earliest. Membership was gone on
+// 07-14. **Two days of warning were sitting in a column nobody read**, and the
+// liveness checks were green for all of it.
+//
+// So this is not a refinement of throughput. It answers a different question:
+// throughput asks *is anything coming out*, diversity asks *is it still being
+// produced by the thing we think is producing it*.
+//
+// ── WHAT IS DELIBERATELY NOT HERE ───────────────────────────────────────────
+//
+// No opinion about WHICH members matter, and no minimum-quorum policy. This
+// module reports that a member present in the baseline is absent now. Whether
+// three providers is acceptable is a policy question with a cost attached, and
+// putting it here would bury it.
+
+/** What was observed about quorum composition over the window. */
+export interface DiversityObservation {
+  producer: string;
+  /** Distinct members seen in the window, non-synthetic rows only. */
+  seen: readonly string[];
+  /**
+   * Distinct members seen over the trailing baseline period.
+   *
+   * The baseline is a SET, not a mean. A member either took part or it did not,
+   * and averaging that produces a number ("4.2 providers") that names nothing
+   * you can go and restart.
+   */
+  baselineSeen: readonly string[];
+  /** Days of history the baseline covers. */
+  baselineDays: number;
+}
+
+export interface DiversityAssessment {
+  producer: string;
+  verdict: Verdict;
+  loud: boolean;
+  detail: string;
+  /** Baseline members absent from the window. Empty when nothing was lost. */
+  missing: readonly string[];
+  /** Members in the window that the baseline never saw. Not a fault — reported. */
+  gained: readonly string[];
+}
+
+/**
+ * Members in `baseline` that are absent from `window`.
+ *
+ * Exported because it is the whole comparison and deserves to be assertable on
+ * its own. Order follows the baseline so a report reads the same way twice.
+ */
+export function lostMembers(
+  windowSeen: readonly string[],
+  baselineSeen: readonly string[]
+): string[] {
+  const present = new Set(windowSeen);
+  return baselineSeen.filter((m) => !present.has(m));
+}
+
+/** Members in the window the baseline never saw. */
+export function gainedMembers(
+  windowSeen: readonly string[],
+  baselineSeen: readonly string[]
+): string[] {
+  const known = new Set(baselineSeen);
+  return windowSeen.filter((m) => !known.has(m));
+}
+
+/**
+ * Classify quorum composition for one producer.
+ *
+ * Mirrors `assess` for the declared-off states so a producer cannot be loud on
+ * diversity while being legitimately silent on throughput — a paused producer
+ * has no members by definition, and reporting that as MEMBER_LOST would be the
+ * ledger crying wolf about its own pause.
+ */
+export function assessDiversity(
+  d: Declaration,
+  o: DiversityObservation,
+  now: string
+): DiversityAssessment {
+  const minDays = d.minBaselineDays ?? 7;
+  const missing = lostMembers(o.seen, o.baselineSeen);
+  const gained = gainedMembers(o.seen, o.baselineSeen);
+
+  const out = (verdict: Verdict, detail: string): DiversityAssessment => ({
+    producer: d.producer,
+    verdict,
+    loud: isLoud(verdict),
+    detail,
+    missing,
+    gained,
+  });
+
+  // Declared off: composition is not a question. Silence is the declaration.
+  if (d.state !== 'running') {
+    return out(
+      'EXPECTED_SILENCE',
+      `declared ${d.state}; quorum composition is not assessed for a producer that is not running`
+    );
+  }
+
+  // Thin history cannot distinguish "member lost" from "member never seen".
+  if (o.baselineDays < minDays) {
+    return out(
+      'NOT_CHECKED',
+      `${o.baselineDays} day(s) of history, ${minDays} required — a short baseline cannot tell a lost member from one that was never there`
+    );
+  }
+
+  if (o.baselineSeen.length === 0) {
+    return out(
+      'NOT_CHECKED',
+      'no members recorded in the baseline, so there is nothing to compare against'
+    );
+  }
+
+  if (missing.length > 0) {
+    // Named, not counted. "1 provider missing" sends nobody anywhere; "gemini"
+    // names the thing to go and restart.
+    return out(
+      'MEMBER_LOST',
+      `${missing.length} of ${o.baselineSeen.length} baseline member(s) ABSENT: ${missing.join(', ')}. ` +
+        `Still present: ${o.seen.length ? o.seen.join(', ') : 'none'}. ` +
+        'Row volume may be unaffected — surviving members absorb the load — so check this before trusting a healthy row count.'
+    );
+  }
+
+  return out(
+    'OK',
+    `all ${o.baselineSeen.length} baseline member(s) present` +
+      (gained.length ? `; ${gained.length} new: ${gained.join(', ')}` : '')
+  );
 }
