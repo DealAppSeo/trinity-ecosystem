@@ -64,18 +64,73 @@ completed zero tasks** in the session. Two independent tables agree — the even
 log says it stopped producing on 06-19, the heartbeat says it kept looping until
 07-17.
 
-**NOT CHECKED:** what it was doing on those 19,155 iterations, and what that cost
-in Railway CPU or LLM spend. `trinity_tasks.agent_name` does not carry this
-fleet's work — all twelve agents show their last completion in **March**, so that
-table answers a different question and is not evidence here either way. The
-service logs would settle it and are not reachable from an agent session.
+### What it was doing — answered from `trinity_agent_logs`, not from Railway
+
+Railway is unreachable from an agent session: `backboard.railway.app` and
+`railway.app` are both **proxy-denied by organization policy**
+(`connect_rejected`, gateway 403 to CONNECT, verified 2026-08-17), and no Railway
+credential exists in this environment. Per `/root/.ccr/README.md` that is reported,
+not retried. **But the application log answers most of what Railway would.**
+
+**`trinity-mel` is the only one of the twelve whose log does not reach August.**
+It stops at **2026-06-17 19:48:35** — every peer logs into late July or August.
+
+Its last 14 entries, inside 14 seconds, are identical but for the task id:
+
+```
+action:   escalation_contract
+message:  Escalating: unknown_task_type: hal_corpus_generation
+metadata: {"squad":"BETA","taskId":"317315","version":"8.2.0-reflect-wired"}
+```
+
+**It was running a different code path from the rest of the fleet.** Counting
+escalations since 2026-06-01: eleven agents emit `task_escalated` (752–867 each)
+and **zero** `escalation_contract`. `trinity-mel` emits **zero** `task_escalated`
+and **7,231** `escalation_contract`. Its own history dates the divergence:
+
+| action | count | window |
+|---|---|---|
+| `task_escalated` | 40 | 2026-05-13 → **2026-05-16** |
+| `escalation_contract` | **7,231** | **2026-05-21** → 2026-06-17 |
+
+It switched paths around **2026-05-21**, escalated 7,231 times over the next four
+weeks — while still producing — and then stopped mid-burst on 06-17.
+
+**All twelve report `code_version = 8.2.0-reflect-wired`.** The version string is
+therefore a **fifth instrument that reported sameness that was not there**; the
+action vocabulary separates the fleet cleanly and the version does not.
+
+### The poison-task theory, checked and REFUTED
+
+The obvious reading — a task type mel could not handle, stuck in the queue,
+re-claimed forever — is **wrong**, and it is worth recording because it would have
+sent the redeploy after the wrong thing. All 14 `hal_corpus_generation` tasks are
+**`done`**, claimed by `trinity-orch`, `trinity-torch` and `trinity-apm` within
+seconds of mel's escalation. Zero remain pending, and none has been created since
+06-17. **Nothing toxic is waiting in the queue for a restarted mel.**
+
+**NOT CHECKED:** why mel alone ran the `escalation_contract` path; what the 19,155
+loop iterations were doing after the log went silent; and any Railway CPU or LLM
+spend. `trinity_tasks.agent_name` does not carry this fleet's work — all twelve
+show their last completion in **March** — so it is not evidence here either way.
 
 ### What this means for the redeploy, concretely
 
-Redeploying **`a5e838e8-3a12-41fb-bfa0-778d88988477`** (`trinity-mel`) unchanged
-restores an agent that was already failing before the outage. It will heartbeat
-`online`, it will raise `loop_count`, and on the evidence above it will produce
-nothing.
+**Check what Railway service `a5e838e8-3a12-41fb-bfa0-778d88988477` builds from —
+branch, image, or pinned commit — against any of the other eleven.** That is the
+one question the logs raise and cannot answer from here, and it is answerable in
+the Railway UI in a minute. The action vocabulary says mel has been running
+different code since ~2026-05-21 while reporting the same version string.
+
+- If the service points at a **different branch or a pinned older image**, a
+  redeploy reproduces the divergence, and the fix is to point it where the other
+  eleven point.
+- If it points at the **same source**, the redeploy is likely to fix it — the
+  divergent build gets replaced and the queue holds nothing toxic.
+
+Either way, redeploying it unchanged restores an agent that was already failing
+before the outage. It will heartbeat `online`, it will raise `loop_count`, and on
+the evidence above that tells you nothing about whether it works.
 
 **It will also make the redeploy look more successful than it is**, because the
 natural pass condition — "twelve agents heartbeating again" — was already true of
