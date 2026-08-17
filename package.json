@@ -112,6 +112,8 @@
     "check:tmpdir-ignored": "node scripts/check-tmpdir-ignored.mjs",
     "check:harness-extractable": "node scripts/check-harness-extractable.mjs",
     "check:issuer-stake": "node scripts/check-issuer-stake.mjs",
+    "check:verdict-provenance": "node scripts/check-verdict-provenance.mjs",
+    "check:earned-metrics-repo": "node scripts/check-earned-metrics-repo.mjs",
     "check:proof-provider-contract": "node scripts/check-proof-provider-contract.mjs",
     "check:bft-evidence-chain": "node scripts/check-bft-evidence-chain.mjs"
   },
