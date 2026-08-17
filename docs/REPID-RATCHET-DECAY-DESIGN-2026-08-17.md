@@ -37,6 +37,23 @@ of 1000. The ratchet binds it by **35 points, 3.4%**, nowhere near a tier
 boundary. It is also the only floor-sitter with activity (67 in 30 days, last
 active 16 days ago).
 
+> **CORRECTED 2026-08-17 (VERIFY lane), evidence only — the design is unchanged.**
+> The `any activity in 30 days = 1` row measures `repid_agents.last_active_at`,
+> which is **not an activity signal**: it is written on **32 of 176** rows, is
+> **NULL on 11 of these 12**, and is written by exactly one database function
+> (`apply_linked_bet_resolution`) and zero lines of this repo. Measured against
+> `v_agent_earned_observations` joined on `repid_agents.id`, **8 of the 12** were
+> observed within 30 days, and **3** have no observation ever (all `test_only`).
+> `trinity-gcm` has **33,434** observations all-time, **15** in the trailing 30
+> days, and was last observed **within the hour**.
+>
+> This does not disturb the conclusion — the ratchet still binds one real agent
+> by 35 points, and the rate is still not calibratable. It changes which column
+> a wired rule may read: `last_active_at` reports 17 recently-active agents
+> fleet-wide where the evidence shows 67, so keying decay on it would expire
+> standing for agents that are demonstrably active. Now gated by
+> `check:observation-identity`; see LESSONS A28.
+
 ## 2. And there is no existing decay to extend
 
 Worth stating because the names say otherwise, and a reader who greps will

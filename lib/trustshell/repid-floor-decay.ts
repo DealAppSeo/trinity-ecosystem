@@ -64,6 +64,76 @@
 // `contracted-evaluator.ts` for `maxDisagreement`. A default here would be a
 // guess wearing a policy's clothes, and it would silently govern every agent.
 //
+// ── THE HUMAN EXEMPTION, AND WHY IT IS NOT A COURTESY ───────────────────────
+//
+// `compute_tier(p_repid, p_agent_id)` returns the base tier for a human BEFORE
+// it consults `count_unique_counterparties` [VERIFIED 2026-08-17 against
+// `pg_get_functiondef`]:
+//
+//   SELECT is_human INTO v_is_human FROM repid_agents WHERE id = p_agent_id;
+//   IF COALESCE(v_is_human, false) THEN RETURN base_tier; END IF;
+//
+// The database already holds that a human's standing is not established by
+// agent-to-agent observation. Decay is an observation-driven rule, so applying
+// it to humans would demote a human for not behaving like a bot — and it would
+// do so on the same population the ratchet already pins: **4 of the 12
+// ratcheted rows are `is_human`**, and one of them last shows evidence 40 days
+// ago. This is not a hypothetical carve-out; without it the first thing a wired
+// decay does is expire four humans.
+//
+// THE ORDER IS THE RULE. The exemption is checked BEFORE the unknown-age
+// branch. `lastReEarnedAt` has no column behind it, so in production every row
+// arrives null — a human checked after that branch is `not_checked` forever,
+// and an operator draining a NOT_CHECKED backlog would "fix" it by inventing
+// re-attestation timestamps for people. Exempt means the question is not asked.
+//
+// ── WHICH RECENCY SOURCE IS ADMISSIBLE, MEASURED ────────────────────────────
+//
+// Whatever eventually feeds `lastReEarnedAt`, it may not be
+// `repid_agents.last_active_at`. Measured 2026-08-17 across all 176 rows:
+//
+//   last_active_at written                    32 of 176   (18.2%)
+//   last_active_at within 30 days             17
+//   agents with ANY observation, ever        123
+//   agents observed within 30 days            67
+//
+// The column reports 17 recently-active agents where the evidence shows 67, and
+// on the 12 ratcheted rows it is NULL on 11. It is written by exactly one
+// database function — `apply_linked_bet_resolution` — and by ZERO lines of this
+// repo, so it is a side effect of one narrow flow rather than an activity
+// signal. A decay keyed on it expires standing for agents that are demonstrably
+// active, fail-open in the direction that costs someone their tier.
+//
+// The admissible source is `v_agent_earned_observations`, and it joins on
+// **`repid_agents.id` (uuid)** — NOT `repid_agents.agent_id`, which is `text`
+// and uuid-shaped on **0 of 176** rows. The two identifier spaces are disjoint,
+// so the wrong key returns an empty set rather than an error, and every agent
+// reads as never-observed. `EarnedMetricsRepo` resolves `id` and is correct;
+// `check:observation-identity` keeps it that way.
+//
+// ── ONE RETRACTED FIGURE, AND ITS CAUSE IS UNVERIFIED ───────────────────────
+//
+// A previous P3 module opened with "**6** floor-holders have never been observed
+// at all" and built a `never_earned` base case on it. Re-measured on the uuid
+// key, **no window reproduces 6**:
+//
+//   no observation EVER        3   — and all three are `lifecycle_status='test_only'`
+//   none in the last 30 days   4
+//   none in the last 120 days  3
+//
+// The figure is RETRACTED and gated. **Its cause is NOT established**: the
+// originating query was not preserved, and the obvious suspect — the text/uuid
+// key mix-up above — does not explain it, because that mistake returns zero
+// observations for EVERY agent, which would have given 12, not 6. Recording the
+// hazard and the retraction separately, rather than assuming one caused the
+// other, because a tidy causal story is exactly what this repo keeps having to
+// withdraw.
+//
+// What follows from the corrected number is the part that matters: **no real
+// agent holds a floor with zero evidence.** The never-earned base case reached
+// mock rows only, so decay is the whole of the defect rather than its smaller
+// half, and P3 needs no base case. See LESSONS A28.
+//
 // ── AND THERE IS NO EXISTING DECAY TO EXTEND ────────────────────────────────
 //
 // Worth stating because the names suggest otherwise, and a reader who greps will
@@ -137,6 +207,12 @@ export interface FloorState {
    * is NOT the same as "long ago".
    */
   readonly lastReEarnedAt: number | null;
+  /**
+   * `repid_agents.is_human`. REQUIRED, not defaulted: a caller that forgets it
+   * would silently decay a person, and the same refusal is why `staleAfterMs`
+   * has no default. See THE HUMAN EXEMPTION in the header.
+   */
+  readonly isHuman: boolean;
 }
 
 export type FloorDecision =
@@ -182,6 +258,22 @@ export function decideFloor(state: FloorState, now: number, cfg: FloorDecayConfi
 
   if (state.floor <= 0) {
     return { kind: 'holds', floor: state.floor, reason: 'already at the bottom of the ladder; nothing to decay' };
+  }
+
+  // THE HUMAN EXEMPTION, CHECKED BEFORE THE CLOCK AND BEFORE THE UNKNOWN-AGE
+  // BRANCH. `compute_tier` already exempts `is_human` from its counterparty
+  // gate; decay is the same kind of observation-driven rule. Placing this after
+  // the `lastReEarnedAt === null` branch would return `not_checked` for every
+  // human forever, since no column feeds that field — and a NOT_CHECKED backlog
+  // invites someone to invent re-attestation timestamps for people.
+  if (state.isHuman) {
+    return {
+      kind: 'holds',
+      floor: state.floor,
+      reason:
+        'is_human — a human\'s standing is not established by agent observations, and compute_tier ' +
+        'already exempts them from the counterparty gate. Exempt means the question is not asked.',
+    };
   }
 
   // INVARIANT 3, CHECKED FIRST. An agent scoring at or above its floor is
