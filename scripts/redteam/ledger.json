@@ -4,7 +4,7 @@
     "and there is a date by which it will be fixed or re-argued. It does NOT mean the finding is closed.",
     "",
     "Every entry needs `owner`, `reason` and `reviewBy`, and `scripts/check-redteam.mjs` refuses to run",
-    "without all three. Past `reviewBy` the run FAILS — a caveat is a debt and this file is where the",
+    "without all three. Past `reviewBy` the run FAILS \u2014 a caveat is a debt and this file is where the",
     "debts are recorded, not where they are forgiven. Removing an entry whose probe still breaches just",
     "turns the finding back into a NEW_FINDING on the next run, and a probe that starts HOLDING while its",
     "entry is still here fails too, so the record cannot rot in either direction.",
@@ -16,7 +16,7 @@
       "id": "PAY-001",
       "owner": "Sean",
       "severity": "High",
-      "reason": "The dual-signature gate on the payment path counts distinct caller-supplied role strings and verifies no cryptographic material. Accepted for now because (a) both live surfaces currently FAIL CLOSED on receipt minting (LIVE-001), so the path is not issuing receipts, and (b) the fix changes a live authorization gate, which is Sean-gated by the preflight fences. The repo already ships the primitive the fix needs — countersignContract in lib/trustshell/identity/work-contract.ts is a two-party signature over canonical bytes, which is exactly the shape a CFO/CTO co-signature is.",
+      "reason": "The dual-signature gate on the payment path counts distinct caller-supplied role strings and verifies no cryptographic material. Accepted for now because (a) both live surfaces currently FAIL CLOSED on receipt minting (LIVE-001), so the path is not issuing receipts, and (b) the fix changes a live authorization gate, which is Sean-gated by the preflight fences. The repo already ships the primitive the fix needs \u2014 countersignContract in lib/trustshell/identity/work-contract.ts is a two-party signature over canonical bytes, which is exactly the shape a CFO/CTO co-signature is.",
       "reviewBy": "2026-09-15",
       "firstSeen": "2026-08-16",
       "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
@@ -25,7 +25,7 @@
       "id": "HAL-001",
       "owner": "unassigned",
       "severity": "Medium",
-      "reason": "verifyHalChain returns outcome=VERIFIED for a truncated window and signals the truncation only in the separate boolean windowStartUnverifiable, which the human-readable `detail` never mentions. Measured by exhaustive search: no input produces VERIFIED with windowStartUnverifiable=false, so EVERY VERIFIED it can emit is over a window whose start is unexaminable. Accepted short-term because the verifier has no production caller yet — nothing currently reads `outcome` to make a decision — which is exactly why fixing it now is cheap. Deliberately left `unassigned` rather than defaulted to Sean: the fix is a library change, not a Sean-gated one, and a false owner is worse than a visibly missing one.",
+      "reason": "verifyHalChain returns outcome=VERIFIED for a truncated window and signals the truncation only in the separate boolean windowStartUnverifiable, which the human-readable `detail` never mentions. Measured by exhaustive search: no input produces VERIFIED with windowStartUnverifiable=false, so EVERY VERIFIED it can emit is over a window whose start is unexaminable. Accepted short-term because the verifier has no production caller yet \u2014 nothing currently reads `outcome` to make a decision \u2014 which is exactly why fixing it now is cheap. Deliberately left `unassigned` rather than defaulted to Sean: the fix is a library change, not a Sean-gated one, and a false owner is worse than a visibly missing one.",
       "reviewBy": "2026-09-15",
       "firstSeen": "2026-08-16",
       "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
@@ -43,10 +43,10 @@
       "id": "LIVE-002",
       "owner": "Sean",
       "severity": "Medium",
-      "reason": "trustshell.dev's client bundle embeds a LEGACY anon Supabase JWT (project qnnpjhlxljtqyigedwkb) that is disabled project-wide — a live PostgREST test with the embedded token returned 401 'Legacy API keys are disabled' (2026-08-16). Fails CLOSED, so nothing leaks and nothing forges: the anon key is public by design and the key is dead. The finding is availability + hygiene — any Supabase-backed feature on trustshell.dev is silently broken, same root cause as the 217-day-dead aitrinitysymphony lead form. Fix is a redeploy of DealAppSeo/trustshell with NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY set to a current sb_publishable_ key; the repo is not attached to this session and the redeploy is Sean's. Whether the site actually calls Supabase at runtime is post-hydration and NOT CHECKED — if it does not, this drops to Low/Informational.",
+      "reason": "trustshell.dev's client bundle embeds a LEGACY anon Supabase JWT (project qnnpjhlxljtqyigedwkb, decoded role:anon) confirmed DISABLED by a live PostgREST test \u2014 401 'Legacy API keys are disabled' (2026-08-16). SOURCE-CONFIRMED 2026-08-17 in DealAppSeo/trustshell@6cfd2d3 lib/supabase.ts (createClient reads NEXT_PUBLIC_SUPABASE_ANON_KEY). EXTENDS to the server path: supabaseConfigured() checks key PRESENCE not validity, so submitSuggestion (service_role insert) and the /market + /repid sbSelect reads also 401 IF SUPABASE_SERVICE_ROLE_KEY is the legacy service_role JWT (disabled same date) \u2014 server env NOT CHECKED. Fails CLOSED (nil confidentiality; anon key is public and dead); cost is availability \u2014 any Supabase feature silently broken, same root cause as the 217-day-dead aitrinitysymphony lead form. Fix: redeploy DealAppSeo/trustshell with NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_ AND SUPABASE_SERVICE_ROLE_KEY=sb_secret_ (Sean; repo not push-attached here).",
       "reviewBy": "2026-09-15",
       "firstSeen": "2026-08-16",
-      "report": "docs/RED-TEAM-TRUSTSHELL-DEV-2026-08-16.md"
+      "report": "docs/RED-TEAM-TRUSTSHELL-DEV-2026-08-16.md, docs/RED-TEAM-TRUSTSHELL-SOURCE-2026-08-17.md"
     }
   ]
 }
