@@ -85,6 +85,9 @@ headroom.db
 # temp compile dir for check:custody-shadow
 .custody-shadow-check-*/
 
+# temp compile dir for measure:pay-custody-shadow
+.measure-pay-shadow-*/
+
 # agent-browser runtime output (screenshots, HAR, traces, video). Derived
 # artefacts of a dev tool; the daemon writes here because ./agent-browser.json
 # sets screenshotDir. Machine-local config lives in ~/.agent-browser/, not here.
