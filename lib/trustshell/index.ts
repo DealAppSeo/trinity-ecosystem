@@ -325,3 +325,15 @@ export type {
   ChainDefect,
   ChainVerification,
 } from './hal-chain';
+
+// The joint between the ledger and its store. Exported because a consumer needs
+// it from here — the two ends have existed for weeks with nothing between them,
+// and the ordering guard it carries (an unloaded ledger cannot be saved) is not
+// something a call site should have to remember.
+export { DurableLedger } from './persistence/durable-ledger';
+export type {
+  HydrateOutcome,
+  HydrateResult,
+  PersistOutcome,
+  PersistResult,
+} from './persistence/durable-ledger';
