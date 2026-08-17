@@ -27,9 +27,14 @@
 // four and a half months, so nothing is queued, nothing is evaluated, and the
 // view has nothing to emit. **The 0.40 weight is not waiting on code.**
 //
-// Worth its own line: 4 settlements since 2026-08-12 produced 0 receipts. The
-// compliance ledger is not recording live settlement activity, which is a
-// separate defect from this one and is NOT diagnosed here.
+// A NOTE I INITIALLY GOT WRONG, kept because the correction is the useful part.
+// I first read "19 x402 settlements in August, 0 compliance receipts" as the
+// ledger failing to record live activity. It is not. NOTHING in app/ or lib/
+// writes `x402_settlements` — it is fed by a service outside this repo — while
+// `kya_compliance_receipts` is written by the pay route via
+// ComplianceReceiptGenerator. They are SEPARATE SUBSYSTEMS with different
+// traffic, and one being busy while the other is idle is not evidence of a
+// defect in either. Two tables that both mention payments are not one pipeline.
 //
 // WHAT THIS SUITE CHECKS. The static half — that each link still exists in the
 // source. It cannot check the live half without the database, and a suite that
