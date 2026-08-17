@@ -118,3 +118,32 @@ lib/**/*.js
 # check.yml), so the tracked copy bought nothing there and cost a new 2.9 MB
 # blob in history every time a run updated it, across every parallel lane.
 .secret-history-state.json
+
+# Scratch dirs written INTO the repo by check suites (mkdtemp + random suffix).
+# Two had already been committed when this block was added on 2026-08-17:
+# .durable-ledger-check-JH8rRL/ and .zk-cost-check-SZFzbE/. Enforced by
+# check:tmpdir-ignored, which also fails if one is TRACKED — an entry here does
+# not untrack what is already in the index.
+.assigned-contract-check-*/
+.auth-session-check-*/
+.checker-assign-check-*/
+.claims-check-*/
+.config-readiness-check-*/
+.criteria-draw-check-*/
+.dogfood-*/
+.durable-ledger-check-*/
+.envelope-check-*/
+.hal-accuracy-check-*/
+.hal-receipt-check-*/
+.hal-repid-linkage-check-*/
+.loud-errors-check-*/
+.m3-check-*/
+.receipt-check-*/
+.receipt-cli-*/
+.repid-calibration-check-*/
+.repid-marginal-check-*/
+.spine-e2e-check-*/
+.spine-reachable-check-*/
+.staged-judge-check-*/
+.throughput-check-*/
+.zk-cost-check-*/
