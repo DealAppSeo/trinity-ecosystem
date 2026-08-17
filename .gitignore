@@ -150,3 +150,4 @@ lib/**/*.js
 .zk-cost-check-*/
 .harness-extract-check-*/
 .repid-weight-sim-*/
+.issuer-stake-check-*/

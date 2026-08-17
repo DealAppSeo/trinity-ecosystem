@@ -1,0 +1,19 @@
+{
+  "_source": "hal_runner_results @ Supabase qnnpjhlxljtqyigedwkb, measured 2026-08-17",
+  "_filter": "hal_mode='fact-check-s2' AND ground_truth_is_hallucination IS NOT NULL AND hal_score IS NOT NULL AND NOT gen_failed",
+  "_shape": "The cost function depends on exactly three booleans, so the corpus reduces without loss to their 8-cell contingency table. Rows would carry no extra information HERE — but see _warning.",
+  "_schema": ["providerAttempted", "vetoed", "isHallucination", "n"],
+  "_warning": "providerAttempted is derived from `providers_attempted`, NOT from `hal_providers_used`. The two agree on this corpus (both empty on the same 59 rows), and the distinction matters: `attempted` is what the issuer chose to do, `used` is what succeeded. Staking the CHOICE is the point — an issuer that tried three providers and got no response has still done the work.",
+  "_warning2": "12 rows carry the literal string 'used:2' in both provider columns where names belong. They are counted as ATTEMPTED here, which is the charitable reading and the conservative one for a penalty.",
+  "_totals": { "rows": 395, "earned": 336, "unearned": 59 },
+  "rows": [
+    [true, true, true, 159],
+    [true, true, false, 7],
+    [true, false, true, 10],
+    [true, false, false, 160],
+    [false, true, true, 19],
+    [false, true, false, 22],
+    [false, false, true, 9],
+    [false, false, false, 9]
+  ]
+}

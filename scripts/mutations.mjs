@@ -1039,6 +1039,45 @@ export const MUTATIONS = [
       '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
   },
   {
+    id: 'issuer-stake-credits-a-lucky-unearned-veto',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'luck is UNBANKABLE. The mutant lets an unearned veto that happened to be right classify ' +
+      'as a true positive, which is the single most tempting "improvement" to this model — it ' +
+      'looks like rewarding accuracy. 46.3% of unearned vetoes were correct, so it would let an ' +
+      'issuer buy standing with a good draw and the 41-veto behaviour would stay rational',
+    find: `  if (!v.providerAttempted) return v.vetoed ? 'unearned_veto' : 'unearned_clean';`,
+    replace: `  if (!v.providerAttempted) {
+    if (v.vetoed && v.isHallucination) return 'earned_true_positive';
+    return v.vetoed ? 'unearned_veto' : 'unearned_clean';
+  }`,
+  },
+  {
+    id: 'issuer-stake-makes-skipping-merely-unattractive',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'verification is STRICTLY DOMINANT, not merely disfavoured. The mutant prices an unearned ' +
+      'veto the same as an honest error, which restores the expected-value argument for the ' +
+      'cheap path: at 46.3% accuracy an issuer maximising EV would still skip. The penalty has ' +
+      'to exceed the cost of verifying AND being wrong, or the incentive does not bind',
+    find: `  unearned_veto: -3,`,
+    replace: `  unearned_veto: -1,`,
+  },
+  {
+    id: 'issuer-stake-refusal-lets-the-evidence-free-verdict-through',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'the refusal at SOURCE, which is the half the stake cannot do. A stake makes an unearned ' +
+      'verdict expensive after the fact; only this stops it being emitted. The mutant keeps the ' +
+      'function and inverts the evidence test, so an issuer that consulted nothing may still ' +
+      'emit an actionable FACTUAL_ERROR veto — exactly what produced the 41',
+    find: `  return !v.providerAttempted && v.vetoed;`,
+    replace: `  return v.providerAttempted && v.vetoed;`,
+  },
+  {
     id: 'zk-verify-asserts-membership-instead-of-checking-it',
     suite: 'check:zk-cost',
     file: 'lib/trustshell/identity/nullifier.ts',

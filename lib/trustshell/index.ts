@@ -337,3 +337,11 @@ export type {
   PersistOutcome,
   PersistResult,
 } from './persistence/durable-ledger';
+
+// P1 of docs/SPRINT-DECISIONS-2026-08-17.md — the issuer is scored by the
+// standard it applies. `refusesToIssue` is the source-side half: an issuer that
+// attempted no provider may not emit an actionable verdict. The enforcement
+// point is the HAL runner, which lives in `repid-engine` and not in this repo,
+// so this barrel export is what makes the rule reachable from here.
+export { classify, scoreIssuer, refusesToIssue, STAKE_POINTS } from './issuer-stake';
+export type { IssuedVerdict, VerdictClass, IssuerStanding } from './issuer-stake';
