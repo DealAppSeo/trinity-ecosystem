@@ -1269,6 +1269,32 @@ export const MUTATIONS = [
     find: '    if (failure.attempt >= this.cfg.maxAttempts) {',
     replace: '    if (failure.attempt > this.cfg.maxAttempts) {',
   },
+  // ---------------------------------------------------------------------------
+  // import-specifiers.mjs — what counts as reaching a module. Both mutations
+  // restore a form of under-reporting that marked modules shipped when nothing
+  // imports them (#73).
+  // ---------------------------------------------------------------------------
+  {
+    id: 'dormancy-counts-type-only-imports',
+    suite: 'check:dormancy',
+    file: 'scripts/lib/import-specifiers.mjs',
+    protects:
+      'a type-only import is erased by the compiler and cannot reach anything at runtime. ' +
+      'Counting it marks a module reachable that nothing imports — under-reporting dormancy, ' +
+      'which hides exactly what the gate exists to surface',
+    find: '    if (TYPE_ONLY_CLAUSE.test(m[1])) continue;',
+    replace: '    if (false) continue;',
+  },
+  {
+    id: 'dormancy-counts-specifiers-in-comments',
+    suite: 'check:dormancy',
+    file: 'scripts/lib/import-specifiers.mjs',
+    protects:
+      'a specifier inside a comment is prose. Counting it is not hypothetical — the router was ' +
+      'marked reachable by a comment explaining why it must not be, while building #70',
+    find: "  return src.replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ').replace(/(^|[^:])\\/\\/[^\\n]*/g, '$1');",
+    replace: '  return src;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
