@@ -160,3 +160,68 @@ that one rather than guess. **It is Sean's.**
 - **Nothing here re-derives the tier floors.** `TIER_FLOORS` at 2500/5000/7500 is
   taken as given; whether those are the right floors is the calibration question,
   and it is closed.
+
+---
+
+## 7. The same defect on the READ path — found, and fixed (2026-08-17)
+
+§6 listed the 0–100 scale question as the obvious unanswered one. Checking it
+closed negative — **nothing reads `agents` or `agent_status`**, and all three
+production `tierForScore` callers are on the 0–10000 scale — but the sweep
+surfaced a third instance of this root cause, on a path that needs no write to
+fire.
+
+`app/api/trustrails/pay/route.ts` briefed the BFT authorization panel with a
+`maxWithdrawal` it derived itself:
+
+```ts
+const maxWithdrawal = TIER_LIMITS[tierForScore(kyaResult.repidScore)].perTx;
+```
+
+while `KYAValidator.validate()` enforces the **stored** `spending_limit_per_tx`.
+Two sources for one fact, again. Ladder applied to the stored score, against what
+is actually enforced:
+
+| agent | enforced per-tx | ladder says | overstated |
+|---|---|---|---|
+| TORCH | 5,000 | 100,000 | **×20** |
+| GCM / HDM / CHESED / MEL / APM | 5,000 | 50,000 | ×10 |
+| ORCH / NEXUS / W3C | 50,000 | 100,000 | ×2 |
+| VERITAS / SHOFET / SOPHIA | 100,000 | 100,000 | — |
+
+**That table is a floor on the confusion, not the runtime figure.** Line 92 of
+the route overwrites `kyaResult.repidScore` with `repidResult.repidScore`,
+recomputed from live earned metrics, *before* the brief is built — so the deleted
+expression applied the ladder to a score no stored limit was ever derived from.
+The actual runtime brief was a third number, and it is **NOT MEASURABLE** from
+outside a live request. Stated because the ×20 figure is the one worth quoting
+and it would be wrong to quote it as the brief.
+
+That line's own comment already recorded deleting a hand-rolled fourth ladder
+from it (`repidScore > 7500 ? 100000 : 50000`) and the reason: *"the panel weighs
+this number, so a wrong one is a wrong brief."* The replacement used the **right**
+ladder against a row the ladder did not write — same defect, entered from the
+other side.
+
+**Fixed.** `KYAComplianceResult` gains a required `enforcedPerTxLimit:
+number | null`, set on all four `validate()` return paths from the same
+`profile.spendingLimitPerTx` that `checkPerTxLimit` measures; the route reads it
+and no longer imports the ladder. A null ceiling **denies with 503** rather than
+substituting a number — the invariant spans two files, so it is checked rather
+than asserted away with `!`.
+
+**This changes no limit.** Reconciling row and ladder is still the open operator
+decision in §5. Briefing a reviewer with a ceiling nobody will enforce was never
+a way of taking it.
+
+Gated by `check:pay-brief` (8 assertions, 3 mutations). It reads SOURCE and
+proves the **wiring, not the runtime behaviour** — `KYAValidator` and the route
+reach Supabase through the `@/` alias so neither compiles standalone, which is
+why neither has ever had a unit test. The hard half is enforced by something
+stronger: the field is **required**, so `tsc` guarantees every return path sets
+it.
+
+One of the three mutations exists because my first version of that suite was
+weak: it asserted that *some* occurrence read `profile.spendingLimitPerTx`, and
+`pay-brief-exports-the-wrong-limit` changed one of four return paths and walked
+straight through a green run. The assertion now enumerates all four.
