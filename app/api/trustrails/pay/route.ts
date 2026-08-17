@@ -5,14 +5,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   KYAValidator, BFTAuthorizer, ComplianceReceiptGenerator,
   SolanaExecutor, FireblocksPreAuth,
-  ZKPAttestationService, RepIDCalculator
+  ZKPAttestationService, RepIDCalculator,
+  CustodyShadow, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION,
 } from '@/lib/trustshell';
 import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
 import { EarnedMetricsRepository } from '@/lib/trustshell/EarnedMetricsRepo';
 import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req: NextRequest) {
-  const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();
+  const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } = await req.json();
 
   const kya        = new KYAValidator();
   const bft        = new BFTAuthorizer();
@@ -22,6 +24,15 @@ export async function POST(req: NextRequest) {
   const zkp        = new ZKPAttestationService();
   const calc       = new RepIDCalculator();
   const earnedMetrics = new EarnedMetricsRepository();
+  // Lazy client, per lib/CLAUDE.md — a getter, not a field initialiser holding a
+  // live client, so nothing is constructed at import time.
+  const custodyShadow = new CustodyShadow(() => getSupabaseAdmin(), undefined, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION);
+
+  // NEXT.md Tier 1 §1 / SPRINT-DECISIONS P2 — the holder path for ControlProof
+  // on this route, in shadow mode. Generated here rather than at its original
+  // spot (just before the BFT step) so the shadow observation below has a
+  // stable identifier; nothing downstream depended on the old placement.
+  const paymentId = crypto.randomUUID();
 
   try {
     // Step 1: KYA Validation
@@ -35,6 +46,26 @@ export async function POST(req: NextRequest) {
         tier: kyaResult.repidTier,
       }, { status: 403 });
     }
+
+    // ---- SHADOW MODE (NEXT.md Tier 1 §1 / SPRINT-DECISIONS P2) -------------
+    // Observe what a ControlProof would decide at this gate, record it, and
+    // change nothing. `kyaResult.humanCustodyBound` below is still the live
+    // signal that feeds the RepID calculation and the receipt. `observe` never
+    // throws — an observability path that can break a payment is worse than no
+    // observability. Every payment "requires custody" for this comparison:
+    // unlike VaultPermission's per-vault flag, this route has no per-payment
+    // opt-out, so treating the legacy signal as authoritative whenever it is
+    // read is the honest mapping, not an assumption this shadow adds.
+    //
+    // Expect `not_comparable` on essentially every observation at first:
+    // nothing presents a proof yet. That is the measurement, not a failure.
+    await custodyShadow.observe({
+      agentName,
+      vaultId: paymentId,
+      legacyCustodyVerified: kyaResult.humanCustodyBound,
+      vaultRequiresCustody: true,
+      controlProof,
+    });
 
     // Addendum 2: Real-time Institutional RepID Calculation
     //
@@ -117,7 +148,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 2: BFT Consensus Authorization
-    const paymentId = crypto.randomUUID();
+    // paymentId generated at the top of the handler now — see the shadow-mode
+    // comment above for why.
     const ruleHash  = await sha256(`${agentName}:${amountUSDC}:${recipientAddress}:${purpose}`);
 
     // A FOURTH tier ladder lived here: `repidScore > 7500 ? 100000 : 50000`.

@@ -390,3 +390,14 @@ export type { IssuedVerdict, VerdictClass, IssuerStanding } from './issuer-stake
 // removed. Two lanes implemented the same concern in parallel; the canonical
 // brief resolves it to ONE module, and the retired one carried a hardcoded
 // 30-day half-life the evidence does not support. See LESSONS A30.
+
+// P2 of docs/SPRINT-DECISIONS-2026-08-17.md — the holder path, not the circuit.
+// `CustodyShadow` was previously reachable only via a relative import from
+// inside `lib/trustshell/`, which was fine while its one caller (
+// `VaultPermission.ts`) lived there too. It now has a second caller outside
+// this directory (`app/api/trustrails/pay/route.ts`, shadowing
+// `humanCustodyBound` the same way), so it is barrel-exported for the same
+// reason `runAgentLoop` was above: unreachable to every consumer that cannot
+// import it, which was all of them.
+export { CustodyShadow, VAULT_AUDIENCE, VAULT_CAPABILITY, VAULT_ACTION, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION, SHADOW_ANALYSIS_SQL } from './CustodyShadow';
+export type { ShadowVerdict, ShadowObservation } from './CustodyShadow';

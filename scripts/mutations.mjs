@@ -627,6 +627,62 @@ export const MUTATIONS = [
     find: '        authorized: false,',
     replace: '        authorized: true,',
   },
+
+  // -------------------------------------------------------------------------
+  // app/api/trustrails/pay/route.ts — ControlProof shadows the payment gate,
+  // NEXT.md Tier 1 §1 / SPRINT-DECISIONS-2026-08-17.md P2
+  // -------------------------------------------------------------------------
+  {
+    id: 'pay-shadow-drops-controlproof',
+    suite: 'check:pay-custody-shadow',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'controlProof is actually accepted on the request. Silently dropping it from the ' +
+      'destructure would make every caller-supplied proof vanish before it ever reaches the ' +
+      'shadow comparison, and the route would still 200 — the exact "looks wired, isn\'t reachable" ' +
+      'shape this repo keeps finding in its own barrel exports, one layer down',
+    find: 'const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } = await req.json();',
+    replace: 'const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();',
+  },
+  {
+    id: 'pay-shadow-wrong-audience',
+    suite: 'check:pay-custody-shadow',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'the payment shadow is built with PAY_AUDIENCE, not VAULT_AUDIENCE. A copy-paste from ' +
+      'VaultPermission.ts that kept the vault constant would silently reject every real payment ' +
+      'ControlProof (minted for trinity:pay) as wrong-audience, making every observation read ' +
+      'shadow_stricter regardless of what the proof actually authorized — a permanent false ' +
+      'signal that adoption has begun disagreeing when it has not begun being measured at all',
+    find: 'new CustodyShadow(() => getSupabaseAdmin(), undefined, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION);',
+    replace: 'new CustodyShadow(() => getSupabaseAdmin(), undefined, VAULT_AUDIENCE, PAY_CAPABILITY, PAY_ACTION);',
+  },
+  {
+    id: 'pay-shadow-becomes-the-gate',
+    suite: 'check:pay-custody-shadow',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'THE LOAD-BEARING ONE. The observation is never captured into a variable, so nothing ' +
+      'downstream can branch on it — capturing it is the first step toward "the shadow decides", ' +
+      'which is the exact failure CustodyShadow.ts\'s own docstring exists to prevent: switching a ' +
+      'live gate on the strength of a finding is how you lock five agents out of their vaults at ' +
+      '3am, and this mutation is what that looks like one line before it ships',
+    find: '    await custodyShadow.observe({',
+    replace: '    const shadowResult = await custodyShadow.observe({',
+  },
+  {
+    id: 'custody-shadow-default-audience-drifts',
+    suite: 'check:custody-shadow',
+    file: 'lib/trustshell/CustodyShadow.ts',
+    protects:
+      'the generalised constructor still defaults `audience` to VAULT_AUDIENCE. Generalising a ' +
+      'single-purpose class into a parameterised one (2026-08-17, for the payment shadow) is ' +
+      'exactly the change that can silently move every pre-existing call site\'s behaviour — ' +
+      'VaultPermission.ts and 13 assertions in this suite construct CustodyShadow with NO audience ' +
+      'argument and rely entirely on the default staying VAULT_AUDIENCE',
+    find: 'private readonly audience: string = VAULT_AUDIENCE,',
+    replace: 'private readonly audience: string = PAY_AUDIENCE,',
+  },
   {
     id: 'repid-drift-headroom-from-stored-tier',
     suite: 'check:repid-registry-drift',
