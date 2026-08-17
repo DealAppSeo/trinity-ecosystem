@@ -1657,3 +1657,163 @@ cost the day is that nothing anywhere said "this PR has no CI".
   (Settings → Actions → General) is **Sean-gated and NOT CHANGED** — no tool in
   this session can read or write Actions permissions, so claiming it was fixed
   would be the defect this entry is about.
+
+## A30 — I retracted a figure, invented its cause, and had to retract that too (2026-08-17)
+
+*Renumbered from A28 on rebase 2026-08-17: main already held A28 (CI never
+started). Newer entry moves, per LESSONS numbering rule.*
+
+Two lanes built the same P3 decay module in parallel. Consolidating them, I
+re-measured the census my version rested on. One number did not reproduce.
+
+**The claim:** *"6 agents hold a floor having never been observed at all"* — and
+on it, a `never_earned` base case, and a header asserting **"decay is the smaller
+half"** of the defect.
+
+**Re-measured** against `v_agent_earned_observations` joined on
+`repid_agents.id`, across every window that could plausibly have been meant:
+
+| window | floor-holders with no observation |
+|---|---|
+| ever | **3** — all `lifecycle_status='test_only'` |
+| last 30 days | 4 |
+| last 120 days | 3 |
+
+**No window gives 6.** The figure is retracted and gated.
+
+What follows is the part worth having: **no real agent holds a floor with zero
+evidence.** The base case reached mock rows only. So decay is not the smaller
+half of the defect — it is the whole of it, and P3 needs no base case at all.
+
+### Then I explained it, and the explanation was wrong
+
+While checking this I found a genuine hazard: `repid_agents` carries **`id`
+(uuid)** and **`agent_id` (text)**, the observation view joins the former, and
+the two spaces are **disjoint** — `agent_id` is uuid-shaped on **0 of 176** rows.
+So the wrong key returns not an error, not a partial result, but the **empty
+set**, uniformly. "This agent has no track record" is a perfectly plausible
+reading of that.
+
+It is a real defect, cheap to make, and invisible. It is also **not what
+happened.** I wrote it up as the cause anyway, and drafted a second retraction
+alongside it — *"trinity-gcm: 12 observations in 30 days"* — before checking.
+
+Both were wrong:
+
+- The key mix-up returns zero observations for **every** agent. It would have
+  produced **12** unobserved floor-holders, not 6. It does not fit.
+- `trinity-gcm` has **33,434** observations all-time but only **15** in the
+  trailing 30 days, and is being observed live (+2 in the twenty minutes between
+  two queries). **12 in 30 days is consistent with that and was never wrong.** I
+  had compared an all-time count against a 30-day claim — the same units error
+  as the retracted hyperdag byte-vs-character figure, committed while writing up
+  a retraction.
+
+So the standing position is deliberately untidy: the figure is retracted, **its
+cause is UNVERIFIED**, and the join hazard is recorded as a separate finding on
+its own evidence. The originating query was not preserved, and no reconstruction
+fits.
+
+### What generalises
+
+CLAUDE.md says *suspect the sample before the measurement*. The sharper version
+this cost me:
+
+**A retraction is a claim, and it needs the same evidence as the claim it
+replaces.** Finding a plausible mechanism nearby is not finding the cause. The
+pull toward a tidy story is strongest precisely when writing up an error,
+because an unexplained mistake feels unfinished — and "unexplained" was the
+accurate report.
+
+The cheap test I skipped twice: **ask what the suspected cause would actually
+have produced.** One line of arithmetic — the bad join yields 12, not 6 — refutes
+it, and it was available before I wrote a word.
+
+### What was never affected
+
+Production. `EarnedMetricsRepo` resolves `id` and filters on it, and always did.
+Both errors were in measurements written *beside* correct code, which no type
+checker reaches and no green suite notices, because nothing executes them.
+
+### The neighbouring trap, found the same way
+
+`repid_agents.last_active_at` is the obvious recency column and is **not a
+recency signal**: written on **32 of 176** rows, NULL on **11 of the 12**
+ratcheted rows, written by exactly one database function
+(`apply_linked_bet_resolution`) and **zero** lines of this repo. It reports **17**
+recently-active agents where the evidence shows **67**.
+
+A decay keyed on it expires standing for agents that are demonstrably active, and
+fails in the expensive direction. The other lane's census reported "1 floor-sitter
+with any 30-day activity" from that column; on the observation evidence it is **8
+of 12**. Neither query was careless. We were both wrong about **which column was
+the fact**.
+
+`check:observation-identity` now gates all three: every consumer of the view must
+prove it resolves the uuid, a new consumer cannot appear undeclared, and no code
+may key recency off `last_active_at`. The mutation swaps the resolved uuid for
+the agent name and is CAUGHT.
+
+## A29 — a migration that was live three and a half hours before it existed anywhere (2026-08-17)
+
+Investigating whether the no-provider-veto defect (A23/P1) also inflates the
+*subject* agent's own earned score, I found `v_agent_earned_observations` had a
+7th column, `quorum_providers_used`, that no branch's migration history
+mentioned. `git log --all` / `git grep` across all 769 fetched commits: **zero**
+matches. But `mcp__Supabase__list_migrations` listed it as the newest applied
+version, timestamped ahead of everything in any checkout.
+
+**It was live and correct** — `pg_get_viewdef` matched exactly what PR #94's
+body proposed as the still-open "smallest unblock." Someone's session had
+applied it directly against the database while investigating, and never
+committed the file. PR #94's own text ("the view projects six columns and none
+is provenance") was already stale by the time I read it.
+
+**The risk this creates, concretely:** a fresh `supabase db reset`, or any
+environment rebuilt from `supabase/migrations/`, would have silently regressed
+to the six-column view — not by anyone editing it back, but by the tracked
+history simply not knowing the seventh column existed. The gap is invisible
+until someone runs exactly that command, at which point it looks like a
+regression with no commit to blame.
+
+**Fixed by writing the missing file, not by re-deciding the change.**
+`20260817162647_v_agent_earned_observations_add_provenance.sql` reproduces the
+live definition. Verified byte-exact the only way that means anything: applied
+it again with `CREATE OR REPLACE VIEW` and confirmed the round trip (column
+count, row count, and the attached comment all unchanged) — an identical
+`CREATE OR REPLACE VIEW` is a safe no-op, and PostgreSQL itself would have
+refused a definition that reordered or retyped an existing column, so success
+was evidence, not just documentation.
+
+### What generalises
+
+Applying a change directly and committing the file that describes it are two
+separate acts, and a session under time pressure ("let me just check what this
+would look like against real data") can do the first without the second. This
+repo's `mcp__Supabase__list_migrations` and its `supabase/migrations/`
+directory can therefore disagree, silently, and the newest thing in the former
+is the one place that will not show up in a `git grep`.
+
+**The tell was a timestamp that shouldn't have been possible** — a migration
+version later than my own session's start, on a database I had only read from
+so far. Worth checking `list_migrations` against `git log --all` whenever a
+column shows up that a `SELECT *` or `\d` reveals but no code in the checkout
+explains — the gap between "the schema has it" and "the repo says why" is
+exactly where this kind of drift hides.
+
+### What the underlying investigation still found, unfixed
+
+Projecting the column is not consuming it. `EarnedMetricsRepo.ts` still reads
+`signal, observed_at, success, domain, value_ms` only. Measured against the
+120-day observation window: **~44,995** `HAL_SCORE_EVENT` rows carry no
+provenance signal under either the new column or the older nested
+`hal_signals.providers_used` a pre-2026-06-04 code path used instead, spread
+across **12 real, active, non-human production agents** — every member of the
+active fleet with a nonzero score. They read as `success = true` unconditionally
+(`hallucination_caught` is never `true` on this cohort) and account for
+**16–19%** of each agent's decayed evidence weight, moving raw `veritasCatchRate`
+by **10–12 percentage points** upward for every one of them — not a rounding
+effect, the single largest swing available in that metric today. Reported on
+PR #94 rather than fixed here: that lane owns `verdict-provenance.ts`, is
+already mid-flight on this exact view, and duplicating the consumer-side fix in
+parallel would recreate tonight's P3 collision (A28) one gate over.
