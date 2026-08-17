@@ -79,9 +79,27 @@ re-attestation, not permanent once-standing.**
 agents on a round number, which is a looser test. Of the 12: **4 are human**,
 **7 are `test_only`**, and **exactly 1 is a real agent** (`trinity-gcm`, which
 clears the **medical/finance** gate at exactly 1000 because of the clamp).
-**And 6 hold a floor having never been observed at all** — which decay cannot
-reach, and which is the larger half of the defect. Reward for good behaviour is permanent; cost of bad
+Reward for good behaviour is permanent; cost of bad
 behaviour is bounded below — precisely backwards.*
+
+***CORRECTED 2026-08-17.** This decision previously claimed a further group of
+floor-holders had never been observed at all, and called that the larger half of
+the defect. **That figure is RETRACTED** — re-measured against
+`v_agent_earned_observations` joined on `repid_agents.id`, no window reproduces
+it: **3** with no observation ever, **4** none in 30 days, **3** none in 120
+days. **Its cause is UNVERIFIED**; the originating query was not preserved, and
+the nearby `id`/`agent_id` key hazard does not explain it. All **3** genuinely
+unobserved floor-holders are **`lifecycle_status='test_only'`**.*
+
+***What changes for the sprint:* **no real agent holds a floor with zero
+evidence**, so the never-earned base case reached fixture rows only — P3 needs no
+base case, and decay is the whole of the defect rather than its smaller half.
+The ~20 mock rows in `repid_agents` are a data-hygiene question, not a scoring
+one. P3 is now **one module** (`lib/trustshell/repid-floor-decay.ts`) per
+`docs/SPRINT-TRUST-HARNESS.md`; the retired duplicate hardcoded a 30-day
+half-life the evidence does not support, and what survived from it is the
+**`is_human` exemption**, which `compute_tier` already applies. See LESSONS A30,
+`check:repid-floor-decay`, `check:observation-identity`.*
 
 ---
 

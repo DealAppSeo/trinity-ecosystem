@@ -1657,3 +1657,99 @@ cost the day is that nothing anywhere said "this PR has no CI".
   (Settings → Actions → General) is **Sean-gated and NOT CHANGED** — no tool in
   this session can read or write Actions permissions, so claiming it was fixed
   would be the defect this entry is about.
+
+## A30 — I retracted a figure, invented its cause, and had to retract that too (2026-08-17)
+
+*Renumbered from A28 on rebase 2026-08-17: main already held A28 (CI never
+started). Newer entry moves, per LESSONS numbering rule.*
+
+Two lanes built the same P3 decay module in parallel. Consolidating them, I
+re-measured the census my version rested on. One number did not reproduce.
+
+**The claim:** *"6 agents hold a floor having never been observed at all"* — and
+on it, a `never_earned` base case, and a header asserting **"decay is the smaller
+half"** of the defect.
+
+**Re-measured** against `v_agent_earned_observations` joined on
+`repid_agents.id`, across every window that could plausibly have been meant:
+
+| window | floor-holders with no observation |
+|---|---|
+| ever | **3** — all `lifecycle_status='test_only'` |
+| last 30 days | 4 |
+| last 120 days | 3 |
+
+**No window gives 6.** The figure is retracted and gated.
+
+What follows is the part worth having: **no real agent holds a floor with zero
+evidence.** The base case reached mock rows only. So decay is not the smaller
+half of the defect — it is the whole of it, and P3 needs no base case at all.
+
+### Then I explained it, and the explanation was wrong
+
+While checking this I found a genuine hazard: `repid_agents` carries **`id`
+(uuid)** and **`agent_id` (text)**, the observation view joins the former, and
+the two spaces are **disjoint** — `agent_id` is uuid-shaped on **0 of 176** rows.
+So the wrong key returns not an error, not a partial result, but the **empty
+set**, uniformly. "This agent has no track record" is a perfectly plausible
+reading of that.
+
+It is a real defect, cheap to make, and invisible. It is also **not what
+happened.** I wrote it up as the cause anyway, and drafted a second retraction
+alongside it — *"trinity-gcm: 12 observations in 30 days"* — before checking.
+
+Both were wrong:
+
+- The key mix-up returns zero observations for **every** agent. It would have
+  produced **12** unobserved floor-holders, not 6. It does not fit.
+- `trinity-gcm` has **33,434** observations all-time but only **15** in the
+  trailing 30 days, and is being observed live (+2 in the twenty minutes between
+  two queries). **12 in 30 days is consistent with that and was never wrong.** I
+  had compared an all-time count against a 30-day claim — the same units error
+  as the retracted hyperdag byte-vs-character figure, committed while writing up
+  a retraction.
+
+So the standing position is deliberately untidy: the figure is retracted, **its
+cause is UNVERIFIED**, and the join hazard is recorded as a separate finding on
+its own evidence. The originating query was not preserved, and no reconstruction
+fits.
+
+### What generalises
+
+CLAUDE.md says *suspect the sample before the measurement*. The sharper version
+this cost me:
+
+**A retraction is a claim, and it needs the same evidence as the claim it
+replaces.** Finding a plausible mechanism nearby is not finding the cause. The
+pull toward a tidy story is strongest precisely when writing up an error,
+because an unexplained mistake feels unfinished — and "unexplained" was the
+accurate report.
+
+The cheap test I skipped twice: **ask what the suspected cause would actually
+have produced.** One line of arithmetic — the bad join yields 12, not 6 — refutes
+it, and it was available before I wrote a word.
+
+### What was never affected
+
+Production. `EarnedMetricsRepo` resolves `id` and filters on it, and always did.
+Both errors were in measurements written *beside* correct code, which no type
+checker reaches and no green suite notices, because nothing executes them.
+
+### The neighbouring trap, found the same way
+
+`repid_agents.last_active_at` is the obvious recency column and is **not a
+recency signal**: written on **32 of 176** rows, NULL on **11 of the 12**
+ratcheted rows, written by exactly one database function
+(`apply_linked_bet_resolution`) and **zero** lines of this repo. It reports **17**
+recently-active agents where the evidence shows **67**.
+
+A decay keyed on it expires standing for agents that are demonstrably active, and
+fails in the expensive direction. The other lane's census reported "1 floor-sitter
+with any 30-day activity" from that column; on the observation evidence it is **8
+of 12**. Neither query was careless. We were both wrong about **which column was
+the fact**.
+
+`check:observation-identity` now gates all three: every consumer of the view must
+prove it resolves the uuid, a new consumer cannot appear undeclared, and no code
+may key recency off `last_active_at`. The mutation swaps the resolved uuid for
+the agent name and is CAUGHT.
