@@ -147,3 +147,4 @@ lib/**/*.js
 .staged-judge-check-*/
 .throughput-check-*/
 .zk-cost-check-*/
+.harness-extract-check-*/
