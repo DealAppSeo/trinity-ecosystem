@@ -202,12 +202,18 @@ the evaluator port, which is the differentiator.
 > | run/idle `TimeoutPolicy` | **built** — `harness/timeout.ts` |
 > | `_replay.py` rewind + first-visit | **built** — `harness/replay.ts` |
 > | message transforms (head/tail) | **built** — `harness/transform.ts` |
-> | `retry_on` **predicate** | **NOT BUILT** — no `RetryPolicy`/`retryOn` anywhere in `lib/` |
+> | `retry_on` **predicate** | ~~NOT BUILT~~ → **BUILT 2026-08-17** — `harness/retry.ts`, `check:harness-retry` 22 assertions, 5 mutations |
 > | control-flow-vs-failure error taxonomy | **PARTIAL / NOT CHECKED** — `AttemptTimeoutError` exists in `timeout.ts`; whether the full separation was implemented was not established |
 >
-> So the genuinely remaining LangGraph item is the **`retry_on` predicate**, not
-> the timeout split. Presence of a file is weaker evidence than reading it, and
-> that is all the two "built" claims above rest on beyond `timeout.ts`, which was
+> This identified the `retry_on` predicate as the one genuinely remaining
+> LangGraph item, and it was **built on 2026-08-17** — see the index row for
+> `harness/retry.ts`. What is left from LangGraph is therefore only the
+> control-flow-vs-failure error taxonomy, whose status is still **PARTIAL /
+> NOT CHECKED**: nobody has established whether the full separation exists beyond
+> `AttemptTimeoutError`, and that is the next thing to read rather than build.
+>
+> Presence of a file is weaker evidence than reading it, and that is all the
+> "built" claims above rest on beyond `timeout.ts` and `retry.ts`, which were
 > read.
 
 It is also behind its own precondition. `harness/replay.ts` is the natural home
