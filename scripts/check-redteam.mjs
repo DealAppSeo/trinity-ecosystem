@@ -44,7 +44,15 @@ const LEDGER = 'scripts/redteam/ledger.json';
 const MINIMUM_PROBES = 5;
 
 const args = process.argv.slice(2);
-const only = args.includes('--probe') ? args[args.indexOf('--probe') + 1] : null;
+let only = null;
+if (args.includes('--probe')) {
+  only = args[args.indexOf('--probe') + 1];
+  if (!only || only.startsWith('--')) {
+    console.error('--probe requires a probe id, e.g. --probe PAY-002');
+    console.error('  (given with no id, this used to silently run ALL probes — a typo in automation would pass unnoticed.)');
+    process.exit(1);
+  }
+}
 const asJson = args.includes('--json');
 
 // ── load the ledger ─────────────────────────────────────────────────────────

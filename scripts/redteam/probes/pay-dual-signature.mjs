@@ -75,7 +75,11 @@ export default {
       );
     }
 
-    const found = VERIFIERS.filter((v) => src.includes(v));
+    // Search the GATE WINDOW, not the whole file: a verifier referenced in some
+    // unrelated stage of the route must not let this probe report HELD while the
+    // dual_signature_gate stage itself verifies nothing. `gate[0]` is the matched
+    // stage text; this makes the search match the intent the comment above states.
+    const found = VERIFIERS.filter((v) => gate[0].includes(v));
     if (found.length > 0) {
       return held(
         `the route references ${found.join(', ')} — the gate has cryptographic material to check`,

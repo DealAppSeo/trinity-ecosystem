@@ -59,7 +59,10 @@ export default {
       catch (e) { return notChecked(`${file} is not valid JSON: ${e.message}`, howToCollect()); }
 
       for (const need of ['surface', 'collectedAt', 'collectedBy', 'collectedVia', 'observations']) {
-        if (ev[need] === undefined) return notChecked(`${file} missing \`${need}\` — provenance is not optional`, `see ${EVIDENCE_DIR}/README.md`);
+        // `== null` catches both undefined AND an explicit null — an evidence file
+        // with `observations: null` is as unprovenanced as one with no key, and
+        // treating it as present would defer the failure to a later property read.
+        if (ev[need] == null) return notChecked(`${file} missing \`${need}\` — provenance is not optional`, `see ${EVIDENCE_DIR}/README.md`);
       }
       const ageDays = (Date.now() - Date.parse(ev.collectedAt)) / 86_400_000;
       if (!Number.isFinite(ageDays)) return notChecked(`${file}: unparseable collectedAt`, 're-collect with an ISO-8601 timestamp');
