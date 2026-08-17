@@ -144,8 +144,23 @@ score and tier **not at all**. Two independent paths, and only one is affected.
 
 ## 7. Open
 
-- **Whether the 1-arg `compute_tier` has any caller.** Not found in this repo; it
-  could be called from SQL, another service, or a dashboard. **NOT CHECKED.**
+- **Whether the 1-arg `compute_tier` has any caller — narrowed, not closed.**
+  **Inside the database it has none.** Exactly one function references
+  `compute_tier` at all — `sync_tier`, using the 2-arg form — and **no view**
+  references it. So nothing server-side reaches the ungated ladder.
+
+  **But both overloads are `EXECUTE`-able by `anon` and `authenticated`**, so
+  both are reachable as PostgREST RPC by any holder of the publishable key —
+  which ships in the browser bundle and is public (see `CLAUDE.md`). Whether an
+  external consumer calls the 1-arg version is **still NOT CHECKED** and is not
+  answerable from this database.
+
+  Severity is low and worth stating so nobody escalates it: the 1-arg version is
+  a pure function of the integer you hand it, reads no table, and returns a
+  classification of a number the caller already had. **The hazard is a developer
+  getting a different answer, not an attacker learning something.** The 2-arg
+  version does read `repid_agents` and `service_contracts`, but it is
+  `SECURITY INVOKER`, so RLS governs what a caller sees.
 - **Whether `est_min`/`earn_min` at 0 is intent or a disabled gate.** No comment,
   no config. **NOT ESTABLISHED.**
 - **What sets `catch_rate_30d`.** NULL on all five agents in #80; no trigger
