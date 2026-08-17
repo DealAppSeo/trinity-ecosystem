@@ -148,11 +148,12 @@ try {
   process.exit(1);
 }
 
-const { runContractedWork } = spine;
+const { runContractedWork, runAcceptedWork } = spine;
 const { generateKeyPair } = did;
 const { ManualClock } = types;
 
 truthy(typeof runContractedWork === 'function', 'the shipped composition must be callable');
+truthy(typeof runAcceptedWork === 'function', 'the shipped acceptance loop must be callable');
 
 const doer = await generateKeyPair();
 const checkers = await Promise.all([0, 1, 2, 3, 4].map(() => generateKeyPair()));
@@ -451,6 +452,104 @@ await check('the grant is OPTIONAL, and its absence is honest', async () => {
 });
 
 rmSync(outDir, { recursive: true, force: true });
+
+// ─── C. DOES THE ACCEPTANCE LOOP FIRE ────────────────────────────────────────
+//
+// The unit suite asserts the decision logic against fixtures. These drive the
+// SHIPPED composition, because the wiring is where a correct decision module
+// gets connected to the wrong field — and reading cannot tell you that.
+
+/** A reviewer that rejects until the doer has produced `acceptFrom` attempts. */
+function reviewerAcceptingFrom(acceptFrom, state) {
+  return [
+    {
+      name: 'reviewer',
+      judge: {
+        async judge() {
+          return state.attempt >= acceptFrom
+            ? { outcome: 'VERIFIED', score: 0.95, detail: 'to spec' }
+            : { outcome: 'FAILED', detail: 'not to spec' };
+        },
+      },
+    },
+  ];
+}
+
+await check('THE ACCEPTANCE LOOP FIRES: rejected twice, then signed off', async () => {
+  const state = { attempt: 0 };
+  const assignment = assignmentFor('acceptance-revises');
+
+  const out = await runAcceptedWork({
+    assignment,
+    doerKey: doer.privateKey,
+    checkerKeyFor: (d) => keyFor.get(d),
+    tiers: reviewerAcceptingFrom(3, state),
+    now: () => new Date('2026-08-16T02:00:00.000Z'),
+    observedAt: '2026-08-16T02:00:00.000Z',
+    attempt: ({ round }) => {
+      state.attempt = round + 1;
+      return { execution: execution(), submissionDigest: `sha256:v${round + 1}` };
+    },
+  });
+
+  eq(out.state.status, 'ACCEPTED', 'the third attempt must be signed off');
+  eq(out.rounds.length, 3, 'three rounds must have run');
+  eq(out.rounds[0].verdict, 'REJECTED', 'the first attempt is rejected');
+  eq(out.rounds[1].verdict, 'REJECTED', 'the second attempt is rejected');
+  eq(out.rounds[2].verdict, 'ACCEPTED', 'the third is accepted');
+  truthy(out.delivered, 'an accepted run must hand back the delivered attempt');
+  truthy(out.delivered.envelope, 'and the delivered attempt carries its portable envelope');
+
+  // THE INVARIANT THIS WHOLE DESIGN RESTS ON. Three rounds, one auditor. If the
+  // assignment is stable the draw is stable, and the doer never got to reroll.
+  const auditors = new Set(out.rounds.map((r) => r.auditorDid));
+  eq(auditors.size, 1, 'the drawn auditor must be identical across every revision');
+  truthy(!auditors.has(doer.did), 'and it is still never the doer');
+});
+
+await check('EXHAUSTED is not a delivery', async () => {
+  const state = { attempt: 0 };
+
+  const out = await runAcceptedWork({
+    assignment: assignmentFor('acceptance-exhausts'),
+    doerKey: doer.privateKey,
+    checkerKeyFor: (d) => keyFor.get(d),
+    // Never accepts, however many times the doer revises.
+    tiers: reviewerAcceptingFrom(Number.MAX_SAFE_INTEGER, state),
+    now: () => new Date('2026-08-16T02:00:00.000Z'),
+    observedAt: '2026-08-16T02:00:00.000Z',
+    policy: { maxRejections: 3 },
+    attempt: ({ round }) => ({
+      execution: execution(),
+      submissionDigest: `sha256:v${round + 1}`,
+    }),
+  });
+
+  eq(out.state.status, 'EXHAUSTED', 'a budget that runs out is EXHAUSTED');
+  eq(out.rounds.length, 3, 'and it stops at the bound rather than looping forever');
+  eq(out.delivered, undefined, 'EXHAUSTED must hand back NO deliverable');
+  truthy(out.attempts.length === 3, 'every attempt is retained as evidence');
+});
+
+await check('STALLED: resubmitting identical bytes is not a revision', async () => {
+  const state = { attempt: 0 };
+
+  const out = await runAcceptedWork({
+    assignment: assignmentFor('acceptance-stalls'),
+    doerKey: doer.privateKey,
+    checkerKeyFor: (d) => keyFor.get(d),
+    tiers: reviewerAcceptingFrom(Number.MAX_SAFE_INTEGER, state),
+    now: () => new Date('2026-08-16T02:00:00.000Z'),
+    observedAt: '2026-08-16T02:00:00.000Z',
+    policy: { maxRejections: 5 },
+    // A doer that never changes anything.
+    attempt: () => ({ execution: execution(), submissionDigest: 'sha256:unchanged' }),
+  });
+
+  eq(out.state.status, 'STALLED', 'identical bytes twice rejected is STALLED');
+  eq(out.rounds.length, 2, 'and it stops immediately rather than burning the budget');
+  eq(out.delivered, undefined, 'STALLED must hand back NO deliverable');
+});
 
 console.log(`\nspine-reachable: ${passed} passed, ${failures.length} failed\n`);
 if (failures.length > 0) {

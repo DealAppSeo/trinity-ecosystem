@@ -51,6 +51,10 @@ const DECLARED = new Map([
     'P2 of SPRINT-DECISIONS-2026-08-17. THE SCHEMA BLOCKER IS CLOSED (2026-08-17, trinity_changelog id 141): v_agent_earned_observations now projects quorum_providers_used and EarnedMetricsRepo.ts selects it — check:verdict-provenance is VERIFIED, exit 0. What remains dormant is `refusesToIssue` from issuer-stake.ts: the value now reaches the code that could apply it, but nothing calls provenanceOf() from the live scoring path yet. That is a scoring-behavior decision (how EarnedMetrics.veritasCatchRate should react to an actionable catch with quorum_providers_used === 0), and the hard rule is explicit — no DEFAULT_WEIGHTS/scoring change without an explicit decision on main. So this stays dormant until that decision is made, not because the data is unavailable.',
   ],
   [
+    'alerts/digest',
+    'alert backlog reduction logic. Today its consumers are the check and replay scripts; wiring it to a notifier is a separate runtime surface, and until that exists the analysis itself is the product.',
+  ],
+  [
     'harness/aggregate',
     'reliability module. The agent loop executor is its intended consumer and is at Stage A — docs/AGENT-LOOP-SCOPE.md measured 47 harness settings with zero production consumers, and names the executor as the wiring that ends this.',
   ],
@@ -106,12 +110,24 @@ const DECLARED = new Map([
     'binds EarnedMetrics into a ZK predicate. Blocked upstream on Poseidon2 parameters from the repid-engine lane — see docs/POSEIDON2-PARAMETER-REQUEST.md.',
   ],
   [
+    'lessons/ids',
+    'the LESSONS parser behind `check:lesson-ids`. Like `schema/decoys`, the gate is the shipped consumer; a product importer would be the wrong direction.',
+  ],
+  [
     'persistence/supabase-reputation-store',
     'the durable adapter behind the reputation history. The JOINT now exists — persistence/durable-ledger.ts binds a ReputationLedger to any ReputationStore and refuses to save one that never loaded — and it takes the INTERFACE, so this implementation still has no importer. What remains is a caller choosing it, which is the product surface Stage B Half A needs and the fleet being off makes worthless. See docs/STAGE-B-SCOPE-2026-08-17.md.',
   ],
   [
+    'priorwork/open-index',
+    'the prior-work parser/matcher behind `check:open-index` and `check:open-work`. The policy is enforced at PR time, so the gate is the product and there is no app importer yet.',
+  ],
+  [
     'receipt/store-sqlite',
     'a local store used by the receipt suite. A server surface would use the Supabase adapter, so a product importer here would be the wrong direction.',
+  ],
+  [
+    'replay/plan',
+    'the HAL replay preflight planner. Today it is exercised by `check:replay-plan` and `hal-replay.mjs`; the replay is an operator script, not a `lib/` or `app/` consumer.',
   ],
   [
     'schema/decoys',
