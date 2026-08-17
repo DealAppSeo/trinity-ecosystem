@@ -2,6 +2,14 @@
 
 **One page. Repo root. If you read nothing else, read this.**
 
+> ## ⇒ CURRENT SPRINT: `docs/SPRINT-DECISIONS-2026-08-17.md`
+> **Owner-issued, canonical, and it supersedes anything below that conflicts.**
+> Five decisions and a hard-ordered P0–P5. If you are a lane starting work,
+> read that file first — the spine below is still right, but four of its
+> properties are known-untrue today and are this sprint's work:
+> **dual-auth, selective disclosure, issuer-staked reputation, and a ratchet
+> that decays unless re-earned.**
+
 Live numbers are **not** in this file on purpose — run `npm run north`. A page
 of hand-copied counts is how the last nine planning surfaces died.
 
@@ -9,10 +17,17 @@ of hand-copied counts is how the last nine planning surfaces died.
 
 ## The one sentence
 
-**TrustShell is the trust harness that makes an AI agent's reputation portable:
+**HyperDAG Protocol is the portable, weighted + earned trust harness:
 HAL decides whether the agent is telling the truth, RepID turns that history
 into a score, a ZK proof makes the score checkable without revealing it, and
 x402 + ERC-8004 make it spendable and recordable on someone else's rails.**
+
+**Three of those four links do not yet hold, and saying so is the point of this
+file.** Measured 2026-08-17 (#83): the ZK proof cannot be produced — the sole
+`IBindingScheme` throws — so `witnessHidden` and `provenWithoutSecret` are
+permanently false; x402 has **no HTTP 402 handling anywhere**; and ERC-8004 is a
+typed seam whose own test pins `proveErc8004Binding` as `undefined`. HAL runs,
+but not in this repo. **Quote the sentence as a target, never as a description.**
 
 If a piece of work does not make that sentence more true, it is not the work.
 
