@@ -50,6 +50,38 @@ the top of the table, and ZK statements over pre-fix deltas will no longer verif
 `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` in repid-engine (`npm run repid:sim`).
 **Never report link 3 working as link 2 working.**
 
+## The target vocabulary — five terms, with status
+
+**Added 2026-08-17 because these words appeared in almost none of the docs the lanes read.**
+Measured before writing: *earned trust*, *issuer-staked* and *decay-unless-re-earned* appeared
+in **zero** docs across both repos; *selective disclosure* in two. Parallel lanes pulling from
+these files would not have found them at all.
+
+The status column is the point. Several of these name nothing yet, and a table that read as
+though they were all shipped is precisely how four numbers came to be retracted here before.
+
+| Term | What it means | Status |
+| :-- | :-- | :-- |
+| **Earned trust** (weighted + earned) | *Earned* = what the agent did, scored per event. *Weighted* = how much that evidence counts, given who observed it and what they had at stake. | **PARTIAL** — earned is live; weighting unimplemented |
+| **Issuer-staked reputation** | Whoever issues an attestation stakes on it, so vouching carries downside and cheap vouching cannot inflate a score. | **TARGET** — no issuer-stake in repid-engine (measured) |
+| **Decay-unless-re-earned ratchet** | Reputation decays with inactivity and must be *re-earned*, not restored: a lapse costs work to undo, so a high score always describes recent behaviour. | **PARTIAL** — activity decay is live; the ratchet is not built |
+| **Selective disclosure** (threshold proof, **not** confession) | The holder proves a predicate — "RepID ≥ X" — revealing neither the score, the events, nor their identity. Nothing is disclosed in order to be believed. | **TARGET** — the ZKP path attests a delta/score range, not a holder-chosen threshold |
+| **Dual-auth** | An action needs two independent authorities, so neither a compromised agent nor a compromised host acts alone. | **PARTIAL** — `ControlProof` verifies; gates nothing yet |
+
+**Weighted is not the same as earned, and conflating them is the trap.** Weighting changes how
+much an observation counts; earning changes what the agent is owed. A knob that silently moves
+the first while looking like the second is the exact shape of the defect measured on 2026-08-17
+— reward that responded to *presentation* rather than to *truth*. Related and measured the same
+day: a **user-settable risk tolerance is worth +73 RepID on byte-identical work, and penalises
+the cautious user by −83**, so preference may govern a user's own experience but must never
+govern the thresholds that mint portable RepID. `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md`
+in repid-engine.
+
+**And the constraint that falls out of it for zkRepID:** anything that changes *how* a score is
+earned — the formula, the gate thresholds, the weighting — must be **inside the proof's
+commitment**, and versioned. Otherwise "RepID ≥ 8000" is unfalsifiable, because a verifier
+cannot know which regime produced it.
+
 ## Where the priorities actually live
 
 **One place: `trinity_tasks`, filtered by `v_agent_preflight`.** Everything
