@@ -510,6 +510,43 @@ export const MUTATIONS = [
     replace: '    if (score > floor) return tier;',
   },
   {
+    id: 'ceiling-rewritten-by-reputation-update',
+    suite: 'check:ceiling-source',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'TRUST THE ROW — a reputation update writes the SCORE and never the ceiling. Restoring ' +
+      'the ladder-derived write is the measured x50: one compliant payment moved TORCH from ' +
+      '10,000 to 500,000 USDC daily, and because the delta is signed a PENALTY did the same, ' +
+      'with 5,100 points of headroom before the limit fell',
+    find: '        repid_score:           newScore,',
+    replace: '        repid_score:           newScore,\n        spending_limit_daily:  500000,',
+  },
+  {
+    id: 'ceiling-read-derived-not-stored',
+    suite: 'check:ceiling-source',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'the ENFORCED per-tx ceiling is read from the stored row. Trust-the-row has two halves ' +
+      'and this is the one a careless fix drops: stop writing the column but also stop reading ' +
+      'it, and nothing enforces anything. Reading the daily column here still type-checks and ' +
+      'still looks like a limit',
+    find: '      spendingLimitPerTx:   data.spending_limit_per_tx,',
+    replace: '      spendingLimitPerTx:   data.spending_limit_daily,',
+  },
+  {
+    id: 'dashboard-derives-tier-from-score',
+    suite: 'check:ceiling-source',
+    file: 'app/api/trustrails/system-trust/route.ts',
+    protects:
+      'the published tier distribution is the STORED tier, which labels the enforced ceiling. ' +
+      'Deriving it from the score publishes a tier the enforcer does not use — the ' +
+      'reviewer-vs-enforcer split closed on the payment path, reopened on a dashboard, and it ' +
+      'disagrees on 9 of the 12 live rows',
+    find: '  agents.forEach(a => { tiers[a.repid_tier as keyof typeof tiers]++; });',
+    replace:
+      '  agents.forEach(a => { tiers[tierForScore(a.repid_score) as keyof typeof tiers]++; });',
+  },
+  {
     id: 'pay-brief-ceiling-optional',
     suite: 'check:pay-brief',
     file: 'lib/trustshell/types.ts',
