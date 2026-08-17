@@ -65,6 +65,15 @@
       "reviewBy": "2026-10-17",
       "firstSeen": "2026-08-17",
       "report": "docs/RED-TEAM-REPID-ENGINE-2026-08-17.md"
+    },
+    {
+      "id": "ERC8004-001",
+      "owner": "Sean",
+      "severity": "Medium",
+      "reason": "Two deployer/attestor keys in this repo's git history are LIVE and FUNDED on Base Sepolia (84532), the operative chain for the ERC-8004 identities \u2014 VERIFIED read-only 2026-08-17 via pg_net JSON-RPC. 0xf6eE1768 (committed 2026-05-11 in src/services/repid-attestation.ts, fallback removed 2026-07-31 but key persists in history): nonce 120, 0.0367 ETH, and it is the on-chain MINTER of the ERC-8004 agent identities (mint tx 0xa9e991 -> IdentityRegistry 0x8004a818). 0xdf6b8215 (CLAUDE.md DEPLOYER_KEY / deployer_wallet): nonce 111, 0.0596 ETH. CORRECTS CLAUDE.md's OPEN item, which says 0xdf6b8215 has 'balance 0, nonce 0' \u2014 that is MAINNET; on the operative testnet chain both are active+funded, so the exposure is real, not inert. MITIGANTS (held): reputation-write authority is ROTATED to 0xb2426888 (not leaked), so reputation writes aren't forgeable via these keys; and value at risk is testnet ETH only (mainnet inert). Impact: identity-anchor control on the operative chain \u2014 anyone with repo history holds the funded key that minted the identities. Escalates to High/Critical if this moves to mainnet unrotated. FIX: rotate the keys per docs/KEY-ROTATION.md. BLOCKED_FOR_SEAN \u2014 CLAUDE.md is explicit no agent session runs the rotation (needs the live key in a transcripted context, which is how it leaked). NOT CHECKED: whether the current EIP-712 attestation signer HYPERDAG_ATTESTOR_PRIVATE_KEY is the rotated key or still 0xf6eE (off-chain, env-only).",
+      "reviewBy": "2026-09-17",
+      "firstSeen": "2026-08-17",
+      "report": "docs/RED-TEAM-ERC8004-2026-08-17.md"
     }
   ]
 }

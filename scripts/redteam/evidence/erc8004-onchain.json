@@ -1,0 +1,50 @@
+{
+  "surface": "ERC-8004 on Base Sepolia (chainId 84532) + repid-engine on-chain writers",
+  "collectedAt": "2026-08-17T04:45:00.000Z",
+  "collectedBy": "claude-code session claude/trust-layer-red-team-ujpq6a",
+  "collectedVia": "supabase pg_net JSON-RPC to https://sepolia.base.org (read-only: eth_getTransactionByHash / eth_getBalance / eth_getTransactionCount) + repid-engine source review + Supabase DB reads. No transactions sent. Addresses only; no private keys stored.",
+  "registries": {
+    "identity_registry": "0x8004a818bfb912233c491871b3d84c89a494bd9e",
+    "reputation_registry": "0x8004b663056a597dffe9eccc1965a193b7388713"
+  },
+  "on_chain_writers_observed": {
+    "reputation_write": {
+      "tx": "0x52e654757da779a74d248409807ceb723978daa9174c0de5cabae2efed051c7c",
+      "from": "0xb24268884472e7613aa58d38c8813f7af1667382",
+      "to": "0x8004b663056a597dffe9eccc1965a193b7388713 (ReputationRegistry)",
+      "note": "current reputation writer — NOT a known-leaked key (rotation held)"
+    },
+    "identity_mint": {
+      "tx": "0xa9e991d9992c4df68f4f35436558cbfa62e01faf10363ecc02df1f44b26587bd",
+      "from": "0xf6ee1768868c3266868edca78bc41c50309cb22a",
+      "to": "0x8004a818bfb912233c491871b3d84c89a494bd9e (IdentityRegistry)",
+      "note": "the ERC-8004 agent identities were minted by the LEAKED key 0xf6eE1768"
+    }
+  },
+  "leaked_keys_live_state_base_sepolia": {
+    "0xf6eE1768868c3266868edcA78bC41C50309cb22A": {
+      "nonce": 120, "balance_eth": 0.03665, "active": true, "funded": true,
+      "leak": "private key committed 2026-05-11 in src/services/repid-attestation.ts as the attestor fallback; fallback REMOVED 2026-07-31 but the key persists in git history (per the file's own security comment)",
+      "role": "on-chain minter of the ERC-8004 agent identities (IdentityRegistry writer)"
+    },
+    "0xdf6b8215D193b11B4903d223729c3CF7A6de271d": {
+      "nonce": 111, "balance_eth": 0.05962, "active": true, "funded": true,
+      "leak": "DEPLOYER_KEY in scripts/register-agents-erc8004.js at 3a22570c (per CLAUDE.md); = trinity_system_config.deployer_wallet",
+      "role": "deployer wallet"
+    }
+  },
+  "correction_to_claude_md": "CLAUDE.md's OPEN item states the leaked deployer 0xdf6b8215 has 'ETH/Base balance 0, nonce 0 (never used on mainnet)'. That is MAINNET. On Base Sepolia (84532) — the operative chain where the ERC-8004 identities and reputation actually live — BOTH leaked keys are ACTIVE (nonce 120 / 111) and FUNDED (0.0367 / 0.0596 testnet ETH). The exposure on the operative chain is real, not inert.",
+  "mitigants_held": [
+    "Reputation-write authority is ROTATED off the leaked keys (current writer 0xb2426888, no private-key leak evidence) — so on-chain reputation writes are not forgeable via the historically-leaked keys.",
+    "The repid-attestation.ts hardcoded-key FALLBACK was removed 2026-07-31; the service now requires HYPERDAG_ATTESTOR_PRIVATE_KEY or refuses to sign.",
+    "Value at risk is TESTNET ETH only; mainnet keys are inert (CLAUDE.md: mainnet nonce 0)."
+  ],
+  "not_checked": [
+    "Whether HYPERDAG_ATTESTOR_PRIVATE_KEY (the current EIP-712 attestation signer) is the rotated key or still 0xf6eE — attestations are off-chain signatures; the trusted attestor address (HYPERDAG_ATTESTOR_ADDRESS) is a Railway env not observable from here.",
+    "Whether identity-mint authority itself was rotated off 0xf6eE, or whether the leaked key can still register/update identities (would need a recent mint tx).",
+    "Whether every reputation consumer filters getSummary by the trusted author address — an unfiltered read would let any client (incl. a leaked key) inject feedback."
+  ],
+  "severity": "Medium — real identity-anchor exposure on the operative (testnet) chain, bounded by testnet-only value and the rotated reputation writer. Escalates to High/Critical if this moves to mainnet without rotating the keys first.",
+  "fix": "Rotate the leaked keys. BLOCKED_FOR_SEAN — CLAUDE.md is explicit that no agent session should run the rotation (it needs the live key in a transcripted context, which is how it leaked). Runbook: docs/KEY-ROTATION.md.",
+  "rules_of_engagement": "Read-only. No transactions were signed or sent. No private keys were extracted or stored. Addresses are public identifiers."
+}
