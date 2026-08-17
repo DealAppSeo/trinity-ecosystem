@@ -1076,6 +1076,83 @@ export const MUTATIONS = [
       '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
   },
   {
+    id: 'ratchet-decay-lets-a-never-observed-floor-decay-gracefully',
+    suite: 'check:ratchet-decay',
+    file: 'lib/trustshell/ratchet-decay.ts',
+    protects:
+      'ORDER. The mutant checks recency before never-earned, so an agent with zero observations ' +
+      'ever but a surviving last-seen date is treated as merely stale and decays gracefully from a ' +
+      'floor it never earned. That is the state an agent reaches when its observations age out of ' +
+      'the retention window, and the mutant keeps compiling because the null-narrowing survives',
+    find: `  if (observationsEver === 0 || daysSinceLastObservation === null) {`,
+    replace: `  if (daysSinceLastObservation === null) {`,
+  },
+  {
+    id: 'ratchet-decay-demotes-humans',
+    suite: 'check:ratchet-decay',
+    file: 'lib/trustshell/ratchet-decay.ts',
+    protects:
+      'the human exemption. 4 of the 12 pinned agents are human, and compute_tier already exempts ' +
+      'is_human from the counterparty gate for the same reason: a human\'s standing is not earned ' +
+      'through agent observations. The mutant applies an observation-driven decay to them, which ' +
+      'demotes a human for not behaving like a bot',
+    find: `  if (isHuman) {`,
+    replace: `  if (false && isHuman) {`,
+  },
+  {
+    id: 'proof-result-claims-privacy-the-provider-does-not-have',
+    suite: 'check:proof-provider-contract',
+    file: 'lib/trustshell/identity/proof-provider.ts',
+    protects:
+      'a result may not claim more privacy than its provider has. The mutant sets witnessHidden ' +
+      'true on a provider whose isZeroKnowledge is false — which is exactly the defect this seam ' +
+      'was built after: a SHA-256 of a timestamp labelled groth16 and published on-chain. It is ' +
+      'a one-word edit and it reads as an improvement',
+    find: `      witnessHidden: false,
+      predicateHolds,`,
+    replace: `      witnessHidden: true,
+      predicateHolds,`,
+  },
+  {
+    id: 'issuer-stake-credits-a-lucky-unearned-veto',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'luck is UNBANKABLE. The mutant lets an unearned veto that happened to be right classify ' +
+      'as a true positive, which is the single most tempting "improvement" to this model — it ' +
+      'looks like rewarding accuracy. 46.3% of unearned vetoes were correct, so it would let an ' +
+      'issuer buy standing with a good draw and the 41-veto behaviour would stay rational',
+    find: `  if (!v.providerAttempted) return v.vetoed ? 'unearned_veto' : 'unearned_clean';`,
+    replace: `  if (!v.providerAttempted) {
+    if (v.vetoed && v.isHallucination) return 'earned_true_positive';
+    return v.vetoed ? 'unearned_veto' : 'unearned_clean';
+  }`,
+  },
+  {
+    id: 'issuer-stake-makes-skipping-merely-unattractive',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'verification is STRICTLY DOMINANT, not merely disfavoured. The mutant prices an unearned ' +
+      'veto the same as an honest error, which restores the expected-value argument for the ' +
+      'cheap path: at 46.3% accuracy an issuer maximising EV would still skip. The penalty has ' +
+      'to exceed the cost of verifying AND being wrong, or the incentive does not bind',
+    find: `  unearned_veto: -3,`,
+    replace: `  unearned_veto: -1,`,
+  },
+  {
+    id: 'issuer-stake-refusal-lets-the-evidence-free-verdict-through',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'the refusal at SOURCE, which is the half the stake cannot do. A stake makes an unearned ' +
+      'verdict expensive after the fact; only this stops it being emitted. The mutant keeps the ' +
+      'function and inverts the evidence test, so an issuer that consulted nothing may still ' +
+      'emit an actionable FACTUAL_ERROR veto — exactly what produced the 41',
+    find: `  return !v.providerAttempted && v.vetoed;`,
+    replace: `  return v.providerAttempted && v.vetoed;`,
+  },
+  {
     id: 'zk-verify-asserts-membership-instead-of-checking-it',
     suite: 'check:zk-cost',
     file: 'lib/trustshell/identity/nullifier.ts',

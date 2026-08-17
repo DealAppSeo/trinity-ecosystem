@@ -149,3 +149,7 @@ lib/**/*.js
 .throughput-check-*/
 .zk-cost-check-*/
 .harness-extract-check-*/
+.repid-weight-sim-*/
+.issuer-stake-check-*/
+.proof-contract-check-*/
+.ratchet-decay-check-*/

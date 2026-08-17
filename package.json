@@ -99,7 +99,11 @@
     "check:lessons-numbering": "node scripts/check-lessons-numbering.mjs",
     "check:durable-ledger": "node scripts/durable-ledger-test.mjs",
     "check:tmpdir-ignored": "node scripts/check-tmpdir-ignored.mjs",
-    "check:harness-extractable": "node scripts/check-harness-extractable.mjs"
+    "check:harness-extractable": "node scripts/check-harness-extractable.mjs",
+    "check:issuer-stake": "node scripts/check-issuer-stake.mjs",
+    "check:proof-provider-contract": "node scripts/check-proof-provider-contract.mjs",
+    "check:ratchet-decay": "node scripts/check-ratchet-decay.mjs",
+    "check:bft-evidence-chain": "node scripts/check-bft-evidence-chain.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

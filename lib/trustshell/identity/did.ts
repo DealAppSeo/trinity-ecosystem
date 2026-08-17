@@ -9,7 +9,7 @@
 // control, which reintroduces exactly the dependency we are trying to remove —
 // the identity stops verifying when DNS, TLS or the host does. did:key cannot
 // be revoked for the same reason it cannot be censored; revocation belongs in
-// the authorization layer (see linking-proof.ts), not the identifier.
+// the authorization layer (see proof-provider.ts), not the identifier.
 //
 // PORTABILITY. Everything here runs on WebCrypto, not node:crypto, so the same
 // code verifies in a browser, a Cloudflare/Vercel edge runtime and Node >= 22.
