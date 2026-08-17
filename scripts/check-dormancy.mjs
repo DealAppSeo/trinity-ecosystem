@@ -35,6 +35,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname, relative, resolve, sep } from 'node:path';
 
+import { runtimeSpecifiers } from './lib/import-specifiers.mjs';
+
 const ROOT = 'lib/trustshell';
 
 /**
@@ -52,6 +54,18 @@ const DECLARED = new Map([
   ['harness/circuit-breaker', 'same as harness/aggregate — awaiting the loop executor.'],
   ['harness/escalate', 'same as harness/aggregate. Also confirmed caller-less in Sprint Z: the module default is marginFloor 0, and the 1000 lives in the simulator.'],
   ['harness/queue', 'same as harness/aggregate — awaiting the loop executor.'],
+  [
+    'harness/capacity',
+    'the capacity governor. Every reference to it in the tree is a TYPE-ONLY import in harness/router.ts, which is itself dormant — nothing constructs it. Surfaced 2026-08-17 when type-only imports stopped counting as reachability (#73); it was never shipped, only counted as though it were.',
+  ],
+  [
+    'harness/leaky-bucket',
+    'the rate limiter. Same shape as harness/capacity: one type-only import from the dormant router, no constructor call anywhere. Surfaced by the #73 fix.',
+  ],
+  [
+    'harness/reputation',
+    'ReputationLedger. Type-imported by the two persistence modules and constructed by neither. Surfaced by the #73 fix — the persistence layer names its types, which is not the same as running it.',
+  ],
   ['harness/quorum', 'same as harness/aggregate — awaiting the loop executor.'],
   ['harness/replay', 'same as harness/aggregate — awaiting the loop executor.'],
   [
@@ -63,6 +77,10 @@ const DECLARED = new Map([
     'the retry_on predicate. Same dependency as the rest of the kernel — awaiting the loop executor. Note it is the reason `harness/timeout` left this list: retry.ts imports AttemptTimeoutError as a VALUE for its instanceof check, which is genuine reachability by this gate\'s definition, though transitively both are still shipped by nobody.',
   ],
   ['harness/transform', 'same as harness/aggregate — awaiting the loop executor.'],
+  [
+    'identity/proof-provider',
+    'the IProofProvider port, and dormant in the same way as identity/contracted-evaluator-port below: three identity modules import its TYPES and none import it at runtime, which is what a port correctly looks like rather than a gap. Surfaced by the #73 fix.',
+  ],
   [
     'identity/contracted-evaluator-port',
     'a compile-time port assertion. It exists to be type-checked, not imported — `check:types` is its consumer, and a runtime importer would be the mistake.',
@@ -81,7 +99,7 @@ const DECLARED = new Map([
   ],
   [
     'persistence/supabase-reputation-store',
-    'the durable adapter behind the reputation history. Nothing writes that history from a product surface yet; wiring the producer is the decided change, not this adapter.',
+    'the durable adapter behind the reputation history. The JOINT now exists — persistence/durable-ledger.ts binds a ReputationLedger to any ReputationStore and refuses to save one that never loaded — and it takes the INTERFACE, so this implementation still has no importer. What remains is a caller choosing it, which is the product surface Stage B Half A needs and the fleet being off makes worthless. See docs/STAGE-B-SCOPE-2026-08-17.md.',
   ],
   [
     'receipt/store-sqlite',
@@ -160,14 +178,31 @@ const bodies = new Map(srcs.map((f) => [f, readFileSync(f, 'utf8')]));
  * Resolving properly also fixes a real case the substring form handled only by
  * accident: a sibling importing `./router` from inside the same directory.
  */
-const SPECIFIER = /(?:from|import|require)\s*\(?\s*['"]([^'"]+)['"]/g;
-
+/**
+ * Every module specifier a file imports, RESOLVED to a repo-relative path.
+ *
+ * The first version matched the BASENAME as a substring — `/router'` — which is
+ * correct only while no two modules anywhere share a name. Measured 2026-08-16:
+ * zero collisions, so it gave the right answer, by luck rather than by
+ * construction. The moment anyone adds a second `router.ts` outside this tree,
+ * a basename match marks `harness/router` reachable and the dormancy count
+ * quietly drops. That is under-reporting — the direction that HIDES the defect
+ * this gate exists to surface, which is the worse of the two ways to be wrong.
+ *
+ * Resolving properly also fixes a real case the substring form handled only by
+ * accident: a sibling importing `./router` from inside the same directory.
+ *
+ * WHICH SPECIFIERS COUNT is `./lib/import-specifiers.mjs`, and it is the same
+ * under-reporting argument one level down: a type-only import is erased by the
+ * compiler and a specifier in a comment is prose, and counting either marked a
+ * module reachable that nothing imports (issue #73, fixed 2026-08-17). That
+ * module has its own self-test because a scanner with nothing to find and a
+ * scanner that never fires print the same line.
+ */
 function importedStems() {
   const stems = new Set();
   for (const [file, body] of bodies) {
-    SPECIFIER.lastIndex = 0;
-    for (const m of body.matchAll(SPECIFIER)) {
-      const spec = m[1];
+    for (const spec of runtimeSpecifiers(body)) {
       let abs;
       if (spec.startsWith('@/')) abs = resolve(spec.slice(2));
       else if (spec.startsWith('.')) abs = resolve(dirname(file), spec);

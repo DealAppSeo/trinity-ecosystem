@@ -57,32 +57,9 @@
 // time. Jitter draws from an injected `Rng` for the same reason — a schedule
 // that calls `Math.random()` cannot be asserted on.
 
+import type { Rng } from '@/lib/trustshell/harness/router';
 import { AttemptTimeoutError } from '@/lib/trustshell/harness/timeout';
 import type { Clock, ExpertId } from '@/lib/trustshell/harness/types';
-
-/**
- * The randomness port, declared here rather than imported from `router.ts`
- * where the identical interface already lives.
- *
- * That is not duplication for its own sake. `check:dormancy` decides
- * reachability by matching the quoted import specifier and does NOT distinguish
- * a type-only import from a value import — so importing this type from the
- * router module would mark that module reachable and delete its dormancy
- * declaration, while erasing completely at compile time. Nothing would actually
- * import it. A three-line structural port is a smaller cost than a gate that has
- * been told a module is shipped when it is not.
- *
- * NB: this comment deliberately does not spell the specifier out. The same gate
- * matches the quoted tail anywhere in the file, comments included — writing the
- * example literally here is what first turned the router "reachable", from a
- * comment explaining why it must not be.
- *
- * Structural typing means `mathRandomRng` and any other existing `Rng` still
- * satisfy this without a cast.
- */
-export interface Rng {
-  next(): number;
-}
 
 /**
  * What the caller knows at the moment a failure arrives.

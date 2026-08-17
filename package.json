@@ -94,7 +94,9 @@
     "check:loud-errors": "node scripts/loud-errors-test.mjs",
     "check:redteam": "node scripts/check-redteam.mjs",
     "check:dormancy": "node scripts/check-dormancy-selftest.mjs && node scripts/check-dormancy.mjs",
-    "check:lessons-numbering": "node scripts/check-lessons-numbering.mjs"
+    "check:lessons-numbering": "node scripts/check-lessons-numbering.mjs",
+    "check:durable-ledger": "node scripts/durable-ledger-test.mjs",
+    "check:tmpdir-ignored": "node scripts/check-tmpdir-ignored.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

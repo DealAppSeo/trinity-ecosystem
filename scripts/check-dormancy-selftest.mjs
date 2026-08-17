@@ -36,12 +36,16 @@ const ok = (cond, what) => (cond ? (passed += 1) : failures.push(what));
  * A miniature repo: `lib/trustshell` with a barrel, one dormant module, and a
  * same-named decoy outside the tree that a real file imports.
  */
-function fixture({ collide }) {
+function fixture({ collide, extras }) {
   const dir = mkdtempSync(join(tmpdir(), 'dormancy-selftest-'));
   mkdirSync(join(dir, 'scripts'), { recursive: true });
   mkdirSync(join(dir, 'lib/trustshell/probe'), { recursive: true });
   mkdirSync(join(dir, 'app'), { recursive: true });
   cpSync(GATE, join(dir, GATE));
+  // The gate imports its specifier scanner from scripts/lib/. Copying only the
+  // gate leaves it unresolvable here, and a crashed gate produces no output —
+  // which reads as every assertion failing rather than as a broken fixture.
+  cpSync('scripts/lib', join(dir, 'scripts/lib'), { recursive: true });
 
   // Reachable, so the fixture proves the gate can say YES as well as NO.
   writeFileSync(join(dir, 'lib/trustshell/reachable.ts'), 'export const r = 1;\n');
@@ -51,6 +55,23 @@ function fixture({ collide }) {
   );
   // Dormant: no barrel entry, no importer anywhere.
   writeFileSync(join(dir, 'lib/trustshell/probe/widget.ts'), 'export const w = 1;\n');
+
+
+  if (extras) {
+    // Dormant, but referenced in ways that LOOK like imports and are not. Both
+    // marked these modules reachable before 2026-08-17 (#73). Kept behind a flag
+    // so the collision cases above keep the undeclared list they assert on —
+    // those assertions anchor to `undeclared: probe/widget`, and an extra
+    // alphabetically-earlier entry moves it.
+    writeFileSync(join(dir, 'lib/trustshell/probe/typeonly.ts'), 'export type T = 1;\n');
+    writeFileSync(join(dir, 'lib/trustshell/probe/inprose.ts'), 'export const p = 1;\n');
+    writeFileSync(
+      join(dir, 'app/consumer.ts'),
+      "import type { T } from '../lib/trustshell/probe/typeonly';\n" +
+        "// example only: import { p } from '../lib/trustshell/probe/inprose'\n" +
+        'export const c = 1;\n'
+    );
+  }
 
   if (collide) {
     // Same BASENAME, different module, genuinely imported. This is the trap.
@@ -106,6 +127,24 @@ try {
   ok(
     !undeclaredLine.includes('reachable'),
     'a barrel-exported module is absent from the undeclared list'
+  );
+
+  // ---- 4. A type-only import and a comment are not reachability (#73).
+  //
+  // Both of these were counted before 2026-08-17, which marked a module
+  // REACHABLE that nothing imports — under-reporting dormancy, the direction
+  // that hides what this gate exists to surface.
+  const erased = fixture({ collide: false, extras: true });
+  dirs.push(erased);
+  const c = run(erased);
+  const erasedLine = /undeclared: ([^\n]*)/.exec(c.stdout)?.[1] ?? '';
+  ok(
+    erasedLine.includes('probe/typeonly'),
+    'a module reached only by `import type` is still dormant — the import is erased'
+  );
+  ok(
+    erasedLine.includes('probe/inprose'),
+    'a specifier inside a comment is prose, not an import'
   );
 } catch (err) {
   console.log(`\ncheck:dormancy self-test — NOT CHECKED (${err.message})`);

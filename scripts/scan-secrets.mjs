@@ -486,11 +486,48 @@ const historyRisk = findings.filter(
   (f) => f.usable && (f.where.startsWith('history:') || f.alsoInHistory)
 );
 
+/**
+ * WHAT THIS SCAN CANNOT SEE, said out loud next to the verdict.
+ *
+ * Both passes skip binary files. The working-tree pass does it deliberately, a
+ * NUL byte in the first 8KB, the way `grep -I` does; the history pass inherits
+ * it from `git grep`, which skips binary by default. So a credential committed
+ * inside a .pyc, a build artefact, a bundled archive or a compiled fixture is
+ * invisible here — and the verdict line below is the one people quote.
+ *
+ * This is not hypothetical. Measured 2026-08-16: scanning unique blobs instead
+ * of `git grep` found a SIXTH legacy JWT in
+ * `trinity-science/app/__pycache__/anfis_router.cpython-313.pyc`, a file no
+ * longer tracked at HEAD. Five by `git grep`, six by blob. That token is
+ * `role=anon` and every legacy key here is disabled, so it is inert; a
+ * `service_role` token in the same place would have been equally invisible.
+ * Full incident: LESSONS.md A22.
+ *
+ * The JWT class is now covered elsewhere — `check:legacy-key` scans unique
+ * blobs and therefore reads binaries. Every OTHER shape this file knows about
+ * (EVM keys, Solana keypairs, API tokens) is still unscanned inside binaries by
+ * anything. That is a NOT CHECKED, and collapsing it into the clean line would
+ * be the exact defect this repo is named for.
+ *
+ * Deliberately not fixed here rather than left unstated: this pass carries an
+ * incremental commit cache, and rewriting it to blob-based scanning changes how
+ * `--since` and the state file work. That is a change with its own measurement,
+ * not a footnote to this one.
+ */
+const BINARY_CAVEAT =
+  'NOT CHECKED: binary files. Both passes skip them — the working tree on a NUL byte, ' +
+  'history via `git grep`.\n' +
+  '  A credential inside a .pyc, archive or build artefact is invisible to this scan. ' +
+  'JWTs\n' +
+  '  are covered by `check:legacy-key`, which scans unique blobs; other shapes are not ' +
+  'covered\n  by anything. See LESSONS.md A22.';
+
 if (findings.length === 0) {
   // Qualified only in range mode: a clean sweep of three commits is not the same
   // statement as a clean sweep of the graph, and this line is the one someone
   // quotes. Full-graph and working-tree-only output is unchanged.
   console.log(`No credential-shaped strings found.${SINCE ? historyScope : ''}`);
+  console.log(BINARY_CAVEAT);
   process.exit(0);
 }
 
@@ -513,6 +550,7 @@ console.log(
   `\n${findings.length} finding(s): ${workingTreeRisk.length} usable in working tree, ` +
     `${historyRisk.length} usable in history${historyScope}.`
 );
+console.log(BINARY_CAVEAT);
 
 if (historyRisk.length > 0) {
   console.log('History hits cannot be removed by a commit. Rotate the credential; see docs/KEY-ROTATION.md.');
