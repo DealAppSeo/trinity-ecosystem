@@ -1171,6 +1171,33 @@ export const MUTATIONS = [
     replace: '  return rows.slice();',
   },
   {
+    id: 'hal-realized-confusion-uses-the-threshold',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      "realizedConfusion scores HAL's ACTUAL veto decision, not `score >= threshold`. The two " +
+      'differ by exactly the 41 sub-threshold vetoes, and those 41 are precisely the verdicts ' +
+      'HAL cast having consulted no provider — 46.3% precise against 95.8% where one ran. ' +
+      'Model HAL as a pure cut and the entire unearned-veto finding disappears from the ' +
+      'numbers, because every unearned veto sits below the line it never reached',
+    find: '    if (r.vetoed && r.isHallucination) tp++;\n    else if (r.vetoed) fp++;',
+    replace:
+      '    if (r.score >= r.threshold && r.isHallucination) tp++;\n' +
+      '    else if (r.score >= r.threshold) fp++;',
+  },
+  {
+    id: 'hal-confusion-precision-counts-misses',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'precision is tp/(tp+fp) — of the verdicts CAST, how many were right. It is the number ' +
+      'an issuer-staking design has to price, and the one that separates an unearned veto ' +
+      '(0.4634) from an earned one (0.9578). Dividing by the wrong denominator makes a veto ' +
+      'that is wrong more often than right look competent',
+    find: '  const precision = tp + fp === 0 ? null : tp / (tp + fp);',
+    replace: '  const precision = tp + fn === 0 ? null : tp / (tp + fn);',
+  },
+  {
     id: 'auditor-grant-analysed-against-a-different-map',
     suite: 'check:spine-reachable',
     file: 'lib/trustshell/identity/spine.ts',
