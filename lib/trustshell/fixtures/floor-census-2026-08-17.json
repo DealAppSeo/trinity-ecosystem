@@ -1,0 +1,15 @@
+{
+  "_source": "repid_agents JOIN v_agent_earned_observations @ qnnpjhlxljtqyigedwkb, measured 2026-08-17",
+  "_test": "pinned = current_repid = tier_lower_bound(peak_repid) AND tier_lower_bound(peak_repid) > 0",
+  "_warning": "The figure '21 agents sitting on floors' quoted in #81 and in the sprint decisions was LOOSE — it counted current_repid IN (500,1000,5000,8000), i.e. agents on a round number. The precise test gives 12. Both numbers are real; only the second is the ratchet.",
+  "_census": { "on_a_round_number": 21, "pinned_by_ratchet": 12, "human": 4, "test_only": 7, "real_agents": 1, "floor_with_zero_observations_ever": 6 },
+  "_schema": ["label", "grantedFloor", "observationsEver", "daysSinceLastObservation", "isHuman"],
+  "agents": [
+    ["HUMAN (x4, active)", 1000, 1, 25, true],
+    ["trinity-gcm (real, active)", 1000, 12, 16, false],
+    ["trinity-z2 smoke agent (test)", 1000, 4, 6, false],
+    ["mock-pair-buyer (test, never observed)", 500, 0, null, false],
+    ["mock-pair-seller (test, never observed)", 500, 0, null, false],
+    ["mock-aggressive (test, observed)", 500, 1, 2, false]
+  ]
+}

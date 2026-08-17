@@ -47,6 +47,10 @@ const ROOT = 'lib/trustshell';
  */
 const DECLARED = new Map([
   [
+    'alerts/digest',
+    'alert backlog reduction logic. Today its consumers are the check and replay scripts; wiring it to a notifier is a separate runtime surface, and until that exists the analysis itself is the product.',
+  ],
+  [
     'harness/aggregate',
     'reliability module. The agent loop executor is its intended consumer and is at Stage A — docs/AGENT-LOOP-SCOPE.md measured 47 harness settings with zero production consumers, and names the executor as the wiring that ends this.',
   ],
@@ -78,6 +82,10 @@ const DECLARED = new Map([
   ],
   ['harness/transform', 'same as harness/aggregate — awaiting the loop executor.'],
   [
+    'repid-floor-decay',
+    "DESIGN, deliberately unwired: decay-unless-re-earned for the ratchet floor. Nothing calls it, no trigger changes, it writes nothing. The invariants are decidable and gated by check:repid-floor-decay; the RATE is not — the ratchet binds exactly one real agent (trinity-gcm, 35 points), and the other 20 floor-sitters are mock/test_only/HUMAN rows. Wiring it needs an operator-chosen window, not more code. See docs/REPID-RATCHET-DECAY-DESIGN-2026-08-17.md.",
+  ],
+  [
     'identity/proof-provider',
     'the IProofProvider port, and dormant in the same way as identity/contracted-evaluator-port below: three identity modules import its TYPES and none import it at runtime, which is what a port correctly looks like rather than a gap. Surfaced by the #73 fix.',
   ],
@@ -98,12 +106,24 @@ const DECLARED = new Map([
     'binds EarnedMetrics into a ZK predicate. Blocked upstream on Poseidon2 parameters from the repid-engine lane — see docs/POSEIDON2-PARAMETER-REQUEST.md.',
   ],
   [
+    'lessons/ids',
+    'the LESSONS parser behind `check:lesson-ids`. Like `schema/decoys`, the gate is the shipped consumer; a product importer would be the wrong direction.',
+  ],
+  [
     'persistence/supabase-reputation-store',
     'the durable adapter behind the reputation history. The JOINT now exists — persistence/durable-ledger.ts binds a ReputationLedger to any ReputationStore and refuses to save one that never loaded — and it takes the INTERFACE, so this implementation still has no importer. What remains is a caller choosing it, which is the product surface Stage B Half A needs and the fleet being off makes worthless. See docs/STAGE-B-SCOPE-2026-08-17.md.',
   ],
   [
+    'priorwork/open-index',
+    'the prior-work parser/matcher behind `check:open-index` and `check:open-work`. The policy is enforced at PR time, so the gate is the product and there is no app importer yet.',
+  ],
+  [
     'receipt/store-sqlite',
     'a local store used by the receipt suite. A server surface would use the Supabase adapter, so a product importer here would be the wrong direction.',
+  ],
+  [
+    'replay/plan',
+    'the HAL replay preflight planner. Today it is exercised by `check:replay-plan` and `hal-replay.mjs`; the replay is an operator script, not a `lib/` or `app/` consumer.',
   ],
   [
     'schema/decoys',

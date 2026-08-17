@@ -169,6 +169,40 @@ export type {
 } from './identity/spine';
 
 /**
+ * The chain run REPEATEDLY against one drawn auditor, until it signs off.
+ *
+ * Exported beside `runContractedWork` rather than instead of it: a single
+ * judged round is a legitimate thing to want, and hiding it would push callers
+ * back to hand-assembly — the failure this barrel exists to prevent.
+ *
+ * `isDelivered` is exported deliberately. `AcceptanceState` has three terminal
+ * statuses and only one of them is a delivery; without a predicate, callers
+ * write `status !== 'REVISE'` and ship on a spent budget.
+ */
+export { runAcceptedWork } from './identity/spine';
+export type {
+  AcceptedWorkInput,
+  AcceptedWorkResult,
+  AttemptContext,
+  AttemptSubmission,
+} from './identity/spine';
+export {
+  evaluateAcceptance,
+  auditorIsStable,
+  roundVerdictFor,
+  isDelivered,
+  isTerminal,
+  DEFAULT_MAX_REJECTIONS,
+  DEFAULT_MAX_ROUNDS,
+} from './identity/acceptance-loop';
+export type {
+  Round as AcceptanceRound,
+  RoundVerdict,
+  AcceptancePolicy,
+  AcceptanceState,
+} from './identity/acceptance-loop';
+
+/**
  * What a zk RepID operation COSTS, in hash calls — the only unit that survives
  * the change of hash function. See `identity/cost.ts`: the production
  * `IBindingScheme` throws pending Poseidon2 parameters, so a millisecond figure
@@ -337,3 +371,18 @@ export type {
   PersistOutcome,
   PersistResult,
 } from './persistence/durable-ledger';
+
+// P1 of docs/SPRINT-DECISIONS-2026-08-17.md — the issuer is scored by the
+// standard it applies. `refusesToIssue` is the source-side half: an issuer that
+// attempted no provider may not emit an actionable verdict. The enforcement
+// point is the HAL runner, which lives in `repid-engine` and not in this repo,
+// so this barrel export is what makes the rule reachable from here.
+export { classify, scoreIssuer, refusesToIssue, STAKE_POINTS } from './issuer-stake';
+export type { IssuedVerdict, VerdictClass, IssuerStanding } from './issuer-stake';
+
+// P3 of docs/SPRINT-DECISIONS-2026-08-17.md — a floor is held, not owned.
+// `effectiveFloor` is the rule; `wouldChange` reports blast radius before a
+// migration runs. The enforcement point is `trg_repid_earned_floor` in the
+// database, so this export is what makes the rule reachable and testable here.
+export { effectiveFloor, wouldChange, FLOOR_HALF_LIFE_DAYS, REATTESTATION_WINDOW_DAYS } from './ratchet-decay';
+export type { FloorInput, FloorDecision, FloorVerdict } from './ratchet-decay';
