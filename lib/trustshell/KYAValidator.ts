@@ -4,10 +4,8 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import type { AgentKYAProfile, KYAComplianceResult } from './types';
 import {
-  TIER_LIMITS,
   checkDailyLimit,
   checkPerTxLimit,
-  tierForScore,
   REPID_MIN,
   REPID_MAX,
 } from './repid-scoring';
@@ -236,20 +234,42 @@ export class KYAValidator {
     }
     if (!profile) return;
 
-    // ONE tier ladder. This used `>` while RepIDConfig used `>=` over the same
-    // thresholds, so at exactly 2500, 5000 and 7500 the two disagreed about the
-    // tier — and the tier decides the spending limits.
+    // ── TRUST THE ROW: this updates the SCORE and nothing else ───────────────
+    //
+    // It used to rewrite `repid_tier`, `spending_limit_daily` and
+    // `spending_limit_per_tx` from `TIER_LIMITS[tierForScore(newScore)]`. That
+    // made an agent's authorized ceiling depend on WHICH WRITER LAST TOUCHED ITS
+    // ROW rather than on anything it did: measured 2026-08-17, one compliant
+    // payment moved TORCH from 10,000 to 500,000 USDC daily (x50), and because
+    // `delta` is signed, a PENALTY did the same — TORCH had 5,100 points of
+    // headroom, more than two full tiers. Full measurement:
+    // `docs/REPID-REGISTRY-DRIFT-2026-08-17.md`.
+    //
+    // Sean's call, 2026-08-17: **the stored limits are the authoritative
+    // ceiling.** The ladder is a derivation aid and a briefing aid, not the
+    // enforcement source. So the three ceiling columns move only by operator
+    // action, and this method stops touching them.
+    //
+    // ── WHY `repid_tier` IS LEFT ALONE TOO, WHICH IS THE SUBTLE PART ─────────
+    //
+    // Dropping the two limit writes while still writing the tier from the ladder
+    // looks conservative and is worse: #82 measured that every stored
+    // `repid_tier` matches its stored `spending_limit_daily` under `TIER_LIMITS`
+    // — the rows are internally consistent, written by an older ladder whose
+    // floors differ. Rewriting the label alone would break that pairing and
+    // leave a row whose tier names a ceiling it does not carry, which is the
+    // same reviewer-vs-enforcer split one level down.
+    //
+    // The tier stored beside a ceiling LABELS THAT CEILING. It is not a
+    // redundant copy of `tierForScore(repid_score)` and must not be reconciled
+    // into one — that reconciliation is the trust-the-LADDER option, which was
+    // considered and rejected.
     const newScore = Math.max(REPID_MIN, Math.min(REPID_MAX, profile.repidScore + delta));
-    const newTier = tierForScore(newScore);
-    const { daily: newDailyLimit, perTx: newTxLimit } = TIER_LIMITS[newTier];
 
     await this.supabase
       .from('agent_kya_registry')
       .update({
         repid_score:           newScore,
-        repid_tier:            newTier,
-        spending_limit_daily:  newDailyLimit,
-        spending_limit_per_tx: newTxLimit,
         last_repid_update:     new Date().toISOString(),
       })
       .eq('agent_name', agentName);

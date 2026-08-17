@@ -142,6 +142,40 @@ Picking either from an agent session would move money on a fabricated mandate.
 This is the same call the curve recalibration was, and it was right to escalate
 that one rather than guess. **It is Sean's.**
 
+### DECIDED 2026-08-17: TRUST THE ROW
+
+`spending_limit_daily` and `spending_limit_per_tx` are the authoritative
+ceiling. `tierForScore` / `TIER_LIMITS` are a derivation aid and a briefing aid,
+never the enforcement source and never a writer of one. The reviewer and the
+enforcer must see the same number.
+
+Applied:
+
+- **`updateRepID` writes the score and nothing else.** The three ceiling columns
+  move only by operator action. That closes the x50 on TORCH and the
+  penalty-raises-the-limit path in §4 at the source — not by changing any limit,
+  but by removing the writer that changed them.
+- **`repid_tier` is a ceiling column too**, and this is the part that is easy to
+  get wrong. Dropping the two limit writes while still writing the tier from the
+  ladder looks conservative and is worse: §2 measured the rows as internally
+  consistent, so rewriting the label alone leaves a row whose tier names a
+  ceiling it does not carry. The tier stored beside a ceiling LABELS THAT
+  CEILING; it is not a stale copy of `tierForScore(repid_score)` and must not be
+  reconciled into one.
+- **`system-trust` keeps publishing the stored tier**, for the same reason.
+  Deriving it there would put a tier the enforcer does not use on a dashboard.
+
+Gated by `check:ceiling-source` (5 assertions, 3 mutations). It asserts both
+halves — the ceiling columns are not WRITTEN by a reputation update, and they are
+still READ and enforced. A fix that dropped the second half would leave nothing
+enforcing anything, and `ceiling-read-derived-not-stored` is the mutation that
+proves the assertion notices.
+
+**The 9-of-12 divergence in §2 is not repaired by this and is not meant to be.**
+Those rows are now stable rather than one payment away from a 50x jump. Bringing
+score and ceiling back into agreement is a data decision — an operator UPDATE, or
+a deliberate re-rating — and nothing in code will do it silently.
+
 ## 6. What this does NOT establish
 
 - **The 12 rows are `agent_kya_registry` only.** Three other tables carry a
