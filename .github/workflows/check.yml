@@ -36,7 +36,7 @@ name: check
 # a second door: anyone with write access, human or agent, can start this run on
 # any ref without waiting for an approval nobody was told to give. The real fix
 # is the repository setting under Settings → Actions → General; that is
-# Sean-gated and recorded in LESSONS A26.
+# Sean-gated and recorded in LESSONS A28.
 on:
   push:
     branches: [main]

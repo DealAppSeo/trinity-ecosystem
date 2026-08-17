@@ -1463,7 +1463,132 @@ it before publishing yours.** The cross-check cost one query and changed a
 headline; not doing it would have left two documents on `main` describing the
 same 41 rows in opposite terms.
 
-## A26 — CI did not run for eight hours, and the PR looked checked (2026-08-16)
+---
+
+## A26 — a flag named for one failure, marking two, and agreeing with neither (2026-08-17)
+
+Chasing a loose end from #55 — *"every one of the 69 failed generations is in the
+weak stratum"* — on the assumption it was a sampling quirk. It was not a sampling
+quirk, and they were not failed generations.
+
+**`gen_failed` marked two unrelated things on `hal_test_cases`, and neither was a
+generation failure.** 26 rows said `no provider responded`; 43 said
+`Low quorum … would-be 'vetoed' downgraded to 'clean'`. Every one of the 69 has
+`gen_provider='corpus'`, `gen_model='labeled-claim'`, `gen_latency_ms=NULL` and a
+complete answer — **the benchmark has no generation step at all.** The flag was
+recording HAL's *verification* providers, in a column named for generation.
+
+### The part that is the founding defect again
+
+On all 43 low-quorum rows, three columns record one event and disagree:
+
+- `signals.decision` = **`clean`** — the quorum rule applied
+- `hal_vetoed` = **`true`** — the flag was never updated
+- `was_caught` / `false_positive` — derived from the **flag**, not the decision
+
+So **32 rows credit HAL with catching a hallucination whose emitted verdict was
+`clean`**. The free-text reason string is the only honest record of what
+happened; every structured column contradicts it.
+
+**And it reached the live path.** `repid_score_events` carries the same pair, and
+`hallucination_caught` drives `veritasCatchRate` → tier → daily limit. 1,585 rows
+have `hallucination_caught` true with `hal_decision <> 'vetoed'`, across 5 agents.
+In May that was **100% of all caught events**; from June it is **exactly zero** —
+a clean before/after that no repo artefact explains.
+
+### Three things worth carrying forward
+
+1. **A boolean is a summary, and a summary can be stale.** The decision changed
+   and the flag did not. Prefer the record that says *what happened* over the one
+   that says *what it meant* — here the free-text column was right and three
+   typed columns were wrong, which is the opposite of the usual advice.
+2. **Check the column name against the data before trusting it.** `gen_failed`
+   on a corpus-fed benchmark cannot mean what it says, and one look at
+   `gen_provider` settles it. Nobody looked, including me, for two prior findings
+   built on filtering that exact flag.
+3. **The integrity finding and the accuracy finding pointed in different
+   directions, and only one was large.** Including the 43 moves AUC 0.9579 ->
+   0.9516. Say so plainly, or the next reader re-opens a settled measurement on
+   the strength of a bookkeeping bug.
+
+### The near-miss, recorded because it nearly shipped
+
+The first AUC run returned **0.8351** — the exact min-rank artifact #55 had
+already retracted. The query averaged `rank()` within ties, which is a **no-op**:
+`rank()` gives every tied row the same value, so averaging returns it unchanged.
+Mid-ranks need `row_number()`.
+
+It was caught **only because 0.8351 is a published retracted number.** Any other
+wrong value would have shipped silently. That is the strongest argument yet for
+retractions naming their figure in `PRIOR-WORK-INDEX.md` — a retired number is a
+tripwire, and it caught the same bug twice in two lanes.
+
+**Resolved 2026-08-17, same day.** A26 left "do those 1,585 rows still move
+current reputation" open. They do: the window is 120 days, all 1,585 are inside
+it, and `veritasCatchRate` for one agent reads 0.4030 against a corrected 0.9590
+— 1,557 of its 1,559 in-window failures are the artifact — on a path that gates
+payment. **And it is nearly harmless**: every affected agent is test or demo, the
+error is fail-closed (a wrongful denial, never a wrongful approval), and the rows
+age out of the window between 2026-08-18 and 2026-09-24 with no backfill.
+
+The lesson is in holding both halves. "Contaminates a live payment gate" and
+"confined to test agents, fail-closed, self-clearing" are both true, and a report
+that gives only the first is as misleading as one that gives only the second.
+The severity was not knowable from the defect — it took the window constant, the
+row cap, the lifecycle column and the direction of the error, and three of those
+four turned the alarm down.
+
+---
+
+## A27 — the column no code writes, and the function that answers to its own name twice (2026-08-17)
+
+#80 left "what populates `repid_agents.tier`" open. `grep` over the repo finds
+**one** reference to that table and it is a `SELECT`. The answer is that
+**nothing in TypeScript writes it** — a chain of database triggers does, and a
+code-only search cannot see a code-free write path.
+
+```
+INSERT repid_score_events -> apply_repid_score_event() -> UPDATE repid_agents.current_repid
+                                                       -> trg_repid_earned_floor()  (ratchet)
+                                                       -> trg_sync_tier()           (tier := compute_tier)
+```
+
+### Three things found on the way, each worth its own line
+
+**There are two tier ladders.** The database has VETERAN/AUTONOMOUS/ESTABLISHED/
+EARNING/PROBATIONARY at 8000/5000/1000/500; `lib/trustshell/repid-scoring.ts` has
+Platinum/Gold/Silver/Bronze at 7500/5000/2500/0. Both live, agreeing on exactly
+one boundary. **"The tier" is ambiguous in this system** and every claim about
+tiers has to say which one it means.
+
+**`compute_tier` is overloaded and the two versions disagree.** A 1-arg version
+applies thresholds only; a 2-arg version adds a counterparty gate, and is the one
+`sync_tier` calls. On `test-agent-v11`: `compute_tier(10000)` returns VETERAN,
+`compute_tier(10000, id)` returns ESTABLISHED. Same agent, same score, **two
+rungs apart**, resolved silently by argument count.
+
+**RepID is a ratchet.** `peak_repid` only rises and `current_repid` is clamped
+*up* to the floor of the best tier ever held. 21 of 176 agents sit exactly on a
+floor. So a penalty is reversible and **an inflation is not** — which makes every
+guard on the write path more load-bearing than it looks.
+
+### The part I got wrong, recorded because the reasoning was seductive
+
+`trg_hal_penalty_guard()` suppresses a negative HAL penalty unless
+`hallucination_caught IS TRUE`. From A26's 1,585 rows — `caught` true on a
+`clean` decision — the inference is immediate and alarming: those are exactly the
+rows that would *defeat* a guard built to stop them.
+
+**Wrong.** They are all `event_type = 'PREDICTION_RESOLVE'`, and the guard only
+fires on `HAL_SCORE_EVENT`. They applied **zero** delta — they never touched
+`current_repid`, `peak_repid` or `tier`.
+
+The inference was sound and the premise was unchecked. **A guard's condition is
+not its scope**: I read what the guard tests and never asked which rows it sees.
+One `group by event_type` settled it, and it was cheaper than the reasoning it
+replaced.
+
+## A28 — CI did not run for eight hours, and the PR looked checked (2026-08-16)
 
 **[VERIFIED] — read from the run record, not inferred: run 31976719734 shows
 `actor: Copilot (Bot)`, `conclusion: action_required`, `run_attempt: 1`,

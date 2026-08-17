@@ -40,7 +40,7 @@ name: prior-work
 # `workflow_dispatch` for the same reason as check.yml: a bot-authored head
 # commit makes the `pull_request` run `action_required`, and an unstarted run is
 # indistinguishable from a PR whose CI has not finished. See that file's header
-# and LESSONS A26.
+# and LESSONS A28.
 on:
   push:
     branches: [main]

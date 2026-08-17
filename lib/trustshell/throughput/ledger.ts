@@ -11,8 +11,24 @@
 // THE FOUR WEEKS THIS EXISTS TO HAVE PREVENTED
 // =============================================================================
 //
-// On 2026-07-17 at 22:18 UTC, twelve agent loops stopped inside a 48-second
+// On 2026-07-17 at 22:18 UTC, ELEVEN agent loops stopped inside a 48-second
 // window. Nothing said anything for 29 days. Measured on 2026-08-15:
+//
+// [CORRECTED 2026-08-17] This block said TWELVE for a month. The window is real
+// and confirmed; the count was not. `trinity-mel` had stopped producing on
+// ~2026-06-19 — FOUR WEEKS EARLIER — and went on heartbeating `online` until it
+// stopped with the rest, so the fleet-wide outage hid it: from 07-17 onward
+// everything was silent and the twelfth looked like one of the twelve. Its own
+// heartbeat row named the difference the whole time, in two adjacent columns —
+// `loop_count` 19,155 against a peer band of 4,271–4,388, and
+// `tasks_completed_session` 0 against 380–2,078. A loop spinning 4.4× harder
+// than its peers and completing nothing is exactly what this module is about,
+// and it sat inside the fleet's own liveness table unread.
+//
+// The lesson is this module's own, applied to itself: an outage that stops
+// everything at once ERASES the evidence of anything that was already broken.
+// After a recovery, a producer must be measured against ITS OWN history, never
+// against "is it back like the others" — see docs/FLEET-REDEPLOY-BASELINE-2026-08-17.md.
 //
 //   trinity_tasks (peer_verify)   35,612/week  ->  11
 //   hal_classifications            2,650/day   ->  1-3
