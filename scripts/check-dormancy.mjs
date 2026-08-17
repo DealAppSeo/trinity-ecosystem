@@ -78,6 +78,10 @@ const DECLARED = new Map([
   ],
   ['harness/transform', 'same as harness/aggregate — awaiting the loop executor.'],
   [
+    'repid-floor-decay',
+    "DESIGN, deliberately unwired: decay-unless-re-earned for the ratchet floor. Nothing calls it, no trigger changes, it writes nothing. The invariants are decidable and gated by check:repid-floor-decay; the RATE is not — the ratchet binds exactly one real agent (trinity-gcm, 35 points), and the other 20 floor-sitters are mock/test_only/HUMAN rows. Wiring it needs an operator-chosen window, not more code. See docs/REPID-RATCHET-DECAY-DESIGN-2026-08-17.md.",
+  ],
+  [
     'identity/proof-provider',
     'the IProofProvider port, and dormant in the same way as identity/contracted-evaluator-port below: three identity modules import its TYPES and none import it at runtime, which is what a port correctly looks like rather than a gap. Surfaced by the #73 fix.',
   ],
