@@ -63,6 +63,12 @@ at every swept combination, and the guard is a test rather than a note. Full
 measurement, the fix, and two things it did NOT resolve — throughput now dominates
 the top of the table, and ZK statements over pre-fix deltas will no longer verify:
 `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` in repid-engine (`npm run repid:sim`).
+That second item is now **partly measured**: **10,627** stored deltas fail a
+recompute (7.0% of the ledger, not all of it), and **0** carry an EAS attestation,
+so nothing on-chain asserts a stale delta. The ZK exposure itself is **NOT
+CHECKABLE** — `repid_score_events.zk_proof_id` resolves to no proof row (uuid vs
+bigint, and the one linking column is NULL for all 79,062 proof rows), which
+independently agrees with #83 above. `reports/2026-08-17/LEDGER-VERDICT-REACHABILITY.md`.
 **Never report link 3 working as link 2 working.**
 
 ## The target vocabulary — five terms, with status
@@ -158,7 +164,7 @@ row still carries its 08-12 verdict and has NOT been re-measured. Re-check with
 | Portable RepID score | everywhere | **STOPPED, same event** — `repid_score_events` monthly: Jun **70,415** → Jul **39,453** → Aug **114**. Scores are therefore FROZEN, not merely unscored: `EarnedMetrics` decay is time-dependent, so every score reads stale-high the longer this runs |
 | Refused trades as the killer feature | HyperDAG README ("160+ refused") | **UNDERSTATED** — the log holds far more refusals than claimed |
 | zkRepID proof (was "ZKP Postcard") | HyperDAG README | **BUILT, COOLING** — large proof corpus, but the rate has fallen off. Name canonicalised 2026-08-17 |
-| RepID rewards good behaviour | everywhere, implicitly | **TRUE as of 2026-08-17, and measured** — it was FALSE when first measured the same day (the best-grounded claim was penalised; a truthful strategy tuned to HAL's flag boundary won at every detector accuracy). Fixed by making the clean branch consume quality: honesty now wins at all ten swept combinations, honest-expert goes −143 → **+574**, and a regression guard composes the real functions on every test run. Two open items: throughput now dominates the top of the table, and pre-fix deltas will fail ZK re-verification. `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` |
+| RepID rewards good behaviour | everywhere, implicitly | **TRUE as of 2026-08-17, and measured** — it was FALSE when first measured the same day (the best-grounded claim was penalised; a truthful strategy tuned to HAL's flag boundary won at every detector accuracy). Fixed by making the clean branch consume quality: honesty now wins at all ten swept combinations, honest-expert goes −143 → **+574**, and a regression guard composes the real functions on every test run. Two open items: throughput now dominates the top of the table, and pre-fix deltas fail ZK re-verification — now measured at **10,627 rows failing a recompute, 0 on-chain attestations, and ZK exposure NOT CHECKABLE** (`zk_proof_id` resolves to no proof row). The realised harm was also measured: **407 clean answers cost 12 agents 1 RepID each**, 406 of them at risk exactly 0. `reports/2026-08-17/LEDGER-VERDICT-REACHABILITY.md`, `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` |
 | x402 settlement | HyperDAG README, handoff | **REAL BUT THIN** — genuine on-chain settlements, low volume |
 | ERC-8004 reputation writes | README, badges | **REAL BUT THIN** — genuine writes, low volume |
 | Peer verification mesh | handoff | **STOPPED 2026-07-21** — died with the fleet freeze, not a code fault |
