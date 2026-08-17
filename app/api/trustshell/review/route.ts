@@ -67,6 +67,74 @@ const BANK = [
   { id: 'complete', statement: 'Nothing required by the specification is missing.', minScore: 0.9 },
 ];
 
+/**
+ * Capability status. GET, no body, no side effects.
+ *
+ * WHY A GET EXISTS AT ALL. `canAccept` was reported only inside POST responses,
+ * which means a dashboard or an operator had to submit work to discover that
+ * the surface cannot sign anything off. A capability that can only be learned
+ * by exercising it is not a capability anyone will notice — the same shape as a
+ * held CI run that produces no check.
+ *
+ * `mode` is the load-bearing field: `reject-only` says, in one token, that
+ * ACCEPTED is UNREACHABLE and no amount of revising will produce a sign-off.
+ * That is an INCOMPLETE FEEDBACK LOOP, not a degraded one — a judge that can
+ * only reject cannot improve work quality over time — so it is reported as a
+ * first-class state rather than as an absence.
+ */
+export async function GET() {
+  // Read inside the handler, never at module scope — see the POST handler.
+  const judges = judgeTiersFrom(process.env);
+
+  let seeds: 'configured' | 'missing' = 'configured';
+  let seedError: string | undefined;
+  try {
+    reviewConfigFrom(process.env);
+  } catch (err) {
+    seeds = 'missing';
+    seedError = err instanceof Error ? err.message : String(err);
+  }
+
+  const mode = seeds === 'missing'
+    ? 'unavailable'
+    : judges.canAccept
+      ? 'full'
+      : 'reject-only';
+
+  return NextResponse.json(
+    {
+      surface: 'trustshell/review',
+      // full        — can reject AND accept
+      // reject-only — can reject; ACCEPTED is unreachable
+      // unavailable — cannot review at all (no identity seeds)
+      mode,
+      canReject: seeds === 'configured',
+      canAccept: judges.canAccept,
+      judgeTiers: judges.tiers.map((t) => t.name),
+      missingForAcceptance: judges.missing,
+      seeds,
+      seedError,
+      // Stated rather than implied, because "reject-only" is easy to read as a
+      // temporary degradation instead of a structural limit.
+      explanation: judges.canAccept
+        ? 'A model tier is configured, so a criterion can be judged MET.'
+        : 'Only the mechanical tier is configured. It may NEVER return VERIFIED — it ' +
+          'detects the absence of quality and cannot establish its presence — so ACCEPTED ' +
+          'is unreachable and every clean submission escalates to NOT_CHECKED. Revising ' +
+          'will not produce a sign-off. Set the variables in missingForAcceptance.',
+    },
+    {
+      // 503 when nothing can be reviewed at all; 200 otherwise. reject-only is
+      // a real, working mode — it is a gate — so it is not an error.
+      status: mode === 'unavailable' ? 503 : 200,
+      headers: {
+        // Greppable from a log or a dashboard probe without parsing JSON.
+        'x-trustshell-review-mode': mode,
+      },
+    }
+  );
+}
+
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
@@ -153,8 +221,11 @@ export async function POST(request: Request) {
   // STALLED and ABANDONED are all successful reviews with a non-delivery
   // result, and mapping them to 4xx would make "the auditor said no" look like
   // a malformed request.
+  const mode = judges.canAccept ? 'full' : 'reject-only';
   return NextResponse.json({
     status: outcome.status,
+    // Same vocabulary as GET, so a caller reading either surface sees one word.
+    mode,
     // A capability statement, not a detail. FALSE means only the mechanical
     // tier is configured, so ACCEPTED is unreachable and every clean
     // submission escalates to NOT_CHECKED. A caller that does not read this
@@ -169,5 +240,5 @@ export async function POST(request: Request) {
     // contract without trusting this host.
     envelope: outcome.envelope,
     delivered: outcome.status === 'ACCEPTED',
-  });
+  }, { headers: { 'x-trustshell-review-mode': mode } });
 }

@@ -279,6 +279,31 @@ Publishing is `git tag trust-demo-v0.1.0 && git push origin trust-demo-v0.1.0`. 
 is **irreversible** and a version can never be reused. **Never do this on your own
 initiative.**
 
+### A GREEN CHECK IS NOT EVIDENCE CI RAN
+
+Four rules, from LESSONS A26. PR #56 had no CI for **eight hours** while looking
+checked, and six commits were reported verified on local runs alone.
+
+1. **Verify the JOBS ran, not the checks list.** The green tick on a PR here is
+   often Vercel's *preview deploy*, which passes whether or not a single test
+   executed. Open the workflow run and look at its jobs.
+2. **`action_required` means CREATED AND NEVER STARTED.** It is not red, it
+   produces **no check run at all**, and it therefore does not appear in the
+   place people look — `get_check_runs` returns only the deploy. Tell a finished
+   run from one that never began by comparing `run_started_at` (and
+   `updated_at`) against `created_at`: **equal timestamps mean it never ran.**
+3. **On this repo, do not trust the PR checks list alone.** `workflow_dispatch`
+   is the reliable path until the `pull_request` trigger gap is understood — see
+   the OPEN entry. `check.yml` and `prior-work.yml` both take a `ref_note` input
+   so the reason for a manual run is recorded on the run itself.
+4. **A bot-authored head commit lands in approval limbo.** Copilot resolving a
+   conflict makes the run's `actor` a Bot, which arms the approval gate.
+   Dispatch bypasses that **without disabling the gate — do not disable it.**
+
+Only `actions_get(get_workflow_run)` names the `actor`, which is why it is the
+call that settles this. Two tidier hypotheses were asserted before that evidence
+and both were wrong.
+
 ## Repo gotchas
 
 - **Adding a check suite: add a `"check:name"` script to `package.json`, and
