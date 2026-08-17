@@ -1,0 +1,23 @@
+{
+  "surface": "repid-engine-production.up.railway.app",
+  "url": "https://repid-engine-production.up.railway.app/api/v1/agents-external/:id/score-event",
+  "collectedAt": "2026-08-17T01:06:41.290Z",
+  "collectedBy": "claude-code session claude/trust-layer-red-team-ujpq6a",
+  "collectedVia": "supabase pg_net (net.http_get /health + net.http_post empty body); net._http_response ids 5120-5121. curl/browser proxy-denied to this host from an agent session.",
+  "note": "SAFE probe: the empty-body POST fails `prompt is required` validation BEFORE the pipeline looks up the agent (src/scoring/pipeline.ts NotFoundError at line 257) or inserts anything (line 565). No score event written, no RepID moved, no real agent touched. A random non-existent UUID was used. Source cross-check: the public handler (src/routes/agents-external-score.ts) has NO auth check — only UUID + prompt + answer validation — so a 400 here means the request reached the handler with no credential, i.e. no auth gate.",
+  "observations": {
+    "deployedCommit": "0b4b3919977dfc943ddb8c78d1bd95c036060438",
+    "deployedCommitShort": "0b4b391",
+    "reviewedSourceCommit": "0b4b391",
+    "healthStatus": 200,
+    "publicScoreEventPath": "/api/v1/agents-external/:id/score-event",
+    "noAuthProbe": {
+      "method": "POST",
+      "agentUuid": "00000000-0000-4000-8000-000000000000 (non-existent, format-valid)",
+      "body": "{}",
+      "authHeader": "none",
+      "statusCode": 400,
+      "responseBody": "{\"error\":\"prompt is required\"}"
+    }
+  }
+}

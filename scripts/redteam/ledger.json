@@ -47,6 +47,15 @@
       "reviewBy": "2026-09-15",
       "firstSeen": "2026-08-16",
       "report": "docs/RED-TEAM-TRUSTSHELL-DEV-2026-08-16.md, docs/RED-TEAM-TRUSTSHELL-SOURCE-2026-08-17.md"
+    },
+    {
+      "id": "REPID-ENG-001",
+      "owner": "Sean",
+      "severity": "Medium",
+      "reason": "repid-engine's PUBLIC score-event path /api/v1/agents-external/:id/score-event has no auth (rate-limit only, no ownership check) \u2014 live-confirmed 2026-08-17: an unauthenticated POST reached the scoring handler (HTTP 400 'prompt is required', not 401) against deployed_commit 0b4b391 which matches the reviewed source. The score itself is HAL-computed server-side (a caller cannot write a delta or outcome), so this is an ATTRIBUTION hole, not score fabrication: anyone with an agent UUID (public via /passport + leaderboard) can inject HAL-scored decisions into that agent's history \u2014 polluting hallucination stats, dragging it toward the floor with bad answers, or burning HAL/LLM cost (60/IP/min). Impact bounded by HAL (can't fabricate a high score; penalties need a fact-check quorum + penalty-guard trigger + floor). The code's own comment says 'Sprint A8 will harden auth' \u2014 a known alpha gap. Fix already exists on the sibling bearer path: requireApiKey(['score_event']) + agent_id ownership check (403 on mismatch); apply it here or restrict the public path to an allowlisted importer. Not applied here \u2014 repid-engine is a separate repo, not push-attached, and hardening a live auth path is Sean's.",
+      "reviewBy": "2026-09-17",
+      "firstSeen": "2026-08-17",
+      "report": "docs/RED-TEAM-REPID-ENGINE-2026-08-17.md"
     }
   ]
 }
