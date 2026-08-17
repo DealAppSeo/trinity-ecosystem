@@ -1537,3 +1537,53 @@ that gives only the first is as misleading as one that gives only the second.
 The severity was not knowable from the defect — it took the window constant, the
 row cap, the lifecycle column and the direction of the error, and three of those
 four turned the alarm down.
+
+---
+
+## A27 — the column no code writes, and the function that answers to its own name twice (2026-08-17)
+
+#80 left "what populates `repid_agents.tier`" open. `grep` over the repo finds
+**one** reference to that table and it is a `SELECT`. The answer is that
+**nothing in TypeScript writes it** — a chain of database triggers does, and a
+code-only search cannot see a code-free write path.
+
+```
+INSERT repid_score_events -> apply_repid_score_event() -> UPDATE repid_agents.current_repid
+                                                       -> trg_repid_earned_floor()  (ratchet)
+                                                       -> trg_sync_tier()           (tier := compute_tier)
+```
+
+### Three things found on the way, each worth its own line
+
+**There are two tier ladders.** The database has VETERAN/AUTONOMOUS/ESTABLISHED/
+EARNING/PROBATIONARY at 8000/5000/1000/500; `lib/trustshell/repid-scoring.ts` has
+Platinum/Gold/Silver/Bronze at 7500/5000/2500/0. Both live, agreeing on exactly
+one boundary. **"The tier" is ambiguous in this system** and every claim about
+tiers has to say which one it means.
+
+**`compute_tier` is overloaded and the two versions disagree.** A 1-arg version
+applies thresholds only; a 2-arg version adds a counterparty gate, and is the one
+`sync_tier` calls. On `test-agent-v11`: `compute_tier(10000)` returns VETERAN,
+`compute_tier(10000, id)` returns ESTABLISHED. Same agent, same score, **two
+rungs apart**, resolved silently by argument count.
+
+**RepID is a ratchet.** `peak_repid` only rises and `current_repid` is clamped
+*up* to the floor of the best tier ever held. 21 of 176 agents sit exactly on a
+floor. So a penalty is reversible and **an inflation is not** — which makes every
+guard on the write path more load-bearing than it looks.
+
+### The part I got wrong, recorded because the reasoning was seductive
+
+`trg_hal_penalty_guard()` suppresses a negative HAL penalty unless
+`hallucination_caught IS TRUE`. From A26's 1,585 rows — `caught` true on a
+`clean` decision — the inference is immediate and alarming: those are exactly the
+rows that would *defeat* a guard built to stop them.
+
+**Wrong.** They are all `event_type = 'PREDICTION_RESOLVE'`, and the guard only
+fires on `HAL_SCORE_EVENT`. They applied **zero** delta — they never touched
+`current_repid`, `peak_repid` or `tier`.
+
+The inference was sound and the premise was unchecked. **A guard's condition is
+not its scope**: I read what the guard tests and never asked which rows it sees.
+One `group by event_type` settled it, and it was cheaper than the reasoning it
+replaced.
