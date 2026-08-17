@@ -1,0 +1,36 @@
+{
+  "surface": "repid-engine-production.up.railway.app",
+  "url": "https://repid-engine-production.up.railway.app/api/v1/llm/complete",
+  "collectedAt": "2026-08-17T03:30:00.000Z",
+  "collectedBy": "claude-code session claude/trust-layer-red-team-ujpq6a",
+  "collectedVia": "supabase pg_net POST (spoofed X-Forwarded-For, empty body) + source review of DealAppSeo/repid-engine@0b4b391 (= live deployed_commit)",
+  "authorization": "User-directed investigation of the /complete LLM proxy (cost gating, key handling, prompt-injection).",
+  "protocol": "SAFE: each probe POST had an empty body, which fails 'Missing or invalid prompt string' (400) AFTER the gate meters but BEFORE any LLM provider call — so no LLM cost, no completion. Spoofed IPs are from TEST-NET-3 (203.0.113.0/24, documentation range).",
+  "findings": {
+    "user_paid_keys_logging": {
+      "verdict": "HELD",
+      "detail": "routes/route.ts destructures user_paid_keys into a local var, passes it to the router for in-memory provider calls, then sets req.body.user_paid_keys='[REDACTED]' (line 231) so any downstream/error logger sees the redaction. The outer catch emits only error.message (no req.body). No logger (anfis_routing_logs, logLlmCall, tool-call-logger) receives user_paid_keys. BYOK custody (encrypted at-rest storage) is future/inert (BYOK_CUSTODY_ENABLED default OFF). Matches the privacy posture. CAVEAT: the PROMPT is logged in previews (prompt_preview 200, request_text 500) for routing analytics — disclosed, and separate from key handling."
+    },
+    "free_tier_gate_ip_spoofing": {
+      "verdict": "HELD (live-refuted)",
+      "source_pattern": "gateIp = (x-forwarded-for).split(',')[0]  — a classically spoofable pattern; meterRun keys anonymous callers by i:${ip}, ANON_RUNS_PER_DAY default 5.",
+      "live_test": [
+        { "req": "XFF 203.0.113.11, empty body", "status": 400, "x_taste_remaining": 3 },
+        { "req": "XFF 203.0.113.11, empty body", "status": 400, "x_taste_remaining": 4 },
+        { "req": "XFF 203.0.113.22 (different), empty body", "status": 400, "x_taste_remaining": 2 }
+      ],
+      "interpretation": "The three responses form ONE monotonic counter (4,3,2 by processing order) across TWO different spoofed IPs. A working spoof would have reset the .22 request to remaining=4; it continued to 2 instead. So the handler is NOT keying on the client-supplied X-Forwarded-For — Railway's edge normalizes XFF so split(',')[0] is the real client IP. The gate is NOT bypassable via X-Forwarded-For on this deployment.",
+      "hardening_note_LOW_informational": "Correctness depends on the edge proxy normalizing XFF. If the deployment ever moves behind a proxy that APPENDS (preserving a client-supplied leftmost), the gate becomes bypassable. Recommend deriving the client IP from Express req.ip with an explicit `trust proxy` hop count, rather than raw x-forwarded-for[0], so the gate does not depend on edge behavior."
+    },
+    "agent_id_impersonation": {
+      "verdict": "HELD",
+      "detail": "F2 fix (2026-06-01): an agent-scoped key must match its bound agent (403 on mismatch); a shared REPID_API_KEYS env key may NOT target a specific agent_id (403). llm_complete scope required for agent-scoped keys (403 if missing)."
+    },
+    "prompt_injection_into_HAL": {
+      "verdict": "OUT OF PATH",
+      "detail": "/complete routes the prompt to an LLM provider (standard proxy). HAL scoring is a SEPARATE call (/score-event), covered by REPID-ENG-001/003. No privileged HAL decision is made inside /complete from the prompt."
+    }
+  },
+  "side_effect": "Consumed 3 of 5 anon /complete runs for the Supabase pg_net egress IP today (in-memory counter, resets at UTC day rollover). No persistent state written.",
+  "cleanup": "None required — no DB rows created; the gate counter is in-memory and self-resets."
+}

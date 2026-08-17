@@ -244,6 +244,56 @@ recorded sample's `repid_after` equals the live `current_repid`.
 
 ---
 
+## The `/complete` LLM proxy — investigated 2026-08-17 (no breach; one Low note)
+
+The trustshell campaign flagged three concerns for `/api/v1/llm/complete`: user
+API-key handling, free-tier cost gating, and prompt-injection into HAL. Source
+review at `0b4b391` (= live) plus two **safe, write-free** live probes. Result:
+**all three held**, and one of them refuted a scary source pattern by execution.
+
+**Key handling — HELD.** BYOK custody (encrypted at-rest storage,
+`byok-custody.ts`) is future/inert (`BYOK_CUSTODY_ENABLED` default OFF), so today
+`user_paid_keys` is read from the request body, used in-memory for the provider
+call, and `req.body.user_paid_keys` is set to `'[REDACTED]'` (route.ts:231) so any
+downstream/error logger sees the redaction. I checked the failure path
+specifically — the redaction sits *after* awaited DB calls that can throw, but the
+outer catch emits only `error.message`, and no logger (`anfis_routing_logs`,
+`logLlmCall`, tool-call-logger) is passed the keys. Matches the privacy posture.
+*Caveat:* the **prompt** is logged in previews (`prompt_preview` 200 chars,
+`request_text` 500) for routing analytics — disclosed, and separate from keys.
+
+**Free-tier gate — HELD, and this one is the "run it" story.** The gate keys
+anonymous callers by IP (`meterRun`, `i:${ip}`, 5 runs/IP/day) and derives the IP
+from `x-forwarded-for.split(',')[0]` — a classically **spoofable** pattern. So I
+tested it: three POSTs with spoofed `X-Forwarded-For` (`.11`, `.11`, `.22`), empty
+body (400 before any LLM call). The `x-taste-remaining` header came back **4, 3,
+2** — one monotonic counter across two *different* spoofed IPs. A working spoof
+would have reset the `.22` request to 4; it continued to 2. **Railway's edge
+normalizes `X-Forwarded-For`, so `split(',')[0]` is the real client IP and the
+gate is not bypassable here.** The source looked vulnerable; the deployment is not.
+
+> **HDN-001 (Low, informational, not ledgered — currently HELD).** The gate's
+> correctness depends on the edge proxy normalizing XFF. Behind a proxy that
+> *appends* (preserving a client-supplied leftmost), it would become bypassable →
+> unbounded free-tier LLM cost/DoS. Harden by deriving the IP from Express
+> `req.ip` with an explicit `trust proxy` hop count rather than raw
+> `x-forwarded-for[0]`, so the control does not depend on edge behavior.
+
+**Impersonation — HELD.** The F2 fix (2026-06-01) enforces the `agent_id` binding
+on every auth path: an agent-scoped key must match its bound agent (403), a shared
+`REPID_API_KEYS` env key may not target a specific `agent_id` (403), and
+`llm_complete` scope is required (403 if missing).
+
+**Prompt-injection into HAL — OUT OF PATH.** `/complete` routes the prompt to an
+LLM provider (a standard proxy); HAL scoring is the separate `/score-event` call
+(REPID-ENG-001/003). No privileged HAL decision is taken inside `/complete`.
+
+Evidence: `scripts/redteam/evidence/repid-engine-complete-proxy.json`. Side effect:
+consumed 3 of 5 anon runs for the Supabase egress IP today (in-memory counter,
+self-resets at UTC rollover); no DB rows written.
+
+---
+
 ## What held — the integrity spine
 
 - **Score is HAL-computed, not written.** Both paths take `(prompt, answer)` and
