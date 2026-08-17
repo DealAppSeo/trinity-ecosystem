@@ -47,10 +47,6 @@ const ROOT = 'lib/trustshell';
  */
 const DECLARED = new Map([
   [
-    'verdict-provenance',
-    'P2 of SPRINT-DECISIONS-2026-08-17. THE SCHEMA BLOCKER IS CLOSED (2026-08-17, trinity_changelog id 141): v_agent_earned_observations now projects quorum_providers_used and EarnedMetricsRepo.ts selects it — check:verdict-provenance is VERIFIED, exit 0. What remains dormant is `refusesToIssue` from issuer-stake.ts: the value now reaches the code that could apply it, but nothing calls provenanceOf() from the live scoring path yet. That is a scoring-behavior decision (how EarnedMetrics.veritasCatchRate should react to an actionable catch with quorum_providers_used === 0), and the hard rule is explicit — no DEFAULT_WEIGHTS/scoring change without an explicit decision on main. So this stays dormant until that decision is made, not because the data is unavailable.',
-  ],
-  [
     'alerts/digest',
     'alert backlog reduction logic. Today its consumers are the check and replay scripts; wiring it to a notifier is a separate runtime surface, and until that exists the analysis itself is the product.',
   ],

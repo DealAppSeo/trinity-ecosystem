@@ -2084,6 +2084,57 @@ export const MUTATIONS = [
     find: '  if (found.length > 0) {',
     replace: '  if (found.length >= 0) {',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/EarnedMetricsRepo.ts — the "consume" half of Gate 2:
+  // integrityObservations() / annotateProvenance(), wired 2026-08-17 per the
+  // operator's review on PR #94.
+  // -------------------------------------------------------------------------
+  {
+    id: 'earned-metrics-repo-clean-rows-demand-provenance',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'only ACTIONABLE catches (success === false) demand provenance. Checking success after ' +
+      'provenanceOf is called with the wrong `vetoed` value would exclude clean rows lacking a ' +
+      'provider — 55,616 of 149,258 rows in the measured window, the positive evidence rather ' +
+      'than the accusations, which is the exact defect this module\'s header retracts',
+    find: '    const verdict = provenanceOf({ vetoed: !success, providerAttempted });',
+    replace: '    const verdict = provenanceOf({ vetoed: true, providerAttempted });',
+  },
+  {
+    id: 'earned-metrics-repo-excluded-rows-leak-through',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'a row provenanceOf excludes must never reach measureRate. The `continue` is the only ' +
+      'thing stopping an untraceable or unearned catch from being pushed into `observations` ' +
+      'anyway, silently undoing the entire point of wiring provenanceOf in',
+    find: '      if (verdict.outcome === \'NOT_CHECKED\') excludedUntraceable += 1;\n      else excludedUnearned += 1;\n      continue;',
+    replace: '      if (verdict.outcome === \'NOT_CHECKED\') excludedUntraceable += 1;\n      else excludedUnearned += 1;',
+  },
+  {
+    id: 'earned-metrics-repo-zero-providers-read-as-attempted',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      '`quorum_providers_used = 0` must mean no provider attempted, not "at least one". Using ' +
+      '>= 0 instead of > 0 would make every zero-provider catch read as earned — the 2,443-row ' +
+      'population `refusesToIssue` exists to gate would silently pass',
+    find: '    const providerAttempted = raw === null || raw === undefined ? null : Number(raw) > 0;',
+    replace: '    const providerAttempted = raw === null || raw === undefined ? null : Number(raw) >= 0;',
+  },
+  {
+    id: 'earned-metrics-repo-annotate-fires-with-nothing-excluded',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'annotateProvenance must be a no-op when nothing was excluded — appending an empty note ' +
+      'to every agent\'s reason string, including the vast majority with zero exclusions, would ' +
+      'bury the signal this note exists to surface',
+    find: '  if (total === 0) return metric;',
+    replace: '  if (total < 0) return metric;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
