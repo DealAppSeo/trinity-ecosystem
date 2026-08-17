@@ -84,6 +84,7 @@
     "mutate": "node scripts/mutate.mjs",
     "check:hal-accuracy": "node scripts/hal-accuracy-test.mjs",
     "check:repid-marginal": "node scripts/check-repid-marginal.mjs",
+    "check:repid-registry-drift": "node scripts/check-repid-registry-drift.mjs",
     "check:repid-scoring": "node scripts/check-repid-scoring.mjs",
     "check:hal-chain": "node scripts/check-hal-chain.mjs",
     "check:hal-repid-linkage": "node scripts/check-hal-repid-linkage.mjs",

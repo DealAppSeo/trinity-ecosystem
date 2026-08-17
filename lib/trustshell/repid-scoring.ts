@@ -709,6 +709,162 @@ export function isPlaceholderProofCid(cid: unknown): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// REGISTRY DRIFT — the stored tier and the derived tier are two ladders again
+//
+// `check:repid-calibration` proves the LADDER sorts agents. It says nothing
+// about the ROWS, and the rows were written by a different ladder.
+//
+// `agent_kya_registry` stores `repid_score`, `repid_tier` AND
+// `spending_limit_daily`. Two of those three are derivable from the first, so
+// they can disagree — and `KYAValidator` reads them from opposite sides:
+//
+//   validate()      enforces the STORED `spending_limit_daily`
+//   updateRepID()   writes `TIER_LIMITS[tierForScore(newScore)]`
+//
+// So an agent's authorized limit depends on WHICH WRITER LAST TOUCHED ITS ROW,
+// not on anything the agent did. That is the one-rule-two-implementations defect
+// this module has already fixed three times — the two tier ladders, the DID
+// comparison, the payment threshold — arriving a fourth time, now split across
+// the code/database boundary where neither a type nor a test could see it.
+//
+// ── MEASURED LIVE, 2026-08-17 — 9 of 12 rows disagree ───────────────────────
+//
+// Against `agent_kya_registry` (12 rows). Every disagreement is PERMISSIVE: the
+// ladder grants more than the row stores, so the next write RAISES the limit.
+//
+//   TORCH    7600  stored Silver /  10,000  ladder Platinum / 500,000   x50
+//   ORCH     8100  stored Gold   / 100,000  ladder Platinum / 500,000   x5
+//   NEXUS    7900  stored Gold   / 100,000  ladder Platinum / 500,000   x5
+//   W3C      7700  stored Gold   / 100,000  ladder Platinum / 500,000   x5
+//   GCM/HDM/CHESED/MEL/APM  6900-7400  stored Silver / 10,000  ladder Gold / 100,000  x10
+//   VERITAS / SHOFET / SOPHIA   agree (Platinum)
+//
+// The trigger is routine: `app/api/trustrails/pay/route.ts` calls
+// `updateRepID(agentName, +10, 'Successful compliant payment')`. ONE compliant
+// payment re-rates the agent. TORCH's daily limit goes 10,000 -> 500,000 for
+// having made a payment, with no change in any measured metric.
+//
+// ── THE SHARPER FORM: A PENALTY RAISES THE LIMIT ───────────────────────────
+//
+// `updateRepID` takes a signed delta, so the same path runs for penalties. Since
+// the stored limit is BELOW what the ladder grants, an agent can be penalised
+// and still come out with more spending power. `penaltyHeadroom` is how far a
+// score may FALL while the ladder still grants at least today's stored limit:
+//
+//   TORCH 5,100 · GCM 4,900 · HDM 4,800 · CHESED 4,700 · MEL 4,600 · APM 4,400
+//   ORCH 3,100 · NEXUS 2,900 · W3C 2,700 · VERITAS 1,700 · SHOFET 1,300 · SOPHIA 1,150
+//
+// TORCH can lose 5,100 points — more than two full tiers — and its authorized
+// daily limit does not fall below 10,000. Anything short of that is a penalty
+// that INCREASES it.
+//
+// ── WHY THIS DETECTS AND DOES NOT FIX ──────────────────────────────────────
+//
+// The two repairs are opposites and both are an operator's call, exactly as the
+// curve recalibration was:
+//
+//   * TRUST THE LADDER — derive the limit on read. Consistent immediately, and
+//     it grants TORCH 500,000 USDC the moment it ships.
+//   * TRUST THE ROW — stop deriving in `updateRepID`. Fail-closed, and it
+//     freezes every limit at whatever the old ladder wrote, including for agents
+//     whose scores have since moved.
+//
+// Picking either from here would move real spending limits on a fabricated
+// mandate. So this reports, in the three outcomes, and the decision is recorded
+// in the index. What is NOT an operator's call is whether anyone can SEE the
+// disagreement, which is what this function is for.
+
+export interface RegistryDrift {
+  /** VERIFIED: row and ladder agree. FAILED: they disagree. NOT_CHECKED: unusable input. */
+  outcome: LimitOutcome;
+  storedTier: unknown;
+  ladderTier: RepIDTier;
+  storedDaily: number | null;
+  ladderDaily: number;
+  /**
+   * What the next `updateRepID` multiplies the daily limit by, `null` when it
+   * cannot be computed. Above 1 means a write RAISES the limit.
+   */
+  limitMultiplierOnNextWrite: number | null;
+  /**
+   * How far the score may FALL while the ladder still grants at least the
+   * stored limit. `null` when the stored limit exceeds every tier, so no score
+   * sustains it. This is the number that makes a penalty legible as a reward.
+   */
+  penaltyHeadroom: number | null;
+  detail: string;
+}
+
+/**
+ * Does a stored registry row agree with the ladder that would rewrite it?
+ *
+ * Pure, and takes the three stored fields rather than a Supabase row, so it is
+ * testable without a database — the reason the drift went unseen is that every
+ * existing suite tests the ladder in isolation, where a row cannot contradict
+ * it.
+ */
+export function describeRegistryDrift(
+  storedScore: unknown,
+  storedTier: unknown,
+  storedDaily: unknown
+): RegistryDrift {
+  const ladderTier = tierForScore(storedScore as number);
+  const ladderDaily = TIER_LIMITS[ladderTier].daily;
+
+  // A non-finite score reaches `tierForScore` and comes back Bronze by design —
+  // safe for a gate, WRONG as evidence of agreement. Reporting VERIFIED here
+  // would claim a comparison against a score nobody could read.
+  if (typeof storedScore !== 'number' || !Number.isFinite(storedScore)) {
+    return {
+      outcome: 'NOT_CHECKED', storedTier, ladderTier, storedDaily: null, ladderDaily,
+      limitMultiplierOnNextWrite: null, penaltyHeadroom: null,
+      detail: `the stored score ${JSON.stringify(storedScore)} is not a finite number, so the row could not be compared against the ladder`,
+    };
+  }
+  if (typeof storedDaily !== 'number' || !Number.isFinite(storedDaily) || storedDaily < 0) {
+    return {
+      outcome: 'NOT_CHECKED', storedTier, ladderTier, storedDaily: null, ladderDaily,
+      limitMultiplierOnNextWrite: null, penaltyHeadroom: null,
+      detail: `the stored daily limit ${JSON.stringify(storedDaily)} is not a usable number, so the row could not be compared against the ladder`,
+    };
+  }
+
+  // The lowest floor whose tier still grants at least the stored limit. Ascending
+  // because we want the LOWEST such floor — the furthest a score can fall.
+  const ascending = [...TIER_FLOORS].sort((a, b) => a.floor - b.floor);
+  const sustaining = ascending.find((t) => TIER_LIMITS[t.tier].daily >= storedDaily);
+  const penaltyHeadroom = sustaining === undefined ? null : storedScore - sustaining.floor;
+  const limitMultiplierOnNextWrite = storedDaily === 0 ? null : ladderDaily / storedDaily;
+
+  const tierAgrees = storedTier === ladderTier;
+  const limitAgrees = storedDaily === ladderDaily;
+  if (tierAgrees && limitAgrees) {
+    return {
+      outcome: 'VERIFIED', storedTier, ladderTier, storedDaily, ladderDaily,
+      limitMultiplierOnNextWrite, penaltyHeadroom,
+      detail: `the stored row agrees with the ladder: ${ladderTier}, ${ladderDaily} USDC daily`,
+    };
+  }
+  const parts: string[] = [];
+  if (!tierAgrees) parts.push(`tier stored as ${JSON.stringify(storedTier)} but the ladder says ${ladderTier}`);
+  if (!limitAgrees) {
+    parts.push(
+      `daily limit stored as ${storedDaily} but the ladder grants ${ladderDaily}` +
+      (limitMultiplierOnNextWrite === null ? '' : ` (x${limitMultiplierOnNextWrite} on the next write)`)
+    );
+  }
+  return {
+    outcome: 'FAILED', storedTier, ladderTier, storedDaily, ladderDaily,
+    limitMultiplierOnNextWrite, penaltyHeadroom,
+    detail:
+      `score ${storedScore}: ` + parts.join('; ') +
+      '. `validate()` enforces the stored limit and `updateRepID` writes the derived one, so ' +
+      'this agent is re-rated by its next reputation update rather than by anything it did' +
+      (penaltyHeadroom === null ? '' : `; the score may fall ${penaltyHeadroom} points before the limit does`),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // MARGINAL VALUE — what does real improvement actually buy?
 //
 // Sprint D4 recorded the inversion as a property of the CURVE: "+0.01 of real
