@@ -51,6 +51,7 @@ where you look to decide what to do next.
 | Surface | Status |
 | :-- | :-- |
 | `trinity_tasks` (+ `v_agent_preflight`) | **canonical** |
+| `docs/SPRINT-TRUST-HARNESS.md` | **canonical sprint brief for all agents** — precedence: `SPRINT-DECISIONS-*.md` on main > it > chat |
 | `autonomous_tasks`, `evergreen_tasks`, `trinity_evergreen_tasks`, `hal_evergreen_tasks`, `ai_task_registry`, `tasks`, `priority_stack`, `trinity_master_plan` | historical — do not add to |
 | `SESSION_SUMMARY.md` | last session's handoff, not a plan |
 | `docs/SHIP-CHECKLIST.md` | operational order for one release |
