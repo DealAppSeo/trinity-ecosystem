@@ -72,14 +72,15 @@ score column stayed put. So the measured magnitudes are:
 | **History / stats pollution** | **REAL, unbounded.** Each unauth submission wrote a `vetoed / hal_score=1` event attributed to the victim. Anything aggregating `repid_score_events` — `hallucination_rate`, the passport/card decision history, the leaderboard — is polluted by decisions the agent never made, at 60/IP/min. |
 | **Cost** | **REAL.** Each POST triggered a live HAL cross-LLM evaluation, with no auth. |
 
-**A ledger divergence surfaced (observation, not a scored finding).** Each event
-row stored `repid_after = 990 / repid_delta_applied = -10` while `current_repid`
-stayed 1000, and consecutive events did not accumulate. The event stream *claims*
-movements the live score never made. This **may be intended** — the "earned vs
-applied" / shadow-floor split that `score-event-guard.ts` and the trustshell
-`earn_gate.would_suppress` copy both describe — so I do **not** score it as a bug;
-distinguishing protective-by-design from a reconciliation defect needs a
-dedicated test (a next-campaign item).
+**A ledger divergence surfaced — now RESOLVED as REPID-ENG-003 (Low), below.**
+Each event row stored `repid_after = 990 / repid_delta_applied = -10` while
+`current_repid` stayed 1000. Investigated to root cause and verified: the DB
+trigger `trg_repid_earned_floor` clamps `current_repid` up to
+`tier_lower_bound(peak_repid)`, absorbing the penalty, while the event keeps the
+pre-clamp value. It is **both** a good control (the earned floor is exactly what
+zeroed the live-score griefing) **and** a Low ledger-accuracy defect (the event
+overstates the applied movement). Full mechanism and behavioural proof in the
+finding.
 
 **Cleanup verified:** both `repid_score_events` rows and the `repid_agents` row
 deleted; **0 rows remain** across all 83 `agent_id` tables and the agent row. The
@@ -181,6 +182,65 @@ moves a score after HAL modulation.
 **Recommended fix.** Seed the base delta from a HAL-derived confidence rather
 than the caller's claimed `certainty`, or cap `certainty`'s contribution so a
 self-declared value cannot dominate the HAL signal.
+
+### REPID-ENG-003 — Score-event ledger overstates the applied penalty (Low)
+
+| | |
+|---|---|
+| **Component** | repid-engine / RepID scoring ledger |
+| **Severity** | Low |
+| **Status** | Open, ledgered, owner **unassigned**, review by 2026-10-17 |
+
+**Description.** `repid_delta_applied` on a `repid_score_events` row is documented
+as *"what actually MOVED the score."* It does not, at or near an agent's earned
+floor — **two floors, only one binds:**
+
+- The JS pipeline writes the event's `repid_after` / `repid_delta_applied` from
+  `applyToScore() + clampRepidLoud()`, which clamps to a **global `REPID_MIN`**.
+  It then `UPDATE`s `repid_agents.current_repid`.
+- The DB trigger **`trg_repid_earned_floor`** (BEFORE UPDATE OF `current_repid`)
+  re-clamps that write **up** to the peak-based `tier_lower_bound(peak_repid)`.
+
+When `tier_lower_bound(peak) > REPID_MIN` — any agent that earned above the bottom
+tier — a below-floor penalty is absorbed (the live score does not move) but the
+event keeps the full negative delta.
+
+**Evidence (VERIFIED via service-role SQL, `repid-engine-ledger-divergence.json`).**
+`tier_lower_bound`: `≥8000→8000, ≥5000→5000, ≥1000→1000, ≥500→500, else 0`.
+`trg_repid_earned_floor` raises `current_repid` to `coalesce(floor_override,
+tier_lower_bound(peak_repid))`. Deterministic behavioural proof on a throwaway
+(created + tested + deleted in one block):
+
+```
+wrote 990  (peak 1000, floor 1000)  -> live current_repid = 1000   (clamped up)
+wrote 1200 (reward)                 -> live = 1200, peak ratchets to 1200
+wrote 950  (peak 1200, floor 1000)  -> live = 1000   (clamped)
+wrote 400  (deep penalty)           -> live = 1000   (clamped)
+```
+
+And the grief-test event: stored `repid_after = 990, repid_delta_applied = -10`
+while live `current_repid = 1000` — **actual movement 0.**
+
+**What this does NOT establish.** It is **not exploitable**, and it arises from a
+**good** control — the earned floor is precisely what made REPID-ENG-001's
+live-score griefing magnitude zero. The reconciliation tripwire
+`appliedScoreReconciles()` does not catch it: it checks the JS decomposition's
+internal consistency, not the JS `after` against the post-trigger live value.
+
+**Impact.** Audit accuracy: `repid_score_events` cannot be summed to reconstruct
+`current_repid`, and a penalty event overstates a drop the live score never took.
+It is also what makes REPID-ENG-001's event-log pollution look worse than the live
+effect. This is the codebase's named recurring class — a system reporting an
+outcome (a penalty) it did not actually apply — in the reputation ledger.
+
+**Recommended fix.** Clamp the JS applier to the **same** floor the trigger uses
+(`coalesce(floor_override, tier_lower_bound(peak_repid))`) so the event's
+`repid_after` / `repid_delta_applied` equal the real post-trigger movement; or
+store the calculated and the true-applied values under distinct, labelled fields.
+The DB trigger is the source of truth; the event should mirror it.
+
+**Re-test.** `npm run check:redteam -- --probe REPID-ENG-003`; HELD once a
+recorded sample's `repid_after` equals the live `current_repid`.
 
 ---
 

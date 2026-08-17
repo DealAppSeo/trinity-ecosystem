@@ -56,6 +56,15 @@
       "reviewBy": "2026-09-17",
       "firstSeen": "2026-08-17",
       "report": "docs/RED-TEAM-REPID-ENGINE-2026-08-17.md"
+    },
+    {
+      "id": "REPID-ENG-003",
+      "owner": "unassigned",
+      "severity": "Low",
+      "reason": "The score-event ledger OVERSTATES applied penalties vs the live score, VERIFIED 2026-08-17. Root cause: TWO FLOORS, only one binds. The JS pipeline writes repid_score_events.repid_after/repid_delta_applied from applyToScore()+clampRepidLoud() (clamps to a GLOBAL REPID_MIN), then UPDATEs repid_agents.current_repid; the DB trigger trg_repid_earned_floor (BEFORE UPDATE OF current_repid) re-clamps UP to the PEAK-based tier_lower_bound(peak_repid). When tier_lower_bound(peak) > REPID_MIN (any agent that earned above the bottom tier), a below-floor penalty is absorbed (live moves 0) but the event keeps the full negative delta. Proven behaviourally: writes of 990/950/400 to an agent at earned floor 1000 all clamped to 1000; the grief-test event stored repid_after=990/delta_applied=-10 while live current_repid=1000 (actual movement 0). appliedScoreReconciles() is blind to it \u2014 it checks the JS decomposition's internal consistency, not JS-after vs post-trigger live. Severity LOW: audit-accuracy, not exploitable, and it arises from a GOOD control (the earned floor is what makes griefing's live-score magnitude ZERO, REPID-ENG-001). But repid_score_events cannot be summed to reconstruct current_repid, and it feeds REPID-ENG-001's event-log pollution. Fix: clamp the JS applier to the same floor the trigger uses (coalesce(floor_override, tier_lower_bound(peak_repid))) so the event mirrors the actual movement, or store calculated AND true-applied with distinct labels. Left unassigned: the fix is a repid-engine code change (separate repo, not push-attached), not a Sean-gated infra action.",
+      "reviewBy": "2026-10-17",
+      "firstSeen": "2026-08-17",
+      "report": "docs/RED-TEAM-REPID-ENGINE-2026-08-17.md"
     }
   ]
 }
