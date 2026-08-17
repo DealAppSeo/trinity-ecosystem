@@ -11,7 +11,7 @@ of hand-copied counts is how the last nine planning surfaces died.
 
 **TrustShell is the trust harness that makes an AI agent's reputation portable:
 HAL decides whether the agent is telling the truth, RepID turns that history
-into a score, a ZK proof makes the score checkable without revealing it, and
+into a score, zkRepID makes the score checkable without revealing it, and
 x402 + ERC-8004 make it spendable and recordable on someone else's rails.**
 
 If a piece of work does not make that sentence more true, it is not the work.
@@ -19,13 +19,33 @@ If a piece of work does not make that sentence more true, it is not the work.
 ## The spine — four links, in order
 
 ```
-  HAL ──────────► RepID ──────────► ZKP Postcard ──────────► x402 / ERC-8004
-  is it true?     what's it worth?  prove it privately       spend + record it
+  HAL ──────────► RepID ──────────► zkRepID ──────────► x402 / ERC-8004
+  is it true?     what's it worth?  prove it privately  spend + record it
 ```
+
+**zkRepID is canonical as of 2026-08-17** (Sean's decision; `DECISIONS.md` §9 and
+`docs/ZKREPID.md` in repid-engine). This link was called "ZKP Postcard" until
+then, and the name now points at real code — `src/zkrepid/` in repid-engine, with
+the boundary enumerated in `boundary.ts` and pinned by tests.
+
+**The boundary is narrower than "the ZK code".** zkRepID names the six
+RepID-specific modules. Poseidon2, Plonky3, hash-agnostic Merkle and the
+`zkp-vault` crate stay `zkp` — they are general zero-knowledge machinery that
+zkRepID uses, and calling them zkRepID would make the vocabulary worse.
 
 Each link is only as good as the one before it. A ZK proof of a RepID that no
 HAL run produced is a proof of nothing — which is the failure mode this whole
 codebase keeps re-learning.
+
+**And a fourth failure mode, measured 2026-08-17: a faithful proof of a score
+that rewards the wrong thing.** zkRepID is faithful to whatever number RepID
+produces, so "the proof verifies" is not evidence that the incentives work. On
+the reward-bearing path RepID currently pays *inversely* to quality — a strategy
+that tunes its prose just under HAL's flag threshold beats every honest strategy
+at every detector accuracy, and no HAL improvement can fix it because the defect
+is in the reward curve. Full measurement, and the six anti-gaming properties that
+DO hold: `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` in repid-engine
+(`npm run repid:sim`). **Never report link 3 working as link 2 working.**
 
 ## Where the priorities actually live
 
@@ -86,7 +106,8 @@ row still carries its 08-12 verdict and has NOT been re-measured. Re-check with
 | HAL hallucination filtering | npm, README, sites | **STOPPED 2026-07-18** — re-measured 2026-08-16. Monthly rows: Jun **70,005** → Jul **39,080** → Aug **33**. The cliff is one night: 07-17 **1,360** → 07-18 **2**, and it has not recovered in 30 days. The 1–2/day since are the nightly smoke test. The corpus is real and large; the producer is off. See the superseded section above |
 | Portable RepID score | everywhere | **STOPPED, same event** — `repid_score_events` monthly: Jun **70,415** → Jul **39,453** → Aug **114**. Scores are therefore FROZEN, not merely unscored: `EarnedMetrics` decay is time-dependent, so every score reads stale-high the longer this runs |
 | Refused trades as the killer feature | HyperDAG README ("160+ refused") | **UNDERSTATED** — the log holds far more refusals than claimed |
-| ZKP Postcard proof | HyperDAG README | **BUILT, COOLING** — large proof corpus, but the rate has fallen off |
+| zkRepID proof (was "ZKP Postcard") | HyperDAG README | **BUILT, COOLING** — large proof corpus, but the rate has fallen off. Name canonicalised 2026-08-17 |
+| RepID rewards good behaviour | everywhere, implicitly | **FALSE as of 2026-08-17** — measured, not inferred. The reward-bearing path pays inversely to quality: the best-grounded claim is penalised, and a truthful strategy tuned just under HAL's flag threshold wins at every swept detector accuracy. Currently *masked* (not fixed) by `HAL_DECISION_REQUIRES_QUORUM`, which zeroes most deltas while the fleet is down. `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` |
 | x402 settlement | HyperDAG README, handoff | **REAL BUT THIN** — genuine on-chain settlements, low volume |
 | ERC-8004 reputation writes | README, badges | **REAL BUT THIN** — genuine writes, low volume |
 | Peer verification mesh | handoff | **STOPPED 2026-07-21** — died with the fleet freeze, not a code fault |
