@@ -1039,6 +1039,20 @@ export const MUTATIONS = [
       '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
   },
   {
+    id: 'proof-result-claims-privacy-the-provider-does-not-have',
+    suite: 'check:proof-provider-contract',
+    file: 'lib/trustshell/identity/proof-provider.ts',
+    protects:
+      'a result may not claim more privacy than its provider has. The mutant sets witnessHidden ' +
+      'true on a provider whose isZeroKnowledge is false — which is exactly the defect this seam ' +
+      'was built after: a SHA-256 of a timestamp labelled groth16 and published on-chain. It is ' +
+      'a one-word edit and it reads as an improvement',
+    find: `      witnessHidden: false,
+      predicateHolds,`,
+    replace: `      witnessHidden: true,
+      predicateHolds,`,
+  },
+  {
     id: 'issuer-stake-credits-a-lucky-unearned-veto',
     suite: 'check:issuer-stake',
     file: 'lib/trustshell/issuer-stake.ts',
