@@ -27,7 +27,7 @@
     "overstatement": -10
   },
   "reconciliation_tripwire_blindspot": "appliedScoreReconciles() checks the JS decomposition's internal consistency (before + decay + delta + clamp == after); it does NOT compare the JS after against the post-trigger live current_repid, so it cannot catch this class.",
-  "severity": "Low — audit/ledger-accuracy, not exploitable; arises from a GOOD control (the earned floor is exactly what made the griefing live-score magnitude ZERO). But repid_score_events cannot be summed to reconstruct current_repid, and repid_delta_applied overstates movement at/near the earned floor.",
+  "severity": "Low — audit/ledger-accuracy, not exploitable; arises from a PARTIAL control (the earned floor CAPS a griefing drain at the floor — corrected 2026-08-17: it does NOT zero it; 164/176 agents have a drainable gap above their floor, REPID-ENG-001). But repid_score_events cannot be summed to reconstruct current_repid, and repid_delta_applied overstates movement at/near the earned floor.",
   "recommended_fix": "Make the JS applier clamp to the same floor the DB trigger uses — coalesce(floor_override, tier_lower_bound(peak_repid)) — so the event's repid_after/repid_delta_applied equal the actual post-trigger movement; or store BOTH calculated and true-applied (post-clamp) with distinct labels. The DB trigger is the source of truth; the event should mirror it.",
   "cleanup": "Both throwaways deleted (grief agent by id; floor-proof agent inside its DO block). The 3 remaining 'redteam'-named rows (trinity-redteam-synth-finder/subject/accuser, created 2026-06-03) are the repid-engine team's pre-existing fixtures — NOT created or touched by this session."
 }

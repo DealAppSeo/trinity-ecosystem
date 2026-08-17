@@ -18,11 +18,12 @@
 //   would push below the earned floor is absorbed (live moves 0), but the event
 //   still records the full negative delta.
 //
-// This is the good-control / bad-ledger split: the earned floor is exactly what
-// makes griefing's live-score magnitude ZERO (REPID-ENG-001), and it is the same
-// mechanism that makes the event overstate. Severity Low — audit accuracy, not
-// exploitable — but it is this codebase's named recurring class: a system
-// reporting an outcome (a penalty) it did not actually apply.
+// This is the partial-control / bad-ledger split: the earned floor CAPS a
+// griefing drain at the floor (it does not zero it — corrected 2026-08-17;
+// 164/176 agents have a drainable gap above their floor, REPID-ENG-001), and it
+// is the same mechanism that makes the event overstate. Severity Low — audit
+// accuracy, not exploitable — but it is this codebase's named recurring class: a
+// system reporting an outcome (a penalty) it did not actually apply.
 //
 // This probe judges recorded reconciliation evidence: for each sample, did the
 // event's `repid_after` match the live `current_repid` after the trigger? A
