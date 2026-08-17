@@ -30,6 +30,7 @@ this system.** It is indistinguishable from a MEASURED one in a slide.
 | **HAL flip rule (in-sample gain)** | **RETRACTED as a tuning target** | **+9.26pp in-sample → +0.16pp on a run-split holdout.** Any future HAL tuning must be split before it is believed. |
 | **`1.0.0-held-out-weights` vs baseline** | **MEASURED — no effect** | 75.96% vs 63.33% **reverses** to 78.70% vs 83.33% same-provider. Paired on 36 cases: **−4.63pp**, sign test **p ≈ 0.51**. Do not ship it as an improvement. |
 | **Derived "margin" (score agreeing with decision)** | **MEASURED — usable** | Accuracy rises monotonically **12.2% → 83.0%** across margin bands. The one signal found today that discriminates. |
+| **Fact-check quorum membership** | **MEASURED — and it is a leading indicator** | Recoverable from `hal_classifications.model`, which encodes participants. Gemini 2,653 → **0** on 07-14; qwen → **0** by 07-15; `fact-check-partial` appears the same day. Predicted the outage **four days early** and nothing watched it. Add it to the throughput ledger. |
 | **No-provider veto rate** | **DARK** | 41 vetoes fired on rows where the detector called no provider (other lane). Rate not computable until the replay corpus exists. |
 | **RepID floor-sitters** | **MEASURED — and it is severe** | **101 of 176 agents (57.4%) sit in 499–505**; another **23 (13.1%) at exactly 200**. So **~70% are parked at seed-looking values** and RepID is not discriminating for them. 41 distinct values across 176 agents; range 60–10,000; **0 agents have `floor_override` set**. |
 | **`DEFAULT_WEIGHTS`** | **TUNABLE — but FROZEN by instruction** | Do not touch. Listed so nobody "discovers" it as an easy lever. |
@@ -62,12 +63,45 @@ reachable from an agent session, so nothing here comes from Railway itself.
 | HAL/day 07-15 → 07-16 → 07-17 → 07-18 | **2,689 → 1,707 → 1,360 → 2** |
 | HAL/day now | **1–3**, all the 09:15 UTC canary |
 
-### The finding that is new today
+### The finding that is new today — and it is a SECOND, EARLIER failure
 
-**The fleet was already degrading two days before it stopped.** 2,689 → 1,707 →
-1,360 is a **49% decline across 07-15 → 07-17**, before the 07-18 collapse to 2.
-A stop-from-outside explains the cliff; it does not explain the slope leading
-into it. That slope is unexplained and is a second question, not the same one.
+**The fleet was already degrading before it stopped**, and the cause is now
+measured. `hal_classifications.model` encodes the fact-check QUORUM MEMBERSHIP,
+so provider participation is recoverable per day:
+
+| day | total | gemini | qwen | llama | glm | mistral | `fact-check-partial` |
+|---|---|---|---|---|---|---|---|
+| 07-13 | 2,683 | **2,653** | 1,799 | 1,355 | 2,072 | 2,683 | 0 |
+| 07-14 | 2,683 | **0** | **177** | 1,275 | 2,249 | 2,424 | **259** |
+| 07-15 | 2,689 | 0 | **0** | 1,331 | 1,863 | 2,209 | 479 |
+| 07-16 | **1,707** | 0 | 0 | 994 | 1,376 | 1,530 | 177 |
+| 07-17 | 1,360 | 0 | 0 | 841 | 1,068 | 1,221 | 139 |
+
+**Gemini went 2,653 → 0 overnight on 07-14; qwen went 1,799 → 177 → 0 by 07-15.**
+`fact-check-partial` — the system recording that it could not assemble a full
+quorum — appears on **exactly** the day gemini vanishes, and never before.
+
+The order matters and is the whole point:
+
+1. **07-14/07-15 — two providers drop out.** Volume does NOT move (2,683 →
+   2,689). The surviving providers absorb the work and quorums shrink.
+2. **07-16/07-17 — throughput falls 36%** as the degraded quorum cannot keep up.
+3. **07-17 22:18 — the containers stop**, killing the remainder.
+
+So there are **TWO failures, not one**, and only the second was ever
+investigated. Step 1 is provider attrition at the LLM gateway — a credential,
+quota or rate-limit event on `trinity-litellm` — and it is **upstream of, and
+independent of, whatever stopped the Railway containers**. Redeploying the fleet
+without restoring gemini and qwen restores a degraded quorum, not the fleet.
+
+**NOT CHECKED:** why gemini and qwen stopped participating. That needs the
+gateway's own logs (`LITELLM_MASTER_KEY`, `trinity-litellm.railway.app`), which
+is the same credential BFT firing needs. **Model diversity was a leading
+indicator of the outage by four days and nothing was watching it.**
+
+(The 2 rows on 07-18 show all five providers present — that is the 09:15 UTC
+`e2e_smoke_nightly` canary on its own configuration, which is exactly why a
+canary kept every liveness check green.)
 
 It is also the reason the throughput ledger's `degradedBelow` default is 0.5 —
 that threshold fires on **07-16**, two days before any liveness check noticed
