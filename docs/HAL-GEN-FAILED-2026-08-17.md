@@ -113,11 +113,65 @@ The month breakdown is the finding:
 A clean before/after: something was fixed on or about **2026-05-27**, and nothing
 in the repo records it.
 
-**NOT ESTABLISHED: whether those 1,585 rows still move current reputation.**
-They are historical, and `value` decays toward `PRIOR_VALUE` while `rawValue`
-does not (#55 §5). Whether the live rate is computed over a window that still
-includes April–May was **NOT CHECKED**. Do not state that current tiers are
-affected, and do not state that they are not.
+### 5.1 They do still move the metric — measured, and the blast radius is small
+
+**This resolves the NOT CHECKED that stood here.** The answer is **yes, and it is
+live, and it barely matters** — all three clauses are load-bearing.
+
+**Yes.** `EarnedMetricsRepo` reads `v_agent_earned_observations` with
+`OBSERVATION_WINDOW_DAYS = 120`, which today reaches back to **2026-04-19**. The
+divergent rows span 2026-04-20 to 05-27, so **every one of the 1,585 is inside
+the window** — `already_outside_window` is **0**. The second gate,
+`MAX_OBSERVATIONS = 3000` newest-first, does not save it either: the worst-hit
+agent has **2,694** observations in the window, under the cap, so nothing is
+truncated.
+
+**And the effect is not marginal.** Recomputing `measureRate` exactly — 30-day
+half-life, `PRIOR_STRENGTH` 10, `PRIOR_VALUE` 0:
+
+| agent | obs | effective N | divergent weight | `veritasCatchRate` now | corrected |
+|---|---|---|---|---|---|
+| `test-agent-v11` | 2,668 | 237.2 | **137.4 (57.9%)** | **0.4030** | **0.9590** |
+| `demo-openai-agent` | 80 | 5.55 | 1.28 | 0.2744 | 0.3570 |
+| `Test_Agent_VDR_2` | 38 | 2.47 | 0.32 | 0.1722 | 0.1979 |
+| `Test_Agent_VDR_1` | 37 | 2.37 | 0.13 | 0.1814 | 0.1918 |
+| `Test_Agent_VDR_0` | 37 | 2.37 | 0.06 | 0.1866 | 0.1918 |
+
+For the first agent, **1,557 of its 1,559 failures in the window are the
+artifact** — 99.87%. Its integrity metric is not slightly wrong; it is almost
+entirely an artifact. The join behind this is exact: 1,557 expected, 1,557
+matched on timestamp, **zero duplicate timestamps**.
+
+**It is live.** `app/api/trustrails/pay/route.ts` constructs
+`EarnedMetricsRepository`, calls `.load(agentName)`, and gates payment on
+`repidResult.meetsThreshold`. This is not a dormant read path.
+
+**And now the three bounds, which are why this is not an incident.**
+
+1. **Every affected agent is a test or demo agent.** Four carry
+   `lifecycle_status = 'test_only'`; the fifth, `demo-openai-agent`, is `active`
+   with **20** divergent rows and was last active 2026-05-28. **No production
+   agent is affected.**
+2. **The error is fail-closed.** It *depresses* the score (0.4030 against a true
+   0.9590), so the exposure is a wrongful **denial** of payment, never a wrongful
+   approval. That is the safe direction, and it is the direction the route's own
+   comments say they chose deliberately elsewhere.
+3. **It expires on its own.** The first divergent rows age out of the 120-day
+   window on **2026-08-18** — tomorrow — and the last on **2026-09-24**. No
+   backfill is needed for the metric to become correct; it needs only the
+   calendar.
+
+**Do not read this as "the live path is compromised".** It is a real
+contamination of a real gate, confined to test agents, pointing in the safe
+direction, and self-clearing within six weeks. The reason to fix the *cause*
+anyway is §3: nothing prevents the next divergence, and the next one may land on
+an agent that matters.
+
+**Still NOT CHECKED:** whether `repid_agents.tier` and `current_repid` derive
+from this path at all. Those columns use a **different tier vocabulary**
+(`ESTABLISHED` / `PROBATIONARY`) than `TIER_FLOORS`
+(`Platinum`/`Gold`/`Silver`/`Bronze`), and `catch_rate_30d` is **NULL on all five
+agents** — so the stored columns are populated by something else, unidentified.
 
 ## 6. The trap this measurement walked into, and how it was caught
 
