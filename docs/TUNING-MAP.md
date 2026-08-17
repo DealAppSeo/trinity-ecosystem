@@ -1,7 +1,11 @@
 # Tuning map — MEASURED / GATED / TUNABLE / DARK
 
-First draft, 2026-08-17. **Every number here was measured against the live
-database on that date.** Where a thing could not be measured it says DARK and
+First draft 2026-08-17, **revised the same day after merging `origin/main`**.
+Two rows were corrected on merge — the no-provider veto rate and the ceiling
+source — because another lane had measured what this map called DARK and
+undecided. **That is the map working as intended**: a stale DARK is exactly as
+dangerous as a stale number, and both are caught by re-reading the index before
+shipping. **Every number here was measured against the live database.** Where a thing could not be measured it says DARK and
 names what would light it, rather than estimating.
 
 This exists so the sprint chooses what to tune from evidence instead of from
@@ -31,14 +35,14 @@ this system.** It is indistinguishable from a MEASURED one in a slide.
 | **`1.0.0-held-out-weights` vs baseline** | **MEASURED — no effect** | 75.96% vs 63.33% **reverses** to 78.70% vs 83.33% same-provider. Paired on 36 cases: **−4.63pp**, sign test **p ≈ 0.51**. Do not ship it as an improvement. |
 | **Derived "margin" (score agreeing with decision)** | **MEASURED — usable** | Accuracy rises monotonically **12.2% → 83.0%** across margin bands. The one signal found today that discriminates. |
 | **Fact-check quorum membership** | **MEASURED — and it is a leading indicator** | Recoverable from `hal_classifications.model`, which encodes participants. Gemini 2,653 → **0** on 07-14; qwen → **0** by 07-15; `fact-check-partial` appears the same day. Predicted the outage **four days early** and nothing watched it. Add it to the throughput ledger. |
-| **No-provider veto rate** | **DARK** | 41 vetoes fired on rows where the detector called no provider (other lane). Rate not computable until the replay corpus exists. |
-| **RepID floor-sitters** | **MEASURED — and it is severe** | **101 of 176 agents (57.4%) sit in 499–505**; another **23 (13.1%) at exactly 200**. So **~70% are parked at seed-looking values** and RepID is not discriminating for them. 41 distinct values across 176 agents; range 60–10,000; **0 agents have `floor_override` set**. |
+| **No-provider veto rate** | **MEASURED — by another lane, 2026-08-17. This row was DARK when first written and is corrected here.** | On `fact-check-s2` (395 usable): HAL consulted NO provider on 59 rows and **vetoed 41 of them anyway — 19 hit a real hallucination, 22 hit a CLEAN answer**. Precision **46.3%**, AUC **0.5150** (chance). Where a provider ran: precision 0.9578, AUC 0.9746. **Not an outage** — `providers_attempted` is empty on all 59. **Cannot be applied to the LIVE path**: `repid_score_events` has no provider column, so unearned-ness is not distinguishable in production. `docs/HAL-UNEARNED-VETOES-2026-08-17.md`. |
+| **RepID floor-sitters** | **MEASURED — and it is severe. Still DARK as to CAUSE, and another lane now names the same gap.** | **101 of 176 agents (57.4%) sit in 499–505**; another **23 (13.1%) at exactly 200**. So **~70% are parked at seed-looking values** and RepID is not discriminating for them. 41 distinct values across 176 agents; range 60–10,000; **0 agents have `floor_override` set**. The registry-drift lane records the matching unknown: *"what populates `repid_agents.tier`/`current_repid` ... is NOT CHECKED"*, and those columns use a DIFFERENT tier vocabulary (`ESTABLISHED`/`PROBATIONARY`) than `TIER_FLOORS`. **Two lanes have now arrived at the same missing writer from opposite directions.** |
 | **`DEFAULT_WEIGHTS`** | **TUNABLE — but FROZEN by instruction** | Do not touch. Listed so nobody "discovers" it as an easy lever. |
 | **RepID event supply** | **GATED** | `repid_score_events` holds **152,158** rows but is fed by the same stopped mesh as HAL — see Railway below. Scores are computed over a corpus frozen since 2026-07-17. |
 | **Doer-seat reputation signal** | **GATED — cross-lane** | `REPUTATION_SIGNALS` closed at seven, **none doer-side**. Adding to `repid_score_events.event_type` is Sean-gated DDL; adding to `ReputationSignal` is not a unilateral decision. |
 | **BFT observation presence** | **DARK** | **0 of 12** receipts carry a non-null `bft_passed`. No panel has ever voted into this table. BFT firing needs `LITELLM_MASTER_KEY` and a reachable `trinity-litellm.railway.app`. |
 | **Selective-disclosure readiness** | **GATED** | The production `IBindingScheme` throws `MISSING_PARAMETERS` pending Poseidon2 from the other lane. Cost is expressed in **hash calls**, not milliseconds, precisely because the hash is not chosen yet. |
-| **Ceiling source (row vs ladder)** | **NEEDS DISAMBIGUATION** | Not resolved in this lane; another lane's PR #55 touched the tier ladder. **Do not tune against a ceiling without first stating which source produced it** — the repo has already retracted figures for exactly this class of ambiguity. |
+| **Ceiling source (row vs ladder)** | **DECIDED 2026-08-17 — TRUST THE ROW.** This row said NEEDS DISAMBIGUATION when written; the decision landed on main and is corrected here. | The stored `spending_limit_daily` / `spending_limit_per_tx` are authoritative; the ladder is a derivation and briefing aid, **never an enforcement source**. `updateRepID` now writes the SCORE ONLY. Gated by `check:ceiling-source`. **9 of 12 `agent_kya_registry` rows still disagree with `tierForScore`, every one permissively, and that is NOT repaired on purpose** — they are stable, not correct. `docs/REPID-REGISTRY-DRIFT-2026-08-17.md`. |
 | **CI reliability** | **MEASURED — partially, and one half is DARK** | `workflow_dispatch` **proven** 2026-08-17 (run 31987897155: `run_started_at == created_at`, no hold). Bot-attributed `pull_request` runs → `action_required`, cause confirmed. **DARK:** why User-attributed pushes stopped creating `pull_request` runs after 16:28 — no mechanism, deliberately not theorised. |
 | **Replay availability** | **GATED** | Writer built, asserted, refusing to start. Four refusal paths run. See the checklist. |
 | **Railway fleet health** | **DARK — operator-only** | See below. |
