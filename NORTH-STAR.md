@@ -105,7 +105,7 @@ row still carries its 08-12 verdict and has NOT been re-measured. Re-check with
 | ZKP Postcard proof | HyperDAG README | **BUILT, COOLING** — large proof corpus, but the rate has fallen off |
 | x402 settlement | HyperDAG README, handoff | **REAL BUT THIN** — genuine on-chain settlements, low volume |
 | ERC-8004 reputation writes | README, badges | **REAL BUT THIN** — genuine writes, low volume |
-| Peer verification mesh | handoff | **STOPPED 2026-07-21** — died with the fleet freeze, not a code fault |
+| Peer verification mesh | handoff | **STOPPED 2026-07-17 22:18Z** — *not* the fleet freeze. Corrected 2026-08-17: all 12 heartbeats stopped four days **before** the pause was set, so the pause cannot be the cause. Throughput had already fallen ~3× on 07-16 ~05:00Z. Cause of neither event is established; no error rows and no deployment events were logged for either |
 | BFT consensus authorizes every transaction | README | **WIRED, NEVER EXECUTED** against real providers |
 | Compliance receipts via IPFS + Solana | one-pager | **OVERSTATED** — Solana yes, IPFS no; none issued since April |
 | Insurance proportional to RepID | README | **NOT MEASURED** |
