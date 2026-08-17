@@ -58,7 +58,10 @@ const DECLARED = new Map([
     'harness/router',
     'the router itself. CLOSED at 98.16% of the omniscient bound over 24 paired seeds, 1.84pp remaining — correct, mutation-tested, and reachable by nobody. Wiring it is the loop executor, NOT another routing sprint.',
   ],
-  ['harness/timeout', 'same as harness/aggregate — awaiting the loop executor.'],
+  [
+    'harness/retry',
+    'the retry_on predicate. Same dependency as the rest of the kernel — awaiting the loop executor. Note it is the reason `harness/timeout` left this list: retry.ts imports AttemptTimeoutError as a VALUE for its instanceof check, which is genuine reachability by this gate\'s definition, though transitively both are still shipped by nobody.',
+  ],
   ['harness/transform', 'same as harness/aggregate — awaiting the loop executor.'],
   [
     'identity/contracted-evaluator-port',

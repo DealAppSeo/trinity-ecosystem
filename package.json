@@ -35,6 +35,7 @@
     "check:harness-aggregate": "node scripts/harness-aggregate-test.mjs",
     "check:harness-escalate": "node scripts/harness-escalate-test.mjs",
     "check:harness-timeout": "node scripts/harness-timeout-test.mjs",
+    "check:harness-retry": "node scripts/harness-retry-test.mjs",
     "check:harness-transform": "node scripts/harness-transform-test.mjs",
     "check:harness-reputation": "node scripts/harness-reputation-test.mjs",
     "check:harness-agreement": "node scripts/harness-agreement-test.mjs",

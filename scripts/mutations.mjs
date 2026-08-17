@@ -1212,6 +1212,63 @@ export const MUTATIONS = [
     find: '  if (value.trim().length < rule.minLength) return \'too_short\';',
     replace: '  if (value.trim().length <= rule.minLength) return \'too_short\';',
   },
+  // ---------------------------------------------------------------------------
+  // retry.ts — the retry_on predicate. Each of these turns the module into a
+  // plausible-looking backoff helper that has quietly stopped making the one
+  // distinction it exists to make.
+  // ---------------------------------------------------------------------------
+  {
+    id: 'retry-budget-checked-before-predicate',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'the predicate is asked BEFORE the budget. Swapped, a permanent error arriving on ' +
+      'the final attempt reports as `exhausted` — which reads as bad luck and sends the ' +
+      'reader looking for more budget instead of at a request that can never succeed',
+    find: '    if (!this.cfg.retryOn(failure)) {',
+    replace: '    if (failure.attempt < this.cfg.maxAttempts && !this.cfg.retryOn(failure)) {',
+  },
+  {
+    id: 'retry-idle-predicate-ignores-timeout-kind',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'retryIdleTimeoutsOnly consumes the run/idle attribution. Ignoring the kind retries a ' +
+      'run timeout, spending another full budget to arrive at the same wall — and makes the ' +
+      'attribution timeout.ts deliberately preserved worthless to its only consumer',
+    find: "  failure.error instanceof AttemptTimeoutError && failure.error.expiry.kind === 'idle';",
+    replace: '  failure.error instanceof AttemptTimeoutError;',
+  },
+  {
+    id: 'retry-cap-applied-after-jitter',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'maxDelayMs bounds the SCHEDULE, not the pre-jitter input to it. Dropping the cap lets a ' +
+      'jittered delay sit above a ceiling the caller believes is absolute',
+    find: '    const capped = Math.min(raw, this.cfg.maxDelayMs);',
+    replace: '    const capped = raw;',
+  },
+  {
+    id: 'retry-trusts-out-of-range-rng',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'a misbehaving Rng cannot push the delay outside its band. Trusting next() blindly means ' +
+      'the bounded-delay claim silently stops holding for any source not in [0, 1)',
+    find: '    const unit = Math.min(1, Math.max(0, this.rng.next()));',
+    replace: '    const unit = this.rng.next();',
+  },
+  {
+    id: 'retry-maxattempts-off-by-one',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'maxAttempts is a TOTAL including the first try, so maxAttempts:1 never retries. Off by one ' +
+      'and every configured budget silently buys one more attempt than it says',
+    find: '    if (failure.attempt >= this.cfg.maxAttempts) {',
+    replace: '    if (failure.attempt > this.cfg.maxAttempts) {',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
