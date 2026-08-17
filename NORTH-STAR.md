@@ -39,13 +39,16 @@ codebase keeps re-learning.
 
 **And a fourth failure mode, measured 2026-08-17: a faithful proof of a score
 that rewards the wrong thing.** zkRepID is faithful to whatever number RepID
-produces, so "the proof verifies" is not evidence that the incentives work. On
-the reward-bearing path RepID currently pays *inversely* to quality — a strategy
-that tunes its prose just under HAL's flag threshold beats every honest strategy
-at every detector accuracy, and no HAL improvement can fix it because the defect
-is in the reward curve. Full measurement, and the six anti-gaming properties that
-DO hold: `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` in repid-engine
-(`npm run repid:sim`). **Never report link 3 working as link 2 working.**
+produces, so "the proof verifies" is not evidence that the incentives work. The
+reward-bearing path *did* pay inversely to quality — a strategy tuning its prose
+just under HAL's flag threshold beat every honest strategy at every detector
+accuracy, and no HAL improvement could fix it because the defect was in the reward
+curve. **FIXED 2026-08-17** (the clean branch now consumes quality): honesty wins
+at every swept combination, and the guard is a test rather than a note. Full
+measurement, the fix, and two things it did NOT resolve — throughput now dominates
+the top of the table, and ZK statements over pre-fix deltas will no longer verify:
+`reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` in repid-engine (`npm run repid:sim`).
+**Never report link 3 working as link 2 working.**
 
 ## Where the priorities actually live
 
@@ -107,7 +110,7 @@ row still carries its 08-12 verdict and has NOT been re-measured. Re-check with
 | Portable RepID score | everywhere | **STOPPED, same event** — `repid_score_events` monthly: Jun **70,415** → Jul **39,453** → Aug **114**. Scores are therefore FROZEN, not merely unscored: `EarnedMetrics` decay is time-dependent, so every score reads stale-high the longer this runs |
 | Refused trades as the killer feature | HyperDAG README ("160+ refused") | **UNDERSTATED** — the log holds far more refusals than claimed |
 | zkRepID proof (was "ZKP Postcard") | HyperDAG README | **BUILT, COOLING** — large proof corpus, but the rate has fallen off. Name canonicalised 2026-08-17 |
-| RepID rewards good behaviour | everywhere, implicitly | **FALSE as of 2026-08-17** — measured, not inferred. The reward-bearing path pays inversely to quality: the best-grounded claim is penalised, and a truthful strategy tuned just under HAL's flag threshold wins at every swept detector accuracy. Currently *masked* (not fixed) by `HAL_DECISION_REQUIRES_QUORUM`, which zeroes most deltas while the fleet is down. `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` |
+| RepID rewards good behaviour | everywhere, implicitly | **TRUE as of 2026-08-17, and measured** — it was FALSE when first measured the same day (the best-grounded claim was penalised; a truthful strategy tuned to HAL's flag boundary won at every detector accuracy). Fixed by making the clean branch consume quality: honesty now wins at all ten swept combinations, honest-expert goes −143 → **+574**, and a regression guard composes the real functions on every test run. Two open items: throughput now dominates the top of the table, and pre-fix deltas will fail ZK re-verification. `reports/2026-08-17/REPID-INCENTIVE-AUDIT.md` |
 | x402 settlement | HyperDAG README, handoff | **REAL BUT THIN** — genuine on-chain settlements, low volume |
 | ERC-8004 reputation writes | README, badges | **REAL BUT THIN** — genuine writes, low volume |
 | Peer verification mesh | handoff | **STOPPED 2026-07-21** — died with the fleet freeze, not a code fault |
