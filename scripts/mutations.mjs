@@ -1122,28 +1122,43 @@ export const MUTATIONS = [
       '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
   },
   {
-    id: 'ratchet-decay-lets-a-never-observed-floor-decay-gracefully',
-    suite: 'check:ratchet-decay',
-    file: 'lib/trustshell/ratchet-decay.ts',
+    id: 'earned-metrics-reads-observations-by-the-wrong-key',
+    suite: 'check:observation-identity',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
     protects:
-      'ORDER. The mutant checks recency before never-earned, so an agent with zero observations ' +
-      'ever but a surviving last-seen date is treated as merely stale and decays gracefully from a ' +
-      'floor it never earned. That is the state an agent reaches when its observations age out of ' +
-      'the retention window, and the mutant keeps compiling because the null-narrowing survives',
-    find: `  if (observationsEver === 0 || daysSinceLastObservation === null) {`,
-    replace: `  if (daysSinceLastObservation === null) {`,
+      'the identity space of the earned evidence. repid_agents carries `id` (uuid) AND `agent_id` ' +
+      '(text), and v_agent_earned_observations joins the FORMER. Measured 2026-08-17 the two spaces ' +
+      'are disjoint — agent_id is uuid-shaped on 0 of 176 rows — so the wrong key returns the EMPTY ' +
+      'SET rather than raising, and all 152,473 observations vanish while every agent reads as ' +
+      'having no track record. The mutant swaps the resolved uuid for the agent name, which is the ' +
+      'exact shape of the ad-hoc census that produced two figures retracted the same day',
+    find: `      .eq('agent_id', resolved.id)`,
+    replace: `      .eq('agent_id', resolved.name)`,
   },
   {
-    id: 'ratchet-decay-demotes-humans',
-    suite: 'check:ratchet-decay',
-    file: 'lib/trustshell/ratchet-decay.ts',
+    id: 'floor-decay-demotes-humans',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
     protects:
-      'the human exemption. 4 of the 12 pinned agents are human, and compute_tier already exempts ' +
+      'the human exemption. 4 of the 12 ratcheted rows are human, and compute_tier already exempts ' +
       'is_human from the counterparty gate for the same reason: a human\'s standing is not earned ' +
       'through agent observations. The mutant applies an observation-driven decay to them, which ' +
       'demotes a human for not behaving like a bot',
-    find: `  if (isHuman) {`,
-    replace: `  if (false && isHuman) {`,
+    find: `  if (state.isHuman) {`,
+    replace: `  if (false && state.isHuman) {`,
+  },
+  {
+    id: 'floor-decay-asks-humans-a-question-it-cannot-answer',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'ORDER, which is where this rule actually binds. The mutant moves the human exemption BELOW ' +
+      'the unknown-age branch. No column feeds `lastReEarnedAt`, so every production row arrives ' +
+      'null and every human then returns not_checked forever — and an operator draining a ' +
+      'NOT_CHECKED backlog would resolve it by inventing re-attestation timestamps for people. ' +
+      'The mutant still decays nobody, so only the ordering assertion catches it',
+    find: `  if (state.isHuman) {`,
+    replace: `  if (state.isHuman && state.lastReEarnedAt !== null) {`,
   },
   {
     id: 'proof-result-claims-privacy-the-provider-does-not-have',

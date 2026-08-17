@@ -51,8 +51,8 @@ const { check, eq, truthy, report } = createChecker('repid-floor-decay');
 
 const DAY = 86_400_000;
 const CFG = { staleAfterMs: 30 * DAY, maxStepsPerEvaluation: 1 };
-const at = (peak, current, floor, lastReEarnedAt) => ({
-  peakRepid: peak, currentRepid: current, floor, lastReEarnedAt,
+const at = (peak, current, floor, lastReEarnedAt, isHuman = false) => ({
+  peakRepid: peak, currentRepid: current, floor, lastReEarnedAt, isHuman,
 });
 
 // ── the ladder this module uses ─────────────────────────────────────────────
@@ -196,6 +196,45 @@ check('a non-finite input is NOT_CHECKED, never a decay', () => {
   for (const s of [at(NaN, 100, 8000, 0), at(8000, NaN, 8000, 0), at(8000, 100, NaN, 0)]) {
     eq(decideFloor(s, 999 * DAY, CFG).kind, 'not_checked', 'garbage in, NOT_CHECKED out');
   }
+});
+
+// ── the human exemption ─────────────────────────────────────────────────────
+
+check('a human holds its floor however stale — decay is an agent rule', () => {
+  // `compute_tier(p_repid, p_agent_id)` returns base_tier for is_human before
+  // consulting count_unique_counterparties [VERIFIED 2026-08-17]. 4 of the 12
+  // ratcheted rows are human, so without this the first thing a wired decay
+  // does is expire four people.
+  const human = decideFloor(at(8000, 100, 8000, 0, true), 9999 * DAY, CFG);
+  eq(human.kind, 'holds', 'a human is never decayed for inactivity');
+  eq(human.floor, 8000, 'and the floor is unchanged');
+  truthy(human.reason.includes('is_human'), 'and the reason names the exemption');
+
+  // The control: identical state, not human, decays. Without this the assertion
+  // above would pass for a module that never decays anything.
+  const agent = decideFloor(at(8000, 100, 8000, 0, false), 9999 * DAY, CFG);
+  eq(agent.kind, 'decays', 'the same state for a non-human agent decays');
+});
+
+check('the exemption is checked BEFORE the unknown-age branch', () => {
+  // The ordering claim, and the one that binds in production: `lastReEarnedAt`
+  // has no column behind it, so every real row arrives null. Checked after the
+  // unknown-age branch, every human is `not_checked` forever — and a NOT_CHECKED
+  // backlog invites someone to invent re-attestation timestamps for people.
+  const human = decideFloor(at(8000, 100, 8000, null, true), 9999 * DAY, CFG);
+  eq(human.kind, 'holds', 'a human with no recorded re-attestation still holds — exempt, not unexamined');
+
+  // The control: the same null age for a non-human IS not_checked.
+  eq(decideFloor(at(8000, 100, 8000, null, false), 9999 * DAY, CFG).kind, 'not_checked',
+    'a non-human with an unknown age is still NOT_CHECKED');
+});
+
+check('a human with garbage inputs is still NOT_CHECKED, not exempt', () => {
+  // Exemption does not outrank input validation. A corrupt score field is
+  // genuinely unexaminable, and answering `holds` would report a row as
+  // examined-and-sound on the strength of a flag.
+  eq(decideFloor(at(NaN, 100, 8000, 0, true), 999 * DAY, CFG).kind, 'not_checked',
+    'validation precedes the exemption');
 });
 
 check('inside the window it holds, outside it decays — the boundary is exact', () => {
