@@ -147,6 +147,7 @@ lib/**/*.js
 .repid-drift-check-*/
 .repid-marginal-check-*/
 .spine-e2e-check-*/
+.trust-harness-fixture-*/
 .spine-reachable-check-*/
 .staged-judge-check-*/
 .throughput-check-*/

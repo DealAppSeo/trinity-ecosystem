@@ -2150,6 +2150,28 @@ export const MUTATIONS = [
     find: '  if (total === 0) return metric;',
     replace: '  if (total < 0) return metric;',
   },
+  {
+    id: 'fixture-accepts-a-rejected-run',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'a doer that reports success and an evaluator that rejects must surface FAILED. ' +
+      'Collapsing the reject path into VERIFIED would make the fixture a certificate ' +
+      'factory — the exact overclaim the status doc exists to prevent',
+    find: "  eq(out.loop.outcome, 'FAILED', 'independent judge overrules the agent');",
+    replace: "  eq(out.loop.outcome, out.loop.outcome, 'independent judge overrules the agent');",
+  },
+  {
+    id: 'fixture-allows-self-judge',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'checker_must_not_be_doer is the product claim. If the false-path attempt is ' +
+      'allowed to certify, the fixture would green-light the one constitutional ' +
+      'failure the harness is built to make loud',
+    find: '    threw = /checker_must_not_be_doer|pool|draw|MIN_MEANINGFUL/i.test(String(e.message));',
+    replace: '    threw = true;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
