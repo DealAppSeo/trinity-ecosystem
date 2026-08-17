@@ -157,6 +157,8 @@ export class KYAValidator {
         zkpProofCID:       '',
         withinDailyLimit:  null,
         withinTxLimit:     null,
+        // No profile, so no ceiling was applied. NOT 0 — that is a real policy.
+        enforcedPerTxLimit: null,
         insuranceCoverage: 0,
         // Denies either way, but says which is true. A registry that could not
         // be read has not told us the agent is absent.
@@ -178,6 +180,7 @@ export class KYAValidator {
         // NOT `true`. This branch never read the spend history.
         withinDailyLimit:  null,
         withinTxLimit:     txCheck.withinLimit,
+        enforcedPerTxLimit: profile.spendingLimitPerTx,
         insuranceCoverage: profile.insuranceCoverage,
         denialReason:      `${txCheck.detail} for ${profile.repidTier} tier`,
       };
@@ -198,6 +201,7 @@ export class KYAValidator {
         zkpProofCID:       profile.zkpProofCID,
         withinDailyLimit:  dailyCheck.withinLimit,
         withinTxLimit:     true,
+        enforcedPerTxLimit: profile.spendingLimitPerTx,
         insuranceCoverage: profile.insuranceCoverage,
         denialReason:      dailyCheck.detail,
       };
@@ -212,6 +216,7 @@ export class KYAValidator {
       zkpProofCID:       profile.zkpProofCID,
       withinDailyLimit:  true,
       withinTxLimit:     true,
+      enforcedPerTxLimit: profile.spendingLimitPerTx,
       insuranceCoverage: profile.insuranceCoverage,
     };
   }
