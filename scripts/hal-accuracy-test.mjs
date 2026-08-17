@@ -13,6 +13,14 @@
 // CHANCE — for a detector that scores 0.958 within `fact-check-s2`. Anyone who
 // queries this table without partitioning first will publish that this detector
 // is broken. It is not; the corpus is three incomparable score scales stacked.
+//
+// SECOND, AND IT IS THE ONE WITH TEETH (section E, added with the 2026-08-17
+// re-export): HAL consulted NO verification provider on 59 of the 395 usable
+// rows, and vetoed 41 of them anyway. Those 41 are 46.3% precise — worse than a
+// coin flip — against 95.8% where a provider ran, and they are exactly the rows
+// the suite already credited with beating a pure threshold cut. A verdict that
+// consulted nothing is not a cheaper verdict; it is a different thing wearing
+// the same name.
 
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
@@ -78,18 +86,22 @@ function throws(fn, needle, m) {
 
 // ── the corpus ──────────────────────────────────────────────────────────────
 const fixture = JSON.parse(
-  readFileSync('lib/hal/fixtures/runner-results-2026-08-16.json', 'utf8')
+  readFileSync('lib/hal/fixtures/runner-results-2026-08-17.json', 'utf8')
 );
-const ALL = fixture.rows.map(([mode, score, y, gf, v, thr, src]) => ({
+const ALL = fixture.rows.map(([mode, score, y, gf, v, thr, src, usedN, attN]) => ({
   mode,
   score: Number(score),
   isHallucination: y === 1,
   genFailed: gf === 1,
   vetoed: v === 1,
   threshold: Number(thr),
-  // Extra field, ignored by every function in accuracy.ts. Carried so the
-  // suite can assert the SUB-stratum split below.
+  // Extra fields, ignored by every function in accuracy.ts. Carried so the
+  // suite can assert the SUB-stratum and EXECUTION splits below.
   benchmarkSource: src,
+  /** How many verification providers HAL actually consulted. 0 = it consulted nothing. */
+  providersUsed: Number(usedN),
+  /** How many it TRIED. Separates "never called one" from "called one and it failed". */
+  providersAttempted: Number(attN),
 }));
 
 // ── A. the corpus is what we think it is ────────────────────────────────────
@@ -213,15 +225,17 @@ await check('THE CEILING: the best F1 any threshold on this score can reach', as
 });
 
 await check("REALIZED: what HAL's own veto decision achieves", async () => {
-  // CAVEAT (#65 §5.5, LESSONS A23). 41 of the vetoes inside this figure fired on
-  // rows where HAL called NO provider: 19 on hallucinations, 22 on clean answers
-  // — slightly MORE often on the clean ones, which is what AUC 0.5150 on that
-  // group predicts. They are vetoes HAL genuinely cast, so this remains an
-  // accurate description of its realized behaviour and the numbers below stand.
-  // What is not evidence-backed is the recall they buy: 0.807 -> 0.904 over the
-  // pure cut. Excluding them, realized F1 is the pure cut's 0.8760 — 98.37% of
-  // the bound rather than 98.95%. The threshold conclusion is unchanged either
-  // way, which is why this is a caveat on the meaning and not a correction.
+  // CAVEAT, NOW ASSERTED RATHER THAN DESCRIBED (#65 §5.5, LESSONS A23; section E
+  // below). 41 of the vetoes inside this figure fired on rows where HAL called
+  // NO provider: 19 on hallucinations, 22 on clean answers — slightly MORE often
+  // on the clean ones, which is what AUC 0.5150 on that group predicts. They are
+  // vetoes HAL genuinely cast, so this remains an accurate description of its
+  // realized behaviour and the numbers below stand. The recall they buy is
+  // 0.807 -> 0.904 over the pure cut; excluding them, realized F1 is the pure
+  // cut's 0.8760 — 98.37% of the bound rather than 98.95%. The threshold
+  // conclusion is unchanged either way, which is why this is a caveat on the
+  // meaning and not a correction. Section E measures the 41 directly, so this
+  // paragraph is no longer an unpaid caveat.
   const r = A.realizedConfusion(FC);
   eq(r.tp, 178, 'tp');
   eq(r.fp, 29, 'fp');
@@ -268,7 +282,8 @@ await check('0.9579 IS A BLEND — the sub-strata disagree, so never quote it fl
   // Split on EXECUTION rather than on source and the gap dissolves: AUC 0.9746
   // [0.9574, 0.9917] wherever HAL actually ran, 0.5150 [0.3662, 0.6637] where it
   // did not — the same either side of the benchmark boundary.
-  // This fixture cannot check that. The next assertion pins why.
+  // MEASURED DIRECTLY IN SECTION E as of the 2026-08-17 re-export. The
+  // 2026-08-16 fixture could not, and pinned a failing guard here instead.
 
   // And the failed generations are not spread evenly either: every one of them
   // is in the weak stratum, so "drop gen_failed" silently reweights the blend.
@@ -281,23 +296,83 @@ await check('0.9579 IS A BLEND — the sub-strata disagree, so never quote it fl
   );
 });
 
-await check('this fixture CANNOT audit its own denominator — pinned so it FIRES', async () => {
-  // The defect explained above is invisible here by construction: the export
-  // omits `hal_providers_used`, the one column that separates a verdict HAL
-  // earned from one it emitted having consulted nothing. Every figure in this
-  // suite is therefore computed over a denominator it cannot audit.
-  //
-  // A comment saying so is another unpaid caveat, and this repo has been bitten
-  // by those. So the LIMITATION is pinned instead of described: re-export the
-  // fixture with the provider column and this assertion FAILS by design. That is
-  // the point — it forces whoever re-exports to add the execution assertions
-  // (0.9746 where HAL ran, 0.5150 where it did not, and the 41 unearned vetoes)
-  // rather than silently inheriting a blended figure that now looks auditable.
-  truthy(
-    Array.isArray(fixture._schema) && !fixture._schema.includes('hal_providers_used'),
-    'fixture gained hal_providers_used — assert the execution split (#65 §5.5, ' +
-      'LESSONS A23) and then delete this guard'
-  );
+// ── E. THE EXECUTION SPLIT — what the 2026-08-16 fixture could not audit ────
+//
+// That export omitted `hal_providers_used`, so every figure above was computed
+// over a denominator it could not audit, and the limitation was PINNED as a
+// failing-by-design guard rather than described. This is the follow-up that
+// guard existed to force. Re-exported 2026-08-17 with `providers_used_n` and
+// `providers_attempted_n`; the guard is gone because these assertions replace
+// it.
+
+await check('the re-export carries the provider columns', async () => {
+  eq(fixture._schema.length, 9, 'schema width');
+  truthy(fixture._schema.includes('providers_used_n'), 'providers_used_n present');
+  truthy(fixture._schema.includes('providers_attempted_n'), 'providers_attempted_n present');
+  // The corpus itself must be UNCHANGED by the re-export, or every figure above
+  // silently moves. fact-check-s2 is byte-identical to the 2026-08-16 export at
+  // the precision it stored; see the fixture's _warning4 for the one field that
+  // is not (mock's threshold, which no headline figure uses).
+  eq(ALL.length, 1709, 'same row count');
+  eq(FC.length, 395, 'same usable fact-check-s2 denominator');
+});
+
+await check('HAL DID NOT RUN on 59 of the 395 — and never even tried', async () => {
+  const ran = FC.filter((r) => r.providersUsed > 0);
+  const notRun = FC.filter((r) => r.providersUsed === 0);
+  eq(ran.length, 336, 'rows where a verification provider was consulted');
+  eq(notRun.length, 59, 'rows where none was');
+  // NOT an outage. `providers_attempted` is empty on every one of them, so this
+  // is not "called a provider and it failed" — it is a FACTUAL_ERROR verdict
+  // emitted having consulted nothing. That distinction is the whole reason the
+  // attempted column was exported alongside the used one.
+  eq(notRun.filter((r) => r.providersAttempted > 0).length, 0,
+    'none of the 59 attempted a provider — this is not a provider outage');
+});
+
+await check('AUC 0.9746 where HAL RAN, 0.5150 where it did not', async () => {
+  // The measurement the 2026-08-16 warning predicted and could not make. It is
+  // the whole of the 0.5940-vs-0.9757 benchmark_source gap asserted above:
+  // split on EXECUTION rather than on source and the gap is the same either
+  // side of the benchmark boundary.
+  near(A.rocAuc(FC.filter((r) => r.providersUsed > 0)), 0.9746, 0.0001, 'provider ran');
+  near(A.rocAuc(FC.filter((r) => r.providersUsed === 0)), 0.5150, 0.0001, 'provider did not');
+  // 0.5150 is chance. A score written without consulting anything carries no
+  // information about whether the answer was a hallucination.
+  truthy(A.rocAuc(FC.filter((r) => r.providersUsed === 0)) < 0.60,
+    'the no-provider stratum must not be mistaken for a working detector');
+});
+
+await check('an UNEARNED veto is worse than a coin flip — 46.3% precision', async () => {
+  const notRun = FC.filter((r) => r.providersUsed === 0);
+  const vetoes = notRun.filter((r) => r.vetoed);
+  eq(vetoes.length, 41, 'vetoes cast having consulted nothing');
+  eq(vetoes.filter((r) => r.isHallucination).length, 19, 'landed on a real hallucination');
+  eq(vetoes.filter((r) => !r.isHallucination).length, 22, 'landed on a CLEAN answer');
+  // More often wrong than right, which is what AUC 0.5150 predicts. Stated as a
+  // precision because that is the number a staking design has to price.
+  near(A.realizedConfusion(notRun).precision, 0.4634, 0.0001, 'unearned veto precision');
+  near(A.realizedConfusion(FC.filter((r) => r.providersUsed > 0)).precision, 0.9578, 0.0001,
+    'earned veto precision, for contrast');
+});
+
+await check('EVERY sub-threshold veto is an unearned one — they are the SAME 41 rows', async () => {
+  // The finding that reframes "the extra veto paths beat the pure cut" above.
+  // Those paths are not a second detector earning its keep: their entire
+  // population is vetoes cast without consulting a provider, and no unearned
+  // veto ever scored at or above the live threshold.
+  const below = FC.filter((r) => r.vetoed && r.score < 0.43);
+  const unearned = FC.filter((r) => r.vetoed && r.providersUsed === 0);
+  eq(below.length, 41, 'vetoed below the threshold');
+  eq(unearned.length, 41, 'vetoed having consulted nothing');
+  eq(below.filter((r) => r.providersUsed === 0).length, 41, 'the two sets are IDENTICAL');
+  eq(unearned.filter((r) => r.score >= 0.43).length, 0,
+    'and no unearned veto ever reached the threshold on score alone');
+  // So the realized F1 advantage over the pure cut is bought ENTIRELY by them.
+  const pure = A.confusionAt(FC, 0.43);
+  truthy(A.realizedConfusion(FC).f1 > pure.f1, 'realized still beats the pure cut');
+  truthy(A.realizedConfusion(FC.filter((r) => r.providersUsed > 0)).f1 <= 1,
+    'stated as a fact about WHERE the gain comes from, not a claim that it is illusory');
 });
 
 await check('THE HEADROOM IS 1% — tuning the threshold is NOT where the win is', async () => {
@@ -321,6 +396,11 @@ await check("HAL's veto is NOT a pure threshold — extra paths fire below it", 
   eq(aboveUnvetoed, 0, 'the threshold is a hard floor: nothing above it escapes');
   // So the realized number is NOT confusionAt(0.43). Asserting the difference
   // stops anyone modelling HAL as a single cut.
+  //
+  // AND SECTION E NAMES WHAT THOSE EXTRA PATHS ARE: all 41 sub-threshold vetoes
+  // are exactly the 41 cast without consulting a provider — the same rows, and
+  // no unearned veto ever reached 0.43 on score alone. The gain below is real
+  // and it is bought entirely by verdicts that consulted nothing.
   const pure = A.confusionAt(FC, 0.43);
   near(pure.f1, 0.876033, 0.000001, 'a pure 0.43 cut');
   truthy(

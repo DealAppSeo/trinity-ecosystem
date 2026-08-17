@@ -15,11 +15,30 @@ export async function GET() {
     return NextResponse.json({ systemTrustScore: 0, status: 'no_agents' });
   }
 
-  // Weighted average — higher RepID agents get more weight
-  const totalWeight = agents.reduce((s, a) => s + a.repid_score, 0);
-  const systemScore = Math.round(totalWeight / agents.length);
+  // PLAIN MEAN. The comment here read "Weighted average — higher RepID agents
+  // get more weight", which this arithmetic does not do: summing scores and
+  // dividing by the count weights every agent equally. Nothing was ever
+  // weighted. Corrected rather than implemented — making it a real weighted
+  // average would change a published number, and the wrong comment is the
+  // actual defect, since it is what the next reader would build on.
+  const scoreTotal  = agents.reduce((s, a) => s + a.repid_score, 0);
+  const systemScore = Math.round(scoreTotal / agents.length);
 
-  // Tier distribution
+  // TIERS COME FROM THE STORED COLUMN, DELIBERATELY, AND MUST NOT BE RECOMPUTED
+  // FROM THE SCORE.
+  //
+  // `agent_kya_registry.repid_tier` disagrees with `tierForScore(repid_score)`
+  // on 9 of 12 live rows — the rows were written by an older ladder whose floors
+  // differ (see `docs/REPID-REGISTRY-DRIFT-2026-08-17.md`). That looks like a
+  // bug to fix here and is not one.
+  //
+  // Sean's call, 2026-08-17: the STORED limits are the authoritative ceiling,
+  // and the stored tier is the LABEL ON THAT CEILING — #82 measured that every
+  // `repid_tier` matches its own `spending_limit_daily` under `TIER_LIMITS`.
+  // So this distribution describes what agents are actually authorized to spend.
+  // Deriving it from the score instead would publish a tier the enforcer does
+  // not use, which is the reviewer-vs-enforcer split #85 just closed on the
+  // payment path, reopened on a dashboard.
   const tiers = { Platinum: 0, Gold: 0, Silver: 0, Bronze: 0 };
   agents.forEach(a => { tiers[a.repid_tier as keyof typeof tiers]++; });
 

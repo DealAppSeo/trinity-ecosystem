@@ -510,6 +510,158 @@ export const MUTATIONS = [
     replace: '    if (score > floor) return tier;',
   },
   {
+    id: 'floor-decay-skips-the-demonstrated-level',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'INVARIANT 3 — a decayed floor never falls below the level the agent is CURRENTLY ' +
+      'demonstrating. Decay removes a claim the agent has stopped supporting; it must not ' +
+      'contradict one it is supporting right now. Without the stop, a multi-step evaluation ' +
+      'walks an active agent all the way to PROBATIONARY',
+    find: '    if (next <= dbTierFloorFor(state.currentRepid)) {',
+    replace: '    if (next < 0) {',
+  },
+  {
+    id: 'floor-decay-expires-an-active-agent',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'the demonstrated-level check is asked BEFORE the clock. An agent scoring at or above ' +
+      'its floor is demonstrating that level NOW, whatever a timestamp says — ask the clock ' +
+      'first and a live, active agent is decayed for having a stale column',
+    find: '  if (state.currentRepid >= state.floor) {',
+    replace: '  if (state.currentRepid > state.peakRepid) {',
+  },
+  {
+    id: 'floor-decay-unknown-age-reads-as-sound',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'an absent last-demonstration is NOT_CHECKED, not holds. It is the most likely input in ' +
+      'production — most rows carry no such timestamp — and reporting holds says a floor was ' +
+      'examined and found sound when it was never examined at all. The two-outcome mistake in ' +
+      'the reassuring direction, on the mechanism that governs standing',
+    find: "      kind: 'not_checked',",
+    replace: "      kind: 'holds',",
+  },
+  {
+    id: 'floor-decay-steps-by-a-point-not-a-tier',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'INVARIANT 2 — decay steps by TIER, never continuously. A floor at 7,999 is not a fact ' +
+      'anyone can act on, and a continuously drifting floor is unobservable between reads. ' +
+      'One tier boundary at a time is the granularity the ladder already uses',
+    find: '  return below.length === 0 ? 0 : Math.max(...below.map((t) => t.floor));',
+    replace: '  return Math.max(0, floor - 100);',
+  },
+  {
+    id: 'ceiling-rewritten-by-reputation-update',
+    suite: 'check:ceiling-source',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'TRUST THE ROW — a reputation update writes the SCORE and never the ceiling. Restoring ' +
+      'the ladder-derived write is the measured x50: one compliant payment moved TORCH from ' +
+      '10,000 to 500,000 USDC daily, and because the delta is signed a PENALTY did the same, ' +
+      'with 5,100 points of headroom before the limit fell',
+    find: '        repid_score:           newScore,',
+    replace: '        repid_score:           newScore,\n        spending_limit_daily:  500000,',
+  },
+  {
+    id: 'ceiling-read-derived-not-stored',
+    suite: 'check:ceiling-source',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'the ENFORCED per-tx ceiling is read from the stored row. Trust-the-row has two halves ' +
+      'and this is the one a careless fix drops: stop writing the column but also stop reading ' +
+      'it, and nothing enforces anything. Reading the daily column here still type-checks and ' +
+      'still looks like a limit',
+    find: '      spendingLimitPerTx:   data.spending_limit_per_tx,',
+    replace: '      spendingLimitPerTx:   data.spending_limit_daily,',
+  },
+  {
+    id: 'dashboard-derives-tier-from-score',
+    suite: 'check:ceiling-source',
+    file: 'app/api/trustrails/system-trust/route.ts',
+    protects:
+      'the published tier distribution is the STORED tier, which labels the enforced ceiling. ' +
+      'Deriving it from the score publishes a tier the enforcer does not use — the ' +
+      'reviewer-vs-enforcer split closed on the payment path, reopened on a dashboard, and it ' +
+      'disagrees on 9 of the 12 live rows',
+    find: '  agents.forEach(a => { tiers[a.repid_tier as keyof typeof tiers]++; });',
+    replace:
+      '  agents.forEach(a => { tiers[tierForScore(a.repid_score) as keyof typeof tiers]++; });',
+  },
+  {
+    id: 'pay-brief-ceiling-optional',
+    suite: 'check:pay-brief',
+    file: 'lib/trustshell/types.ts',
+    protects:
+      'enforcedPerTxLimit stays REQUIRED on KYAComplianceResult. Required is what makes tsc — ' +
+      'not a grep — guarantee every return path in validate() sets it; make it optional and a ' +
+      'future branch omits it silently, which is exactly how `withinDailyLimit: true` came to be ' +
+      'asserted on a path that never read the spend history',
+    find: '  enforcedPerTxLimit: number | null;',
+    replace: '  enforcedPerTxLimit?: number | null;',
+  },
+  {
+    id: 'pay-brief-exports-the-wrong-limit',
+    suite: 'check:pay-brief',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'the exported ceiling is the field checkPerTxLimit actually measured against. Exporting ' +
+      'spendingLimitDaily instead still type-checks and still looks like a limit — it briefs the ' +
+      'authorization panel with a number 20x the enforced one for the live rows, which is the ' +
+      'wrong-brief defect this whole change removes, reintroduced one identifier over',
+    find: '      withinTxLimit:     true,\n      enforcedPerTxLimit: profile.spendingLimitPerTx,',
+    replace: '      withinTxLimit:     true,\n      enforcedPerTxLimit: profile.spendingLimitDaily,',
+  },
+  {
+    id: 'pay-brief-unevaluated-ceiling-approves',
+    suite: 'check:pay-brief',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'a per-tx ceiling that was never evaluated DENIES. A guard that reports authorized:true ' +
+      'on an unevaluated limit is the two-outcome fail-open this repo keeps removing — "we did ' +
+      'not look" scored as "it passed", on the payment path',
+    find: '        authorized: false,',
+    replace: '        authorized: true,',
+  },
+  {
+    id: 'repid-drift-headroom-from-stored-tier',
+    suite: 'check:repid-registry-drift',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'penaltyHeadroom is measured from the LOWEST floor that still sustains the stored ' +
+      'limit, not from the stored tier\'s own floor. Anchoring on the wrong floor understates ' +
+      'the headroom by a whole tier — TORCH\'s real 5,100 reported as 2,600, which is the ' +
+      'error the first SQL pass at this actually made',
+    find: '  const sustaining = ascending.find((t) => TIER_LIMITS[t.tier].daily >= storedDaily);',
+    replace: '  const sustaining = ascending.find((t) => TIER_LIMITS[t.tier].daily > storedDaily);',
+  },
+  {
+    id: 'repid-drift-unreadable-score-agrees',
+    suite: 'check:repid-registry-drift',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'an unreadable score is NOT_CHECKED. `tierForScore` answers Bronze for a non-finite ' +
+      'score — correct for a gate — so without this guard a garbage score silently AGREES ' +
+      'with any row storing Bronze, and the drift report asserts a comparison it never made',
+    find: "  if (typeof storedScore !== 'number' || !Number.isFinite(storedScore)) {",
+    replace: "  if (typeof storedScore !== 'number') {",
+  },
+  {
+    id: 'repid-drift-limit-mismatch-ignored',
+    suite: 'check:repid-registry-drift',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'the stored TIER and the stored LIMIT are separate columns and either can drift. ' +
+      '`validate()` enforces the NUMBER, so a row carrying the right word and the wrong ' +
+      'number is the dangerous half — dropping this check passes it as agreement',
+    find: '  const limitAgrees = storedDaily === ladderDaily;',
+    replace: '  const limitAgrees = true;',
+  },
+  {
     id: 'repid-coherence-never-fails',
     suite: 'check:repid-scoring',
     file: 'lib/trustshell/repid-scoring.ts',
@@ -970,6 +1122,83 @@ export const MUTATIONS = [
       '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
   },
   {
+    id: 'ratchet-decay-lets-a-never-observed-floor-decay-gracefully',
+    suite: 'check:ratchet-decay',
+    file: 'lib/trustshell/ratchet-decay.ts',
+    protects:
+      'ORDER. The mutant checks recency before never-earned, so an agent with zero observations ' +
+      'ever but a surviving last-seen date is treated as merely stale and decays gracefully from a ' +
+      'floor it never earned. That is the state an agent reaches when its observations age out of ' +
+      'the retention window, and the mutant keeps compiling because the null-narrowing survives',
+    find: `  if (observationsEver === 0 || daysSinceLastObservation === null) {`,
+    replace: `  if (daysSinceLastObservation === null) {`,
+  },
+  {
+    id: 'ratchet-decay-demotes-humans',
+    suite: 'check:ratchet-decay',
+    file: 'lib/trustshell/ratchet-decay.ts',
+    protects:
+      'the human exemption. 4 of the 12 pinned agents are human, and compute_tier already exempts ' +
+      'is_human from the counterparty gate for the same reason: a human\'s standing is not earned ' +
+      'through agent observations. The mutant applies an observation-driven decay to them, which ' +
+      'demotes a human for not behaving like a bot',
+    find: `  if (isHuman) {`,
+    replace: `  if (false && isHuman) {`,
+  },
+  {
+    id: 'proof-result-claims-privacy-the-provider-does-not-have',
+    suite: 'check:proof-provider-contract',
+    file: 'lib/trustshell/identity/proof-provider.ts',
+    protects:
+      'a result may not claim more privacy than its provider has. The mutant sets witnessHidden ' +
+      'true on a provider whose isZeroKnowledge is false — which is exactly the defect this seam ' +
+      'was built after: a SHA-256 of a timestamp labelled groth16 and published on-chain. It is ' +
+      'a one-word edit and it reads as an improvement',
+    find: `      witnessHidden: false,
+      predicateHolds,`,
+    replace: `      witnessHidden: true,
+      predicateHolds,`,
+  },
+  {
+    id: 'issuer-stake-credits-a-lucky-unearned-veto',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'luck is UNBANKABLE. The mutant lets an unearned veto that happened to be right classify ' +
+      'as a true positive, which is the single most tempting "improvement" to this model — it ' +
+      'looks like rewarding accuracy. 46.3% of unearned vetoes were correct, so it would let an ' +
+      'issuer buy standing with a good draw and the 41-veto behaviour would stay rational',
+    find: `  if (!v.providerAttempted) return v.vetoed ? 'unearned_veto' : 'unearned_clean';`,
+    replace: `  if (!v.providerAttempted) {
+    if (v.vetoed && v.isHallucination) return 'earned_true_positive';
+    return v.vetoed ? 'unearned_veto' : 'unearned_clean';
+  }`,
+  },
+  {
+    id: 'issuer-stake-makes-skipping-merely-unattractive',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'verification is STRICTLY DOMINANT, not merely disfavoured. The mutant prices an unearned ' +
+      'veto the same as an honest error, which restores the expected-value argument for the ' +
+      'cheap path: at 46.3% accuracy an issuer maximising EV would still skip. The penalty has ' +
+      'to exceed the cost of verifying AND being wrong, or the incentive does not bind',
+    find: `  unearned_veto: -3,`,
+    replace: `  unearned_veto: -1,`,
+  },
+  {
+    id: 'issuer-stake-refusal-lets-the-evidence-free-verdict-through',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'the refusal at SOURCE, which is the half the stake cannot do. A stake makes an unearned ' +
+      'verdict expensive after the fact; only this stops it being emitted. The mutant keeps the ' +
+      'function and inverts the evidence test, so an issuer that consulted nothing may still ' +
+      'emit an actionable FACTUAL_ERROR veto — exactly what produced the 41',
+    find: `  return !v.providerAttempted && v.vetoed;`,
+    replace: `  return v.providerAttempted && v.vetoed;`,
+  },
+  {
     id: 'zk-verify-asserts-membership-instead-of-checking-it',
     suite: 'check:zk-cost',
     file: 'lib/trustshell/identity/nullifier.ts',
@@ -1063,6 +1292,33 @@ export const MUTATIONS = [
       'and the realized confusion all shift',
     find: '  return rows.filter((r) => !r.genFailed);',
     replace: '  return rows.slice();',
+  },
+  {
+    id: 'hal-realized-confusion-uses-the-threshold',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      "realizedConfusion scores HAL's ACTUAL veto decision, not `score >= threshold`. The two " +
+      'differ by exactly the 41 sub-threshold vetoes, and those 41 are precisely the verdicts ' +
+      'HAL cast having consulted no provider — 46.3% precise against 95.8% where one ran. ' +
+      'Model HAL as a pure cut and the entire unearned-veto finding disappears from the ' +
+      'numbers, because every unearned veto sits below the line it never reached',
+    find: '    if (r.vetoed && r.isHallucination) tp++;\n    else if (r.vetoed) fp++;',
+    replace:
+      '    if (r.score >= r.threshold && r.isHallucination) tp++;\n' +
+      '    else if (r.score >= r.threshold) fp++;',
+  },
+  {
+    id: 'hal-confusion-precision-counts-misses',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'precision is tp/(tp+fp) — of the verdicts CAST, how many were right. It is the number ' +
+      'an issuer-staking design has to price, and the one that separates an unearned veto ' +
+      '(0.4634) from an earned one (0.9578). Dividing by the wrong denominator makes a veto ' +
+      'that is wrong more often than right look competent',
+    find: '  const precision = tp + fp === 0 ? null : tp / (tp + fp);',
+    replace: '  const precision = tp + fn === 0 ? null : tp / (tp + fn);',
   },
   {
     id: 'auditor-grant-analysed-against-a-different-map',
