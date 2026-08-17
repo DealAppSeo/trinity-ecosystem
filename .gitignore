@@ -149,3 +149,4 @@ lib/**/*.js
 .throughput-check-*/
 .zk-cost-check-*/
 .harness-extract-check-*/
+.repid-weight-sim-*/
