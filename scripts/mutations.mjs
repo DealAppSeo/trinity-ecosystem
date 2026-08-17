@@ -510,6 +510,41 @@ export const MUTATIONS = [
     replace: '    if (score > floor) return tier;',
   },
   {
+    id: 'pay-brief-ceiling-optional',
+    suite: 'check:pay-brief',
+    file: 'lib/trustshell/types.ts',
+    protects:
+      'enforcedPerTxLimit stays REQUIRED on KYAComplianceResult. Required is what makes tsc — ' +
+      'not a grep — guarantee every return path in validate() sets it; make it optional and a ' +
+      'future branch omits it silently, which is exactly how `withinDailyLimit: true` came to be ' +
+      'asserted on a path that never read the spend history',
+    find: '  enforcedPerTxLimit: number | null;',
+    replace: '  enforcedPerTxLimit?: number | null;',
+  },
+  {
+    id: 'pay-brief-exports-the-wrong-limit',
+    suite: 'check:pay-brief',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'the exported ceiling is the field checkPerTxLimit actually measured against. Exporting ' +
+      'spendingLimitDaily instead still type-checks and still looks like a limit — it briefs the ' +
+      'authorization panel with a number 20x the enforced one for the live rows, which is the ' +
+      'wrong-brief defect this whole change removes, reintroduced one identifier over',
+    find: '      withinTxLimit:     true,\n      enforcedPerTxLimit: profile.spendingLimitPerTx,',
+    replace: '      withinTxLimit:     true,\n      enforcedPerTxLimit: profile.spendingLimitDaily,',
+  },
+  {
+    id: 'pay-brief-unevaluated-ceiling-approves',
+    suite: 'check:pay-brief',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'a per-tx ceiling that was never evaluated DENIES. A guard that reports authorized:true ' +
+      'on an unevaluated limit is the two-outcome fail-open this repo keeps removing — "we did ' +
+      'not look" scored as "it passed", on the payment path',
+    find: '        authorized: false,',
+    replace: '        authorized: true,',
+  },
+  {
     id: 'repid-drift-headroom-from-stored-tier',
     suite: 'check:repid-registry-drift',
     file: 'lib/trustshell/repid-scoring.ts',
