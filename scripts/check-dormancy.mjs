@@ -33,7 +33,7 @@
 // NOT CHECKED, never a pass.
 
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, basename, relative } from 'node:path';
+import { join, dirname, relative, resolve, sep } from 'node:path';
 
 const ROOT = 'lib/trustshell';
 
@@ -146,23 +146,51 @@ try {
 
 const bodies = new Map(srcs.map((f) => [f, readFileSync(f, 'utf8')]));
 
-const dormant = [];
-for (const file of mods) {
-  const stem = relative(ROOT, file).replace(/\.ts$/, '').split('\\').join('/');
-  const base = basename(stem);
-  // Reachable if the barrel re-exports it, or any OTHER source imports it by
-  // specifier. Matching on the quoted specifier tail avoids counting a mention
-  // in prose or a same-named symbol.
-  if (barrel.includes(`'./${stem}'`)) continue;
-  let imported = false;
-  for (const [g, body] of bodies) {
-    if (g === file) continue;
-    if (body.includes(`/${base}'`) || body.includes(`./${base}'`)) {
-      imported = true;
-      break;
+/**
+ * Every module specifier a file imports, RESOLVED to a repo-relative path.
+ *
+ * The first version matched the BASENAME as a substring — `/router'` — which is
+ * correct only while no two modules anywhere share a name. Measured 2026-08-16:
+ * zero collisions, so it gave the right answer, by luck rather than by
+ * construction. The moment anyone adds a second `router.ts` outside this tree,
+ * a basename match marks `harness/router` reachable and the dormancy count
+ * quietly drops. That is under-reporting — the direction that HIDES the defect
+ * this gate exists to surface, which is the worse of the two ways to be wrong.
+ *
+ * Resolving properly also fixes a real case the substring form handled only by
+ * accident: a sibling importing `./router` from inside the same directory.
+ */
+const SPECIFIER = /(?:from|import|require)\s*\(?\s*['"]([^'"]+)['"]/g;
+
+function importedStems() {
+  const stems = new Set();
+  for (const [file, body] of bodies) {
+    SPECIFIER.lastIndex = 0;
+    for (const m of body.matchAll(SPECIFIER)) {
+      const spec = m[1];
+      let abs;
+      if (spec.startsWith('@/')) abs = resolve(spec.slice(2));
+      else if (spec.startsWith('.')) abs = resolve(dirname(file), spec);
+      else continue; // a bare package name is never one of ours
+      const rel = relative(resolve(ROOT), abs).split(sep).join('/');
+      // `..` means it resolved outside lib/trustshell.
+      if (rel && !rel.startsWith('..')) stems.add(rel.replace(/\.tsx?$/, ''));
     }
   }
-  if (!imported) dormant.push(stem);
+  return stems;
+}
+
+const imported = importedStems();
+
+const dormant = [];
+for (const file of mods) {
+  const stem = relative(ROOT, file).split(sep).join('/').replace(/\.ts$/, '');
+  // Reachable if the barrel re-exports it, or any source resolves an import to
+  // it. A module importing itself cannot make itself reachable, and an index
+  // re-export inside a subdirectory counts — that is a real consumer path.
+  if (barrel.includes(`'./${stem}'`)) continue;
+  if (imported.has(stem)) continue;
+  dormant.push(stem);
 }
 
 const dormantSet = new Set(dormant);
