@@ -855,6 +855,50 @@ export const MUTATIONS = [
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
   {
+    id: 'bft-outage-claims-the-vote-happened',
+    suite: 'check:payment-fail-posture',
+    file: 'lib/trustshell/BFTAuthorizer.ts',
+    protects:
+      'a provider outage is recorded as NOT EVALUATED, never as an evaluated verdict. The ' +
+      'payment proceeds either way — that is the deliberate fail-open — so `evaluated` is the ' +
+      'ONLY thing distinguishing "three providers authorised this" from "nobody voted". ' +
+      'Flipping it makes an unchecked payment indistinguishable from a consensus-authorised one',
+    find: `        votedAt: new Date().toISOString(),
+        evaluated: false,
+        notEvaluatedReason: \`BFT engine unavailable: \${message}\`,`,
+    replace: `        votedAt: new Date().toISOString(),
+        evaluated: true,
+        notEvaluatedReason: \`BFT engine unavailable: \${message}\`,`,
+  },
+  {
+    id: 'bft-observe-invents-a-consensus-weight',
+    suite: 'check:payment-fail-posture',
+    file: 'lib/trustshell/BFTAuthorizer.ts',
+    protects:
+      'observe mode reports NO consensus weight, because it held no vote. This is the exact ' +
+      'defect BFTAuthorizer replaced — a placeholder returning passed:true with a weight of ' +
+      '1.0, which is why all 12 rows in kya_compliance_receipts claim BFT consensus. A number ' +
+      'here is worse than a null: it is auditable-looking',
+    find: `        consensusWeight: null,
+        threshold: 0.618033988749895,
+        passed: true, // not blocked`,
+    replace: `        consensusWeight: 1.0,
+        threshold: 0.618033988749895,
+        passed: true, // not blocked`,
+  },
+  {
+    id: 'bft-enforcement-default-flips',
+    suite: 'check:payment-fail-posture',
+    file: 'lib/trustshell/BFTAuthorizer.ts',
+    protects:
+      'enforcement is OFF unless the exact word `enforce` is set. The default decides whether ' +
+      'every transfer waits on three third-party models, and the Comma veto fires on unanimous ' +
+      'high confidence — so a routine payment may be escalated at a rate nobody has measured ' +
+      'yet. Flipping the default chooses a refusal rate blind',
+    find: "  return process.env.BFT_ENFORCEMENT_MODE === 'enforce' ? 'enforce' : 'observe';",
+    replace: "  return process.env.BFT_ENFORCEMENT_MODE === 'observe' ? 'observe' : 'enforce';",
+  },
+  {
     id: 'sign-out-claims-success-it-did-not-earn',
     suite: 'check:auth-session',
     file: 'lib/auth-session.ts',
