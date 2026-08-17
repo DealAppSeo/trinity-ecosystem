@@ -1522,3 +1522,18 @@ It was caught **only because 0.8351 is a published retracted number.** Any other
 wrong value would have shipped silently. That is the strongest argument yet for
 retractions naming their figure in `PRIOR-WORK-INDEX.md` — a retired number is a
 tripwire, and it caught the same bug twice in two lanes.
+
+**Resolved 2026-08-17, same day.** A26 left "do those 1,585 rows still move
+current reputation" open. They do: the window is 120 days, all 1,585 are inside
+it, and `veritasCatchRate` for one agent reads 0.4030 against a corrected 0.9590
+— 1,557 of its 1,559 in-window failures are the artifact — on a path that gates
+payment. **And it is nearly harmless**: every affected agent is test or demo, the
+error is fail-closed (a wrongful denial, never a wrongful approval), and the rows
+age out of the window between 2026-08-18 and 2026-09-24 with no backfill.
+
+The lesson is in holding both halves. "Contaminates a live payment gate" and
+"confined to test agents, fail-closed, self-clearing" are both true, and a report
+that gives only the first is as misleading as one that gives only the second.
+The severity was not knowable from the defect — it took the window constant, the
+row cap, the lifecycle column and the direction of the error, and three of those
+four turned the alarm down.
