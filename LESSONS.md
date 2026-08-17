@@ -1683,3 +1683,67 @@ the fact**.
 prove it resolves the uuid, a new consumer cannot appear undeclared, and no code
 may key recency off `last_active_at`. The mutation swaps the resolved uuid for
 the agent name and is CAUGHT.
+
+## A29 — a migration that was live three and a half hours before it existed anywhere (2026-08-17)
+
+Investigating whether the no-provider-veto defect (A23/P1) also inflates the
+*subject* agent's own earned score, I found `v_agent_earned_observations` had a
+7th column, `quorum_providers_used`, that no branch's migration history
+mentioned. `git log --all` / `git grep` across all 769 fetched commits: **zero**
+matches. But `mcp__Supabase__list_migrations` listed it as the newest applied
+version, timestamped ahead of everything in any checkout.
+
+**It was live and correct** — `pg_get_viewdef` matched exactly what PR #94's
+body proposed as the still-open "smallest unblock." Someone's session had
+applied it directly against the database while investigating, and never
+committed the file. PR #94's own text ("the view projects six columns and none
+is provenance") was already stale by the time I read it.
+
+**The risk this creates, concretely:** a fresh `supabase db reset`, or any
+environment rebuilt from `supabase/migrations/`, would have silently regressed
+to the six-column view — not by anyone editing it back, but by the tracked
+history simply not knowing the seventh column existed. The gap is invisible
+until someone runs exactly that command, at which point it looks like a
+regression with no commit to blame.
+
+**Fixed by writing the missing file, not by re-deciding the change.**
+`20260817162647_v_agent_earned_observations_add_provenance.sql` reproduces the
+live definition. Verified byte-exact the only way that means anything: applied
+it again with `CREATE OR REPLACE VIEW` and confirmed the round trip (column
+count, row count, and the attached comment all unchanged) — an identical
+`CREATE OR REPLACE VIEW` is a safe no-op, and PostgreSQL itself would have
+refused a definition that reordered or retyped an existing column, so success
+was evidence, not just documentation.
+
+### What generalises
+
+Applying a change directly and committing the file that describes it are two
+separate acts, and a session under time pressure ("let me just check what this
+would look like against real data") can do the first without the second. This
+repo's `mcp__Supabase__list_migrations` and its `supabase/migrations/`
+directory can therefore disagree, silently, and the newest thing in the former
+is the one place that will not show up in a `git grep`.
+
+**The tell was a timestamp that shouldn't have been possible** — a migration
+version later than my own session's start, on a database I had only read from
+so far. Worth checking `list_migrations` against `git log --all` whenever a
+column shows up that a `SELECT *` or `\d` reveals but no code in the checkout
+explains — the gap between "the schema has it" and "the repo says why" is
+exactly where this kind of drift hides.
+
+### What the underlying investigation still found, unfixed
+
+Projecting the column is not consuming it. `EarnedMetricsRepo.ts` still reads
+`signal, observed_at, success, domain, value_ms` only. Measured against the
+120-day observation window: **~44,995** `HAL_SCORE_EVENT` rows carry no
+provenance signal under either the new column or the older nested
+`hal_signals.providers_used` a pre-2026-06-04 code path used instead, spread
+across **12 real, active, non-human production agents** — every member of the
+active fleet with a nonzero score. They read as `success = true` unconditionally
+(`hallucination_caught` is never `true` on this cohort) and account for
+**16–19%** of each agent's decayed evidence weight, moving raw `veritasCatchRate`
+by **10–12 percentage points** upward for every one of them — not a rounding
+effect, the single largest swing available in that metric today. Reported on
+PR #94 rather than fixed here: that lane owns `verdict-provenance.ts`, is
+already mid-flight on this exact view, and duplicating the consumer-side fix in
+parallel would recreate tonight's P3 collision (A28) one gate over.
