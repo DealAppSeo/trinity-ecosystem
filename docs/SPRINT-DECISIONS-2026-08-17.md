@@ -89,7 +89,9 @@ the defect. **That figure is RETRACTED** — re-measured against
 it: **3** with no observation ever, **4** none in 30 days, **3** none in 120
 days. **Its cause is UNVERIFIED**; the originating query was not preserved, and
 the nearby `id`/`agent_id` key hazard does not explain it. All **3** genuinely
-unobserved floor-holders are **`lifecycle_status='test_only'`**.*
+unobserved floor-holders are **`lifecycle_status='test_only'`**.
+**XC re-query 2026-08-17T21:12Z independently confirms the same three windows
+and the same 12-way split; no window gives 6.***
 
 ***What changes for the sprint:* **no real agent holds a floor with zero
 evidence**, so the never-earned base case reached fixture rows only — P3 needs no
