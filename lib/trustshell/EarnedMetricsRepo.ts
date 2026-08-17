@@ -160,9 +160,15 @@ export class EarnedMetricsRepository {
 
     const since = new Date(Date.parse(now) - OBSERVATION_WINDOW_DAYS * 86_400_000).toISOString();
 
+    // `quorum_providers_used` was added 2026-08-17 (Gate 2, PR #94) so this
+    // query can see the provenance repid_score_events.metadata already carried.
+    // Selecting it here does not yet change scoring — nothing downstream reads
+    // it. It is the "repo half" check:verdict-provenance requires; see
+    // lib/trustshell/verdict-provenance.ts for what wiring it into
+    // `refusesToIssue` still needs, and why that is a separate, larger change.
     const { data, error } = await this.supabase
       .from('v_agent_earned_observations')
-      .select('signal, observed_at, success, domain, value_ms')
+      .select('signal, observed_at, success, domain, value_ms, quorum_providers_used')
       .eq('agent_id', resolved.id)
       .gte('observed_at', since)
       .order('observed_at', { ascending: false })

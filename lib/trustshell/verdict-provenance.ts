@@ -58,15 +58,32 @@
 // SERVICE_FULFILLED / SERVICE_SATISFIED / PREDICTION_RESOLVE / VALIDATION_FAILED,
 // which render no HAL verdict and so have nothing to be provenanced.
 //
-// ── WHAT REMAINS BLOCKED, AND WHY IT IS STILL WORTH A GATE ──────────────────
+// ── THE PROJECTION IS CLOSED [2026-08-17, same session, logged] ─────────────
+//
+// `v_agent_earned_observations` now projects `quorum_providers_used` as an
+// eighth column — additive, nullable, row counts unchanged (152,164 / 233 / 85
+// by signal, verified before and after). Migration and rollback SQL logged to
+// `trinity_changelog` id 141, allowed under the preflight fence for additive
+// reversible views. `EarnedMetricsRepo.ts`'s `.select()` now names the column,
+// so `describeLinkage` — both the repo half (parsed from source) and the
+// measured half (SCORING_PATH_COLUMNS below) — is VERIFIED. This is what that
+// verdict means and does not mean: the value now REACHES the code that could
+// consult it. Nothing consults it yet.
+//
+// ── WHAT REMAINS, AND WHY IT IS A SEPARATE DECISION ─────────────────────────
 //
 // `issuer-stake.ts` and its `refusesToIssue` are correct, mutation-tested and
-// exported — and still have zero importers beyond the barrel, because the view
-// the scorer reads cannot see any of the above. `v_agent_earned_observations`
-// exposes six columns — agent_id, signal, observed_at, success, domain,
-// value_ms — and none is provenance. `describeLinkage` reports on THAT surface,
-// which is why it is still NOT_CHECKED: the finding is now "the view drops it",
-// not "the pipeline never had it".
+// exported — and STILL have zero importers beyond the barrel. The schema
+// blocker is gone; what is left is deciding how `EarnedMetrics.veritasCatchRate`
+// should react to an actionable catch with `quorum_providers_used === 0`. That
+// is a scoring-behavior change, and this repo's hard rule is explicit: "No
+// DEFAULT_WEIGHTS changes without explicit decision on main." Measured today
+// it would change nothing live — the 2,443 zero-provider events include zero
+// actionable catches — but the decision of HOW to gate future ones (drop the
+// observation? weight it down? hold it NOT_CHECKED like `provenanceOf` does?)
+// is not this module's to make unilaterally. `provenanceOf` above is the
+// candidate policy, mutation-tested and ready; wiring it in is deliberately
+// left undone here.
 //
 // ── A SECOND DEFECT IN THE SAME VIEW, RECORDED WHERE IT WAS FOUND ───────────
 //
@@ -173,7 +190,10 @@ export function provenanceOf(event: ScoringEvent): ProvenanceVerdict {
 }
 
 /**
- * The columns `EarnedMetricsRepo` can actually see, measured 2026-08-17.
+ * The columns `EarnedMetricsRepo` can actually see, RE-MEASURED 2026-08-17
+ * after the migration in the same session (trinity_changelog id 141). Was
+ * six columns, none provenance, from 2026-08-17T13:xx until the migration
+ * later the same day; now seven, `quorum_providers_used` among them.
  *
  * Checked in as SCHEMA, not as rows — the preflight fences forbid prod rows as
  * git fixtures, and a column list is neither a row nor a secret. It is here so
@@ -186,6 +206,7 @@ export const SCORING_PATH_COLUMNS: readonly string[] = [
   'success',
   'domain',
   'value_ms',
+  'quorum_providers_used',
 ];
 
 /**
