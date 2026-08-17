@@ -142,6 +142,8 @@ lib/**/*.js
 .floor-decay-check-*/
 .receipt-cli-*/
 .repid-calibration-check-*/
+.verdict-provenance-check-*/
+.mutate.lock
 .repid-drift-check-*/
 .repid-marginal-check-*/
 .spine-e2e-check-*/

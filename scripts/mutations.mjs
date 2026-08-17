@@ -1551,6 +1551,103 @@ export const MUTATIONS = [
     find: "  return src.replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ').replace(/(^|[^:])\\/\\/[^\\n]*/g, '$1');",
     replace: '  return src;',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/verdict-provenance.ts — P2, the Gate 2 schema blocker
+  // -------------------------------------------------------------------------
+  {
+    id: 'provenance-null-reads-as-unearned',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'ABSENT provenance is NOT_CHECKED, never a finding of "unearned". Every event on the ' +
+      'live scoring path has null provenance today, so reading null as false would ' +
+      'manufacture ~70,000 accusations out of a missing column — a fabricated finding at ' +
+      'scale, worse than the gap it claims to describe',
+    find: '  if (event.providerAttempted === null || event.providerAttempted === undefined) {',
+    replace: '  if (event.providerAttempted === undefined) {',
+  },
+  {
+    id: 'provenance-untraceable-counts',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'an event whose provenance cannot be established must NOT move a reputation score. ' +
+      'NOT_CHECKED and FAILED are different facts with the same consequence, and letting ' +
+      'the first one through is how "we could not tell" becomes "it passed"',
+    find: "      outcome: 'NOT_CHECKED',\n      countsTowardScore: false,",
+    replace: "      outcome: 'NOT_CHECKED',\n      countsTowardScore: true,",
+  },
+  // `provenance-abstention-punished` lived here until 2026-08-17. It pointed at
+  // `if (event.vetoed && event.providerAttempted === false)`, which the ordering
+  // fix dissolved — `vetoed` is now tested first, so that conjunction no longer
+  // exists and the runner correctly reported DRIFT rather than a pass.
+  //
+  // The invariant it protected — "only actionable verdicts stake" — is NOT gone;
+  // it moved to the `!event.vetoed` early return, where the two mutants below
+  // point at it directly. Deleted rather than re-pointed at a contrived target,
+  // because a mutant aimed at a line chosen to make it compile tests the line,
+  // not the invariant.
+  {
+    id: 'provenance-null-checked-before-vetoed',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'ORDER: `vetoed` is tested BEFORE provenance, so a NON-ACTIONABLE event owes no ' +
+      'evidence. This mutant reinstates the original bug — demanding provenance from an ' +
+      'event that stakes nothing — which drops 82,459 of 152,482 observation rows (54.1%), ' +
+      'including 100% of the x402 and latency arms, neither of which has a provider concept ' +
+      'to record. It deletes the positive evidence and keeps the accusations, and every ' +
+      'assertion that existed before 2026-08-17 stayed green through it',
+    find: '  if (!event.vetoed) {',
+    replace: '  if (!event.vetoed && event.providerAttempted !== null && event.providerAttempted !== undefined) {',
+  },
+  {
+    id: 'provenance-nonactionable-does-not-count',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'a non-actionable observation MAY move a score. It is the positive evidence — the ' +
+      'clean runs, the settled payments, the recorded latencies — and a reputation system ' +
+      'that counts only the failures is not a reputation system',
+    find: "      outcome: 'VERIFIED',\n      countsTowardScore: true,\n      detail:\n        'a non-actionable verdict; nothing is staked either way",
+    replace: "      outcome: 'VERIFIED',\n      countsTowardScore: false,\n      detail:\n        'a non-actionable verdict; nothing is staked either way",
+  },
+  {
+    id: 'provenance-near-miss-column-accepted',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'a column that merely SOUNDS like provenance does not satisfy the gate. Substring ' +
+      'matching would let a column named `provider` declare Gate 2 unblocked while carrying ' +
+      'nothing about whether one was attempted',
+    find: '  const found = PROVENANCE_COLUMN_CANDIDATES.filter((c) => columns.includes(c));',
+    replace: '  const found = PROVENANCE_COLUMN_CANDIDATES.filter((c) => columns.some((col) => c.includes(col)));',
+  },
+  {
+    id: 'provenance-parser-moved-callsite-reads-as-blocked',
+    suite: 'check:verdict-provenance',
+    file: 'scripts/check-verdict-provenance.mjs',
+    protects:
+      '"could not look" must not collapse into "found nothing". If the scorer query moves or ' +
+      'is renamed, the parser returns ok:false and the gate FAILS. Letting it return an empty ' +
+      'column list instead would make describeLinkage report NOT_CHECKED — the exact blocker ' +
+      'this gate was written to report, reached by not looking, and indistinguishable from ' +
+      'the real thing in the output',
+    find: "    return { ok: false, columns: [], detail: `no \\`.from('${VIEW}')\\` in ${REPO_SRC}` };",
+    replace: "    return { ok: true, columns: [], detail: `no \\`.from('${VIEW}')\\` in ${REPO_SRC}` };",
+  },
+  {
+    id: 'provenance-linkage-always-verified',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'the linkage report is derived from the columns actually present. A gate that reports ' +
+      'VERIFIED regardless is the unearned green this whole repository is organised against, ' +
+      'in the gate written to report a blocker',
+    find: '  if (found.length > 0) {',
+    replace: '  if (found.length >= 0) {',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

@@ -47,6 +47,10 @@ const ROOT = 'lib/trustshell';
  */
 const DECLARED = new Map([
   [
+    'verdict-provenance',
+    'P2 of SPRINT-DECISIONS-2026-08-17. It cannot be wired yet, and the obstruction is a PROJECTION, not a missing foreign key: repid_score_events already carries provenance as metadata->>\'quorum_providers_used\' on 93,657 of 147,723 HAL_SCORE_EVENT rows (63.4%, and 100% since the 2026-06-04 cutover), but v_agent_earned_observations — the view EarnedMetricsRepo reads — projects six columns and none is provenance. So the scorer cannot see a value the pipeline already records. `check:verdict-provenance` reports NOT_CHECKED and turns VERIFIED on its own the moment the view projects it; this declaration goes stale in the same moment, which is the point.',
+  ],
+  [
     'harness/aggregate',
     'reliability module. The agent loop executor is its intended consumer and is at Stage A — docs/AGENT-LOOP-SCOPE.md measured 47 harness settings with zero production consumers, and names the executor as the wiring that ends this.',
   ],
