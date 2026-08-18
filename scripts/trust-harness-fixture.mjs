@@ -64,6 +64,7 @@ try {
 const { runContractedWork } = spine;
 const { generateKeyPair } = did;
 const { ManualClock } = types;
+const workContract = await import(pathToFileURL(join(outDir, 'trustshell', 'identity', 'work-contract.js')).href);
 
 const started = Date.now();
 let passed = 0;
@@ -206,6 +207,38 @@ await check('FALSE PATH: same-DID evaluator is refused', async () => {
   counts.after.falsePath += 1;
 });
 
+await check('AMENDED CONTRACT: verdict is not bound after the contract changes', async () => {
+  const out = await run('fixture-amend', { outcome: 'VERIFIED', score: 0.97, detail: 'judged' });
+  truthy(out.verdict, 'a verdict exists to bind');
+  const amended = { ...out.contract, taskId: 'amended-after-work' };
+  const v = await workContract.verifyVerdict({ verdict: out.verdict, contract: amended });
+  eq(v.boundToContract, false, 'amending the contract after work must unbind the verdict');
+  counts.after.falsePath += 1;
+});
+
+await check('OUTAGE: last-tier throw cannot certify', async () => {
+  const out = await runContractedWork({
+    assignment: assignmentFor('fixture-outage'),
+    doerKey: doer.privateKey,
+    checkerKeyFor: (d) => keyFor.get(d),
+    tiers: [
+      {
+        name: 'panel',
+        judge: {
+          async judge() {
+            throw new Error('evaluator outage');
+          },
+        },
+      },
+    ],
+    execution: execution(),
+    now: () => new Date('2026-08-17T02:00:00.000Z'),
+    observedAt: '2026-08-17T02:00:00.000Z',
+  });
+  eq(out.loop.outcome === 'VERIFIED', false, 'an outage is not an accept');
+  counts.after.falsePath += 1;
+});
+
 const ms = Date.now() - started;
 const report = {
   fixture: 'check:trust-harness-fixture',
@@ -216,8 +249,8 @@ const report = {
     note: 'in-process counters, not ledger rows — this fixture writes no prod events',
   },
   not_checked: [
-    'live POST /api/trustshell/review (judge secrets absent → REJECT-ONLY)',
-    'live POST /api/trustrails/pay (does not call runContractedWork)',
+    'live POST /api/trustshell/review still REJECT-ONLY without judge model secrets',
+    'live POST /api/trustrails/pay now calls evaluateContractedPayment (this fixture is in-process)',
     'doer ReputationSignal leaf (circuit vocabulary; withheld reasons only)',
     'witnessHidden / provenWithoutSecret (permanently false)',
     'BFT evaluations (0 rows)',
@@ -238,5 +271,5 @@ console.log(`trust-harness-fixture: ${passed} passed, 0 failed`);
 console.log(JSON.stringify(report, null, 2));
 console.log(
   `check:trust-harness-fixture — VERIFIED. accept=${counts.after.accept} reject=${counts.after.reject} ` +
-    `falsePath=${counts.after.falsePath} wall_ms=${ms}. Live payment/review paths remain NOT CHECKED.`
+    `falsePath=${counts.after.falsePath} wall_ms=${ms}. Live /pay fail-closes without seeds.`
 );

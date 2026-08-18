@@ -12,6 +12,10 @@ import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
 import { EarnedMetricsRepository } from '@/lib/trustshell/EarnedMetricsRepo';
 import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import {
+  evaluateContractedPayment,
+  mayApproveAfterContract,
+} from '@/lib/trustshell/identity/payment-contract';
 
 export async function POST(req: NextRequest) {
   const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } = await req.json();
@@ -201,6 +205,30 @@ export async function POST(req: NextRequest) {
     }
     const maxWithdrawal = kyaResult.enforcedPerTxLimit;
 
+    // LIVE CALLER. The spine existed; this route used to approve without it.
+    // Fail closed if the contracted path is not invoked or does not VERIFIED.
+    // BFT stays observe-only after this — this is not flipping #95 or BFT.
+    const contracted = await evaluateContractedPayment({
+      brief: {
+        paymentId,
+        agentName,
+        amountUSDC,
+        recipientAddress,
+        purpose: purpose ?? '',
+      },
+      env: process.env,
+    });
+    if (!mayApproveAfterContract(contracted)) {
+      return NextResponse.json({
+        approved: false,
+        stage: 'contracted_evaluation',
+        reason: contracted.invoked
+          ? `contracted evaluator ${contracted.outcome}`
+          : contracted.reason,
+        contracted,
+      }, { status: contracted.invoked ? 403 : 503 });
+    }
+
     // The panel needs the actual decision context, not just an amount — the
     // recipient, the stated purpose and the agent's standing are what a
     // reviewer weighs. In observe mode this returns immediately without
@@ -314,6 +342,8 @@ export async function POST(req: NextRequest) {
         observationsTruncated: earned.truncated,
         detail: earned.evidence.detail,
       },
+      contracted,
+      floorDecay: earned.floorDecay ?? null,
       bft: {
         evaluated: bftProof.evaluated,
         status:    bftProof.evaluated ? (bftProof.passed ? 'passed' : 'failed') : 'NOT CHECKED',

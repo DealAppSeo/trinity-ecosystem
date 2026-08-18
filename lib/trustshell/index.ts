@@ -380,11 +380,19 @@ export type {
 export { classify, scoreIssuer, refusesToIssue, STAKE_POINTS } from './issuer-stake';
 export type { IssuedVerdict, VerdictClass, IssuerStanding } from './issuer-stake';
 
-// P3 of docs/SPRINT-DECISIONS-2026-08-17.md lives in `repid-floor-decay.ts` and
-// is deliberately NOT exported here. It is declared dormant in
-// `check-dormancy.mjs` with its reason: the invariants are decidable and gated,
-// the RATE is not, and a barrel export would make an uncalibrated rule reachable
-// by a caller who has no window to pass it.
+export {
+  evaluateContractedPayment,
+  mayApproveAfterContract,
+} from './identity/payment-contract';
+export type {
+  PaymentBrief,
+  PaymentContractDecision,
+} from './identity/payment-contract';
+
+// P3 of docs/SPRINT-DECISIONS-2026-08-17.md lives in `repid-floor-decay.ts`.
+// `EarnedMetricsRepo` now CONSULTS it via floor-decay-consult.ts. The barrel
+// still does not re-export decideFloor: the RATE remains NOT_CHECKED and a
+// caller must pass a window, not pick one up from an import.
 //
 // A second P3 module (`ratchet-decay.ts`) was exported from here and is now
 // removed. Two lanes implemented the same concern in parallel; the canonical
