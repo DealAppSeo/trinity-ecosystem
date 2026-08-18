@@ -23,9 +23,10 @@ tagged [code] / [R].
 | Gate 2 provenance reaches the scorer | #94 merged `4fccb6a`. View projects `quorum_providers_used`. `EarnedMetricsRepo` selects it and excludes only **actionable** catches with null/0 providers. |
 | Gate 2 effect is tiny on real agents | [R from #94 SQL, 2026-08-17] actionable-unproven share **0.02–0.18%** of decayed integrity weight. The 16–19% “lacks provenance” mass is almost all **clean** evidence — excluding it would delete the positive, not the accusations. Per-agent: shofet +0.04pp, gcm +0.02pp, mel +0.10pp. |
 | Spine composition exists and is mutation-tested | `runContractedWork` / `runAcceptedWork`. `check:spine-e2e`, `check:spine-reachable`, `check:checker-assignment`. `checker_must_not_be_doer` is constitutional. |
+| Named Trust Harness fixture on `main` | #101 `a4e2d6a`. `check:trust-harness-fixture`: contract → work → independent Evaluator → signed contract-bound verdict → evidence vs progress, accept **and** reject. Local 2/2 + CI: accept=1 reject=1 falsePath=1. Mutate on merge head: **167 CAUGHT / 0 SURVIVED**, including `fixture-accepts-a-rejected-run` and `fixture-allows-self-judge`. Live `/review` and `/pay` remain **NOT CHECKED**. |
 | RepID threshold fail-closed | [code] `app/api/trustrails/pay/route.ts`: null threshold → **503**, not a silent 5000. |
 | KYA object is not a ZK proof | [code] same route: `proven=false`; commitment, not groth16. |
-| Mutation job present | `.github/workflows/check.yml` still has `mutate`. A18 on #93 and #94 required it green on the merge head. |
+| Mutation job present | `.github/workflows/check.yml` still has `mutate`. A18 on #93, #94, #101 required it green on the merge head. #101: 167 CAUGHT / 0 SURVIVED. |
 
 ## Observe-only (exists; does not enforce)
 
@@ -41,8 +42,8 @@ tagged [code] / [R].
 
 | item | owner | state |
 |---|---|---|
-| HAL volume | Sean (Railway + gateway) | [V 23:19Z] `hal_classifications` 7 / 1d, 15 / 7d, 121 / 30d. `HAL_SCORE_EVENT` 5 / 1d, 12 / 7d. `trinity_tasks` 6 / 1d. Last healthy day remains **2026-07-17**. Three distinct causes already named in PRIOR-WORK — do not re-derive: (1) Railway container stop 22:18Z, (2) gemini/qwen attrition from 07-14, (3) remaining 1–2/day is `e2e_smoke_nightly`. **No threshold tuning.** |
-| Production Evaluator caller | kernel | Review route exists but is REJECT-ONLY without judge secrets. Named product fixture lands in this cycle (`check:trust-harness-fixture`). Live payment path does **not** run the spine. |
+| HAL volume | Sean (Railway + gateway) | [V 23:19Z and remasure 23:55Z, identical] `hal_classifications` 7 / 1d, 15 / 7d, 121 / 30d. `HAL_SCORE_EVENT` 5 / 1d, 12 / 7d. `trinity_tasks` 6 / 1d. Last healthy day remains **2026-07-17**. Three distinct causes already named in PRIOR-WORK — do not re-derive: (1) Railway container stop 22:18Z, (2) gemini/qwen attrition from 07-14, (3) remaining 1–2/day is `e2e_smoke_nightly`. **No threshold tuning.** |
+| Production Evaluator caller | kernel | Fixture is on `main`. Review route is still REJECT-ONLY without judge secrets. Live `/pay` does **not** call `runContractedWork`. |
 | Doer verified-work `ReputationSignal` | cross-lane (XAI) | Missing leaf. Local withheld reasons exist on the spine. Do **not** claim “only verified outcomes move reputation” for doers. |
 | `witnessHidden` / `provenWithoutSecret` | cross-lane | Permanently false; sole production `IBindingScheme` throws. Naming is honest; marketing “ZK” is not. Circuit public inputs BLOCKED. |
 | HAL replay (147,704 rows) | Sean (secrets) | HMAC + new secret key. Irreversible if run under a weak secret. |
@@ -61,7 +62,7 @@ Agents stop at diagnosis. In order:
 
 ## Confidence-language gate (all required)
 
-- [ ] Named E2E fixture green in CI (`check:trust-harness-fixture`) — local 2/2: accept=1 reject=1 falsePath=1; CI on this PR is the merge gate
+- [x] Named E2E fixture green in CI (`check:trust-harness-fixture`) — #101 `a4e2d6a`; accept=1 reject=1 falsePath=1; mutants CAUGHT
 - [x] Retracted unobserved-floor figure cannot merge (`check:prior-work`)
 - [x] Observe vs enforce labeled in this file
 - [ ] Payment fail postures mutation-caught as a dedicated suite (503 path is [code] only today)
