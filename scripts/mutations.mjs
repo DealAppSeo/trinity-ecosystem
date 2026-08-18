@@ -2004,6 +2004,114 @@ export const MUTATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // The gate that protects the gates — .github/workflows/check.yml and the
+  // checker_must_not_be_doer enforcement sites.
+  // -------------------------------------------------------------------------
+  {
+    id: 'ci-integrity-mutate-step-removed',
+    suite: 'check:ci-integrity',
+    file: '.github/workflows/check.yml',
+    protects:
+      'the mutate job actually invokes npm run mutate. Removing the run step ' +
+      '(a step whose name survives while its body is gutted, or renamed to ' +
+      'skip a different script) turns 123+ "protects:" claims in this very ' +
+      'file into comments nobody runs, with a green CI tick as cover',
+    find: '        run: npm run mutate',
+    replace: '        run: echo "mutation gate skipped"',
+  },
+  {
+    id: 'ci-integrity-mutate-softened',
+    suite: 'check:ci-integrity',
+    file: '.github/workflows/check.yml',
+    protects:
+      'the mutate job is not softened with continue-on-error. This is the exact ' +
+      'failure mode named in the job\'s own comment: "No continue-on-error and ' +
+      'no || true: this job is allowed to fail the run" — a one-line addition ' +
+      'that lets every SURVIVED mutation report green',
+    find: '  mutate:\n    runs-on: ubuntu-latest',
+    replace: '  mutate:\n    runs-on: ubuntu-latest\n    continue-on-error: true',
+  },
+  {
+    id: 'ci-integrity-restore-check-removed',
+    suite: 'check:ci-integrity',
+    file: '.github/workflows/check.yml',
+    protects:
+      'the tree-restore verification step survives beside the mutate step. ' +
+      'Without it, a mutation runner that corrupts the working tree on exit ' +
+      '(the exact failure this session hit locally when two invocations ' +
+      'collided) goes undetected in CI rather than failing the run',
+    find: '      - name: sources restored\n        run: git diff --exit-code',
+    replace: '',
+  },
+  {
+    id: 'ci-integrity-spine-guard-removed',
+    suite: 'check:ci-integrity',
+    file: 'lib/trustshell/identity/spine.ts',
+    protects:
+      'THE ONE THE COMMENT ITSELF WARNS ABOUT. spine.ts\'s checker_must_not_be_doer ' +
+      'guard exists BECAUSE "a constitutional invariant should not rest on one ' +
+      'call site" — removing this one, leaving the other three (work-contract.ts, ' +
+      'checker-assignment.ts, auditor-grant.ts) intact, is precisely the partial ' +
+      'regression normal test coverage is worst at catching, since three of four ' +
+      'call sites still pass everything',
+    find:
+      "  if (assigned.unsigned.checkerDid === assignment.doerDid) {\n" +
+      "    throw new Error(\n" +
+      "      'checker_must_not_be_doer: the drawn checker is the doer. This is ' +\n" +
+      "        'constitutional and no setting may relax it.'\n" +
+      "    );\n" +
+      "  }",
+    replace: '  // checker_must_not_be_doer guard removed',
+  },
+  {
+    id: 'ci-integrity-assignment-exclusion-unnamed',
+    suite: 'check:ci-integrity',
+    file: 'lib/trustshell/identity/checker-assignment.ts',
+    protects:
+      'the doer-exclusion in eligiblePool stays NAMED as checker_must_not_be_doer, ' +
+      'not merely present as an unexplained comparison. A future refactor that ' +
+      'keeps the exclusion but drops the name is how this invariant stops being ' +
+      'discoverable by anyone grepping for it — including this very gate',
+    find: '  /** Excluded unconditionally. `checker_must_not_be_doer`, applied at selection. */',
+    replace: '  /** Excluded unconditionally. */',
+  },
+  {
+    id: 'ci-integrity-work-contract-guard-removed',
+    suite: 'check:ci-integrity',
+    file: 'lib/trustshell/identity/work-contract.ts',
+    protects:
+      'assertContractSane still refuses a contract whose doer and checker are ' +
+      'the same identity. This is the FIRST of the four independent ' +
+      'checker_must_not_be_doer sites — a contract that never reaches this ' +
+      'check has nothing left upstream of it in the identity spine',
+    find:
+      "  if (sameDid(c.doerDid, c.checkerDid)) {\n" +
+      "    throw new Error(\n" +
+      "      `the doer and the checker are the same identity (${c.doerDid}). ` +\n" +
+      "        'verification.checker_must_not_be_doer is constitutional — no layer may waive it.'\n" +
+      "    );\n" +
+      "  }",
+    replace: '  // checker_must_not_be_doer guard removed',
+  },
+  {
+    id: 'ci-integrity-auditor-grant-guard-removed',
+    suite: 'check:ci-integrity',
+    file: 'lib/trustshell/identity/auditor-grant.ts',
+    protects:
+      'an auditor still cannot hold a grant to audit the very agent it is. ' +
+      'This is the fourth checker_must_not_be_doer site — auditor-grant.ts\'s ' +
+      'own comment names it as getting the SAME constitutional guarantee "by ' +
+      'comparing DIDs instead of trusting a flag", which this mutation removes',
+    find:
+      "  if (sameDid(input.auditor.did, input.doerDid)) {\n" +
+      "    throw new Error(\n" +
+      "      `the auditor and the doer are the same identity (${input.auditor.did}). ` +\n" +
+      "        'verification.checker_must_not_be_doer is constitutional; an agent may not hold a ' +\n" +
+      "        'grant to audit itself.'\n" +
+      "    );\n" +
+      "  }",
+    replace: '  // checker_must_not_be_doer guard removed',
+  },
   // lib/trustshell/verdict-provenance.ts — P2, the Gate 2 schema blocker
   // -------------------------------------------------------------------------
   {
