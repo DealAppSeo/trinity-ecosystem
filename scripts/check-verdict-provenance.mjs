@@ -152,6 +152,8 @@ check('an ACTIONABLE verdict with no provider is FAILED', () => {
   const r = provenanceOf({ vetoed: true, providerAttempted: false });
   eq(r.outcome, 'FAILED', 'unearned veto');
   eq(r.countsTowardScore, false, 'must not move a score');
+  const src = readFileSync('lib/trustshell/verdict-provenance.ts', 'utf8');
+  truthy(/refusesToIssue\s*\(/.test(src), 'provenanceOf must call refusesToIssue, not inline a lookalike');
 });
 
 check('a NON-actionable verdict with no provider stakes nothing', () => {

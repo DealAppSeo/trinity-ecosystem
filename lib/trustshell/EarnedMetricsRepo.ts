@@ -19,6 +19,8 @@ import {
   type Observation,
 } from './EarnedMetrics';
 import { provenanceOf } from './verdict-provenance';
+import { consultFloor } from './floor-decay-consult';
+import type { FloorDecision } from './repid-floor-decay';
 
 /**
  * How far back to pull observations. Four half-lives, past which a row's decay
@@ -44,6 +46,8 @@ export interface EarnedMetricsLoad {
   evidence: EvidenceReport;
   /** True when the row cap was hit, so a reader knows the tail was dropped. */
   truncated: boolean;
+  /** decideFloor consulted on this load. not_checked is a real answer. */
+  floorDecay: FloorDecision | null;
 }
 
 /**
@@ -144,6 +148,7 @@ export class EarnedMetricsRepository {
         metrics,
         evidence: describeEvidence(metrics),
         truncated: false,
+        floorDecay: null,
       };
     }
 
@@ -156,6 +161,7 @@ export class EarnedMetricsRepository {
         metrics,
         evidence: describeEvidence(metrics),
         truncated: false,
+        floorDecay: null,
       };
     }
 
@@ -189,6 +195,7 @@ export class EarnedMetricsRepository {
         metrics,
         evidence: describeEvidence(metrics),
         truncated: false,
+        floorDecay: await this.consultAgentFloor(resolved.id, now),
       };
     }
 
@@ -245,7 +252,36 @@ export class EarnedMetricsRepository {
       metrics,
       evidence: describeEvidence(metrics),
       truncated: rows.length >= MAX_OBSERVATIONS,
+      floorDecay: await this.consultAgentFloor(resolved.id, now),
     };
+  }
+
+  /**
+   * Call decideFloor. last-demonstration is not a column we can honestly fill,
+   * so the typical result is not_checked. That is the consult, not a hold.
+   */
+  private async consultAgentFloor(agentId: string, nowIso: string): Promise<FloorDecision> {
+    const { data, error } = await this.supabase
+      .from('repid_agents')
+      .select('peak_repid, current_repid, floor_override, is_human')
+      .eq('id', agentId)
+      .maybeSingle();
+    if (error) {
+      return {
+        kind: 'not_checked',
+        floor: 0,
+        reason: `could not read floor state: ${error.message}`,
+      };
+    }
+    return consultFloor({
+      peakRepid: typeof data?.peak_repid === 'number' ? data.peak_repid : null,
+      currentRepid: typeof data?.current_repid === 'number' ? data.current_repid : null,
+      floorOverride: typeof data?.floor_override === 'number' ? data.floor_override : null,
+      isHuman: typeof data?.is_human === 'boolean' ? data.is_human : null,
+      lastReEarnedAt: null,
+      now: Date.parse(nowIso),
+      env: process.env,
+    });
   }
 }
 

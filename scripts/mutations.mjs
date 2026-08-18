@@ -2336,6 +2336,76 @@ export const MUTATIONS = [
     find: "  truthy(threw, 'a doer-as-checker pool must refuse, never certify');",
     replace: "  truthy(!threw, 'a doer-as-checker pool must refuse, never certify');",
   },
+  {
+    id: 'fixture-accepts-an-amended-contract',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'a verdict bound to contract A must not remain bound after the contract is amended. ' +
+      'Treating boundToContract as true here would certify work against a contract nobody signed',
+    find: "  eq(v.boundToContract, false, 'amending the contract after work must unbind the verdict');",
+    replace: "  eq(v.boundToContract, true, 'amending the contract after work must unbind the verdict');",
+  },
+  {
+    id: 'fixture-outage-certifies',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'an evaluator outage must not certify. Inverting this assertion would make a throw look like VERIFIED',
+    find: "  eq(out.loop.outcome === 'VERIFIED', false, 'an outage is not an accept');",
+    replace: "  eq(out.loop.outcome === 'VERIFIED', true, 'an outage is not an accept');",
+  },
+  {
+    id: 'pay-approves-without-contracted-path',
+    suite: 'check:live-callers',
+    file: 'lib/trustshell/identity/payment-contract.ts',
+    protects:
+      'a payment must not approve unless the contracted path invoked an independent ' +
+      'evaluator. Returning true from mayApproveAfterContract unconditionally is the ' +
+      'silent skip the live-caller claim exists to close',
+    find: '    d.invoked === true &&\n    d.outcome === \'VERIFIED\' &&\n    d.boundToPayment === true &&\n    d.checkerDid !== d.doerDid',
+    replace: '    true',
+  },
+  {
+    id: 'pay-approves-a-failed-evaluation',
+    suite: 'check:live-callers',
+    file: 'lib/trustshell/identity/payment-contract.ts',
+    protects:
+      'an evaluator REJECT is not an approval. Collapsing FAILED into VERIFIED would ' +
+      'make /pay a certificate factory — the same overclaim the fixture already forbids',
+    find: "    result.loop.outcome === 'VERIFIED' && verdict.outcome === 'VERIFIED' ? 'VERIFIED' : 'FAILED';",
+    replace: "    'VERIFIED';",
+  },
+  {
+    id: 'pay-route-skips-contracted-gate',
+    suite: 'check:live-callers',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'L3 wiring: /pay must call evaluateContractedPayment. Deleting the call is the ' +
+      'original gap — exists-but-not-on — and must go red',
+    find: '    if (!mayApproveAfterContract(contracted)) {',
+    replace: '    if (false) {',
+  },
+  {
+    id: 'review-route-skips-session',
+    suite: 'check:live-callers',
+    file: 'app/api/trustshell/review/route.ts',
+    protects:
+      '/review is the production Evaluator caller. If POST stops calling runReviewSession ' +
+      'the surface is a comment',
+    find: '    outcome = await runReviewSession({',
+    replace: "    outcome = { status: 'ACCEPTED', awaitingRevision: false, rounds: [] }; void ({",
+  },
+  {
+    id: 'provenance-skips-refuses-to-issue',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'refusesToIssue must be the issuer-stake function, not an inlined lookalike that ' +
+      'can drift. Replacing the call with false lets an unearned veto move a score',
+    find: '      refusesToIssue({\n        providerAttempted: false,\n        vetoed: event.vetoed,\n      })',
+    replace: '      false',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
