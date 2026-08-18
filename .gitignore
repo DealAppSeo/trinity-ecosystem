@@ -152,6 +152,7 @@ lib/**/*.js
 .staged-judge-check-*/
 .throughput-check-*/
 .zk-cost-check-*/
+.poseidon2-check-*/
 .harness-extract-check-*/
 .repid-weight-sim-*/
 .issuer-stake-check-*/

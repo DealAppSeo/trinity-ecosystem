@@ -1,6 +1,23 @@
 # Poseidon2 parameter request — trinity-ecosystem → repid-engine lane
 
-**Status:** OPEN, blocking `lib/trustshell/identity/nullifier.ts`
+**Status 2026-08-17: PARTIAL — the parameters were never missing.**
+Every row of the table below except the last three was already answered in
+`repid-engine/src/zkp/poseidon2-babybear.ts`, dated **2026-08-10**, four days
+before this request was written. It is now copied into this lane at
+`lib/trustshell/identity/poseidon2-babybear.ts` (byte-identical, md5-compared)
+and verified against Plonky3's own oracle — **12 KAT vectors, 0 failures**, via
+`npm run check:poseidon2`.
+
+| | |
+|---|---|
+| **SETTLED** | field, width, R_F, R_P, α, round constants, both matrices, and the 2-scalar hash `H(a,b) = Perm16([a,b,0..])[0]` |
+| **STILL OPEN** | `secret: string` → field encoding; domain-tag encoding; absorption layout for the **4-input** nullifier |
+| **`IBindingScheme`** | still refuses. `PendingPoseidon2Scheme` throws, and `check:poseidon2` asserts that it does |
+
+The three open items are the ones a KAT cannot answer: the oracle fixes the
+2-scalar case only, and a permuted absorption order is a different function that
+still verifies internally. They need the circuit's answer, not this lane's.
+
 **Decided 2026-08-14:** Poseidon2 is the canonical hash for every circuit-bound
 commitment and nullifier across both lanes.
 

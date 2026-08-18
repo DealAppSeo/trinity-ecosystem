@@ -110,6 +110,7 @@
     "check:lessons-numbering": "node scripts/check-lessons-numbering.mjs",
     "check:durable-ledger": "node scripts/durable-ledger-test.mjs",
     "check:tmpdir-ignored": "node scripts/check-tmpdir-ignored.mjs",
+    "check:poseidon2": "node scripts/check-poseidon2.mjs",
     "check:harness-extractable": "node scripts/check-harness-extractable.mjs",
     "check:issuer-stake": "node scripts/check-issuer-stake.mjs",
     "check:verdict-provenance": "node scripts/check-verdict-provenance.mjs",
