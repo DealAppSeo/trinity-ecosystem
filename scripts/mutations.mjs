@@ -855,6 +855,31 @@ export const MUTATIONS = [
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
   },
   {
+    id: 'promotion-counts-a-run-against-another-artifact',
+    suite: 'check:promotion-evidence',
+    file: 'lib/trustshell/promotion.ts',
+    protects:
+      'A18, mechanised. A real gate, a real pass, the wrong subject — three commits once sat ' +
+      'with `npm run check` never having run against them, behind a green tick belonging to ' +
+      "Vercel's preview-comments check. The mutant counts any green run, so a stale one " +
+      'promotes a surface to live. The filter on `ranAgainst` is the only thing standing ' +
+      'between a status table and that tick',
+    find: '  return claim.runs.filter((r) => r.gate.length > 0 && r.ranAgainst === claim.artifact);',
+    replace: '  return claim.runs.filter((r) => r.gate.length > 0);',
+  },
+  {
+    id: 'promotion-turns-absence-into-a-posture',
+    suite: 'check:promotion-evidence',
+    file: 'lib/trustshell/promotion.ts',
+    protects:
+      'an unmeasured surface returns NULL, rendered as NOT CHECKED — it does not get the ' +
+      'lowest good-looking row. `observe` is a deliberate posture (it ran, it does not gate); ' +
+      'silently assigning it to a surface nobody measured is the table-shaped version of the ' +
+      'two-outcome collapse',
+    find: '  if (runs.length === 0) return null;',
+    replace: "  if (runs.length === 0) return 'observe';",
+  },
+  {
     id: 'bft-outage-claims-the-vote-happened',
     suite: 'check:payment-fail-posture',
     file: 'lib/trustshell/BFTAuthorizer.ts',
