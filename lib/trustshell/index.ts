@@ -177,6 +177,24 @@ export type {
 export { countingScheme, totalCalls, verifyGrowth, COST_MODEL, ZERO_COST } from './identity/cost';
 export type { HashCost, CountingScheme } from './identity/cost';
 
+/**
+ * What a surface may CLAIM about itself, and what it must show first.
+ *
+ * A stage is DERIVED from gate runs, never asserted — see `promotion.ts`. A run
+ * against a different artifact is reported rather than counted, which is A18
+ * mechanised: a real gate, a real pass, the wrong subject.
+ */
+export {
+  stageFor,
+  report as reportStage,
+  statusTable,
+  canPromoteToLive,
+  evidenceFor,
+  staleEvidence,
+  StageAsserted,
+} from './promotion';
+export type { Stage, GateRun, GateOutcome, SurfaceClaim, StageReport } from './promotion';
+
 export {
   CONTRACT_DOMAIN,
   VERDICT_DOMAIN,
