@@ -1,7 +1,7 @@
 # Sprint: Portable zk Trust Harness
 
 Canonical brief for all agents.
-Precedence: SPRINT-DECISIONS-*.md on main > this file > chat.
+Precedence: SPRINT-DECISIONS-*.md on main > docs/TRUST-HARNESS-STATUS-2026-08-17.md > this file > chat.
 
 Agents must use this path only. Do not use Windows E:\ paths.
 
@@ -27,4 +27,6 @@ under hard trust ceilings. npm install must not lie about keyless behavior.
 - P5 reweight: blocked until real BFT observations
 
 ## Idle agents
-Pull main, read this file + SPRINT-DECISIONS, do not duplicate open work.
+Pull main. Read `docs/TRUST-HARNESS-STATUS-2026-08-17.md` (proven / observe-only / blocked).
+Then this file + SPRINT-DECISIONS. Do not duplicate open work. Do not restate
+the retracted unobserved-floor census. Do not call shadow or observe-mode "enforced".

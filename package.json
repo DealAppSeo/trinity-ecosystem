@@ -115,7 +115,8 @@
     "check:verdict-provenance": "node scripts/check-verdict-provenance.mjs",
     "check:earned-metrics-repo": "node scripts/check-earned-metrics-repo.mjs",
     "check:proof-provider-contract": "node scripts/check-proof-provider-contract.mjs",
-    "check:bft-evidence-chain": "node scripts/check-bft-evidence-chain.mjs"
+    "check:bft-evidence-chain": "node scripts/check-bft-evidence-chain.mjs",
+    "check:trust-harness-fixture": "node scripts/trust-harness-fixture.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",
