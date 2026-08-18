@@ -1816,4 +1816,4 @@ by **10–12 percentage points** upward for every one of them — not a rounding
 effect, the single largest swing available in that metric today. Reported on
 PR #94 rather than fixed here: that lane owns `verdict-provenance.ts`, is
 already mid-flight on this exact view, and duplicating the consumer-side fix in
-parallel would recreate tonight's P3 collision (A28) one gate over.
+parallel would recreate tonight's P3 collision (A30) one gate over.
