@@ -96,6 +96,18 @@ const RETRACTED = [
       'and read the ERROR deploy off `hyperdag-org`, a project that serves no custom domain',
   },
   {
+    id: 'floor-never-observed-6',
+    pattern:
+      /\b(6|six)\s+(agents\s+)?(hold|holding)\s+(a\s+)?(floor|standing)|6\s+with\s+zero\s+observations/i,
+    claim: '6 agents hold a floor having never been observed at all',
+    truth:
+      'does not reproduce under any window tested against v_agent_earned_observations joined on ' +
+      'repid_agents.id: 3 with none ever, 4 with none in 30 days, 3 with none in 120 days. The ' +
+      'originating query was not preserved, so the CAUSE is UNVERIFIED — but all 3 genuinely ' +
+      'unobserved floor-holders are lifecycle_status=test_only, so no real agent holds a floor ' +
+      'with zero evidence and "decay is the smaller half" does not follow',
+  },
+  {
     id: 'anon-137-4',
     pattern: /\b137\s*(tables\s*)?anon-?read|\b137\s*readable\b|\b4\s*anon-?writable\b/i,
     claim: '137 anon-readable / 4 anon-writable tables',
@@ -120,6 +132,11 @@ const RETRACTED = [
  * path so a new file cannot quietly inherit the exemption.
  */
 const ALLOWED = new Set([
+  // The failure log. Its entire function is to state a wrong claim next to the
+  // measurement that corrected it, so it necessarily quotes retracted figures.
+  // Same reasoning as SPRINT-LOG.md, and it needed no entry until 2026-08-17
+  // because no retraction had been written up here before.
+  'LESSONS.md',
   'docs/SPRINT-LOG.md',
   'docs/TRUST-HARNESS.md',
   'docs/PRIOR-WORK-INDEX.md',
@@ -136,6 +153,11 @@ const ALLOWED = new Set([
   'docs/RED-TEAM-REPID-ENGINE-2026-08-17.md',
   'docs/RED-TEAM-EXECUTIVE-SUMMARY-2026-08-17.md',
   'scripts/redteam/ledger.json',
+  // Carry the 2026-08-17 floor-census retraction, naming the withdrawn figure
+  // beside the corrected one because a reader who met the old number needs to
+  // recognise it; that is the whole function of those lines.
+  'lib/trustshell/fixtures/observation-identity-2026-08-17.json',
+  'lib/trustshell/repid-floor-decay.ts',
 ]);
 
 const SKIP_DIRS = new Set([

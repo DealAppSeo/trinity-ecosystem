@@ -1165,7 +1165,7 @@ or an outage ever claims a referral.
 
 ---
 
-## A25 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
+## A24 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
 
 **[VERIFIED] — the run is in CI: `check` green, `test:e2e` red, same commit.**
 
@@ -1205,7 +1205,7 @@ break shows up in seconds rather than after a build and a server boot.
 
 ---
 
-## A24 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
+## A25 — a CI poll that 403s looks exactly like a CI run that has not finished (2026-08-16)
 
 **[VERIFIED] — `curl` to the REST endpoint returns 403; the MCP tool returns the
 same runs successfully, seconds apart.**
@@ -1537,3 +1537,283 @@ that gives only the first is as misleading as one that gives only the second.
 The severity was not knowable from the defect — it took the window constant, the
 row cap, the lifecycle column and the direction of the error, and three of those
 four turned the alarm down.
+
+---
+
+## A27 — the column no code writes, and the function that answers to its own name twice (2026-08-17)
+
+#80 left "what populates `repid_agents.tier`" open. `grep` over the repo finds
+**one** reference to that table and it is a `SELECT`. The answer is that
+**nothing in TypeScript writes it** — a chain of database triggers does, and a
+code-only search cannot see a code-free write path.
+
+```
+INSERT repid_score_events -> apply_repid_score_event() -> UPDATE repid_agents.current_repid
+                                                       -> trg_repid_earned_floor()  (ratchet)
+                                                       -> trg_sync_tier()           (tier := compute_tier)
+```
+
+### Three things found on the way, each worth its own line
+
+**There are two tier ladders.** The database has VETERAN/AUTONOMOUS/ESTABLISHED/
+EARNING/PROBATIONARY at 8000/5000/1000/500; `lib/trustshell/repid-scoring.ts` has
+Platinum/Gold/Silver/Bronze at 7500/5000/2500/0. Both live, agreeing on exactly
+one boundary. **"The tier" is ambiguous in this system** and every claim about
+tiers has to say which one it means.
+
+**`compute_tier` is overloaded and the two versions disagree.** A 1-arg version
+applies thresholds only; a 2-arg version adds a counterparty gate, and is the one
+`sync_tier` calls. On `test-agent-v11`: `compute_tier(10000)` returns VETERAN,
+`compute_tier(10000, id)` returns ESTABLISHED. Same agent, same score, **two
+rungs apart**, resolved silently by argument count.
+
+**RepID is a ratchet.** `peak_repid` only rises and `current_repid` is clamped
+*up* to the floor of the best tier ever held. 21 of 176 agents sit exactly on a
+floor. So a penalty is reversible and **an inflation is not** — which makes every
+guard on the write path more load-bearing than it looks.
+
+### The part I got wrong, recorded because the reasoning was seductive
+
+`trg_hal_penalty_guard()` suppresses a negative HAL penalty unless
+`hallucination_caught IS TRUE`. From A26's 1,585 rows — `caught` true on a
+`clean` decision — the inference is immediate and alarming: those are exactly the
+rows that would *defeat* a guard built to stop them.
+
+**Wrong.** They are all `event_type = 'PREDICTION_RESOLVE'`, and the guard only
+fires on `HAL_SCORE_EVENT`. They applied **zero** delta — they never touched
+`current_repid`, `peak_repid` or `tier`.
+
+The inference was sound and the premise was unchecked. **A guard's condition is
+not its scope**: I read what the guard tests and never asked which rows it sees.
+One `group by event_type` settled it, and it was cheaper than the reasoning it
+replaced.
+
+## A28 — CI did not run for eight hours, and the PR looked checked (2026-08-16)
+
+**[VERIFIED] — read from the run record, not inferred: run 31976719734 shows
+`actor: Copilot (Bot)`, `conclusion: action_required`, `run_attempt: 1`,
+`updated_at` equal to `created_at`.**
+
+Copilot was asked to resolve a merge conflict on PR #56. It did, correctly. The
+head commit was therefore authored by `copilot-swe-agent[bot]`, so the
+`pull_request` workflow run was attributed to a Bot — and GitHub held it for
+manual approval.
+
+A held run is `status: completed, conclusion: action_required`. It was created
+and never started. **Six commits were pushed onto that head and every one of
+them was reported as verified on the strength of local runs alone.**
+
+### Why it took eight hours to notice
+
+Three things each looked fine on their own:
+
+- **The PR had a green check.** Vercel's preview deploy passed throughout. A
+  green tick on the PR is what people read as "checked"; nothing distinguishes
+  a deploy check from a test suite at a glance.
+- **The checks API showed one entry, not a failure.** A run that never starts
+  produces no check run, so `get_check_runs` returned only Vercel. Absence, not
+  red.
+- **Actions were healthy everywhere else.** `main` and three sibling branches
+  ran normally in the same window, which rules out the first thing anyone would
+  suspect.
+
+### Two wrong causes, stated before the evidence
+
+**The merge conflict was blamed first.** The PR was conflicted, `pull_request`
+workflows run against the merge ref, and a conflicted PR has no merge ref — a
+tidy explanation that fit the timeline and was wrong. It was tested by Copilot
+resolving the conflicts: `mergeable_state` went to `unstable` and **CI still did
+not run**. The hypothesis died on contact with the fix.
+
+**Then approval was assumed to have been granted.** After the first "approved
+it", the runs still read `action_required` with `updated_at` unchanged from
+`created_at` — an approval that had landed would have moved them to `queued` or
+created `run_attempt: 2`. The right check was the run's own timestamps, not the
+report that a button had been pressed.
+
+Only `actions_get(get_workflow_run)` settled it, because it is the one call that
+names the actor.
+
+### The rule
+
+**A workflow run has more than two states, and the interesting one is invisible.**
+`success` and `failure` are what everybody looks for. `action_required` means
+*created and never started*, and it does not appear as a check, does not appear
+as red, and does not appear at all in the place people look. Before reading a
+PR as verified, look at the RUN, not the checks list — and compare
+`updated_at` against `created_at` to tell a run that finished from a run that
+never began.
+
+The corollary is the recurring one in this file: **the failure was the silence,
+not the gate.** The gate is a reasonable security control and should stay. What
+cost the day is that nothing anywhere said "this PR has no CI".
+
+### What was done
+
+- `workflow_dispatch` added to `check.yml` and `prior-work.yml`, so a blocked
+  run has a second door that any write-access actor can open without waiting on
+  an approval nobody was told to give. It does not remove the gate.
+- The repository setting that governs bot-attributed runs
+  (Settings → Actions → General) is **Sean-gated and NOT CHANGED** — no tool in
+  this session can read or write Actions permissions, so claiming it was fixed
+  would be the defect this entry is about.
+
+## A30 — I retracted a figure, invented its cause, and had to retract that too (2026-08-17)
+
+*Renumbered from A28 on rebase 2026-08-17: main already held A28 (CI never
+started). Newer entry moves, per LESSONS numbering rule.*
+
+Two lanes built the same P3 decay module in parallel. Consolidating them, I
+re-measured the census my version rested on. One number did not reproduce.
+
+**The claim:** *"6 agents hold a floor having never been observed at all"* — and
+on it, a `never_earned` base case, and a header asserting **"decay is the smaller
+half"** of the defect.
+
+**Re-measured** against `v_agent_earned_observations` joined on
+`repid_agents.id`, across every window that could plausibly have been meant:
+
+| window | floor-holders with no observation |
+|---|---|
+| ever | **3** — all `lifecycle_status='test_only'` |
+| last 30 days | 4 |
+| last 120 days | 3 |
+
+**No window gives 6.** The figure is retracted and gated.
+
+What follows is the part worth having: **no real agent holds a floor with zero
+evidence.** The base case reached mock rows only. So decay is not the smaller
+half of the defect — it is the whole of it, and P3 needs no base case at all.
+
+### Then I explained it, and the explanation was wrong
+
+While checking this I found a genuine hazard: `repid_agents` carries **`id`
+(uuid)** and **`agent_id` (text)**, the observation view joins the former, and
+the two spaces are **disjoint** — `agent_id` is uuid-shaped on **0 of 176** rows.
+So the wrong key returns not an error, not a partial result, but the **empty
+set**, uniformly. "This agent has no track record" is a perfectly plausible
+reading of that.
+
+It is a real defect, cheap to make, and invisible. It is also **not what
+happened.** I wrote it up as the cause anyway, and drafted a second retraction
+alongside it — *"trinity-gcm: 12 observations in 30 days"* — before checking.
+
+Both were wrong:
+
+- The key mix-up returns zero observations for **every** agent. It would have
+  produced **12** unobserved floor-holders, not 6. It does not fit.
+- `trinity-gcm` has **33,434** observations all-time but only **15** in the
+  trailing 30 days, and is being observed live (+2 in the twenty minutes between
+  two queries). **12 in 30 days is consistent with that and was never wrong.** I
+  had compared an all-time count against a 30-day claim — the same units error
+  as the retracted hyperdag byte-vs-character figure, committed while writing up
+  a retraction.
+
+So the standing position is deliberately untidy: the figure is retracted, **its
+cause is UNVERIFIED**, and the join hazard is recorded as a separate finding on
+its own evidence. The originating query was not preserved, and no reconstruction
+fits.
+
+### What generalises
+
+CLAUDE.md says *suspect the sample before the measurement*. The sharper version
+this cost me:
+
+**A retraction is a claim, and it needs the same evidence as the claim it
+replaces.** Finding a plausible mechanism nearby is not finding the cause. The
+pull toward a tidy story is strongest precisely when writing up an error,
+because an unexplained mistake feels unfinished — and "unexplained" was the
+accurate report.
+
+The cheap test I skipped twice: **ask what the suspected cause would actually
+have produced.** One line of arithmetic — the bad join yields 12, not 6 — refutes
+it, and it was available before I wrote a word.
+
+### What was never affected
+
+Production. `EarnedMetricsRepo` resolves `id` and filters on it, and always did.
+Both errors were in measurements written *beside* correct code, which no type
+checker reaches and no green suite notices, because nothing executes them.
+
+### The neighbouring trap, found the same way
+
+`repid_agents.last_active_at` is the obvious recency column and is **not a
+recency signal**: written on **32 of 176** rows, NULL on **11 of the 12**
+ratcheted rows, written by exactly one database function
+(`apply_linked_bet_resolution`) and **zero** lines of this repo. It reports **17**
+recently-active agents where the evidence shows **67**.
+
+A decay keyed on it expires standing for agents that are demonstrably active, and
+fails in the expensive direction. The other lane's census reported "1 floor-sitter
+with any 30-day activity" from that column; on the observation evidence it is **8
+of 12**. Neither query was careless. We were both wrong about **which column was
+the fact**.
+
+`check:observation-identity` now gates all three: every consumer of the view must
+prove it resolves the uuid, a new consumer cannot appear undeclared, and no code
+may key recency off `last_active_at`. The mutation swaps the resolved uuid for
+the agent name and is CAUGHT.
+
+## A29 — a migration that was live three and a half hours before it existed anywhere (2026-08-17)
+
+Investigating whether the no-provider-veto defect (A23/P1) also inflates the
+*subject* agent's own earned score, I found `v_agent_earned_observations` had a
+7th column, `quorum_providers_used`, that no branch's migration history
+mentioned. `git log --all` / `git grep` across all 769 fetched commits: **zero**
+matches. But `mcp__Supabase__list_migrations` listed it as the newest applied
+version, timestamped ahead of everything in any checkout.
+
+**It was live and correct** — `pg_get_viewdef` matched exactly what PR #94's
+body proposed as the still-open "smallest unblock." Someone's session had
+applied it directly against the database while investigating, and never
+committed the file. PR #94's own text ("the view projects six columns and none
+is provenance") was already stale by the time I read it.
+
+**The risk this creates, concretely:** a fresh `supabase db reset`, or any
+environment rebuilt from `supabase/migrations/`, would have silently regressed
+to the six-column view — not by anyone editing it back, but by the tracked
+history simply not knowing the seventh column existed. The gap is invisible
+until someone runs exactly that command, at which point it looks like a
+regression with no commit to blame.
+
+**Fixed by writing the missing file, not by re-deciding the change.**
+`20260817162647_v_agent_earned_observations_add_provenance.sql` reproduces the
+live definition. Verified byte-exact the only way that means anything: applied
+it again with `CREATE OR REPLACE VIEW` and confirmed the round trip (column
+count, row count, and the attached comment all unchanged) — an identical
+`CREATE OR REPLACE VIEW` is a safe no-op, and PostgreSQL itself would have
+refused a definition that reordered or retyped an existing column, so success
+was evidence, not just documentation.
+
+### What generalises
+
+Applying a change directly and committing the file that describes it are two
+separate acts, and a session under time pressure ("let me just check what this
+would look like against real data") can do the first without the second. This
+repo's `mcp__Supabase__list_migrations` and its `supabase/migrations/`
+directory can therefore disagree, silently, and the newest thing in the former
+is the one place that will not show up in a `git grep`.
+
+**The tell was a timestamp that shouldn't have been possible** — a migration
+version later than my own session's start, on a database I had only read from
+so far. Worth checking `list_migrations` against `git log --all` whenever a
+column shows up that a `SELECT *` or `\d` reveals but no code in the checkout
+explains — the gap between "the schema has it" and "the repo says why" is
+exactly where this kind of drift hides.
+
+### What the underlying investigation still found, unfixed
+
+Projecting the column is not consuming it. `EarnedMetricsRepo.ts` still reads
+`signal, observed_at, success, domain, value_ms` only. Measured against the
+120-day observation window: **~44,995** `HAL_SCORE_EVENT` rows carry no
+provenance signal under either the new column or the older nested
+`hal_signals.providers_used` a pre-2026-06-04 code path used instead, spread
+across **12 real, active, non-human production agents** — every member of the
+active fleet with a nonzero score. They read as `success = true` unconditionally
+(`hallucination_caught` is never `true` on this cohort) and account for
+**16–19%** of each agent's decayed evidence weight, moving raw `veritasCatchRate`
+by **10–12 percentage points** upward for every one of them — not a rounding
+effect, the single largest swing available in that metric today. Reported on
+PR #94 rather than fixed here: that lane owns `verdict-provenance.ts`, is
+already mid-flight on this exact view, and duplicating the consumer-side fix in
+parallel would recreate tonight's P3 collision (A30) one gate over.

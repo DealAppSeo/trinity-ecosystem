@@ -1220,18 +1220,46 @@ await check('the default verifier still rejects a toy-hasher disclosure', async 
 await check('THE POSEIDON2 PLACEHOLDER REFUSES TO COMPUTE', async () => {
   const s = new nullifier.PendingPoseidon2Scheme();
   assert.equal(s.parametersKnown, false);
-  await assert.rejects(s.commit('secret'), /parameters are not available/);
-  await assert.rejects(s.nullify('secret', 'd', 'sc'), /parameters are not available/);
-  await assert.rejects(s.hashPair('a', 'b'), /parameters are not available/);
+  // Matches on `refused`, which is the invariant, rather than on the specific
+  // reason — the reason narrowed on 2026-08-17 and will narrow again.
+  await assert.rejects(s.commit('secret'), /refused/);
+  await assert.rejects(s.nullify('secret', 'd', 'sc'), /refused/);
+  await assert.rejects(s.hashPair('a', 'b'), /refused/);
 });
 
-await check('the refusal names exactly what is missing', async () => {
+// NARROWED 2026-08-17. This used to require the refusal to name `field`,
+// `width`, `round constants` and `test vectors` as missing. They are NOT
+// missing — repid-engine has held them since 2026-08-10, they are now in this
+// lane, and `npm run check:poseidon2` verifies all 12 of them against Plonky3's
+// oracle. An assertion demanding that a closed question be described as open is
+// how a stale blocker survives, so it is inverted below: the refusal must name
+// what REMAINS, and must NOT claim the parameters are the problem.
+await check('the refusal names what REMAINS, not what is already settled', async () => {
   const s = new nullifier.PendingPoseidon2Scheme();
   const msg = await s.commit('x').then(() => '', (e) => e.message);
-  for (const needed of ['field', 'width', 'round constants', 'test vectors']) {
-    assert.ok(msg.includes(needed), `refusal does not name '${needed}'`);
+  for (const needed of ['ENCODING', 'domain tags', 'absorption']) {
+    assert.ok(msg.includes(needed), `refusal does not name the open item '${needed}'`);
   }
   assert.match(msg, /POSEIDON2-PARAMETER-REQUEST/);
+  // It must point at the evidence that the permutation is settled, so a reader
+  // hitting this error does not re-open the request that is already answered.
+  assert.match(msg, /check:poseidon2/);
+});
+
+await check('the refusal does NOT claim the parameters are missing', async () => {
+  const s = new nullifier.PendingPoseidon2Scheme();
+  const msg = await s.commit('x').then(() => '', (e) => e.message);
+  // The exact wording that stood for three days while the answer sat one repo
+  // away. If it comes back, the blocker has been re-opened by prose.
+  assert.ok(
+    !/parameters are not available/i.test(msg),
+    'the refusal again claims the Poseidon2 parameters are unavailable; they are in ' +
+      'identity/poseidon2-babybear.ts and KAT-verified by check:poseidon2'
+  );
+  assert.ok(
+    !/round constants/i.test(msg),
+    'the refusal again asks for round constants, which are settled'
+  );
 });
 
 await check('commit and nullifier tags are distinct', () => {

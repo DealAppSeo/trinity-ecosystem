@@ -5,15 +5,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   KYAValidator, BFTAuthorizer, ComplianceReceiptGenerator,
   SolanaExecutor, FireblocksPreAuth,
-  ZKPAttestationService, RepIDCalculator
+  ZKPAttestationService, RepIDCalculator,
+  CustodyShadow, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION,
 } from '@/lib/trustshell';
 import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
 import { EarnedMetricsRepository } from '@/lib/trustshell/EarnedMetricsRepo';
 import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
-import { TIER_LIMITS, tierForScore } from '@/lib/trustshell/repid-scoring';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req: NextRequest) {
-  const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();
+  const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } = await req.json();
 
   const kya        = new KYAValidator();
   const bft        = new BFTAuthorizer();
@@ -23,6 +24,15 @@ export async function POST(req: NextRequest) {
   const zkp        = new ZKPAttestationService();
   const calc       = new RepIDCalculator();
   const earnedMetrics = new EarnedMetricsRepository();
+  // Lazy client, per lib/CLAUDE.md — a getter, not a field initialiser holding a
+  // live client, so nothing is constructed at import time.
+  const custodyShadow = new CustodyShadow(() => getSupabaseAdmin(), undefined, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION);
+
+  // NEXT.md Tier 1 §1 / SPRINT-DECISIONS P2 — the holder path for ControlProof
+  // on this route, in shadow mode. Generated here rather than at its original
+  // spot (just before the BFT step) so the shadow observation below has a
+  // stable identifier; nothing downstream depended on the old placement.
+  const paymentId = crypto.randomUUID();
 
   try {
     // Step 1: KYA Validation
@@ -36,6 +46,26 @@ export async function POST(req: NextRequest) {
         tier: kyaResult.repidTier,
       }, { status: 403 });
     }
+
+    // ---- SHADOW MODE (NEXT.md Tier 1 §1 / SPRINT-DECISIONS P2) -------------
+    // Observe what a ControlProof would decide at this gate, record it, and
+    // change nothing. `kyaResult.humanCustodyBound` below is still the live
+    // signal that feeds the RepID calculation and the receipt. `observe` never
+    // throws — an observability path that can break a payment is worse than no
+    // observability. Every payment "requires custody" for this comparison:
+    // unlike VaultPermission's per-vault flag, this route has no per-payment
+    // opt-out, so treating the legacy signal as authoritative whenever it is
+    // read is the honest mapping, not an assumption this shadow adds.
+    //
+    // Expect `not_comparable` on essentially every observation at first:
+    // nothing presents a proof yet. That is the measurement, not a failure.
+    await custodyShadow.observe({
+      agentName,
+      vaultId: paymentId,
+      legacyCustodyVerified: kyaResult.humanCustodyBound,
+      vaultRequiresCustody: true,
+      controlProof,
+    });
 
     // Addendum 2: Real-time Institutional RepID Calculation
     //
@@ -118,7 +148,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 2: BFT Consensus Authorization
-    const paymentId = crypto.randomUUID();
+    // paymentId generated at the top of the handler now — see the shadow-mode
+    // comment above for why.
     const ruleHash  = await sha256(`${agentName}:${amountUSDC}:${recipientAddress}:${purpose}`);
 
     // A FOURTH tier ladder lived here: `repidScore > 7500 ? 100000 : 50000`.
@@ -128,7 +159,47 @@ export async function POST(req: NextRequest) {
     // real Bronze limit of 100. The panel weighs this number, so a wrong one is
     // a wrong brief. Same defect as the two disagreeing ladders, third
     // recurrence; same fix, which is to delete the second implementation.
-    const maxWithdrawal = TIER_LIMITS[tierForScore(kyaResult.repidScore)].perTx;
+    //
+    // THE REPLACEMENT REINTRODUCED IT FROM THE OTHER SIDE, and the comment above
+    // is why that is worth spelling out. `TIER_LIMITS[tierForScore(score)].perTx`
+    // is the RIGHT ladder — applied to a row the ladder did not write.
+    // `KYAValidator.validate()` enforces the STORED `spending_limit_per_tx`, and
+    // for the 9 of 12 live rows written by the previous ladder the two diverge:
+    // measured 2026-08-17, TORCH is enforced at 5,000 while the panel was told
+    // 100,000, a 20x overstatement; five agents 10x, three 2x.
+    //
+    // So the brief is now the enforced number itself, read from the decision
+    // that will actually be applied. This changes NO limit — reconciling the row
+    // with the ladder is the open operator decision recorded in
+    // `docs/REPID-REGISTRY-DRIFT-2026-08-17.md`, and briefing a reviewer with a
+    // ceiling nobody will enforce is not a way of taking it.
+    //
+    // AND THE OLD BRIEF USED A DIFFERENT SCORE AS WELL AS A DIFFERENT SOURCE.
+    // `kyaResult.repidScore` is overwritten above with `repidResult.repidScore`,
+    // recomputed from live metrics — so the deleted expression applied the
+    // ladder to a score that no stored limit was ever derived from. The 20x
+    // figure quoted above is the ladder applied to the STORED score; the actual
+    // runtime brief was a third number, and it is not measurable from outside a
+    // live request. Both divergences close the same way: read the number that
+    // will be enforced instead of deriving one.
+    //
+    // `enforcedPerTxLimit` is `number | null`, null meaning NOT EVALUATED. It
+    // cannot be null here — `validate()` only sets `kya_verified: true` on the
+    // path that populates it, and line 30 returns on `!kya_verified` — but that
+    // is an invariant across two files, so it is CHECKED rather than asserted
+    // away with `!`. A wrong `!` here would hand the panel `null` typed as a
+    // number, which is the fabricated-bound failure this whole change removes.
+    if (kyaResult.enforcedPerTxLimit === null) {
+      return NextResponse.json({
+        authorized: false,
+        error: 'per-transaction ceiling NOT_CHECKED',
+        message:
+          'KYA validation reported verified without a per-transaction ceiling. That combination ' +
+          'should be unreachable; refusing rather than briefing the authorization panel with a ' +
+          'bound nobody evaluated.',
+      }, { status: 503 });
+    }
+    const maxWithdrawal = kyaResult.enforcedPerTxLimit;
 
     // The panel needs the actual decision context, not just an amount — the
     // recipient, the stated purpose and the agent's standing are what a
