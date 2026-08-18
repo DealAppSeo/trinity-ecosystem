@@ -84,6 +84,7 @@
     "mutate": "node scripts/mutate.mjs",
     "check:hal-accuracy": "node scripts/hal-accuracy-test.mjs",
     "check:repid-floor-decay": "node scripts/check-repid-floor-decay.mjs",
+    "check:observation-identity": "node scripts/check-observation-identity.mjs",
     "check:repid-marginal": "node scripts/check-repid-marginal.mjs",
     "check:ceiling-source": "node scripts/check-ceiling-source.mjs",
     "check:pay-brief": "node scripts/check-pay-brief.mjs",
@@ -112,9 +113,11 @@
     "check:poseidon2": "node scripts/check-poseidon2.mjs",
     "check:harness-extractable": "node scripts/check-harness-extractable.mjs",
     "check:issuer-stake": "node scripts/check-issuer-stake.mjs",
+    "check:verdict-provenance": "node scripts/check-verdict-provenance.mjs",
+    "check:earned-metrics-repo": "node scripts/check-earned-metrics-repo.mjs",
     "check:proof-provider-contract": "node scripts/check-proof-provider-contract.mjs",
-    "check:ratchet-decay": "node scripts/check-ratchet-decay.mjs",
-    "check:bft-evidence-chain": "node scripts/check-bft-evidence-chain.mjs"
+    "check:bft-evidence-chain": "node scripts/check-bft-evidence-chain.mjs",
+    "check:trust-harness-fixture": "node scripts/trust-harness-fixture.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

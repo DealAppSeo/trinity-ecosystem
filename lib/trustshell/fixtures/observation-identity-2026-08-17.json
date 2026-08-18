@@ -1,0 +1,47 @@
+{
+  "measured_at": "2026-08-17",
+  "project_ref": "qnnpjhlxljtqyigedwkb",
+  "what_this_is": "The identity and recency facts that govern every read of v_agent_earned_observations. Dated measurements, not assertions \u2014 re-run the SQL before relying on them.",
+  "identity_spaces": {
+    "repid_agents.id": "uuid \u2014 the key the observation view is keyed on",
+    "repid_agents.agent_id": "text \u2014 a DIFFERENT identifier, uuid-shaped on 0 of 176 rows",
+    "v_agent_earned_observations.agent_id": "uuid \u2014 joins repid_agents.id, NOT repid_agents.agent_id",
+    "repid_agents_total": 176,
+    "repid_agents_uuid_shaped_agent_id": 0,
+    "agents_matched_on_id": 123,
+    "observation_rows_total": 152473,
+    "observation_rows_orphaned_from_repid_agents_id": 0,
+    "agents_matched_on_agent_id": 0,
+    "sql": "select (select count(*) from repid_agents a where exists (select 1 from v_agent_earned_observations o where o.agent_id = a.id)) as on_id, (select count(*) from repid_agents a where exists (select 1 from v_agent_earned_observations o where o.agent_id::text = a.agent_id)) as on_agent_id, (select count(*) from repid_agents where agent_id ~ '^[0-9a-f]{8}-') as uuid_shaped;",
+    "why_it_matters": "The two spaces are DISJOINT, so the wrong key returns an empty set rather than raising. Every agent then reads as never-observed, and a scoring or decay rule built on that reads as 'no track record' when the track record is 152,473 rows. NOT claimed: that this caused any published figure \u2014 reading by the text column zeroes EVERY agent uniformly, which does not fit the one retraction of 2026-08-17."
+  },
+  "recency_source": {
+    "last_active_at_written": 32,
+    "last_active_at_within_30d": 17,
+    "agents_observed_ever": 123,
+    "agents_observed_within_30d": 67,
+    "last_active_at_writers_in_repo": 0,
+    "last_active_at_writers_in_db": [
+      "apply_linked_bet_resolution"
+    ],
+    "sql": "select count(*) as total, count(last_active_at) as written, count(*) filter (where last_active_at >= now() - interval '30 days') as recent from repid_agents; select count(distinct agent_id) from v_agent_earned_observations where observed_at >= now() - interval '30 days';",
+    "why_it_matters": "repid_agents.last_active_at reports 17 recently-active agents where the observation evidence shows 67, and it is NULL on 11 of the 12 ratcheted rows. It is a side effect of one betting-resolution function, not an activity signal. A decay or dormancy rule keyed on it expires standing for agents that are demonstrably active."
+  },
+  "ratchet_census": {
+    "pinned_by_ratchet": 12,
+    "pinned_human": 4,
+    "pinned_test_only": 7,
+    "pinned_real": 1,
+    "pinned_zero_observations_ever": 3,
+    "pinned_observed_within_30d": 8,
+    "trinity_gcm_observations_ever": 33434,
+    "trinity_gcm_days_since_last_observation": 0,
+    "sql": "with pinned as (select a.id, a.is_human, a.lifecycle_status from repid_agents a where a.current_repid = tier_lower_bound(a.peak_repid)), obs as (select agent_id, count(*) n, max(observed_at) last_obs from v_agent_earned_observations group by 1) select count(*) filter (where coalesce(o.n,0)=0) as zero_obs, count(*) filter (where o.last_obs >= now() - interval '30 days') as recent from pinned p left join obs o on o.agent_id = p.id;",
+    "supersedes": "The figure '6 floor-holders have never been observed at all' is RETRACTED: no window reproduces it (3 ever / 4 in 30d / 3 in 120d). Its CAUSE is UNVERIFIED \u2014 the originating query was not preserved. All 3 genuinely unobserved floor-holders are lifecycle_status='test_only', so no real agent holds a floor with zero evidence and the never-earned base case reached fixture rows only.",
+    "pinned_zero_observations_30d": 4,
+    "pinned_zero_observations_120d": 3,
+    "trinity_gcm_observations_30d": 15,
+    "trinity_gcm_hours_since_last_observation": 1,
+    "note_on_trinity_gcm": "33,434 observations all-time but only 15 in the trailing 30 days, and it is being observed live (+2 in ~20 minutes during this measurement). A previously published '12 observations in 30 days' is CONSISTENT with this and is NOT retracted \u2014 quoting the all-time count against a 30-day claim would be the same units error as the hyperdag byte/character retraction."
+  }
+}

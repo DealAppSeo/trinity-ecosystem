@@ -1122,28 +1122,43 @@ export const MUTATIONS = [
       '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
   },
   {
-    id: 'ratchet-decay-lets-a-never-observed-floor-decay-gracefully',
-    suite: 'check:ratchet-decay',
-    file: 'lib/trustshell/ratchet-decay.ts',
+    id: 'earned-metrics-reads-observations-by-the-wrong-key',
+    suite: 'check:observation-identity',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
     protects:
-      'ORDER. The mutant checks recency before never-earned, so an agent with zero observations ' +
-      'ever but a surviving last-seen date is treated as merely stale and decays gracefully from a ' +
-      'floor it never earned. That is the state an agent reaches when its observations age out of ' +
-      'the retention window, and the mutant keeps compiling because the null-narrowing survives',
-    find: `  if (observationsEver === 0 || daysSinceLastObservation === null) {`,
-    replace: `  if (daysSinceLastObservation === null) {`,
+      'the identity space of the earned evidence. repid_agents carries `id` (uuid) AND `agent_id` ' +
+      '(text), and v_agent_earned_observations joins the FORMER. Measured 2026-08-17 the two spaces ' +
+      'are disjoint — agent_id is uuid-shaped on 0 of 176 rows — so the wrong key returns the EMPTY ' +
+      'SET rather than raising, and all 152,473 observations vanish while every agent reads as ' +
+      'having no track record. The mutant swaps the resolved uuid for the agent name, which is the ' +
+      'exact shape of the ad-hoc census that produced two figures retracted the same day',
+    find: `      .eq('agent_id', resolved.id)`,
+    replace: `      .eq('agent_id', resolved.name)`,
   },
   {
-    id: 'ratchet-decay-demotes-humans',
-    suite: 'check:ratchet-decay',
-    file: 'lib/trustshell/ratchet-decay.ts',
+    id: 'floor-decay-demotes-humans',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
     protects:
-      'the human exemption. 4 of the 12 pinned agents are human, and compute_tier already exempts ' +
+      'the human exemption. 4 of the 12 ratcheted rows are human, and compute_tier already exempts ' +
       'is_human from the counterparty gate for the same reason: a human\'s standing is not earned ' +
       'through agent observations. The mutant applies an observation-driven decay to them, which ' +
       'demotes a human for not behaving like a bot',
-    find: `  if (isHuman) {`,
-    replace: `  if (false && isHuman) {`,
+    find: `  if (state.isHuman) {`,
+    replace: `  if (false && state.isHuman) {`,
+  },
+  {
+    id: 'floor-decay-asks-humans-a-question-it-cannot-answer',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'ORDER, which is where this rule actually binds. The mutant moves the human exemption BELOW ' +
+      'the unknown-age branch. No column feeds `lastReEarnedAt`, so every production row arrives ' +
+      'null and every human then returns not_checked forever — and an operator draining a ' +
+      'NOT_CHECKED backlog would resolve it by inventing re-attestation timestamps for people. ' +
+      'The mutant still decays nobody, so only the ordering assertion catches it',
+    find: `  if (state.isHuman) {`,
+    replace: `  if (state.isHuman && state.lastReEarnedAt !== null) {`,
   },
   {
     id: 'proof-result-claims-privacy-the-provider-does-not-have',
@@ -1986,6 +2001,176 @@ export const MUTATIONS = [
       'marked reachable by a comment explaining why it must not be, while building #70',
     find: "  return src.replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ').replace(/(^|[^:])\\/\\/[^\\n]*/g, '$1');",
     replace: '  return src;',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/verdict-provenance.ts — P2, the Gate 2 schema blocker
+  // -------------------------------------------------------------------------
+  {
+    id: 'provenance-null-reads-as-unearned',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'ABSENT provenance is NOT_CHECKED, never a finding of "unearned". Every event on the ' +
+      'live scoring path has null provenance today, so reading null as false would ' +
+      'manufacture ~70,000 accusations out of a missing column — a fabricated finding at ' +
+      'scale, worse than the gap it claims to describe',
+    find: '  if (event.providerAttempted === null || event.providerAttempted === undefined) {',
+    replace: '  if (event.providerAttempted === undefined) {',
+  },
+  {
+    id: 'provenance-untraceable-counts',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'an event whose provenance cannot be established must NOT move a reputation score. ' +
+      'NOT_CHECKED and FAILED are different facts with the same consequence, and letting ' +
+      'the first one through is how "we could not tell" becomes "it passed"',
+    find: "      outcome: 'NOT_CHECKED',\n      countsTowardScore: false,",
+    replace: "      outcome: 'NOT_CHECKED',\n      countsTowardScore: true,",
+  },
+  // `provenance-abstention-punished` lived here until 2026-08-17. It pointed at
+  // `if (event.vetoed && event.providerAttempted === false)`, which the ordering
+  // fix dissolved — `vetoed` is now tested first, so that conjunction no longer
+  // exists and the runner correctly reported DRIFT rather than a pass.
+  //
+  // The invariant it protected — "only actionable verdicts stake" — is NOT gone;
+  // it moved to the `!event.vetoed` early return, where the two mutants below
+  // point at it directly. Deleted rather than re-pointed at a contrived target,
+  // because a mutant aimed at a line chosen to make it compile tests the line,
+  // not the invariant.
+  {
+    id: 'provenance-null-checked-before-vetoed',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'ORDER: `vetoed` is tested BEFORE provenance, so a NON-ACTIONABLE event owes no ' +
+      'evidence. This mutant reinstates the original bug — demanding provenance from an ' +
+      'event that stakes nothing — which drops 82,459 of 152,482 observation rows (54.1%), ' +
+      'including 100% of the x402 and latency arms, neither of which has a provider concept ' +
+      'to record. It deletes the positive evidence and keeps the accusations, and every ' +
+      'assertion that existed before 2026-08-17 stayed green through it',
+    find: '  if (!event.vetoed) {',
+    replace: '  if (!event.vetoed && event.providerAttempted !== null && event.providerAttempted !== undefined) {',
+  },
+  {
+    id: 'provenance-nonactionable-does-not-count',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'a non-actionable observation MAY move a score. It is the positive evidence — the ' +
+      'clean runs, the settled payments, the recorded latencies — and a reputation system ' +
+      'that counts only the failures is not a reputation system',
+    find: "      outcome: 'VERIFIED',\n      countsTowardScore: true,\n      detail:\n        'a non-actionable verdict; nothing is staked either way",
+    replace: "      outcome: 'VERIFIED',\n      countsTowardScore: false,\n      detail:\n        'a non-actionable verdict; nothing is staked either way",
+  },
+  {
+    id: 'provenance-near-miss-column-accepted',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'a column that merely SOUNDS like provenance does not satisfy the gate. Substring ' +
+      'matching would let a column named `provider` declare Gate 2 unblocked while carrying ' +
+      'nothing about whether one was attempted',
+    find: '  const found = PROVENANCE_COLUMN_CANDIDATES.filter((c) => columns.includes(c));',
+    replace: '  const found = PROVENANCE_COLUMN_CANDIDATES.filter((c) => columns.some((col) => c.includes(col)));',
+  },
+  {
+    id: 'provenance-parser-moved-callsite-reads-as-blocked',
+    suite: 'check:verdict-provenance',
+    file: 'scripts/check-verdict-provenance.mjs',
+    protects:
+      '"could not look" must not collapse into "found nothing". If the scorer query moves or ' +
+      'is renamed, the parser returns ok:false and the gate FAILS. Letting it return an empty ' +
+      'column list instead would make describeLinkage report NOT_CHECKED — the exact blocker ' +
+      'this gate was written to report, reached by not looking, and indistinguishable from ' +
+      'the real thing in the output',
+    find: "    return { ok: false, columns: [], detail: `no \\`.from('${VIEW}')\\` in ${REPO_SRC}` };",
+    replace: "    return { ok: true, columns: [], detail: `no \\`.from('${VIEW}')\\` in ${REPO_SRC}` };",
+  },
+  {
+    id: 'provenance-linkage-always-verified',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'the linkage report is derived from the columns actually present. A gate that reports ' +
+      'VERIFIED regardless is the unearned green this whole repository is organised against, ' +
+      'in the gate written to report a blocker',
+    find: '  if (found.length > 0) {',
+    replace: '  if (found.length >= 0) {',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/EarnedMetricsRepo.ts — the "consume" half of Gate 2:
+  // integrityObservations() / annotateProvenance(), wired 2026-08-17 per the
+  // operator's review on PR #94.
+  // -------------------------------------------------------------------------
+  {
+    id: 'earned-metrics-repo-clean-rows-demand-provenance',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'only ACTIONABLE catches (success === false) demand provenance. Checking success after ' +
+      'provenanceOf is called with the wrong `vetoed` value would exclude clean rows lacking a ' +
+      'provider — 55,616 of 149,258 rows in the measured window, the positive evidence rather ' +
+      'than the accusations, which is the exact defect this module\'s header retracts',
+    find: '    const verdict = provenanceOf({ vetoed: !success, providerAttempted });',
+    replace: '    const verdict = provenanceOf({ vetoed: true, providerAttempted });',
+  },
+  {
+    id: 'earned-metrics-repo-excluded-rows-leak-through',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'a row provenanceOf excludes must never reach measureRate. The `continue` is the only ' +
+      'thing stopping an untraceable or unearned catch from being pushed into `observations` ' +
+      'anyway, silently undoing the entire point of wiring provenanceOf in',
+    find: '      if (verdict.outcome === \'NOT_CHECKED\') excludedUntraceable += 1;\n      else excludedUnearned += 1;\n      continue;',
+    replace: '      if (verdict.outcome === \'NOT_CHECKED\') excludedUntraceable += 1;\n      else excludedUnearned += 1;',
+  },
+  {
+    id: 'earned-metrics-repo-zero-providers-read-as-attempted',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      '`quorum_providers_used = 0` must mean no provider attempted, not "at least one". Using ' +
+      '>= 0 instead of > 0 would make every zero-provider catch read as earned — the 2,443-row ' +
+      'population `refusesToIssue` exists to gate would silently pass',
+    find: '    const providerAttempted = raw === null || raw === undefined ? null : Number(raw) > 0;',
+    replace: '    const providerAttempted = raw === null || raw === undefined ? null : Number(raw) >= 0;',
+  },
+  {
+    id: 'earned-metrics-repo-annotate-fires-with-nothing-excluded',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'annotateProvenance must be a no-op when nothing was excluded — appending an empty note ' +
+      'to every agent\'s reason string, including the vast majority with zero exclusions, would ' +
+      'bury the signal this note exists to surface',
+    find: '  if (total === 0) return metric;',
+    replace: '  if (total < 0) return metric;',
+  },
+  {
+    id: 'fixture-accepts-a-rejected-run',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'a doer that reports success and an evaluator that rejects must surface FAILED. ' +
+      'Collapsing the reject path into VERIFIED would make the fixture a certificate ' +
+      'factory — the exact overclaim the status doc exists to prevent',
+    find: "  eq(out.loop.outcome, 'FAILED', 'independent judge overrules the agent');",
+    replace: "  eq(out.loop.outcome, 'VERIFIED', 'independent judge overrules the agent');",
+  },
+  {
+    id: 'fixture-allows-self-judge',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'checker_must_not_be_doer is the product claim. If the false-path attempt is ' +
+      'allowed to certify, the fixture would green-light the one constitutional ' +
+      'failure the harness is built to make loud',
+    find: "  truthy(threw, 'a doer-as-checker pool must refuse, never certify');",
+    replace: "  truthy(!threw, 'a doer-as-checker pool must refuse, never certify');",
   },
 ];
 

@@ -18,6 +18,7 @@ import {
   type MeasuredMetric,
   type Observation,
 } from './EarnedMetrics';
+import { provenanceOf } from './verdict-provenance';
 
 /**
  * How far back to pull observations. Four half-lives, past which a row's decay
@@ -160,9 +161,12 @@ export class EarnedMetricsRepository {
 
     const since = new Date(Date.parse(now) - OBSERVATION_WINDOW_DAYS * 86_400_000).toISOString();
 
+    // `quorum_providers_used` was added 2026-08-17 (Gate 2, PR #94), projecting
+    // provenance repid_score_events.metadata already carried. See
+    // provenanceOf() below for how it is consumed.
     const { data, error } = await this.supabase
       .from('v_agent_earned_observations')
-      .select('signal, observed_at, success, domain, value_ms')
+      .select('signal, observed_at, success, domain, value_ms, quorum_providers_used')
       .eq('agent_id', resolved.id)
       .gte('observed_at', since)
       .order('observed_at', { ascending: false })
@@ -202,6 +206,12 @@ export class EarnedMetricsRepository {
       .filter((r) => r.signal === 'latency' && r.value_ms !== null)
       .map((r) => ({ observedAt: r.observed_at as string, latencyMs: Number(r.value_ms) }));
 
+    // `integrity` is the one signal where `success` can mean "an actionable
+    // verdict was issued" (hallucination_caught = true), which is exactly the
+    // case provenanceOf exists to gate. bft/x402/latency have no vetoed/provider
+    // concept — they use bySignal() unchanged, below.
+    const integrity = integrityObservations(rows);
+
     const metrics: EarnedMetricSet = {
       // Consensus verdicts from bft_payment_evaluations, counted only once the
       // worker has actually evaluated them. This carries the heaviest default
@@ -214,7 +224,14 @@ export class EarnedMetricsRepository {
       // ABSENCE of a caught hallucination, i.e. a clean-output rate. That is what
       // the data supports; it is not literally a "catch rate", and the field name
       // it feeds is inherited from RepIDConfig rather than chosen here.
-      veritasCatchRate: measureRate(bySignal('integrity'), { now, domain: opts.domain }),
+      //
+      // Rows provenanceOf excludes never reach measureRate — see
+      // integrityObservations() below for what is excluded and why, and its
+      // header comment for the measured effect on real agents.
+      veritasCatchRate: annotateProvenance(
+        measureRate(integrity.observations, { now, domain: opts.domain }),
+        integrity
+      ),
 
       x402SuccessRate: measureRate(bySignal('x402'), { now }),
 
@@ -230,6 +247,109 @@ export class EarnedMetricsRepository {
       truncated: rows.length >= MAX_OBSERVATIONS,
     };
   }
+}
+
+/**
+ * Turn integrity rows into Observations, EXCLUDING the ones provenanceOf says
+ * must not count toward the score.
+ *
+ * WHAT IS EXCLUDED, PRECISELY. Only rows where `success === false` (an
+ * actionable catch — hallucination_caught) AND `quorum_providers_used` is null
+ * or 0 (no provider consulted, or that fact was never carried). A CLEAN
+ * observation (success === true) is non-actionable — provenanceOf's own first
+ * branch — and always counts, with or without a provenance value. Getting this
+ * ordering backwards is the exact defect provenanceOf's docstring records
+ * fixing: checking provenance before actionability would exclude clean rows
+ * that happen to lack it, which is 55,616 of 149,258 rows in the current
+ * 120-day window — the positive evidence, not the accusations.
+ *
+ * MEASURED EFFECT, 2026-08-17, replicating measureRate's own decay formula in
+ * SQL against the live 120-day window (real, non-test agents):
+ *
+ *   excluded rows total: 200, across 13 agents, ALL dated 2026-06-04 or
+ *   2026-04-20 — the corpus's earliest provenance coverage, now 74-119 days
+ *   old and mostly decayed (weight 0.06-0.18 at the 30-day half-life).
+ *
+ *   trinity-shofet   34,000 rows, 56 excluded: veritasCatchRate 0.36534 -> 0.36574  (+0.04pp)
+ *   trinity-mel      21,693 rows, 42 excluded: veritasCatchRate 0.52958 -> 0.53056  (+0.10pp)
+ *   trinity-gcm      33,426 rows, 35 excluded: veritasCatchRate 0.35475 -> 0.35500  (+0.02pp)
+ *   demo-openai-agent   80 rows, 20 excluded: veritasCatchRate 0.76872 -> 1.00000   (+23.1pp)
+ *
+ * For every real production agent with meaningful volume the effect is under
+ * 0.1 percentage points — the excluded rows are a small, old, decaying tail.
+ * `demo-openai-agent` is the one exception: 20 of its 80 window rows were its
+ * ONLY catches, so excluding them (neutral, not "clean") pushes it to a
+ * literal 100%. Recorded, not corrected here — lifecycle_status is `active`,
+ * not `test_only`, so this module has no basis to exclude it, and inventing
+ * one unilaterally would be the same defect this file exists to avoid.
+ *
+ * A LARGER FIGURE WAS PROPOSED FIRST (PR #93: "~44,995 rows, 10-12pp
+ * inflation, 16-19% of decayed weight"). ITS MEASUREMENT IS CONFIRMED, ITS
+ * CONCLUSION IS NOT. Independently re-measured: 20.05%-45.46% of decayed
+ * integrity weight across the 12 real agents genuinely lacks
+ * `quorum_providers_used` — #93's number is real, and in the same range.
+ * But cross-tabulating that weight by `success` shows almost all of it is
+ * CLEAN: the actionable-and-unproven share — the only slice provenanceOf
+ * says to exclude — is 0.02%-0.18% of decayed weight, three orders of
+ * magnitude smaller. Treating "lacks provenance" as "should be discounted"
+ * without splitting on actionability is the defect this module's own header
+ * already retracted once: it would discount the positive evidence, not the
+ * accusations. Not a disagreement about the goal — about which rows within
+ * the measured population the goal actually names.
+ */
+export function integrityObservations(
+  rows: readonly { signal: string; observed_at: unknown; success: unknown; domain: unknown; quorum_providers_used: unknown }[]
+): { observations: Observation[]; excludedUntraceable: number; excludedUnearned: number } {
+  let excludedUntraceable = 0;
+  let excludedUnearned = 0;
+  const observations: Observation[] = [];
+
+  for (const r of rows) {
+    if (r.signal !== 'integrity') continue;
+    const success = r.success === true;
+    const raw = r.quorum_providers_used;
+    const providerAttempted = raw === null || raw === undefined ? null : Number(raw) > 0;
+    const verdict = provenanceOf({ vetoed: !success, providerAttempted });
+
+    if (!verdict.countsTowardScore) {
+      if (verdict.outcome === 'NOT_CHECKED') excludedUntraceable += 1;
+      else excludedUnearned += 1;
+      continue;
+    }
+
+    observations.push({
+      observedAt: r.observed_at as string,
+      success,
+      domain: (r.domain as string | null) ?? null,
+    });
+  }
+
+  return { observations, excludedUntraceable, excludedUnearned };
+}
+
+/**
+ * Note the exclusion in the reason string, the same way `explain()` appends a
+ * systemic note — so a reader of the API response sees it without a second
+ * query, rather than only in a code comment nobody outside this file reads.
+ */
+export function annotateProvenance(
+  metric: MeasuredMetric,
+  integrity: { excludedUntraceable: number; excludedUnearned: number }
+): MeasuredMetric {
+  const total = integrity.excludedUntraceable + integrity.excludedUnearned;
+  if (total === 0) return metric;
+  const parts = [
+    integrity.excludedUntraceable > 0
+      ? `${integrity.excludedUntraceable} untraceable (no provenance recorded)`
+      : null,
+    integrity.excludedUnearned > 0
+      ? `${integrity.excludedUnearned} unearned (verdict issued consulting no provider)`
+      : null,
+  ].filter((p): p is string => p !== null);
+  return {
+    ...metric,
+    reason: `${metric.reason} — ${total} actionable catch(es) excluded per provenanceOf: ${parts.join(', ')}`,
+  };
 }
 
 /**
