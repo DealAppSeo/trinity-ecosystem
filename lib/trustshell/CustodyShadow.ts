@@ -1,6 +1,6 @@
 // lib/trustshell/CustodyShadow.ts
 //
-// Shadow-mode comparison for the human-custody gate.
+// Shadow-mode comparison for a human-custody gate.
 //
 // THE PROBLEM THIS MEASURES (LESSONS A11). `VaultPermission.ts:48` denies vault
 // access when `vault.requires_human_custody && !profile.humanCustodyVerified`.
@@ -12,6 +12,19 @@
 // `ControlProof` can replace it with something verifiable. But switching a live
 // gate on the strength of a finding is how you lock five agents out of their
 // vaults at 3am, so this file changes NOTHING. It watches.
+//
+// GENERALIZED 2026-08-17 to a second gate: NEXT.md Tier 1 §1 asks for the same
+// treatment on `app/api/trustrails/pay/route.ts`'s `humanCustodyBound`, which is
+// the identical unread-registry-boolean shape one route over. Rather than a
+// second copy of this file (the sprint brief's "one concern → one
+// implementation"), `audience`/`capability`/`actionLabel` are now constructor
+// parameters — DEFAULTED to the vault's existing values, so every call site that
+// does not pass them (`VaultPermission.ts`, and all 14 assertions in
+// `check-custody-shadow.mjs`) is unchanged byte-for-byte. `vaultId` on the
+// observation is NOT renamed in this pass — the payment call site reuses it to
+// carry `paymentId`. Recorded here rather than quietly fixed: a generic
+// `resourceId` is the honest name and is deferred to the next lane that touches
+// this file, per this repo's own "recorded, not fixed" category (PR #94).
 //
 // THREE PROPERTIES, AND THE THIRD IS THE ONE THAT MATTERS MOST:
 //
@@ -46,6 +59,20 @@ export const VAULT_AUDIENCE = 'trinity:vault';
 
 /** Capability a proof must carry to stand in for the custody boolean. */
 export const VAULT_CAPABILITY = 'vault:access';
+
+/** The audience a payment-bound control proof must be minted for. */
+export const PAY_AUDIENCE = 'trinity:pay';
+
+/** Capability a proof must carry to stand in for `kyaResult.humanCustodyBound`. */
+export const PAY_CAPABILITY = 'pay:usdc';
+
+/** The DB `action` label for vault-gate observations — unchanged, see above. */
+export const VAULT_ACTION = 'custody_shadow_observation';
+
+/** The DB `action` label for payment-gate observations — kept distinct from
+ * `VAULT_ACTION` so `SHADOW_ANALYSIS_SQL`'s vault-only read is not silently
+ * diluted by an unrelated gate's rows. */
+export const PAY_ACTION = 'custody_shadow_observation_pay';
 
 export type ShadowVerdict =
   /** Both say allow. Switching would change nothing here. */
@@ -99,7 +126,12 @@ export class CustodyShadow {
      * module-scope client fails the build when a key is absent (lib/CLAUDE.md).
      */
     private readonly getClient: () => SupabaseLike,
-    private readonly nonceStore?: NonceStore
+    private readonly nonceStore?: NonceStore,
+    /** Which gate this instance shadows. Defaulted to the vault's original
+     * values so every pre-existing call site is unaffected. */
+    private readonly audience: string = VAULT_AUDIENCE,
+    private readonly capability: string = VAULT_CAPABILITY,
+    private readonly actionLabel: string = VAULT_ACTION
   ) {}
 
   /**
@@ -169,9 +201,9 @@ export class CustodyShadow {
     proof: ControlProof | DelegatedControlProof
   ): Promise<boolean> {
     const ctx = {
-      audience: VAULT_AUDIENCE,
+      audience: this.audience,
       nonceStore: this.nonceStore,
-      requiredCapabilities: [VAULT_CAPABILITY],
+      requiredCapabilities: [this.capability],
     };
     if (isDelegated(proof)) {
       return (await verifyDelegationChain(proof, ctx)).valid;
@@ -189,7 +221,7 @@ export class CustodyShadow {
         .from('trinity_agent_logs')
         .insert({
           agent_name: o.agentName,
-          action: 'custody_shadow_observation',
+          action: this.actionLabel,
           content: `${o.verdict}: legacy=${o.legacyPermits} proof=${String(o.proofPermits)} vault=${o.vaultId}`,
           metadata: { ...o, shadowMode: true, gateUnchanged: true },
         });
