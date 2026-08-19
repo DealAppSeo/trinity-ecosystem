@@ -486,3 +486,29 @@ export {
   ledgerStateFromClaim,
 } from './reward-idempotency';
 export type { LedgerState, IdempotentOutcome, IdempotentDecision } from './reward-idempotency';
+
+
+/**
+ * Who may call the payment route.
+ *
+ * Ships in OBSERVE mode: evaluates, discloses, and changes nothing until
+ * `PAY_AUTH_MODE=enforce`. The field that matters is
+ * `wouldDenyUnderEnforcement` — enforcement cannot be turned on responsibly
+ * until someone can say how many live callers it would deny, and nothing
+ * measured that before.
+ */
+export {
+  payAuthMode,
+  payAuthDecision,
+  verifyPaySignature,
+  secretUsable,
+  constantTimeEqual,
+  parseSignatureHeader,
+  timestampFresh,
+  signingPayload,
+  hmacSha256Hex,
+  SIGNATURE_WINDOW_MS,
+  SIGNATURE_HEADER,
+  TIMESTAMP_HEADER,
+} from './pay-auth';
+export type { PayAuthMode, PayAuthOutcome, PayAuthVerdict, PayAuthDecision } from './pay-auth';

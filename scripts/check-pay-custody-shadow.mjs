@@ -62,8 +62,22 @@ const routeCode = stripComments(route);
 // ── the request accepts a proof ─────────────────────────────────────────────
 
 check('controlProof is destructured from the request body', () => {
-  truthy(/const\s*\{[^}]*\bcontrolProof\b[^}]*\}\s*=\s*await\s+req\.json\(\)/.test(routeCode),
-    'controlProof must be read from the same destructure as agentName/amountUSDC');
+  // The INVARIANT is that controlProof comes out of the same destructure as
+  // agentName and amountUSDC — one read of one body, so a proof cannot be taken
+  // from a different source than the payment it authorises.
+  //
+  // The MECHANISM changed on 2026-08-19 and this assertion was pinned to it.
+  // Request signing needs the raw bytes: `req.json()` consumes the stream, and a
+  // signature computed over a re-serialised object verifies a different string
+  // than the caller signed, because key order and whitespace do not survive the
+  // round trip. So the route now reads `req.text()` once and `JSON.parse`s it.
+  // Both forms are accepted here; the destructure is what is asserted.
+  truthy(
+    /const\s*\{[^}]*\bcontrolProof\b[^}]*\}\s*=\s*(await\s+req\.json\(\)|JSON\.parse\(rawBody\))/.test(
+      routeCode
+    ),
+    'controlProof must be read from the same destructure as agentName/amountUSDC'
+  );
 });
 
 // ── the shadow is imported and constructed with the PAY identity, not the

@@ -60,6 +60,7 @@
     "check:lane-files": "node scripts/check-lane-files.mjs",
     "check:reward-idempotency": "node scripts/check-reward-idempotency.mjs",
     "check:portable-surface": "node scripts/check-portable-surface.mjs",
+    "check:pay-auth": "node scripts/check-pay-auth.mjs",
     "check:panel-tier": "node scripts/panel-tier-test.mjs",
     "check:spine-e2e": "node scripts/spine-e2e-test.mjs",
     "check:checker-assignment": "node scripts/checker-assignment-test.mjs",

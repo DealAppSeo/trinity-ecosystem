@@ -641,8 +641,17 @@ export const MUTATIONS = [
       'destructure would make every caller-supplied proof vanish before it ever reaches the ' +
       'shadow comparison, and the route would still 200 — the exact "looks wired, isn\'t reachable" ' +
       'shape this repo keeps finding in its own barrel exports, one layer down',
-    find: 'const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } = await req.json();',
-    replace: 'const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();',
+    // Re-pointed 2026-08-19. Request signing needs the RAW bytes — `req.json()`
+    // consumes the stream, and a signature over a re-serialised object verifies a
+    // different string than the caller signed. The route reads `req.text()` once
+    // and parses it, so this find string stopped matching. CI reported DRIFT,
+    // which is the outcome working: the code moved and the manifest did not.
+    find:
+      '  const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } =\n' +
+      '    JSON.parse(rawBody);',
+    replace:
+      '  const { agentName, amountUSDC, recipientAddress, purpose, signatures } =\n' +
+      '    JSON.parse(rawBody);',
   },
   {
     id: 'pay-shadow-wrong-audience',
@@ -1031,7 +1040,11 @@ export const MUTATIONS = [
   {
     id: 'spine-unreachable-from-barrel',
     suite: 'check:spine-reachable',
-    file: 'lib/trustshell/index.ts',
+    // Re-pointed 2026-08-19: the barrel split in two, and the spine exports moved
+    // to `portable.ts` (they carry no host dependency). CI reported this as DRIFT
+    // — find string occurs 0 times — which is the outcome doing exactly its job:
+    // the code moved and the manifest did not. The invariant is unchanged.
+    file: 'lib/trustshell/portable.ts',
     protects:
       'the spine stays REACHABLE. Every module below was correct, mutation-tested and ' +
       'green while being importable by nobody — measured 2026-08-16, 0 of 10 exported ' +
@@ -2202,6 +2215,65 @@ export const MUTATIONS = [
       'is supposed to be invisible to them, and this is what keeps it so',
     find: "export * from './portable';",
     replace: "// export * from './portable';",
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/pay-auth.ts — shipped in observe mode, and it must stay that way
+  // -------------------------------------------------------------------------
+  {
+    id: 'pay-auth-defaults-to-enforcing',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'the mode defaults to OBSERVE. The mutant enforces unless told otherwise, which denies ' +
+      'every existing caller of a live payment route the moment it deploys — and nobody can yet ' +
+      'say how many that is, which is the entire reason this ships in observe mode',
+    find: "  return env.PAY_AUTH_MODE === 'enforce' ? 'enforce' : 'observe';",
+    replace: "  return env.PAY_AUTH_MODE === 'observe' ? 'observe' : 'enforce';",
+  },
+  {
+    id: 'pay-auth-observe-allow-looks-like-a-pass',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'an observe-mode allow SAYS so. The mutant returns the bare verdict text, so an ' +
+      'unauthenticated request that was let through reads identically to one that verified — ' +
+      'the same defect as a BFT `passed:true` with `evaluated:false`, in the auth field',
+    find: "        ? `${verdict.detail} — ALLOWED because PAY_AUTH_MODE is observe; this would be denied under enforce`",
+    replace: '        ? verdict.detail',
+  },
+  {
+    id: 'pay-auth-unconfigured-secret-opens-the-door',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'NOT_CHECKED denies under enforcement. The mutant treats "no secret configured" as a pass, ' +
+      'so deleting an environment variable disables authentication silently — an open door ' +
+      'reached by a missing config, which is the failure this repo names most often',
+    find: '  const wouldDeny = verdict.outcome !== \'VERIFIED\';',
+    replace: '  const wouldDeny = verdict.outcome === \'FAILED\';',
+  },
+  {
+    id: 'pay-auth-timestamp-not-signed',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'the timestamp is bound INTO the signature. The mutant signs the body alone, so a captured ' +
+      'signature stays valid forever — resend it with a fresh timestamp and the freshness window ' +
+      'becomes decorative',
+    find: '  return `${timestamp}.${body}`;',
+    replace: '  return body;',
+  },
+  {
+    id: 'pay-auth-digest-compare-leaks-timing',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'digest comparison accumulates over every byte. The mutant returns on the first mismatch, ' +
+      'so how long the check takes reveals how many leading bytes were right — enough to recover ' +
+      'a valid signature one byte at a time',
+    find: '  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);',
+    replace: '  for (let i = 0; i < a.length; i++) { if (a.charCodeAt(i) !== b.charCodeAt(i)) return false; }',
   },
   // ── check:throughput — quorum diversity ───────────────────────────────────
   {

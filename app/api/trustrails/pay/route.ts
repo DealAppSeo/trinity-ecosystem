@@ -14,6 +14,7 @@ import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
 import { rewardFor, rewardReason, isPermittedReward } from '@/lib/trustshell/reward';
 import { idempotentDecision } from '@/lib/trustshell/reward-idempotency';
 import { RewardLedger } from '@/lib/trustshell/RewardLedger';
+import { payAuthMode, payAuthDecision, verifyPaySignature, SIGNATURE_HEADER, TIMESTAMP_HEADER } from '@/lib/trustshell/pay-auth';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import {
   evaluateContractedPayment,
@@ -21,7 +22,12 @@ import {
 } from '@/lib/trustshell/identity/payment-contract';
 
 export async function POST(req: NextRequest) {
-  const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } = await req.json();
+  // The RAW body, read once. `req.json()` consumes the stream, so a signature
+  // computed over a re-serialised object would verify a DIFFERENT string than the
+  // caller signed — key order and whitespace are not preserved by a round trip.
+  const rawBody = await req.text();
+  const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } =
+    JSON.parse(rawBody);
 
   const kya        = new KYAValidator();
   const bft        = new BFTAuthorizer();
@@ -43,6 +49,35 @@ export async function POST(req: NextRequest) {
   const paymentId = crypto.randomUUID();
 
   try {
+    // ---- STEP 0: AUTHENTICATION, IN OBSERVE MODE -------------------------
+    //
+    // This route has never had authentication. The only barrier is that
+    // `agentName` must exist in `agent_kya_registry` — a lookup, not a
+    // credential, and agent names are not secret.
+    //
+    // Whether the route should be callable by anyone is a POLICY question, so
+    // this ships the same way ControlProof and BFT did on this same route:
+    // evaluate, disclose, change nothing. `allow` is true for every verdict
+    // while PAY_AUTH_MODE is observe. What it produces is
+    // `wouldDenyUnderEnforcement` — the number nobody can currently answer, and
+    // the reason flipping the switch would otherwise be a guess.
+    const authVerdict = await verifyPaySignature({
+      rawBody,
+      signature: req.headers.get(SIGNATURE_HEADER),
+      timestamp: req.headers.get(TIMESTAMP_HEADER),
+      secret: process.env.TRUSTRAILS_HMAC_SECRET,
+      now: Date.now(),
+    });
+    const auth = payAuthDecision(authVerdict, payAuthMode(process.env));
+    if (!auth.allow) {
+      return NextResponse.json({
+        approved: false,
+        stage: 'authentication',
+        reason: auth.detail,
+        auth: { mode: auth.mode, outcome: auth.outcome },
+      }, { status: 401 });
+    }
+
     // Step 1: KYA Validation
     const kyaResult = await kya.validate(agentName, amountUSDC);
     if (!kyaResult.kya_verified) {
@@ -407,6 +442,15 @@ export async function POST(req: NextRequest) {
       },
       contracted,
       floorDecay: earned.floorDecay ?? null,
+      // What authentication decided, and what it WOULD have decided. Disclosed
+      // for the same reason `bft.evaluated:false` is: an observe-mode allow and
+      // a genuine pass are indistinguishable to a caller otherwise.
+      auth: {
+        mode:      auth.mode,
+        outcome:   auth.outcome,
+        wouldDenyUnderEnforcement: auth.wouldDenyUnderEnforcement,
+        detail:    auth.detail,
+      },
       bft: {
         evaluated: bftProof.evaluated,
         status:    bftProof.evaluated ? (bftProof.passed ? 'passed' : 'failed') : 'NOT CHECKED',
