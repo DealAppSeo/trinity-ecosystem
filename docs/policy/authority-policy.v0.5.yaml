@@ -1,0 +1,270 @@
+# authority-policy.v0.5.yaml
+# Trust Passport — locked Phase-1 policy.
+# Chat is commentary. This file is the claim.
+#
+# Diff from previous (chat-only v0.5):
+#   - K is data-driven; K=4 is a prior only when W is known-absent from docs,
+#     never a substitute for inventing last_active. NULL last_active = skip.
+#   - Residual (1-λ_σ)Δ_full enters routing on a single settle tick, then σ→0.
+#   - Referral curve locked; eight mutants are pass/fail predicates, not notes.
+#   - Live | Soft-live | Observe | Blocked table is first-class.
+#
+# Not claimed: decay enforced on main, BFT live, doer leaf, witnessHidden,
+# DEFAULT_WEIGHTS rebalance, best-in-class, Vercel = A18.
+
+meta:
+  version: "0.5"
+  as_of: "2026-08-18"
+  phase: 1
+  bias: instrumented_soft_live
+  phrase: "spine in place; activation incomplete"
+  contracted_pay_gate: proven          # #104
+  refuses_to_issue: proven
+  vercel_is_not_a18: true
+
+# ---------------------------------------------------------------------------
+# Status table (authoritative)
+# ---------------------------------------------------------------------------
+status:
+  live:
+    - pay_contracted_eval              # evaluateContractedPayment; 503/403
+    - refuses_to_issue                 # provenanceOf calls it
+  soft_live:
+    - dormancy_decay_envelope          # CC survivor + K ticks + λ_σ + settle
+    - referral_curve_delta_n           # locked parameters + 8 mutants
+    - impact_index_I                   # on existing contribution types
+    - five_axis_pi                     # passport / routing display
+    - anfis_lasso_routing              # cold start = linear L_p
+    - hot_warm_cold_degradation        # rules locked; θ are priors
+  observe:
+    - floor_decideFloor_write          # consult only; typical not_checked
+    - bft_payment_evaluations          # 0 rows; structurally unearned
+    - control_proof                    # #95 shadow; cannot approve or deny
+  blocked:
+    - doer_verified_work_leaf          # BLOCKED_FOR_CROSS_LANE
+    - witnessHidden
+    - default_weights_rebalance        # frozen until P5
+    - referral_halo                    # deferred; not required to exit Phase 1
+    - layers_decay_ts                  # not the survivor
+
+# ---------------------------------------------------------------------------
+# Soft-landing decay
+# ---------------------------------------------------------------------------
+decay:
+  survivor: [scripts/run-repid-decay.ts, src/services/repid-decay.ts]
+  formula: |
+    r = ρ · m
+    R_dec = max(R · (1-r)^W, F_tier)
+    Δ_full = R - R_dec
+  rate_prior: 0.0015                   # per idle week; decaying-decay eases m ∈ [0.25, 1]
+  last_active_null: skip               # never invent a timestamp
+  lifecycle_not_active: skip
+  decay_rate_null: skip
+
+  K:
+    rule: data_driven
+    expression: "min(8, max(1, ceil(W)))"
+    prior_when_W_unmeasured: 4         # docs/backtest prior ONLY
+    prior_does_not_override_skip: true
+  ticks:
+    remainder_on_last: true
+    identity: "sum_k Δ_k = Δ_full"
+
+  sigma:
+    meaning: envelope_open
+    open_while: "k ≤ K and settle_not_done"
+
+  lambda_sigma: 0.5
+
+  under_sigma_eq_1:
+    R_ledger: "R_pre - sum_{j≤k} Δ_j"
+    R_route:  "R_pre - λ_σ · sum_{j≤k} Δ_j"
+    A_eff:    "min(R_route, 100 * sqrt(S_usd)) * 1[builder ≥ 500]"
+    invariants:
+      - "|R_route(k) - R_route(k-1)| ≤ λ_σ · Δ_k"
+      - "R_route ≥ R_ledger while σ = 1"
+      - "A_eff uses R_route, never R_ledger, while σ = 1"
+      - "A_eff never rises because decay was latent"
+      - "floor observe 'decays' does not enter R_route or A_eff"
+      - "peer ρ_rater uses R_pre, not R_ledger"
+      - "clustered DECAY is not collusion"
+
+  settle_tick:
+    when: "after tick K is written"
+    action: "R_route ← R_ledger; σ ← 0"
+    magnitude: "(1 - λ_σ) · Δ_full = 0.5 · Δ_full"
+    split_if_magnitude_gt: 50          # RepID points; then two equal settle ticks
+
+  write:
+    dry_run_default: true
+    apply: ["--apply", "REPID_DECAY_APPLY=true"]
+  ga_decay_event: reintegrate_into_survivor_do_not_replace
+
+# ---------------------------------------------------------------------------
+# Locked referral curve
+# ---------------------------------------------------------------------------
+referral:
+  rank_n: qualified_count_only
+  qualify_or:
+    - referred_R_ge_500
+    - referred_nonsim_x402_ge_1
+    - referred_quorum_hal_ge_1
+  qualify_and:
+    - lifecycle_not_test_only
+    - evidence_ref_present
+    - not_self
+    - not_same_family
+  curve:
+    delta_raw: "20 * (2 / (n + 1)) = 40 / (n + 1)"
+    n0: 2
+    gamma: 1
+    delta_max: 20
+  type_clamp:
+    n_eq_1: 12
+    n_in_2_3: 8
+    n_ge_4: 5
+  delta: "clip(round(delta_raw(n)), 0, c(n))"
+  unproven: 0
+  lands_on_axis: Q                     # not S
+  worked_values:
+    n_1:  { raw: 20.0,  delta: 12 }
+    n_2:  { raw: 13.33, delta: 8 }
+    n_3:  { raw: 10.0,  delta: 8 }
+    n_10: { raw: 3.64,  delta: 4 }
+    n_100:{ raw: 0.396, delta: 0 }
+  halo: deferred                       # 0.15 * exp(-t/45d) on outgoing peer only
+  global_hal_clamp_remains: 5
+
+  # Eight mutants — pass/fail predicates. Any false ⇒ curve not shipped.
+  mutants:
+    - id: M1_first_gt_tenth
+      predicate: "δ(1) > δ(10)"
+      numeric: "12 > 4"
+    - id: M2_tenth_gg_hundredth
+      predicate: "δ(10) ≫ δ(100)"
+      numeric: "4 > 0 and δ(100) = 0"
+    - id: M3_hundredth_zero
+      predicate: "δ(100) = 0"
+    - id: M4_unproven_zero
+      predicate: "unproven ⇒ δ = 0 even if n = 1"
+    - id: M5_test_only_no_increment
+      predicate: "test_only referee ⇒ n does not increment and δ = 0"
+    - id: M6_same_family_or_self_zero
+      predicate: "same-family or self ⇒ δ = 0"
+    - id: M7_hal_clamp_untouched
+      predicate: "global HAL clamp remains +5; only this type uses c(n)"
+    - id: M8_lands_on_Q_not_S
+      predicate: "δ lands on axis Q, not S"
+
+# ---------------------------------------------------------------------------
+# Impact index
+# ---------------------------------------------------------------------------
+impact:
+  I: "clip_[0,1](ι_sev · ι_who · ι_proof)"
+  iota_sev:
+    S0: 0.15
+    S1: 0.35
+    S2: 0.60
+    S3: 0.85
+    S4: 1.00
+  iota_who:
+    self_only: 0.40
+    other_agents: 0.80
+    people_ops: 1.00
+    ecosystem: 1.15                    # then clip I ≤ 1
+  iota_proof:
+    none: 0                            # zeroes the delta
+    artifact_ref: 0.70
+    verified_bounty_or_contracted: 1.00
+  scale: "δ_imp = round(δ_0 · (0.4 + 1.6 · I))"
+  clamp: global_plus_5_minus_10
+  bounty_exception:
+    when: "I ≥ 0.85 and type = AUDIT_CONTRIBUTION"
+    clamp_max: 8
+  types:
+    - AUDIT_CONTRIBUTION
+    - CODE_CONTRIBUTION
+    - WORKFLOW_CONTRIBUTION
+    - TOOL_PIONEER
+    - AGENT_TEACHING
+    - HANDOFF_COSIGN_VERIFIED
+    - PEACEMAKER
+
+# ---------------------------------------------------------------------------
+# Five-axis Π
+# ---------------------------------------------------------------------------
+composite:
+  axes: [S, P, H, Q, E]
+  weights:
+    S: 0.35                            # self-performance: quorum HAL + nonsim x402
+    P: 0.20                            # peer L1–L5; ρ_rater(R_pre) while σ=1
+    H: 0.15                            # human custody / dual-sig / HITL
+    Q: 0.10                            # qualified referrals only
+    E: 0.20                            # ecosystem impact I
+  missing_axis: zero_then_renormalize
+  do_not_pour_leftover_into_bft: true
+  default_weights_bft_040: frozen_until_P5
+  bft_on_passport: observe_zero
+  excluded_from_S:
+    - doer_verified_work
+    - bft_payment_evaluations
+
+# ---------------------------------------------------------------------------
+# effectiveAuthority
+# ---------------------------------------------------------------------------
+authority:
+  A: "min(R, 100 * sqrt(S_usd))"       # published anti-whale; unchanged
+  A_eff: "min(R_route, 100 * sqrt(S_usd)) * 1[builder ≥ 500]"
+  builder_floor: 500
+  pay_gate_is_not_a_term: true         # #104 is contracted eval, not this formula
+
+# ---------------------------------------------------------------------------
+# Modes and promote / park / reject
+# ---------------------------------------------------------------------------
+invariants:
+  - checker_must_not_be_doer
+  - no_approve_without_contracted_eval
+  - refusesToIssue_on_scoring_path
+  - last_active_null_skips_decay
+  - shock_flag_on_first_apply
+  - peer_weights_use_R_pre_while_sigma
+  - unproven_self_report_delta_is_0
+  - test_only_never_qualifies_referral
+  - bft_unevaluated_never_claims_weight
+  - no_doer_leaf_in_S
+
+promote:
+  observe_to_soft_live:
+    requires: [named_formula, mutant_or_identity]
+    sean_go_on_testnet: not_required
+  soft_live_to_live_write:
+    requires: [measured_once, idempotent_ticks, skip_reasons_logged]
+  cannot_promote:
+    - doer_verified_work
+    - witnessHidden
+    - bft_as_evidence
+    - floor_decay_write
+    - default_weights_rebalance
+
+park:
+  - layers_decay_ts
+  - doer_ReputationSignal_leaf
+  - perceived_eigenttrust_overlay
+  - referral_halo
+
+reject:
+  - silent_skip_of_contracted_eval
+  - inventing_last_active_at
+  - one_shot_apply_of_Delta_full_into_A_eff
+  - treating_DECAY_cluster_as_collusion
+  - self_award_referral_without_ref
+  - using_shadow_control_proof_to_approve
+  - claiming_best_in_class
+  - treating_vercel_as_a18
+
+phase_1_exit:
+  all_required:
+    - referral_mutants_M1_through_M8_accepted
+    - K_data_driven_and_K_prior_4_and_settle_tick_accepted
+    - anfis_lasso_and_hot_warm_cold_accepted
+    - CC_can_state_whether_dry_run_produces_W_and_Delta_full
