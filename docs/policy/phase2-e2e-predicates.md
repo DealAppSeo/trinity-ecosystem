@@ -110,3 +110,61 @@ Reputation and \(\Pi_S\) accrue on **non-simulated** settlements only.
 | A3 | missing stake \(S\) \(\Rightarrow\) do not invent \(S\); \(A^{\mathrm{eff}}\) is NOT_CHECKED, not a fabricated 0-authority pass |
 
 Phase 2 exits when D, R, I, P, X, A are all measured (pass or explicit NOT_CHECKED with owner), none silently skipped.
+
+---
+
+## Fixture numeric pack (for measurement)
+
+Values a fixture MUST use. Derived from locked curves, not invented per test.
+
+### F-REF — locked \(\delta(n)\) table
+
+| \(n\) | \(\delta_{\mathrm{raw}}=40/(n+1)\) | \(\delta\) |
+|---|---|---|
+| 1 | 20 | 12 |
+| 2 | 13.333… | 8 |
+| 3 | 10 | 8 |
+| 4 | 8 | 5 |
+| 5 | 6.667… | 5 |
+| 6 | 5.714… | 5 |
+| 7 | 5 | 5 |
+| 8 | 4.444… | 4 |
+| 9 | 4 | 4 |
+| 10 | 3.636… | 4 |
+| 100 | 0.396… | 0 |
+
+30-day farming cap for 10 distinct qualified referees (\(n=1\ldots10\)):
+
+\[
+12+8+8+5+5+5+4+4+4+4 = 59
+\]
+
+Pair idempotency: second \(n=1\) on the same referrer–referee pair \(\Rightarrow\) FAIL if \(\delta=12\).
+
+### F-DECAY-SIM — simultaneous shock
+
+Five agents, identical, non-`test_only`, \(W=5\), \(K=5\), \(\Delta^{\mathrm{full}}=10\), \(\Delta_k=2\), \(\lambda_\sigma=0.5\).
+
+| quantity | bound |
+|---|---|
+| per-tick \(\lvert\Delta R^{\mathrm{route}}\rvert\) | \(\le 1\) |
+| fleet \(\max_a \lvert\Delta R^{\mathrm{route}}_k\rvert\) | \(\le 1\) |
+| settle residual \(\tfrac12\Delta^{\mathrm{full}}\) | \(5 \le 50\) → **one** settle tick |
+| \(\sigma\) | per-agent; one settle does not close another |
+
+### F-DECAY-SETTLE-SPLIT
+
+\(\Delta^{\mathrm{full}}=120 \Rightarrow \tfrac12\Delta^{\mathrm{full}}=60 > 50\) → **two** settle ticks of 30. Do not raise \(\lambda_\sigma\).
+
+### F-AEFF
+
+| inputs | \(A^{\mathrm{eff}}\) |
+|---|---|
+| \(R^{\mathrm{route}}=1000\), \(S_{\mathrm{USD}}=100\) | \(\min(1000, 100\sqrt{100})=1000\) |
+| \(R^{\mathrm{route}}=1000\), \(S_{\mathrm{USD}}=25\) | \(\min(1000, 500)=500\) |
+| builder \(=400\), not fresh-demo | \(0\) |
+| \(S\) missing | NOT_CHECKED (A3), not a 0-authority **pass** |
+| Capability Declaration missing | \(A^{\mathrm{eff}}\) **unchanged**; \(\mathrm{class}(p)\ne\mathrm{hot}\) |
+| HAL axis \(S\) absent | renormalize \(\Pi\); \(A^{\mathrm{eff}}\) unchanged |
+
+Priors: \(\theta_{\mathrm{hot}}=2000\), \(\theta_{\mathrm{warm}}=500\), \(\theta_{\mathrm{cold}}=0\) (testnet may drop \(\theta_{\mathrm{hot}}\) to 1000; that is Phase 3, not a silent change here).

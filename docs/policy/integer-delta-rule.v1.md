@@ -1,15 +1,15 @@
-# Integer-delta rule (locked)
+# Integer-delta rule (locked) — ledger law
 
-**Claim:** every ledger-applied reputation delta is an integer.  
-**Why:** `current_repid` is an integer; `events.v1.json` score rows must round-trip without float drift; `round(δ_raw)` in the referral curve is load-bearing, not cosmetic.
+**Claim:** every ledger-applied reputation delta is a JSON integer.  
+`events.v1.json` rejects non-integer `delta` and `repid_delta_applied` on `DORMANCY_DECAY`, `ECOSYSTEM_REFERRAL`, and `IMPACT_REWARD`. No implicit exception.
 
-Stand-in for GA: `docs/contracts/events.v1.json` currently types `delta` / `repid_delta_applied` as `number`. Policy below is the lock. GA tightens those fields to `integer` and replaces this stand-in; until then, writers MUST emit integers anyway.
+**Why:** `current_repid` is an integer; `round(δ_raw)` on the referral curve is load-bearing; float round-trips drift.
 
 ---
 
 ## Rule
 
-Let \(\delta\) be any value written as `delta` or `repid_delta_applied` on a score event, and \(\Delta R = R_{\mathrm{after}} - R_{\mathrm{before}}\).
+Let \(\delta\) be `delta` or `repid_delta_applied`, \(\Delta R = R_{\mathrm{after}} - R_{\mathrm{before}}\).
 
 \[
 \delta \in \mathbb{Z},\qquad
@@ -18,15 +18,29 @@ R_{\mathrm{before}}, R_{\mathrm{after}} \in \mathbb{Z},\qquad
 \]
 
 \[
-\delta_{\mathrm{written}} = \operatorname{round}(\delta_{\mathrm{raw}})
-\quad\text{with half-away-from-zero, then clip to the type clamp}
+\delta_{\mathrm{written}} = \operatorname{clip}\bigl(\operatorname{round}(\delta_{\mathrm{raw}}),\,c_{\min},\,c_{\max}\bigr)
 \]
 
-Floats may exist **only** in non-applied fields (`weeks_idle`, `effective_rate`, \(I\), \(\delta_{\mathrm{raw}}\) before round). They never enter the ledger column `delta`.
+Round: half away from zero, then type clamp.
 
-Decay ticks: \(\Delta_k \in \mathbb{Z}\), remainder on last tick, \(\sum_k \Delta_k = \operatorname{round}(\Delta^{\mathrm{full}})\) with the same rounding, and \(\sum_k \Delta_k = R_{\mathrm{pre}} - R_{\mathrm{final}}\).
+Decay ticks: \(\Delta_k \in \mathbb{Z}\), remainder on last tick, \(\sum_k \Delta_k = R_{\mathrm{pre}} - R_{\mathrm{final}}\).
 
-Zero after round is a legal delta (referral \(n=100\)). Unproven still writes **no** row, or a row with \(\delta=0\) that does not increment \(n\).
+Zero after round is legal (referral \(n=100\)). Unproven: **no row**, or \(\delta=0\) that does not increment \(n\).
+
+## Explicit exceptions (non-applied fields only)
+
+These MAY be JSON `number` (float). They MUST NOT be copied into `delta`.
+
+| field | why |
+|---|---|
+| `metadata.weeks_idle` | idle weeks, real |
+| `metadata.effective_rate` | \(\rho \cdot m\) |
+| `I`, `delta_raw` before round | impact / curve intermediates |
+| `metadata.base_reward`, `base_value`, `severity_multiplier` | inputs to round |
+| `X402GateDecision.effective_authority`, `requested_usd`, `real_collateral_usd` | USD / \(\sqrt{S}\), not ledger \(\delta\) |
+| passport `axis_scores` | display 0–100, not \(\delta\) |
+
+There is **no** exception that lets a reward path write `1.5` to `delta`. A path that wants a float must round first or it fails ID1.
 
 ## Pass / fail
 
@@ -34,11 +48,8 @@ Zero after round is a legal delta (referral \(n=100\)). Unproven still writes **
 |---|---|
 | ID1 | \(\delta \notin \mathbb{Z} \Rightarrow\) FAIL |
 | ID2 | \(R_{\mathrm{after}} \ne R_{\mathrm{before}} + \delta \Rightarrow\) FAIL |
-| ID3 | referral \(\delta(n)\) equals the locked integers 12, 8, 8, 4, 0 for \(n=1,2,3,10,100\) |
-| ID4 | a non-integer `delta` in a fixture that claims to be a ledger event \(\Rightarrow\) FAIL |
+| ID3 | referral \(\delta(n) \in \{12,8,8,4,0\}\) for \(n=1,2,3,10,100\) |
+| ID4 | fixture ledger event with `type: number` on `delta` \(\Rightarrow\) FAIL |
+| ID5 | `events.v1.json` `DORMANCY_DECAY.delta.type` is `integer` (mutant `contract-delta-accepts-float`) |
 
-## Handoff (GA)
-
-Replace `number` with `integer` on `delta` and `repid_delta_applied` in `docs/contracts/events.v1.json` (`DORMANCY_DECAY`, `ECOSYSTEM_REFERRAL`, `IMPACT_REWARD`). Until that lands, this file is the measurement bar.
-
-Not claimed: schema already integer; decay already writing.
+Not claimed: decay already writing live.

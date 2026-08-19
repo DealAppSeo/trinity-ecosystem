@@ -2353,8 +2353,8 @@ export const MUTATIONS = [
       'be negative. The mutant lifts the cap, so a decay event can carry a POSITIVE delta: a ' +
       'reward wearing a decay label, which no downstream reader would question because the event ' +
       'type says decay',
-    find: '"delta": { "type": "number", "maximum": 0 }',
-    replace: '"delta": { "type": "number", "maximum": 10000 }',
+    find: '"delta": { "type": "integer", "maximum": 0 }',
+    replace: '"delta": { "type": "integer", "maximum": 10000 }',
   },
   {
     id: 'contract-x402-loses-the-stake-denial',
@@ -2367,6 +2367,17 @@ export const MUTATIONS = [
       'remedies',
     find: '"DENIED_NO_STAKE"',
     replace: '"DENIED_AUTHORITY_EXCEEDED"',
+  },
+  {
+    id: 'contract-delta-accepts-float',
+    suite: 'check:lane-files',
+    file: 'docs/contracts/events.v1.json',
+    protects:
+      'applied delta and repid_delta_applied are JSON integers. Reverting DORMANCY_DECAY.delta ' +
+      'to type number lets a float ledger write pass the envelope — the exact drift the ' +
+      'integer-delta rule exists to forbid',
+    find: '"delta": { "type": "integer", "maximum": 0 }',
+    replace: '"delta": { "type": "number", "maximum": 0 }',
   },
 
   // NOT REGISTERED — `portable-alias-creeps-back`, rejected 2026-08-19.
