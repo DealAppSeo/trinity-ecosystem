@@ -12,6 +12,14 @@
       "These match the actual database schema for RepID score events (DORMANCY_DECAY, ECOSYSTEM_REFERRAL, IMPACT_REWARD) and passport/spending gate contracts (ZKPPassportDisclosure, X402GateDecision)."
     ]
   },
+  "x-open-blockers": {
+    "agent_id_vs_did_mapping": {
+      "status": "OPEN",
+      "severity": "CRITICAL",
+      "description": "The ledger event and scoring schemas use strict UUID foreign keys pointing to repid_agents(id). Signed verdicts, however, carry Decentralized Identifiers (DIDs, did:key:...). Currently, there is 0 active database mapping from DID to repid_agents.id (identity_claims and sandbox_repid_credentials are both 0 rows). This is an open blocker for live-verdict ledger resolution.",
+      "remediation_plan": "A separate translation module or oracle must populate identity_claims before on-chain write lanes or routing engines can map did-named signatures to database-assigned UUIDs."
+    }
+  },
   "definitions": {
     "uuid": {
       "type": "string",
@@ -43,7 +51,9 @@
         "repid_delta_applied": { "type": "number", "maximum": 0 },
         "idempotency_key": {
           "type": "string",
-          "pattern": "^decay:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}:[0-9]{4}-[0-9]{2}-[0-9]{2}:tick_[0-9]+_of_[0-9]+$"
+          "pattern": "^decay:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}:[0-9]{4}-[0-9]{2}-[0-9]{2}:tick_[0-9]+_of_[0-9]+$",
+          "description": "Unique key ensuring idempotency under clock skew and retries. Format: 'decay:<agent_id_uuid>:<utc_decay_week_start_date>:tick_<k>_of_<K>'. The date parameter MUST represent the deterministic UTC week-start date (typically a Monday) of the decay run epoch to remain perfectly immune to local system clock skew or drift at runtime.",
+          "comment": "CLOCK_SKEW_IMMUNE: Generated deterministically on week boundary."
         },
         "metadata": {
           "type": "object",
@@ -89,7 +99,9 @@
         "repid_delta_applied": { "type": "number", "minimum": 1 },
         "idempotency_key": {
           "type": "string",
-          "pattern": "^referral:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          "pattern": "^referral:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "description": "Unique key ensuring idempotency. Format: 'referral:<deterministic_v5_uuid>'. The UUID MUST be generated using RFC 4122 namespace v5 over the deterministic tuple (referrer_id, referee_id, referral_index) to guarantee identical output on caller retry, bypassing client clock-skew.",
+          "comment": "CLOCK_SKEW_IMMUNE: Deterministic UUIDv5."
         },
         "metadata": {
           "type": "object",
@@ -124,7 +136,9 @@
         "repid_delta_applied": { "type": "number", "minimum": 1 },
         "idempotency_key": {
           "type": "string",
-          "pattern": "^impact:[a-zA-Z0-9_-]+:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          "pattern": "^impact:[a-zA-Z0-9_-]+:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "description": "Unique key ensuring idempotency. Format: 'impact:<action_class_slug>:<deterministic_v5_uuid>'. The UUID MUST be generated using RFC 4122 namespace v5 over the payload tuple (action_class, severity_multiplier, base_value, reviewer_id) to ensure zero duplicate writes even under clock drift or late network retries.",
+          "comment": "CLOCK_SKEW_IMMUNE: Deterministic UUIDv5."
         },
         "metadata": {
           "type": "object",
