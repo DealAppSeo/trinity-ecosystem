@@ -132,6 +132,7 @@
     "check:trust-harness-fixture": "node scripts/trust-harness-fixture.mjs",
     "check:live-callers": "node scripts/check-live-callers.mjs",
     "check:authority-runtime": "node scripts/check-authority-runtime.mjs",
+    "check:collateral-live": "node scripts/exercise-collateral-live.mjs",
     "build:package": "tsc -p tsconfig.package.json",
     "check:package-install": "node scripts/check-package-install.mjs",
     "check:verifier-independence": "node scripts/check-verifier-independence.mjs"
