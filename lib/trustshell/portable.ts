@@ -532,3 +532,39 @@ export {
   formatRate,
 } from './regulatory-claims';
 export type { ClaimStatus, ClaimEvidence, RegulatoryClaim, ComplianceRate } from './regulatory-claims';
+
+
+/**
+ * How much collateral is REAL, and what authority that buys.
+ *
+ * `stake_deposits` is 51/52 simulated — summing it overstates collateral 114x,
+ * and that figure feeds `100 * sqrt(S_usd)`, so an unfiltered sum grants more
+ * than ten times the collateralised authority. A tx hash does NOT mean real:
+ * every simulated active row carries one.
+ *
+ * `authority-policy.ts` is the FIRST runtime consumer of
+ * docs/policy/authority-policy.v0.5.yaml — the thing that makes that file a
+ * policy rather than a document, and the path off soft-live. No constant in it
+ * has a default: a default would be a second copy of the policy, and the runtime
+ * would drift from the file while every gate kept grading the file.
+ */
+export {
+  USDC_DECIMALS,
+  USDC_SCALE,
+  COLLATERALISING_STATUS,
+  realCollateralUsd,
+  overstatementIfUnfiltered,
+} from './collateral';
+export type { StakeDeposit, CollateralOutcome, RealCollateral } from './collateral';
+export {
+  loadAuthorityPolicy,
+  weightsSumToOne,
+  effectiveAuthority,
+} from './authority-policy';
+export type {
+  AuthorityPolicy,
+  PolicyLoad,
+  AuthorityInputs,
+  AuthorityOutcome,
+  EffectiveAuthority,
+} from './authority-policy';

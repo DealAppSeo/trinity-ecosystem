@@ -130,7 +130,8 @@
     "check:proof-provider-contract": "node scripts/check-proof-provider-contract.mjs",
     "check:bft-evidence-chain": "node scripts/check-bft-evidence-chain.mjs",
     "check:trust-harness-fixture": "node scripts/trust-harness-fixture.mjs",
-    "check:live-callers": "node scripts/check-live-callers.mjs"
+    "check:live-callers": "node scripts/check-live-callers.mjs",
+    "check:authority-runtime": "node scripts/check-authority-runtime.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

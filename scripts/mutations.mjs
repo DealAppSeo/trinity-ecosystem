@@ -2191,6 +2191,68 @@ export const MUTATIONS = [
   // SOFT-LIVE rows. Measured by doing it — the reconstructed contracts moved
   // both rows off NOT CHECKED while the assertion count stayed at 19.
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // collateral.ts / authority-policy.ts — what backs a spending ceiling
+  // -------------------------------------------------------------------------
+  {
+    id: 'collateral-counts-simulated-deposits',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/collateral.ts',
+    protects:
+      'stake_deposits is 51 of 52 SIMULATED. The mutant counts them, taking collateral from 50 ' +
+      'USDC to 5,722 — a 114x overstatement that lands in 100*sqrt(S_usd) and grants more than ' +
+      'TEN TIMES the collateralised authority. This is the sample-shape trap CLAUDE.md names',
+    find: '    if (r.is_simulated) {',
+    replace: '    if (false) {',
+  },
+  {
+    id: 'collateral-counts-closed-deposits',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/collateral.ts',
+    protects:
+      'only `active` deposits collateralise. The mutant counts `completed` ones too, so withdrawn ' +
+      'money keeps buying authority — and the two completed rows carry no tx hash, so nothing ' +
+      'downstream would look twice at them',
+    find: "    if (r.status !== COLLATERALISING_STATUS) {",
+    replace: "    if (false) {",
+  },
+  {
+    id: 'collateral-reports-a-partial-sum-as-a-total',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/collateral.ts',
+    protects:
+      'an unreadable row makes the TOTAL unknown, not smaller. The mutant returns the sum of the ' +
+      'rows it understood as though it were complete — a spending ceiling computed from part of ' +
+      'the evidence, presented as the whole of it',
+    find: '  if (excluded.wrongAsset > 0 || excluded.unparseable > 0) {',
+    replace: '  if (false) {',
+  },
+  {
+    id: 'authority-defaults-a-missing-policy-constant',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/authority-policy.ts',
+    protects:
+      'NO constant has a default. The mutant substitutes 500 for a missing builder_floor, which ' +
+      'is a SECOND COPY of the policy: the runtime would keep using it after XC retuned the file, ' +
+      'while every gate went on grading the file and reporting agreement. RepIDConfig produced ' +
+      'exactly this shape once — an unreadable threshold silently became 5000, LOWERING the bar',
+    find: "  const builderFloor = d.authority?.builder_floor;",
+    replace: "  const builderFloor = d.authority?.builder_floor ?? 500;",
+  },
+  {
+    id: 'authority-unknown-collateral-spends-as-zero-stake',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/authority-policy.ts',
+    protects:
+      'unknown collateral is NOT_CHECKED and grants nothing. The mutant reports it as MEASURED, ' +
+      'which is a different claim — "we could not read the backing" becomes "there is no ' +
+      'backing", and the two must not resolve to one spending decision by accident. Targets the ' +
+      'RETURN rather than the guard: `if (false)` on the guard defeats TypeScript narrowing and ' +
+      'the mutant stops compiling, which is INVALID and not evidence',
+    find: "      detail: 'collateral could not be measured — unknown backing is not zero backing',",
+    replace: "      detail: 'collateral measured as zero',",
+  },
+
   {
     id: 'contract-referral-lands-on-S',
     suite: 'check:lane-files',
