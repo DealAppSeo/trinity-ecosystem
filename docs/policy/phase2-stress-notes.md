@@ -34,7 +34,7 @@ Attack: mint identities, refer them, collect \(n=1\) at \(+12\) repeatedly.
 - Cap: at most **one** \(n=1\) payout per referrer–referee pair (idempotent).
 - \(\delta(100)=0\): industrial farming of qualified humans still hits the noise floor.
 
-**Bound (locked table):** 10 distinct qualified referees in 30 days \(\Rightarrow\) \(\sum_{n=1}^{10}\delta(n)=59\). Fixture `F-REF` in `phase2-e2e-predicates.md`. A payout \(>12\) for \(n=1\), or a second \(+12\) on the same pair, **fails**. The earlier \(5\times 7=63\) sketch is **withdrawn**; 59 is the number.
+**Bound (locked table):** 10 distinct qualified referees in 30 days \(\Rightarrow\) \(\sum_{n=1}^{10}\delta(n)=60\). Fixture `F-REF` in `phase2-e2e-predicates.md`. A payout \(>12\) for \(n=1\), or a second \(+12\) on the same pair, **fails**. The earlier \(5\times 7=63\) sketch is **withdrawn**. A prior **59** was a dropped \(n=7\) term (\(12+8+8+5+5+5+4+4+4+4\)); the table itself was already \(12,8,8,5,5,5,5,4,4,4\).
 
 **Fail:** treating click / code-create as qualification; paying \(Q\) into \(S\).
 

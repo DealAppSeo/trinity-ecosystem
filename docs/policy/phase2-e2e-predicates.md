@@ -136,8 +136,10 @@ Values a fixture MUST use. Derived from locked curves, not invented per test.
 30-day farming cap for 10 distinct qualified referees (\(n=1\ldots10\)):
 
 \[
-12+8+8+5+5+5+4+4+4+4 = 59
+12+8+8+5+5+5+5+4+4+4 = 60
 \]
+
+(\(n=7\) is \(\delta=5\), same as \(n=4,5,6\). A prior sum of 59 dropped that term. \(5\times 7=63\) remains withdrawn.)
 
 Pair idempotency: second \(n=1\) on the same referrer–referee pair \(\Rightarrow\) FAIL if \(\delta=12\).
 
@@ -168,3 +170,15 @@ Five agents, identical, non-`test_only`, \(W=5\), \(K=5\), \(\Delta^{\mathrm{ful
 | HAL axis \(S\) absent | renormalize \(\Pi\); \(A^{\mathrm{eff}}\) unchanged |
 
 Priors: \(\theta_{\mathrm{hot}}=2000\), \(\theta_{\mathrm{warm}}=500\), \(\theta_{\mathrm{cold}}=0\) (testnet may drop \(\theta_{\mathrm{hot}}\) to 1000; that is Phase 3, not a silent change here).
+
+---
+
+## ZK / ecology / RMF (observe; not Phase 2 exit)
+
+GateRun MEASURED / NOT_CHECKED / FAILED only. No circuits. No new soft-live surface.
+
+| file | suites |
+|---|---|
+| `docs/policy/zk-attestation-predicates.md` | Z1–Z5 (axis range); ZR1–ZR5 (\(A^{\mathrm{eff}}\) used \(S_{\mathrm{real}}\) only). `provenWithoutSecret` stays blocked. |
+| `docs/policy/trust-ecology-profile.md` | public vs internal profile |
+| `docs/policy/nist-ai-rmf-mapping.md` | Measure / Manage for promote/park/reject and \(A^{\mathrm{eff}}\) |
