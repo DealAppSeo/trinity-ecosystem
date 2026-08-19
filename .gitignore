@@ -179,3 +179,10 @@ lib/**/*.js
 .alert-digest-check-*/
 .open-index-check-*/
 .open-work-check-*/
+
+# V1-spine item 1-4 exercise scripts (2026-08-19) — same mkdtemp-into-cwd
+# pattern, caught by check:tmpdir-ignored on PR #111 rather than missed by it.
+.collateral-live-check-*/
+.promotion-attribution-check-*/
+.phase2-status-check-*/
+.dogfood-identity-*/
