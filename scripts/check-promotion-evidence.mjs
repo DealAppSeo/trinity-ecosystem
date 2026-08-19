@@ -70,6 +70,14 @@ const run = (o) => ({
   coversWholeClaim: true,
   gatesTheBuild: true,
   detail: '',
+  // Attributed to two DIFFERENT training lineages by default, so "every
+  // condition holds" means every condition — independence included. Added
+  // 2026-08-19 when promotion started requiring a verifier disjoint from the
+  // author; the assertion below pins the other direction.
+  attribution: {
+    authoredBy: { family: 'claude', model: 'opus', provider: 'anthropic' },
+    verifiedBy: { family: 'llama', model: 'llama-3.1-8b-instant', provider: 'groq' },
+  },
   ...o,
 });
 const claim = (o) => ({ surface: 's', artifact: 'sha-abc', runs: [], ...o });
@@ -150,6 +158,75 @@ check('canPromoteToLive passes only when every condition holds', () => {
   const r = P.canPromoteToLive(claim({ runs: [run()] }));
   eq(r.ok, true, `should promote: ${r.blockers.join(' | ')}`);
   eq(r.blockers.length, 0, 'no blockers');
+});
+
+// ── the grader must not be the author ──────────────────────────────────────
+//
+// Added 2026-08-19, after the implementation lane authored GA's contract files
+// and then ran the harness that graded them. Content gates fixed the empty-gate
+// half; this fixes the half that survived it.
+
+check('an UNATTRIBUTED run cannot promote, however green it is', () => {
+  // This is the default state of every gate in this repo — none records who
+  // checked what. "Nobody recorded it" must not read as "someone independent did".
+  const bare = run();
+  delete bare.attribution;
+  const r = P.canPromoteToLive(claim({ runs: [bare] }));
+  eq(r.ok, false, 'a fully green, fully gating, whole-claim run still must not promote');
+  truthy(
+    r.blockers.some((b) => /unattributed evidence is not independent/.test(b)),
+    `blockers must name it: ${r.blockers.join(' | ')}`
+  );
+});
+
+check('a SELF-VERIFIED run cannot promote, and is named as such', () => {
+  const r = P.canPromoteToLive(
+    claim({
+      runs: [
+        run({
+          attribution: {
+            authoredBy: { family: 'claude', model: 'opus' },
+            verifiedBy: { family: 'claude', model: 'sonnet' },
+          },
+        }),
+      ],
+    })
+  );
+  eq(r.ok, false, 'same lineage on both sides must not promote');
+  truthy(
+    r.blockers.some((b) => /one opinion stated twice/.test(b)),
+    `blockers must name it: ${r.blockers.join(' | ')}`
+  );
+});
+
+check('independence is decided by LINEAGE, not by vendor', () => {
+  // Two families behind one provider is what cross-llm-verifier.ts already does
+  // on purpose: provider redundancy reduced, training-data diversity preserved.
+  const r = P.canPromoteToLive(
+    claim({
+      runs: [
+        run({
+          attribution: {
+            authoredBy: { family: 'llama', provider: 'groq' },
+            verifiedBy: { family: 'gpt', provider: 'groq' },
+          },
+        }),
+      ],
+    })
+  );
+  eq(r.ok, true, `a shared vendor must not block disjoint lineages: ${r.blockers.join(' | ')}`);
+});
+
+check('independentEvidenceFor and selfVerifiedEvidence partition the attributed runs', () => {
+  const c = claim({
+    runs: [
+      run(),                                                                  // disjoint
+      run({ attribution: { authoredBy: { family: 'gpt' }, verifiedBy: { family: 'gpt' } } }),
+      (() => { const b = run(); delete b.attribution; return b; })(),         // unattributed
+    ],
+  });
+  eq(P.independentEvidenceFor(c).length, 1, 'exactly one disjoint run');
+  eq(P.selfVerifiedEvidence(c).length, 1, 'exactly one self-verified run');
 });
 
 // ── the table ───────────────────────────────────────────────────────────────

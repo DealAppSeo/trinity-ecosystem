@@ -568,3 +568,26 @@ export type {
   AuthorityOutcome,
   EffectiveAuthority,
 } from './authority-policy';
+
+
+/**
+ * Is the grader disjoint from the author?
+ *
+ * Added after the implementation lane authored GA's contract files and then ran
+ * the harness that graded them. The unit of independence is the TRAINING
+ * LINEAGE, not the API vendor — two models from one lineage agreeing is one
+ * opinion stated twice. `promotion.ts` consults this, so a claim cannot reach
+ * `live` on self-verified or unattributed evidence.
+ */
+export {
+  assessIndependence,
+  bestIndependence,
+  familiesInvolved,
+} from './verifier-independence';
+export type {
+  ModelFamily,
+  Attribution,
+  Independence,
+  IndependenceVerdict,
+} from './verifier-independence';
+export { independentEvidenceFor, selfVerifiedEvidence } from './promotion';

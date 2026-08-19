@@ -2221,6 +2221,58 @@ export const MUTATIONS = [
   // never ran.
 
   // -------------------------------------------------------------------------
+  // verifier-independence.ts — the grader must not be the author
+  // -------------------------------------------------------------------------
+  {
+    id: 'independence-unattributed-counts-as-independent',
+    suite: 'check:verifier-independence',
+    file: 'lib/trustshell/verifier-independence.ts',
+    protects:
+      'missing attribution is NOT_CHECKED. The mutant treats it as disjoint — and unattributed ' +
+      'is the DEFAULT STATE of every gate in this repo, so this single change would silently ' +
+      'promote every claim to fully-independent evidence. "Nobody recorded who checked this" ' +
+      'must never read as "someone independent did". Targets the RETURN, not the guard: ' +
+      '`if (false)` on the guard defeats TypeScript narrowing and the mutant stops compiling — ' +
+      'INVALID, not evidence. Third time that trap has cost a run',
+    find: "      independence: 'NOT_CHECKED',\n      sharedProvider,\n      counts: false,",
+    replace: "      independence: 'DISJOINT',\n      sharedProvider,\n      counts: true,",
+  },
+  {
+    id: 'independence-same-family-counts',
+    suite: 'check:verifier-independence',
+    file: 'lib/trustshell/verifier-independence.ts',
+    protects:
+      'two models from ONE training lineage agreeing is one opinion stated twice. The mutant ' +
+      'lets a claude-checks-claude verdict count as a second opinion, which is exactly the ' +
+      'self-grading this module was written to refuse',
+    find: "      independence: 'SHARED_FAMILY',\n      sharedProvider,\n      counts: false,",
+    replace: "      independence: 'DISJOINT',\n      sharedProvider,\n      counts: true,",
+  },
+  {
+    id: 'independence-vendor-mistaken-for-lineage',
+    suite: 'check:verifier-independence',
+    file: 'lib/trustshell/verifier-independence.ts',
+    protects:
+      'a SHARED VENDOR does not disqualify disjoint lineages. The mutant rejects the exact pair ' +
+      'cross-llm-verifier.ts ships on purpose — llama + gpt behind one groq endpoint, chosen for ' +
+      'training-data diversity. Conflating vendor with lineage would reject real independence ' +
+      'and, run the other way, accept two same-lineage models bought from different resellers',
+    find: '  return {\n    independence: \'DISJOINT\',\n    sharedProvider,\n    counts: true,',
+    replace: '  return {\n    independence: sharedProvider ? \'SHARED_FAMILY\' : \'DISJOINT\',\n    sharedProvider,\n    counts: !sharedProvider,',
+  },
+  {
+    id: 'promotion-accepts-self-verified-evidence',
+    suite: 'check:promotion-evidence',
+    file: 'lib/trustshell/promotion.ts',
+    protects:
+      'promotion requires a verifier disjoint from the author. The mutant drops the filter, so a ' +
+      'claim graded entirely by the lineage that wrote it reaches `live` — the incident this seam ' +
+      'was built for, restored',
+    find: '    if (!a || !v) return false;',
+    replace: '    if (!a || !v) return true;',
+  },
+
+  // -------------------------------------------------------------------------
   // collateral.ts / authority-policy.ts — what backs a spending ceiling
   // -------------------------------------------------------------------------
   {

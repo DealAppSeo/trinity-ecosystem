@@ -167,6 +167,7 @@ lib/**/*.js
 .pay-auth-check-*/
 .regulatory-check-*/
 .authority-runtime-check-*/
+.verifier-independence-check-*/
 .repid-weight-sim-*/
 .issuer-stake-check-*/
 .proof-contract-check-*/

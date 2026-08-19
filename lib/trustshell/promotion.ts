@@ -63,6 +63,23 @@ export interface GateRun {
   /** True when the gate observes and reports but cannot fail the build. */
   gatesTheBuild: boolean;
   detail: string;
+  /**
+   * WHO produced the artifact and WHO checked it.
+   *
+   * Optional, and absent on every gate in this repo today — which is the point:
+   * absence resolves to NOT_CHECKED, never to "someone independent looked".
+   * `verifier-independence.ts` holds the decision; this field is the record it
+   * decides over.
+   *
+   * The unit is the TRAINING LINEAGE, not the API vendor. Two models from one
+   * lineage agreeing is one opinion stated twice — the reasoning
+   * `lib/trust/cross-llm-verifier.ts` already applies when it pairs a Llama
+   * model with a GPT one behind a single provider.
+   */
+  attribution?: {
+    authoredBy?: { family: string; model?: string; provider?: string };
+    verifiedBy?: { family: string; model?: string; provider?: string };
+  };
 }
 
 export interface SurfaceClaim {
@@ -188,6 +205,20 @@ export function canPromoteToLive(claim: SurfaceClaim): { ok: boolean; blockers: 
   if (runs.some((r) => r.gatesTheBuild && !r.coversWholeClaim))
     blockers.push('a gating check covers only part of the claim (soft-live)');
 
+  // The grader must not be the author. Nothing in this repo satisfies this yet —
+  // no gate records attribution — so promotion to `live` is blocked on it by
+  // design, and the blocker names what is missing rather than what is wrong.
+  if (runs.length > 0 && independentEvidenceFor(claim).length === 0) {
+    const selfChecked = selfVerifiedEvidence(claim).length;
+    blockers.push(
+      selfChecked > 0
+        ? `${selfChecked} run(s) were verified by the SAME training lineage that authored the ` +
+          'artifact — one opinion stated twice is not a second opinion'
+        : 'no run records a verifier disjoint from the author; unattributed evidence is not ' +
+          'independent evidence'
+    );
+  }
+
   const stale = staleEvidence(claim);
   if (stale.length > 0)
     blockers.push(
@@ -196,6 +227,38 @@ export function canPromoteToLive(claim: SurfaceClaim): { ok: boolean; blockers: 
     );
 
   return { ok: blockers.length === 0, blockers };
+}
+
+/**
+ * Runs whose VERIFIER is from a different training lineage than the author.
+ *
+ * Deliberately NOT folded into `stageFor`. Doing that would re-grade every
+ * existing claim as blocked in one commit, and a gate that turns everything red
+ * teaches people to ignore it. Independence tightens PROMOTION — the moment the
+ * mistake actually gets made — and is REPORTED everywhere else.
+ *
+ * A run with no attribution does not count. That is the load-bearing case:
+ * unattributed is the default state of every gate here today, and reading
+ * "nobody recorded who checked this" as "someone independent did" is the exact
+ * substitution this module exists to refuse.
+ */
+export function independentEvidenceFor(claim: SurfaceClaim): GateRun[] {
+  return evidenceFor(claim).filter((r) => {
+    const a = r.attribution?.authoredBy;
+    const v = r.attribution?.verifiedBy;
+    if (!a || !v) return false;
+    if (a.family === 'unknown' || v.family === 'unknown') return false;
+    return a.family !== v.family;
+  });
+}
+
+/** Runs that were checked by the SAME lineage that authored them. Reported. */
+export function selfVerifiedEvidence(claim: SurfaceClaim): GateRun[] {
+  return evidenceFor(claim).filter((r) => {
+    const a = r.attribution?.authoredBy;
+    const v = r.attribution?.verifiedBy;
+    return !!a && !!v && a.family === v.family;
+  });
 }
 
 /** Render the DoD table. Ordered worst-first: the rows needing work read first. */
