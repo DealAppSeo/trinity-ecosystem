@@ -2182,6 +2182,50 @@ export const MUTATIONS = [
   // -------------------------------------------------------------------------
   // The portable entry point — DoD 1's actual question, asked of Node
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // docs/contracts/*.json — GA's contracts, graded against XC'S policy file
+  //
+  // These mutate the CONTRACT and require the cross-lane comparison to notice.
+  // Before 2026-08-19 there was nothing to mutate: check:lane-files had no
+  // content assertions for either GA path, so `{}` at both paths produced two
+  // SOFT-LIVE rows. Measured by doing it — the reconstructed contracts moved
+  // both rows off NOT CHECKED while the assertion count stayed at 19.
+  // -------------------------------------------------------------------------
+  {
+    id: 'contract-referral-lands-on-S',
+    suite: 'check:lane-files',
+    file: 'docs/contracts/events.v1.json',
+    protects:
+      'referral mutant M8 — the delta lands on axis Q, not S. Landing it on S double-counts a ' +
+      'referral as self-performance, and S carries weight 0.35 against Q\'s 0.10, so the mutant ' +
+      'both moves the value to the wrong axis and inflates it 3.5x. The assertion reads the axis ' +
+      'from the POLICY file, so the contract cannot ratify its own answer',
+    find: '"const": "Q",',
+    replace: '"const": "S",',
+  },
+  {
+    id: 'contract-invents-a-contribution-type',
+    suite: 'check:lane-files',
+    file: 'docs/contracts/events.v1.json',
+    protects:
+      'impact.types is a CLOSED set of seven in the policy. Adding one here is a cross-lane ' +
+      'vocabulary change wearing a schema edit — the contract would accept an event the policy ' +
+      'has no scaling rule for, and delta_0 for it would be undefined',
+    find: '"PEACEMAKER"',
+    replace: '"PEACEMAKER",\n            "INVENTED_TYPE"',
+  },
+  {
+    id: 'contract-lambda-sigma-drifts-from-policy',
+    suite: 'check:lane-files',
+    file: 'docs/contracts/events.v1.json',
+    protects:
+      'lambda_sigma is 0.5 in the policy and the contract must not carry a second copy that can ' +
+      'drift. It sets how much of an applied decay routing sees while the envelope is open, so a ' +
+      'drifted value makes A_eff disagree with the ledger in a way no functional test would see',
+    find: '"const": 0.5,',
+    replace: '"const": 0.9,',
+  },
+
   // NOT REGISTERED — `portable-alias-creeps-back`, rejected 2026-08-19.
   //
   // The invariant is real and load-bearing: no module reachable from
