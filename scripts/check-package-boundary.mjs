@@ -19,11 +19,12 @@
 //
 //   A. reaches OUTSIDE the package via `@/`            9   the real cost
 //   B. `@/` but only self-references                    0   DONE 2026-08-19
-//   C+D. npm deps only, or pure                        92  portable
+//   A. reaches OUTSIDE via `@/` is now 10           10   the real cost
+//   C+D. npm deps only, or pure                        93  portable
 //                                                     ───
-//                                                     101
+//                                                     103
 //
-// **92 of 101 are portable, and group B is now empty.** The 14 self-aliased
+// **93 of 103 are portable, and group B is now empty.** The 14 self-aliased
 // modules were rewritten to relative paths — 19 specifiers across 15 files —
 // once `check:portable-surface` proved the rewrite was REQUIRED rather than
 // cosmetic: `@/lib/trustshell/harness/types` does not resolve without the alias,
@@ -105,6 +106,10 @@ const HOST_COUPLED = new Set([
   'lib/trustshell/ZKPAttestation.ts',
   'lib/trustshell/persistence/supabase-reputation-store.ts',
   'lib/trustshell/RewardLedger.ts',
+  // Tenth, 2026-08-19. Reads stake_deposits so effectiveAuthority has a real
+  // S_usd; the decision logic stays in collateral.ts with zero imports. The
+  // gate FAILED on this before the commit, which is the list doing its job.
+  'lib/trustshell/CollateralRepository.ts',
 ]);
 
 /** The only host modules they may reach. Both are ports, not logic. */
@@ -220,10 +225,10 @@ check('no undeclared npm dependency', () => {
 check('the portable majority has not shrunk', () => {
   // B + C + D: everything that ships today or after a mechanical path rewrite.
   const portable = files.length - outside.size;
-  return portable >= 92
+  return portable >= 93
     ? true
     : `portable modules fell to ${portable} of ${files.length} ` +
-      '(92 of 101 on 2026-08-19 after the packaging work; 88 of 97 before it; 69 of 77 at the start)';
+      '(93 of 103 on 2026-08-19 with CollateralRepository added; 92 of 101 before it; 69 of 77 at the start)';
 });
 
 // ── 3. DoD 1 is NOT CHECKED, and must say so ────────────────────────────────

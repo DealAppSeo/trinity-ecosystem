@@ -14,6 +14,9 @@ import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
 import { rewardFor, rewardReason, isPermittedReward } from '@/lib/trustshell/reward';
 import { idempotentDecision } from '@/lib/trustshell/reward-idempotency';
 import { RewardLedger } from '@/lib/trustshell/RewardLedger';
+import { loadAuthorityPolicy, effectiveAuthority } from '@/lib/trustshell/authority-policy';
+import { CollateralRepository } from '@/lib/trustshell/CollateralRepository';
+import POLICY_DOC from '@/lib/trustshell/authority-policy.generated.json';
 import { payAuthMode, payAuthDecision, verifyPaySignature, SIGNATURE_HEADER, TIMESTAMP_HEADER } from '@/lib/trustshell/pay-auth';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import {
@@ -38,6 +41,7 @@ export async function POST(req: NextRequest) {
   const calc       = new RepIDCalculator();
   const earnedMetrics = new EarnedMetricsRepository();
   const rewardLedger = new RewardLedger();
+  const collateral = new CollateralRepository();
   // Lazy client, per lib/CLAUDE.md — a getter, not a field initialiser holding a
   // live client, so nothing is constructed at import time.
   const custodyShadow = new CustodyShadow(() => getSupabaseAdmin(), undefined, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION);
@@ -151,6 +155,41 @@ export async function POST(req: NextRequest) {
         thresholdSource: repidResult.thresholdSource,
       }, { status: 503 });
     }
+
+    // ---- effectiveAuthority, IN OBSERVE MODE --------------------------------
+    //
+    // The FIRST live consumer of docs/policy/authority-policy.v0.5.yaml. That
+    // file sat at soft-live because nothing in the runtime read it — a policy
+    // nothing reads is a document. This reads it (through the generated JSON
+    // mirror, which check:authority-runtime fails on if it drifts from the YAML)
+    // and computes A_eff = min(R_route, 100*sqrt(S_usd)) * 1[builder >= 500].
+    //
+    // It DECIDES NOTHING. Same posture as the ControlProof shadow and the auth
+    // check on this route: evaluate, disclose, change no outcome. Two reasons,
+    // and the second is the interesting one:
+    //
+    //   1. Turning a new ceiling on unilaterally could deny live payments.
+    //   2. IT WOULD DENY EVERY PAYMENT ANYWAY, because S_usd is NOT_CHECKED for
+    //      every agent — there is no join key from an agent to its deposits, and
+    //      `agent_kya_registry.collateral_staked` is a LITERAL (50.000000 for
+    //      all 12 agents, summing to 600 USDC against the 50 that exists).
+    //      Enforcing against unknown backing would be correct and would also
+    //      stop the product; reporting it is what makes the gap visible.
+    const policyLoad = loadAuthorityPolicy(POLICY_DOC);
+    const agentCollateral = await collateral.forAgent(agentName);
+    const authority = policyLoad.ok
+      ? effectiveAuthority(
+          {
+            // r_route, not r_ledger: A_eff must never rise because decay was
+            // latent. No decay envelope is open today, so these coincide — the
+            // distinction is recorded before it can start mattering silently.
+            rRoute: repidResult.repidScore,
+            stakeUsd: agentCollateral.usd,
+            builderScore: repidResult.repidScore,
+          },
+          policyLoad.policy
+        )
+      : null;
 
     // Addendum 2: KYA commitment. NOT a zero-knowledge proof — it never was.
     // The object used to carry proofSystem 'groth16' over a SHA-256 of a
@@ -442,6 +481,22 @@ export async function POST(req: NextRequest) {
       },
       contracted,
       floorDecay: earned.floorDecay ?? null,
+      // effectiveAuthority, computed from the policy FILE and disclosed. Nothing
+      // here gated this payment — see the observe-mode note at the call site.
+      effectiveAuthority: {
+        mode:          'observe',
+        policyVersion: policyLoad.ok ? policyLoad.policy.version : null,
+        policyLoaded:  policyLoad.ok,
+        aEff:          authority?.aEff ?? null,
+        outcome:       authority?.outcome ?? 'NOT_CHECKED',
+        bindingTerm:   authority?.bindingTerm ?? null,
+        detail:        authority?.detail ?? (policyLoad.ok ? 'not computed' : policyLoad.detail),
+        collateral: {
+          usd:     agentCollateral.usd,
+          outcome: agentCollateral.outcome,
+          detail:  agentCollateral.detail,
+        },
+      },
       // What authentication decided, and what it WOULD have decided. Disclosed
       // for the same reason `bft.evaluated:false` is: an observe-mode allow and
       // a genuine pass are indistinguishable to a caller otherwise.

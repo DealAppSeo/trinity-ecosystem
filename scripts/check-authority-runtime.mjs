@@ -271,6 +271,77 @@ check('the UNFILTERED collateral would grant >10x the authority', () => {
     : `inflated/real = ${(inflated.aEff / real.aEff).toFixed(2)} — the point of filtering is this ratio`;
 });
 
+// ── 4. The generated JSON mirror must not drift from the YAML ──────────────
+//
+// The runtime imports a generated JSON copy, because `docs/` is not traced into
+// a Next build and no module here does a runtime readFileSync. That IS a second
+// copy — the defect this repo has logged four times — and what makes it safe is
+// that it cannot silently diverge.
+
+const { renderPolicyJson, JSON_PATH } = await import('./generate-policy-json.mjs');
+
+check('the generated policy JSON is byte-identical to a fresh render', () => {
+  const committed = readFileSync(JSON_PATH, 'utf8');
+  return committed === renderPolicyJson()
+    ? true
+    : `${JSON_PATH} is stale — the runtime would use a constant the policy no longer states. ` +
+      'Run: node scripts/generate-policy-json.mjs';
+});
+
+check('the runtime loads the GENERATED json to the same policy as the YAML', () => {
+  const fromJson = A.loadAuthorityPolicy(JSON.parse(readFileSync(JSON_PATH, 'utf8')));
+  if (!fromJson.ok) return `generated json does not load: ${fromJson.missing?.join(', ')}`;
+  if (!load.ok) return 'yaml did not load';
+  return JSON.stringify(fromJson.policy) === JSON.stringify(load.policy)
+    ? true
+    : `json -> ${JSON.stringify(fromJson.policy)} vs yaml -> ${JSON.stringify(load.policy)}`;
+});
+
+check('the generated file warns against hand-editing', () => {
+  const doc = JSON.parse(readFileSync(JSON_PATH, 'utf8'));
+  return /DO NOT EDIT/.test(doc?._generated?.warning ?? '')
+    ? true
+    : 'the generated artifact does not say it is generated — someone will edit it';
+});
+
+// ── 5. The live consumer, and the literal it must not read ─────────────────
+
+const payRoute = stripComments(readFileSync('app/api/trustrails/pay/route.ts', 'utf8'));
+
+check('the payment route COMPUTES effectiveAuthority', () =>
+  /effectiveAuthority\(/.test(payRoute) && /loadAuthorityPolicy\(POLICY_DOC\)/.test(payRoute)
+    ? true
+    : 'the pay route does not compute A_eff — the policy file would still have no runtime reader');
+
+check('the route DISCLOSES A_eff and names observe mode', () =>
+  /effectiveAuthority: \{/.test(payRoute) && /mode:\s*'observe'/.test(payRoute)
+    ? true
+    : 'A_eff is computed but not disclosed, or does not say it decided nothing');
+
+check('A_eff decides NOTHING — no branch returns on it', () => {
+  const badBranch = /if\s*\(\s*!?\s*authority[^)]*\)\s*\{[^}]*NextResponse/.test(payRoute);
+  return !badBranch
+    ? true
+    : 'the route now DENIES on effectiveAuthority. That is enforcement, not observation — and it ' +
+      'would deny every payment, because S_usd is NOT_CHECKED for every agent';
+});
+
+check('the route does NOT read agent_kya_registry.collateral_staked', () => {
+  // Measured 2026-08-19: 50.000000 for ALL 12 agents — one distinct value,
+  // summing to 600 USDC against the 50 that exists in stake_deposits. A literal,
+  // and it would go straight into 100*sqrt(S_usd), a spending ceiling.
+  return !/collateral_staked/.test(payRoute)
+    ? true
+    : 'the route reads collateral_staked — a constant across every agent, 12x the real total';
+});
+
+check('the collateral adapter refuses per-agent lookups and says why', () => {
+  const src = stripComments(readFileSync('lib/trustshell/CollateralRepository.ts', 'utf8'));
+  return /no join key from agent/.test(src) && /NOT_CHECKED/.test(src)
+    ? true
+    : 'forAgent no longer names the missing join key — the gap would stop being visible';
+});
+
 rmSync(outDir, { recursive: true, force: true });
 
 if (failures.length > 0) {
