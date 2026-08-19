@@ -38,7 +38,7 @@
 //     order give different answers for identical input across runs. Ordering is
 //     total: weight descending, then key ascending.
 
-import { BPS_MAX, type Bps, type Clock, type ExpertId } from '@/lib/trustshell/harness/types';
+import { BPS_MAX, type Bps, type Clock, type ExpertId } from './types';
 
 /**
  * One expert's answer.

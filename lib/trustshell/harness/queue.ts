@@ -16,7 +16,7 @@
 // an exception ends up caught somewhere generic and counted as a failure of
 // something else; a named terminal state stays attributable.
 
-import type { Clock, ExpertId, Task } from '@/lib/trustshell/harness/types';
+import type { Clock, ExpertId, Task } from './types';
 
 export type LeaseId = string;
 

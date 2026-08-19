@@ -26,7 +26,7 @@
 // the behaviour a trust layer should have, and it is the same principle as the
 // cold-start rule in router.ts — no evidence is not evidence of badness.
 
-import { BPS_MAX, type Bps } from '@/lib/trustshell/harness/types';
+import { BPS_MAX, type Bps } from './types';
 
 export interface ReputationConfig {
   /** Starting belief for an unobserved expert. Default 5000 = neutral. */

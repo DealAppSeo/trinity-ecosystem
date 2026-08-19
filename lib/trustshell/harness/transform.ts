@@ -37,7 +37,7 @@
 // 50% compression for dropping ten one-word messages while the window stayed
 // full.
 
-import type { Clock } from '@/lib/trustshell/harness/types';
+import type { Clock } from './types';
 
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
 

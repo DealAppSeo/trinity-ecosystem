@@ -641,8 +641,17 @@ export const MUTATIONS = [
       'destructure would make every caller-supplied proof vanish before it ever reaches the ' +
       'shadow comparison, and the route would still 200 — the exact "looks wired, isn\'t reachable" ' +
       'shape this repo keeps finding in its own barrel exports, one layer down',
-    find: 'const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } = await req.json();',
-    replace: 'const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();',
+    // Re-pointed 2026-08-19. Request signing needs the RAW bytes — `req.json()`
+    // consumes the stream, and a signature over a re-serialised object verifies a
+    // different string than the caller signed. The route reads `req.text()` once
+    // and parses it, so this find string stopped matching. CI reported DRIFT,
+    // which is the outcome working: the code moved and the manifest did not.
+    find:
+      '  const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } =\n' +
+      '    JSON.parse(rawBody);',
+    replace:
+      '  const { agentName, amountUSDC, recipientAddress, purpose, signatures } =\n' +
+      '    JSON.parse(rawBody);',
   },
   {
     id: 'pay-shadow-wrong-audience',
@@ -1031,7 +1040,11 @@ export const MUTATIONS = [
   {
     id: 'spine-unreachable-from-barrel',
     suite: 'check:spine-reachable',
-    file: 'lib/trustshell/index.ts',
+    // Re-pointed 2026-08-19: the barrel split in two, and the spine exports moved
+    // to `portable.ts` (they carry no host dependency). CI reported this as DRIFT
+    // — find string occurs 0 times — which is the outcome doing exactly its job:
+    // the code moved and the manifest did not. The invariant is unchanged.
+    file: 'lib/trustshell/portable.ts',
     protects:
       'the spine stays REACHABLE. Every module below was correct, mutation-tested and ' +
       'green while being importable by nobody — measured 2026-08-16, 0 of 10 exported ' +
@@ -1061,6 +1074,75 @@ export const MUTATIONS = [
       'which every signature check downstream would still call valid',
     find: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid);',
     replace: 'const checkerKey = checkerKeyFor(assigned.unsigned.checkerDid) ?? doerKey;',
+  },
+  {
+    id: 'promotion-counts-a-run-against-another-artifact',
+    suite: 'check:promotion-evidence',
+    file: 'lib/trustshell/promotion.ts',
+    protects:
+      'A18, mechanised. A real gate, a real pass, the wrong subject — three commits once sat ' +
+      'with `npm run check` never having run against them, behind a green tick belonging to ' +
+      "Vercel's preview-comments check. The mutant counts any green run, so a stale one " +
+      'promotes a surface to live. The filter on `ranAgainst` is the only thing standing ' +
+      'between a status table and that tick',
+    find: '  return claim.runs.filter((r) => r.gate.length > 0 && r.ranAgainst === claim.artifact);',
+    replace: '  return claim.runs.filter((r) => r.gate.length > 0);',
+  },
+  {
+    id: 'promotion-turns-absence-into-a-posture',
+    suite: 'check:promotion-evidence',
+    file: 'lib/trustshell/promotion.ts',
+    protects:
+      'an unmeasured surface returns NULL, rendered as NOT CHECKED — it does not get the ' +
+      'lowest good-looking row. `observe` is a deliberate posture (it ran, it does not gate); ' +
+      'silently assigning it to a surface nobody measured is the table-shaped version of the ' +
+      'two-outcome collapse',
+    find: '  if (runs.length === 0) return null;',
+    replace: "  if (runs.length === 0) return 'observe';",
+  },
+  {
+    id: 'bft-outage-claims-the-vote-happened',
+    suite: 'check:payment-fail-posture',
+    file: 'lib/trustshell/BFTAuthorizer.ts',
+    protects:
+      'a provider outage is recorded as NOT EVALUATED, never as an evaluated verdict. The ' +
+      'payment proceeds either way — that is the deliberate fail-open — so `evaluated` is the ' +
+      'ONLY thing distinguishing "three providers authorised this" from "nobody voted". ' +
+      'Flipping it makes an unchecked payment indistinguishable from a consensus-authorised one',
+    find: `        votedAt: new Date().toISOString(),
+        evaluated: false,
+        notEvaluatedReason: \`BFT engine unavailable: \${message}\`,`,
+    replace: `        votedAt: new Date().toISOString(),
+        evaluated: true,
+        notEvaluatedReason: \`BFT engine unavailable: \${message}\`,`,
+  },
+  {
+    id: 'bft-observe-invents-a-consensus-weight',
+    suite: 'check:payment-fail-posture',
+    file: 'lib/trustshell/BFTAuthorizer.ts',
+    protects:
+      'observe mode reports NO consensus weight, because it held no vote. This is the exact ' +
+      'defect BFTAuthorizer replaced — a placeholder returning passed:true with a weight of ' +
+      '1.0, which is why all 12 rows in kya_compliance_receipts claim BFT consensus. A number ' +
+      'here is worse than a null: it is auditable-looking',
+    find: `        consensusWeight: null,
+        threshold: 0.618033988749895,
+        passed: true, // not blocked`,
+    replace: `        consensusWeight: 1.0,
+        threshold: 0.618033988749895,
+        passed: true, // not blocked`,
+  },
+  {
+    id: 'bft-enforcement-default-flips',
+    suite: 'check:payment-fail-posture',
+    file: 'lib/trustshell/BFTAuthorizer.ts',
+    protects:
+      'enforcement is OFF unless the exact word `enforce` is set. The default decides whether ' +
+      'every transfer waits on three third-party models, and the Comma veto fires on unanimous ' +
+      'high confidence — so a routine payment may be escalated at a rate nobody has measured ' +
+      'yet. Flipping the default chooses a refusal rate blind',
+    find: "  return process.env.BFT_ENFORCEMENT_MODE === 'enforce' ? 'enforce' : 'observe';",
+    replace: "  return process.env.BFT_ENFORCEMENT_MODE === 'observe' ? 'observe' : 'enforce';",
   },
   {
     id: 'sign-out-claims-success-it-did-not-earn',
@@ -1927,6 +2009,510 @@ export const MUTATIONS = [
     replace: '  if (value.trim().length <= rule.minLength) return \'too_short\';',
   },
 
+  // -------------------------------------------------------------------------
+  // lib/trustshell/reward.ts — the reputation the payment path is allowed to pay
+  // -------------------------------------------------------------------------
+  {
+    id: 'reward-trusts-observe-mode-passed-true',
+    suite: 'check:reward-earned',
+    file: 'lib/trustshell/reward.ts',
+    protects:
+      'observe mode returns `passed: true, evaluated: false` BY DESIGN — not blocked is not ' +
+      'a verdict. The mutant reads the flag the panel never set, so the default configuration ' +
+      'goes back to paying +10 RepID for a consensus that did not run. That reward is durable: ' +
+      'it rewrites repid_tier and both spending limits, raising the ceiling on the next request',
+    find: '  if (!evidence.consensusEvaluated) {',
+    replace: '  if (!evidence.consensusPassed) {',
+  },
+  {
+    id: 'reward-pays-for-a-simulated-settlement',
+    suite: 'check:reward-earned',
+    file: 'lib/trustshell/reward.ts',
+    protects:
+      'a payment that touched no chain earns no reputation. The executor simulates whenever ' +
+      'AGENT_SOPHIA_SECRET_BYTES is absent, which is every environment observed here, so the ' +
+      'mutant is not an edge case — it restores +10 per call for money that never moved, with ' +
+      'no idempotency key and no authentication on the route',
+    find: '  if (evidence.settlementSimulated) {',
+    replace: '  if (evidence.settlementSimulated && !evidence.consensusPassed) {',
+  },
+  {
+    id: 'reward-collapses-not-checked-into-failed',
+    suite: 'check:reward-earned',
+    file: 'lib/trustshell/reward.ts',
+    protects:
+      'three outcomes, never two. A broadcast transaction awaiting confirmation is NOT CHECKED; ' +
+      'the mutant charges it as a consensus FAILURE, which is the same defect this module fixes ' +
+      'pointed the other way — and it would make a provider outage indistinguishable from a ' +
+      'rejected payment in the response the caller reads',
+    find: '    outcome: failed ? \'WITHHELD_FAILED\' : \'WITHHELD_NOT_CHECKED\',',
+    replace: '    outcome: \'WITHHELD_FAILED\',',
+  },
+
+  // -------------------------------------------------------------------------
+  // scripts/lib/module-specifiers.mjs — the parser the package boundary rests on
+  //
+  // All three break the MEASUREMENT rather than the thing measured. A boundary
+  // check whose extractor under-reports prints a clean boundary, and the report
+  // is what anyone reads. These are the shapes that actually defeated it.
+  // -------------------------------------------------------------------------
+  {
+    id: 'specifiers-reads-prose-as-imports',
+    suite: 'check:package-boundary',
+    file: 'scripts/lib/module-specifiers.mjs',
+    protects:
+      'comments are stripped before specifiers are matched. Four modules in lib/trustshell ' +
+      'were once reported as carrying npm dependencies because their header prose contains ' +
+      "the word \"from\" followed by a quoted phrase — the mutant restores that reading, and " +
+      'an inflated dependency list is a boundary nobody can act on',
+    find: '      return !t.startsWith(\'//\') && !t.startsWith(\'*\');',
+    replace: '      return true;',
+  },
+  {
+    id: 'specifiers-misses-multiline-imports',
+    suite: 'check:package-boundary',
+    file: 'scripts/lib/module-specifiers.mjs',
+    protects:
+      'the SPECIFIER is matched, not the statement. Anchoring to `import`/`export` on one line ' +
+      'misses every `import {\\n … \\n} from "x"` — it filed SolanaExecutor.ts, which imports ' +
+      'two Solana packages, as having no dependencies at all. Under-reporting is the dangerous ' +
+      'direction: it prints a portable package that is not one',
+    find: '    ...code.matchAll(/\\bfrom\\s*[\'"]([^\'"]+)[\'"]/g),',
+    replace: '    ...code.matchAll(/^\\s*(?:import|export)\\b[^;\\n]*?\\bfrom\\s*[\'"]([^\'"]+)[\'"]/gm),',
+  },
+  {
+    id: 'specifiers-admits-template-phantoms',
+    suite: 'check:package-boundary',
+    file: 'scripts/lib/module-specifiers.mjs',
+    protects:
+      'a `${…}` interpolation cannot be a module path. `retargets audience from \'${a.audience}\'` ' +
+      'is an error message, and counting it invents a dependency on a package that does not exist ' +
+      '— the opposite error to the one above, and equally a wrong boundary',
+    find: '  return [...new Set(found.filter((s) => !s.includes(\'${\') && !s.includes(\' \')))];',
+    replace: '  return [...new Set(found)];',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/lane-files.ts — the recomputation that grades a lane's file
+  // -------------------------------------------------------------------------
+  {
+    id: 'lane-referral-clamp-ignored',
+    suite: 'check:lane-files',
+    file: 'lib/trustshell/lane-files.ts',
+    protects:
+      'the per-rank clamp c(n) is what caps the referral delta, not the curve. At n=1 the raw ' +
+      'curve pays 20 against a clamp of 12; the mutant returns the uncapped value, so a policy ' +
+      'file publishing delta=20 would be accepted as derivable. The clamp is the anti-whale term',
+    find: '  return Math.min(Math.max(Math.round(referralRaw(n)), 0), referralClamp(n));',
+    replace: '  return Math.max(Math.round(referralRaw(n)), 0);',
+  },
+  {
+    id: 'lane-bucket-overlap-unnoticed',
+    suite: 'check:lane-files',
+    file: 'lib/trustshell/lane-files.ts',
+    protects:
+      'a surface listed in two status buckets is two incompatible claims, not a typo — whichever ' +
+      'a reader hits first wins, and `live` next to `blocked` is the worst pair. The mutant stops ' +
+      'recording the collision and the policy table silently self-contradicts',
+    find: '      if (prior) out.push(`"${item}" is in both ${prior} and ${bucket}`);',
+    replace: '      if (prior) seen.set(item, bucket);',
+  },
+  {
+    id: 'lane-live-claims-read-as-evidence',
+    suite: 'check:lane-files',
+    file: 'lib/trustshell/lane-files.ts',
+    protects:
+      'a document`s own `status.live` list is an ASSERTED stage — the exact thing promotion.ts ' +
+      'refuses. The mutant returns nothing to back, so every self-declared live surface passes ' +
+      'unexamined and the policy file grades itself',
+    find: '  return [...(status.live ?? [])];',
+    replace: '  return [];',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/reward-idempotency.ts — paid at most once, and fail closed
+  // -------------------------------------------------------------------------
+  {
+    id: 'idempotency-pays-on-an-unreadable-ledger',
+    suite: 'check:reward-idempotency',
+    file: 'lib/trustshell/reward-idempotency.ts',
+    protects:
+      'a ledger that cannot be read WITHHOLDS. The mutant pays when the claim could not be ' +
+      'recorded, so a database outage becomes an unbounded faucet — and every payment during ' +
+      'it is replayable forever, because nothing recorded that the reward was taken',
+    find: "    case 'unreadable':\n      return {\n        award: false,",
+    replace: "    case 'unreadable':\n      return {\n        award: true,",
+  },
+  {
+    id: 'idempotency-claims-before-checking-earned',
+    suite: 'check:reward-idempotency',
+    file: 'lib/trustshell/reward-idempotency.ts',
+    protects:
+      'a zero delta short-circuits BEFORE the ledger. The mutant lets an unearned reward fall ' +
+      'through to the ledger states, so the receipt gets claimed for a payment that was never ' +
+      'made — and the eventual legitimate reward then reads as a duplicate and is withheld ' +
+      'forever. The ordering is the invariant, not the branch',
+    find: '  if (earnedDelta === 0) {',
+    replace: '  if (earnedDelta < 0) {',
+  },
+  {
+    id: 'idempotency-unknown-error-blamed-on-the-migration',
+    suite: 'check:reward-idempotency',
+    file: 'lib/trustshell/reward-idempotency.ts',
+    protects:
+      'only 42703 (undefined_column) means the migration is unapplied. The mutant reports every ' +
+      'connection drop and statement timeout as a missing migration, which sends the operator to ' +
+      'apply SQL while a live database problem continues — both withhold, so the failure is ' +
+      'invisible in the payout and only the DIAGNOSIS is wrong',
+    find: "  return 'unreadable';\n}",
+    replace: "  return 'store-absent';\n}",
+  },
+  {
+    id: 'idempotency-missing-receipt-read-as-duplicate',
+    suite: 'check:reward-idempotency',
+    file: 'lib/trustshell/reward-idempotency.ts',
+    protects:
+      'zero rows updated is ambiguous, and the two readings are not interchangeable. Against a ' +
+      'MISSING receipt it is an outage; the mutant calls it a suppressed duplicate, which is the ' +
+      'one classification nobody ever investigates — a vanished receipt would be hidden forever',
+    find: '  if (!receiptExists) return \'unreadable\';',
+    replace: '  if (!receiptExists) return \'already-awarded\';',
+  },
+
+  // -------------------------------------------------------------------------
+  // The portable entry point — DoD 1's actual question, asked of Node
+  // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // docs/contracts/*.json — GA's contracts, graded against XC'S policy file
+  //
+  // These mutate the CONTRACT and require the cross-lane comparison to notice.
+  // Before 2026-08-19 there was nothing to mutate: check:lane-files had no
+  // content assertions for either GA path, so `{}` at both paths produced two
+  // SOFT-LIVE rows. Measured by doing it — the reconstructed contracts moved
+  // both rows off NOT CHECKED while the assertion count stayed at 19.
+  // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // The publishable package — DoD 1, and the failure only an install can see
+  // -------------------------------------------------------------------------
+  // NOT REGISTERED — `package-ships-no-dist` and
+  // `package-exports-a-path-that-is-not-packed`, both rejected 2026-08-19.
+  //
+  // The invariants are real and the assertions DO catch them. Verified by hand:
+  // setting `files: ["README.md"]` turns check:package-install red at 3 of 12,
+  // and pointing `exports` at a path that is never emitted does the same. Both
+  // are the failure that only an install can see — the package still builds and
+  // still loads from the repo tree in each case.
+  //
+  // They cannot be SCORED here, for two independent reasons:
+  //
+  //   1. mutate.mjs marks a run INVALID when the suite's output matches
+  //      /Cannot find (module|name)/, on the sound rule that a non-compiling
+  //      mutant is not evidence. This suite's subject IS a module that cannot be
+  //      found — at the consumer, at require time, which is a different failure
+  //      from a broken build and the heuristic cannot tell them apart.
+  //   2. The mutation target would be `package.json`, which npm READS during the
+  //      run (`npm pack`, `npm install`). Mutating it mid-suite races the very
+  //      tool the suite drives, which is the concurrency hazard the mutate lock
+  //      exists to prevent — applied to the manifest that configures npm itself.
+  //
+  // Recorded rather than registered, the same disposition as the non-terminating
+  // `i += 2` mutation and `portable-alias-creeps-back`. What is missing is
+  // mutation EVIDENCE, not the assertions; saying so beats a green entry that
+  // never ran.
+
+  // -------------------------------------------------------------------------
+  // verifier-independence.ts — the grader must not be the author
+  // -------------------------------------------------------------------------
+  {
+    id: 'independence-unattributed-counts-as-independent',
+    suite: 'check:verifier-independence',
+    file: 'lib/trustshell/verifier-independence.ts',
+    protects:
+      'missing attribution is NOT_CHECKED. The mutant treats it as disjoint — and unattributed ' +
+      'is the DEFAULT STATE of every gate in this repo, so this single change would silently ' +
+      'promote every claim to fully-independent evidence. "Nobody recorded who checked this" ' +
+      'must never read as "someone independent did". Targets the RETURN, not the guard: ' +
+      '`if (false)` on the guard defeats TypeScript narrowing and the mutant stops compiling — ' +
+      'INVALID, not evidence. Third time that trap has cost a run',
+    find: "      independence: 'NOT_CHECKED',\n      sharedProvider,\n      counts: false,",
+    replace: "      independence: 'DISJOINT',\n      sharedProvider,\n      counts: true,",
+  },
+  {
+    id: 'independence-same-family-counts',
+    suite: 'check:verifier-independence',
+    file: 'lib/trustshell/verifier-independence.ts',
+    protects:
+      'two models from ONE training lineage agreeing is one opinion stated twice. The mutant ' +
+      'lets a claude-checks-claude verdict count as a second opinion, which is exactly the ' +
+      'self-grading this module was written to refuse',
+    find: "      independence: 'SHARED_FAMILY',\n      sharedProvider,\n      counts: false,",
+    replace: "      independence: 'DISJOINT',\n      sharedProvider,\n      counts: true,",
+  },
+  {
+    id: 'independence-vendor-mistaken-for-lineage',
+    suite: 'check:verifier-independence',
+    file: 'lib/trustshell/verifier-independence.ts',
+    protects:
+      'a SHARED VENDOR does not disqualify disjoint lineages. The mutant rejects the exact pair ' +
+      'cross-llm-verifier.ts ships on purpose — llama + gpt behind one groq endpoint, chosen for ' +
+      'training-data diversity. Conflating vendor with lineage would reject real independence ' +
+      'and, run the other way, accept two same-lineage models bought from different resellers',
+    find: '  return {\n    independence: \'DISJOINT\',\n    sharedProvider,\n    counts: true,',
+    replace: '  return {\n    independence: sharedProvider ? \'SHARED_FAMILY\' : \'DISJOINT\',\n    sharedProvider,\n    counts: !sharedProvider,',
+  },
+  {
+    id: 'promotion-accepts-self-verified-evidence',
+    suite: 'check:promotion-evidence',
+    file: 'lib/trustshell/promotion.ts',
+    protects:
+      'promotion requires a verifier disjoint from the author. The mutant drops the filter, so a ' +
+      'claim graded entirely by the lineage that wrote it reaches `live` — the incident this seam ' +
+      'was built for, restored',
+    find: '    if (!a || !v) return false;',
+    replace: '    if (!a || !v) return true;',
+  },
+
+  // -------------------------------------------------------------------------
+  // collateral.ts / authority-policy.ts — what backs a spending ceiling
+  // -------------------------------------------------------------------------
+  {
+    id: 'collateral-counts-simulated-deposits',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/collateral.ts',
+    protects:
+      'stake_deposits is 51 of 52 SIMULATED. The mutant counts them, taking collateral from 50 ' +
+      'USDC to 5,722 — a 114x overstatement that lands in 100*sqrt(S_usd) and grants more than ' +
+      'TEN TIMES the collateralised authority. This is the sample-shape trap CLAUDE.md names',
+    find: '    if (r.is_simulated) {',
+    replace: '    if (false) {',
+  },
+  {
+    id: 'collateral-counts-closed-deposits',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/collateral.ts',
+    protects:
+      'only `active` deposits collateralise. The mutant counts `completed` ones too, so withdrawn ' +
+      'money keeps buying authority — and the two completed rows carry no tx hash, so nothing ' +
+      'downstream would look twice at them',
+    find: "    if (r.status !== COLLATERALISING_STATUS) {",
+    replace: "    if (false) {",
+  },
+  {
+    id: 'collateral-reports-a-partial-sum-as-a-total',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/collateral.ts',
+    protects:
+      'an unreadable row makes the TOTAL unknown, not smaller. The mutant returns the sum of the ' +
+      'rows it understood as though it were complete — a spending ceiling computed from part of ' +
+      'the evidence, presented as the whole of it',
+    find: '  if (excluded.wrongAsset > 0 || excluded.unparseable > 0) {',
+    replace: '  if (false) {',
+  },
+  {
+    id: 'authority-defaults-a-missing-policy-constant',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/authority-policy.ts',
+    protects:
+      'NO constant has a default. The mutant substitutes 500 for a missing builder_floor, which ' +
+      'is a SECOND COPY of the policy: the runtime would keep using it after XC retuned the file, ' +
+      'while every gate went on grading the file and reporting agreement. RepIDConfig produced ' +
+      'exactly this shape once — an unreadable threshold silently became 5000, LOWERING the bar',
+    find: "  const builderFloor = d.authority?.builder_floor;",
+    replace: "  const builderFloor = d.authority?.builder_floor ?? 500;",
+  },
+  {
+    id: 'authority-unknown-collateral-spends-as-zero-stake',
+    suite: 'check:authority-runtime',
+    file: 'lib/trustshell/authority-policy.ts',
+    protects:
+      'unknown collateral is NOT_CHECKED and grants nothing. The mutant reports it as MEASURED, ' +
+      'which is a different claim — "we could not read the backing" becomes "there is no ' +
+      'backing", and the two must not resolve to one spending decision by accident. Targets the ' +
+      'RETURN rather than the guard: `if (false)` on the guard defeats TypeScript narrowing and ' +
+      'the mutant stops compiling, which is INVALID and not evidence',
+    find: "      detail: 'collateral could not be measured — unknown backing is not zero backing',",
+    replace: "      detail: 'collateral measured as zero',",
+  },
+
+  // -------------------------------------------------------------------------
+  // docs/contracts/events.v1.json — the REAL envelope, not the stand-in
+  //
+  // REPLACED 2026-08-19. Three earlier entries mutated a CC-authored stand-in's
+  // structure (`lands_on_axis`, an iota ladder, a duplicated lambda_sigma). GA's
+  // real file landed on main via #105 and is an EVENT ENVELOPE that deliberately
+  // does NOT restate the policy's constants — so all three find-strings vanished
+  // and the run reported DRIFT, which is that outcome doing its job. Retargeted
+  // at the envelope invariants the real file actually holds.
+  // -------------------------------------------------------------------------
+  {
+    id: 'contract-decay-can-add-repid',
+    suite: 'check:lane-files',
+    file: 'docs/contracts/events.v1.json',
+    protects:
+      'DORMANCY_DECAY carries `maximum: 0` on delta and repid_delta_applied — decay can only ever ' +
+      'be negative. The mutant lifts the cap, so a decay event can carry a POSITIVE delta: a ' +
+      'reward wearing a decay label, which no downstream reader would question because the event ' +
+      'type says decay',
+    find: '"delta": { "type": "number", "maximum": 0 }',
+    replace: '"delta": { "type": "number", "maximum": 10000 }',
+  },
+  {
+    id: 'contract-x402-loses-the-stake-denial',
+    suite: 'check:lane-files',
+    file: 'docs/contracts/events.v1.json',
+    protects:
+      'the x402 gate distinguishes DENIED_NO_STAKE from DENIED_AUTHORITY_EXCEEDED. The mutant ' +
+      'collapses them, so an agent denied for having no collateral and one denied for exceeding ' +
+      'its ceiling get the same answer — a denial nobody can act on, and the two have opposite ' +
+      'remedies',
+    find: '"DENIED_NO_STAKE"',
+    replace: '"DENIED_AUTHORITY_EXCEEDED"',
+  },
+
+  // NOT REGISTERED — `portable-alias-creeps-back`, rejected 2026-08-19.
+  //
+  // The invariant is real and load-bearing: no module reachable from
+  // `portable.ts` may import through `@/`, because `paths` is compile-time only
+  // and the emitted `require("@/lib/...")` is unresolvable by Node. The mutation
+  // that breaks it — aliasing a value import in `identity/spine.ts` — is also
+  // real: the repo's own `tsc --noEmit` still reports 0 errors with it applied,
+  // so it is a mutant that compiles.
+  //
+  // It cannot be SCORED here. `mutate.mjs` marks a run INVALID when the suite's
+  // output matches /error TS\d+/ or /Cannot find (module|name)/, on the sound
+  // rule that a mutant which does not compile is not evidence — and
+  // `check:portable-surface` is the one suite whose SUBJECT is a compile
+  // failure. Its correct red is indistinguishable from a broken build, and
+  // rewording tsc's prose until the heuristic stops matching would be evading
+  // the detector, not clarifying a message.
+  //
+  // Recorded rather than registered, the same disposition as the non-terminating
+  // `i += 2` mutation on `buildGroup`. The invariant is still protected — by the
+  // suite's first assertion, which fails with the full diagnostics naming every
+  // import that only resolves because of the alias. What is missing is mutation
+  // EVIDENCE for it, and saying so is better than a green entry that never ran.
+
+  {
+    id: 'portable-barrel-stops-reexporting',
+    suite: 'check:portable-surface',
+    file: 'lib/trustshell/index.ts',
+    protects:
+      'the app barrel re-exports the whole portable surface. The mutant drops the re-export, ' +
+      'and every consumer of @/lib/trustshell silently loses ~100 names at once — the split ' +
+      'is supposed to be invisible to them, and this is what keeps it so',
+    find: "export * from './portable';",
+    replace: "// export * from './portable';",
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/pay-auth.ts — shipped in observe mode, and it must stay that way
+  // -------------------------------------------------------------------------
+  {
+    id: 'pay-auth-defaults-to-enforcing',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'the mode defaults to OBSERVE. The mutant enforces unless told otherwise, which denies ' +
+      'every existing caller of a live payment route the moment it deploys — and nobody can yet ' +
+      'say how many that is, which is the entire reason this ships in observe mode',
+    find: "  return env.PAY_AUTH_MODE === 'enforce' ? 'enforce' : 'observe';",
+    replace: "  return env.PAY_AUTH_MODE === 'observe' ? 'observe' : 'enforce';",
+  },
+  {
+    id: 'pay-auth-observe-allow-looks-like-a-pass',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'an observe-mode allow SAYS so. The mutant returns the bare verdict text, so an ' +
+      'unauthenticated request that was let through reads identically to one that verified — ' +
+      'the same defect as a BFT `passed:true` with `evaluated:false`, in the auth field',
+    find: "        ? `${verdict.detail} — ALLOWED because PAY_AUTH_MODE is observe; this would be denied under enforce`",
+    replace: '        ? verdict.detail',
+  },
+  {
+    id: 'pay-auth-unconfigured-secret-opens-the-door',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'NOT_CHECKED denies under enforcement. The mutant treats "no secret configured" as a pass, ' +
+      'so deleting an environment variable disables authentication silently — an open door ' +
+      'reached by a missing config, which is the failure this repo names most often',
+    find: '  const wouldDeny = verdict.outcome !== \'VERIFIED\';',
+    replace: '  const wouldDeny = verdict.outcome === \'FAILED\';',
+  },
+  {
+    id: 'pay-auth-timestamp-not-signed',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'the timestamp is bound INTO the signature. The mutant signs the body alone, so a captured ' +
+      'signature stays valid forever — resend it with a fresh timestamp and the freshness window ' +
+      'becomes decorative',
+    find: '  return `${timestamp}.${body}`;',
+    replace: '  return body;',
+  },
+  {
+    id: 'pay-auth-digest-compare-leaks-timing',
+    suite: 'check:pay-auth',
+    file: 'lib/trustshell/pay-auth.ts',
+    protects:
+      'digest comparison accumulates over every byte. The mutant returns on the first mismatch, ' +
+      'so how long the check takes reveals how many leading bytes were right — enough to recover ' +
+      'a valid signature one byte at a time',
+    find: '  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);',
+    replace: '  for (let i = 0; i < a.length; i++) { if (a.charCodeAt(i) !== b.charCodeAt(i)) return false; }',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/regulatory-claims.ts — the statement with the highest cost
+  // of being wrong
+  // -------------------------------------------------------------------------
+  {
+    id: 'regulatory-empty-window-reports-full-compliance',
+    suite: 'check:regulatory-claims',
+    file: 'lib/trustshell/regulatory-claims.ts',
+    protects:
+      'a rate over an EMPTY set is undefined — not 100%. The mutant restores the fallback that ' +
+      'shipped for this endpoint\'s entire existence: measured 2026-08-19, 0 receipts in 24h and ' +
+      '12 all time, every one with bft_passed NULL, so the denominator has never been anything ' +
+      'but zero and the route always published perfect compliance from no data',
+    find: '  if (total <= 0) {',
+    replace: '  if (total < 0) {',
+  },
+  {
+    id: 'regulatory-mica-met-without-a-consensus',
+    suite: 'check:regulatory-claims',
+    file: 'lib/trustshell/regulatory-claims.ts',
+    protects:
+      'MiCA Art. 68 is about controls that DEMONSTRABLY prevent unauthorized transactions. The ' +
+      'mutant reports it MET when transactions exist but no consensus ever ran — which is the ' +
+      'live shape exactly (12 receipts, 12 unevaluated), and is the hardcoded `true` returning ' +
+      'through a function call instead of a literal',
+    find: '      if (e.evaluatedConsensusCount === 0) {',
+    replace: '      if (e.evaluatedConsensusCount < 0) {',
+  },
+  {
+    id: 'regulatory-partial-custody-reads-as-ready',
+    suite: 'check:regulatory-claims',
+    file: 'lib/trustshell/regulatory-claims.ts',
+    protects:
+      'GENIUS Act readiness needs custody verified for EVERY transacting agent. The mutant lets ' +
+      'one verified agent carry the claim for all of them — "mostly compliant" published as ' +
+      'compliant, which is the two-outcome collapse in the field where it costs most',
+    find: '      if (e.humanCustodyVerifiedCount < e.agentCount) {',
+    replace: '      if (e.humanCustodyVerifiedCount === 0) {',
+  },
+  {
+    id: 'regulatory-all-met-ignores-not-checked',
+    suite: 'check:regulatory-claims',
+    file: 'lib/trustshell/regulatory-claims.ts',
+    protects:
+      'allClaimsMet requires every claim to be MET. The mutant counts NOT_CHECKED as good enough, ' +
+      'so a system that measured nothing reports full compliance — the exact failure this module ' +
+      'replaced, rebuilt out of the three-outcome type that was supposed to prevent it',
+    find: "  return claims.length > 0 && claims.every((c) => c.status === 'MET');",
+    replace: "  return claims.length > 0 && claims.every((c) => c.status !== 'NOT_MET');",
+  },
   // ── check:throughput — quorum diversity ───────────────────────────────────
   {
     id: 'diversity-member-loss-never-detected',

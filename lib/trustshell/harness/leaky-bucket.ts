@@ -11,7 +11,7 @@
 // arrive just after a tick and stall for the remainder of the interval, which
 // shows up as a latency spike that no metric attributes to the limiter.
 
-import type { Clock, ExpertId } from '@/lib/trustshell/harness/types';
+import type { Clock, ExpertId } from './types';
 
 export interface BucketConfig {
   /** Sustained rate. Tokens replenished per minute. */
