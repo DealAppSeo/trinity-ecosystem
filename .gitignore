@@ -161,6 +161,8 @@ lib/**/*.js
 .payment-posture-check-*/
 .promotion-check-*/
 .reward-check-*/
+.lane-files-check-*/
+.reward-idem-check-*/
 .repid-weight-sim-*/
 .issuer-stake-check-*/
 .proof-contract-check-*/

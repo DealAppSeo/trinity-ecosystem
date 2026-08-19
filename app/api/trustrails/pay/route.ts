@@ -12,6 +12,8 @@ import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
 import { EarnedMetricsRepository } from '@/lib/trustshell/EarnedMetricsRepo';
 import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
 import { rewardFor, rewardReason, isPermittedReward } from '@/lib/trustshell/reward';
+import { idempotentDecision } from '@/lib/trustshell/reward-idempotency';
+import { RewardLedger } from '@/lib/trustshell/RewardLedger';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import {
   evaluateContractedPayment,
@@ -29,6 +31,7 @@ export async function POST(req: NextRequest) {
   const zkp        = new ZKPAttestationService();
   const calc       = new RepIDCalculator();
   const earnedMetrics = new EarnedMetricsRepository();
+  const rewardLedger = new RewardLedger();
   // Lazy client, per lib/CLAUDE.md — a getter, not a field initialiser holding a
   // live client, so nothing is constructed at import time.
   const custodyShadow = new CustodyShadow(() => getSupabaseAdmin(), undefined, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION);
@@ -317,7 +320,24 @@ export async function POST(req: NextRequest) {
     if (!isPermittedReward(reward.delta)) {
       throw new Error(`refusing an out-of-band RepID delta on the payment path: ${reward.delta}`);
     }
-    if (reward.delta !== 0) {
+    // EARNED is not the same as PAYABLE. `updateRepID` has no key and no
+    // constraint, so replaying one accepted payment pays again — and the write
+    // recomputes the tier and both spending limits, raising the ceiling for the
+    // next request. The claim below is one conditional UPDATE against
+    // `kya_compliance_receipts`, whose `receipt_id` is already UNIQUE, so two
+    // concurrent replays cannot both win. See lib/trustshell/reward-idempotency.ts.
+    //
+    // Withholds on an unreadable or absent ledger, and says which. The columns
+    // arrive with 20260819013000_repid_reward_idempotency.sql, deliberately
+    // UNAPPLIED — until then this reports WITHHELD_LEDGER_ABSENT rather than
+    // paying a reward it cannot record.
+    const claim =
+      reward.delta === 0
+        ? { state: 'claimed' as const, detail: 'not consulted; nothing was earned' }
+        : await rewardLedger.claim(receipt.receiptId, reward.delta);
+    const payout = idempotentDecision(reward.delta, claim.state);
+
+    if (payout.award) {
       await kya.updateRepID(agentName, reward.delta, rewardReason(reward, amountUSDC));
     }
 
@@ -368,10 +388,21 @@ export async function POST(req: NextRequest) {
         // is disclosed for the same reason `bft.evaluated:false` is: a silent
         // zero and an earned zero look identical to the caller otherwise.
         reward: {
-          delta:    reward.delta,
+          // What was EARNED...
+          delta:    payout.award ? reward.delta : 0,
           outcome:  reward.outcome,
           unmet:    reward.unmet,
           reason:   reward.reason,
+          // ...and whether it was PAYABLE. Two separate questions, disclosed
+          // separately: an earned-but-duplicate reward and an unearned one are
+          // both zero and mean entirely different things.
+          paid:     payout.award,
+          payout:   payout.outcome,
+          payoutReason: payout.reason,
+          // True when a human needs to look — a ledger outage, or the unapplied
+          // migration. Surfaced rather than logged, for the same reason
+          // `bft.evaluated:false` is.
+          needsOperator: payout.needsOperator,
         },
       },
       contracted,

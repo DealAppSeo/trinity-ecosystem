@@ -2115,6 +2115,56 @@ export const MUTATIONS = [
     find: '  return [...(status.live ?? [])];',
     replace: '  return [];',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/reward-idempotency.ts — paid at most once, and fail closed
+  // -------------------------------------------------------------------------
+  {
+    id: 'idempotency-pays-on-an-unreadable-ledger',
+    suite: 'check:reward-idempotency',
+    file: 'lib/trustshell/reward-idempotency.ts',
+    protects:
+      'a ledger that cannot be read WITHHOLDS. The mutant pays when the claim could not be ' +
+      'recorded, so a database outage becomes an unbounded faucet — and every payment during ' +
+      'it is replayable forever, because nothing recorded that the reward was taken',
+    find: "    case 'unreadable':\n      return {\n        award: false,",
+    replace: "    case 'unreadable':\n      return {\n        award: true,",
+  },
+  {
+    id: 'idempotency-claims-before-checking-earned',
+    suite: 'check:reward-idempotency',
+    file: 'lib/trustshell/reward-idempotency.ts',
+    protects:
+      'a zero delta short-circuits BEFORE the ledger. The mutant lets an unearned reward fall ' +
+      'through to the ledger states, so the receipt gets claimed for a payment that was never ' +
+      'made — and the eventual legitimate reward then reads as a duplicate and is withheld ' +
+      'forever. The ordering is the invariant, not the branch',
+    find: '  if (earnedDelta === 0) {',
+    replace: '  if (earnedDelta < 0) {',
+  },
+  {
+    id: 'idempotency-unknown-error-blamed-on-the-migration',
+    suite: 'check:reward-idempotency',
+    file: 'lib/trustshell/reward-idempotency.ts',
+    protects:
+      'only 42703 (undefined_column) means the migration is unapplied. The mutant reports every ' +
+      'connection drop and statement timeout as a missing migration, which sends the operator to ' +
+      'apply SQL while a live database problem continues — both withhold, so the failure is ' +
+      'invisible in the payout and only the DIAGNOSIS is wrong',
+    find: "  return 'unreadable';\n}",
+    replace: "  return 'store-absent';\n}",
+  },
+  {
+    id: 'idempotency-missing-receipt-read-as-duplicate',
+    suite: 'check:reward-idempotency',
+    file: 'lib/trustshell/reward-idempotency.ts',
+    protects:
+      'zero rows updated is ambiguous, and the two readings are not interchangeable. Against a ' +
+      'MISSING receipt it is an outage; the mutant calls it a suppressed duplicate, which is the ' +
+      'one classification nobody ever investigates — a vanished receipt would be hidden forever',
+    find: '  if (!receiptExists) return \'unreadable\';',
+    replace: '  if (!receiptExists) return \'already-awarded\';',
+  },
   // ── check:throughput — quorum diversity ───────────────────────────────────
   {
     id: 'diversity-member-loss-never-detected',

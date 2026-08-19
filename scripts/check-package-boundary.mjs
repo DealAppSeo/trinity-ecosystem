@@ -15,13 +15,13 @@
 // before writing a single line of packaging, this asks how many modules could
 // actually leave:
 //
-//   A. reaches OUTSIDE the package via `@/`            8   the real cost
+//   A. reaches OUTSIDE the package via `@/`            9   the real cost
 //   B. `@/` but only self-references                   14  mechanical rewrite
-//   C+D. npm deps only, or pure                        71  already portable
+//   C+D. npm deps only, or pure                        73  already portable
 //                                                     ───
-//                                                      93
+//                                                      96
 //
-// **85 of 93 are portable today or after a path rewrite.** The whole cost of
+// **87 of 96 are portable today or after a path rewrite.** The whole cost of
 // DoD 1 is the 8 in group A, and 7 of those reach one thing: `@/lib/supabase-admin`.
 //
 // Those are the stateful adapters a portable package should take by injection
@@ -29,10 +29,12 @@
 // work. That is the finding; it is much cheaper than "the package is private,
 // therefore this is far away" suggested.
 //
-// Group A has not grown while the package has: 8 of 77 before merging main, 8
-// of 93 after — main added 16 modules and none of them reached outside. That is
-// why the assertion below NAMES the eight rather than counting them. A count
-// would have absorbed a new violation silently.
+// Group A grows only on purpose. It held at 8 of 77 and then 8 of 93 across a
+// 16-module merge, and went to 9 when `RewardLedger.ts` was added — a change the
+// gate FAILED on before that commit landed, which is exactly the intended
+// behaviour. That is why the assertion below NAMES the members rather than
+// counting them: a count would have absorbed the new adapter silently, and would
+// also let a real violation in whenever an old one left.
 //
 // ── WHY THE MATCHER IS TESTED BEFORE THE CODE IS ────────────────────────────
 //
@@ -77,7 +79,16 @@ function walk(dir, acc = []) {
 // Named files, not a count. A count would let a new violation in as long as an
 // old one left, which is how a budget becomes a ratchet in the wrong direction.
 
-/** Modules permitted to reach outside `lib/trustshell` via `@/`. */
+/**
+ * Modules permitted to reach outside `lib/trustshell` via `@/`.
+ *
+ * Grew from 8 to 9 on 2026-08-19 — DELIBERATELY, and the gate caught it before
+ * the commit. `RewardLedger.ts` is the ninth stateful adapter: it exists to run
+ * one conditional UPDATE against `kya_compliance_receipts`, which is the whole
+ * point of it, and the decisions it classifies live in `reward-idempotency.ts`
+ * with zero imports so they stay gateable. Adding an adapter here is a cost paid
+ * knowingly; the list is what makes the cost visible.
+ */
 const HOST_COUPLED = new Set([
   'lib/trustshell/BFTAuthorizer.ts',
   'lib/trustshell/ComplianceReceipt.ts',
@@ -87,6 +98,7 @@ const HOST_COUPLED = new Set([
   'lib/trustshell/VaultPermission.ts',
   'lib/trustshell/ZKPAttestation.ts',
   'lib/trustshell/persistence/supabase-reputation-store.ts',
+  'lib/trustshell/RewardLedger.ts',
 ]);
 
 /** The only host modules they may reach. Both are ports, not logic. */
@@ -202,10 +214,10 @@ check('no undeclared npm dependency', () => {
 check('the portable majority has not shrunk', () => {
   // B + C + D: everything that ships today or after a mechanical path rewrite.
   const portable = files.length - outside.size;
-  return portable >= 85
+  return portable >= 87
     ? true
     : `portable modules fell to ${portable} of ${files.length} ` +
-      '(85 of 93 after merging main on 2026-08-19; 69 of 77 before it)';
+      '(87 of 96 on 2026-08-19 with RewardLedger added; 85 of 93 before it; 69 of 77 before the main merge)';
 });
 
 // ── 3. DoD 1 is NOT CHECKED, and must say so ────────────────────────────────
