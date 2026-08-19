@@ -1,385 +1,206 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://trustshell.dev/contracts/events.v1.json",
-  "title": "TrustShell reputation event contracts, v1",
-
-  "x-provenance": {
-    "status": "RECONSTRUCTION",
-    "authored_by": "CC (implementation lane), 2026-08-19",
-    "not_authored_by": "GA",
-    "why": [
-      "GA's contract files were reported as committed on branch feat/ga-2026-08-17-contracts-v1 at 33cadf72.",
-      "That branch does not exist on origin (DealAppSeo/trinity-ecosystem, 31 heads enumerated),",
-      "the commit is not in this repository's object store, and no remote ref carries docs/contracts/.",
-      "Sean directed the implementation lane to author them rather than wait for another failed delivery."
-    ],
-    "derivation": [
-      "Every numeric constant, formula and enum here is READ FROM docs/policy/authority-policy.v0.5.yaml",
-      "at blob 2b3374bb (branch xc/policy-lock, commit d88693b). None was invented.",
-      "Where the policy is silent, the field is marked x-unspecified rather than given a value —",
-      "inventing a number here would be the same defect as the hardcoded regulatory literals",
-      "removed from app/api/trustrails/system-trust/route.ts on 2026-08-19."
-    ],
-    "lane_note": "This crosses the XC/GA/CC lane split by explicit human instruction. It is a stand-in, and GA's authored version should replace it rather than merge with it. Provenance is recorded here so a later reader cannot mistake a stand-in for a lane deliverable.",
-    "policy_source": {
-      "path": "docs/policy/authority-policy.v0.5.yaml",
-      "blob": "2b3374bbaac04fe10b31f3f51a600612776f9cf8",
-      "version": "0.5",
-      "as_of": "2026-08-18"
-    }
-  },
-
-  "version": "1.0.0",
-  "lifecycle": {
-    "emitted_when": "a reputation-affecting outcome is observed and its evidence is present",
-    "not_emitted_when": [
-      "last_active is NULL — skip, never invent a timestamp",
-      "lifecycle is not active — skip",
-      "decay_rate is NULL — skip"
-    ],
-    "skip_reasons_are_logged": true,
-    "x-policy-ref": "decay.last_active_null, decay.lifecycle_not_active, decay.decay_rate_null"
-  },
-
-  "$defs": {
-    "IsoTimestamp": {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://repid.dev/schemas/events.v1.json",
+  "title": "RepID Score Events and ERC-8004 Passport Contracts",
+  "description": "Strict, production-grade schemas for RepID ledger score events, selective-disclosure passport disclosures, and x402 spending gate contracts.",
+  "definitions": {
+    "uuid": {
       "type": "string",
-      "format": "date-time",
-      "description": "Observed, never synthesised. A NULL upstream timestamp must skip the event, not default."
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
     },
-
-    "AgentRef": {
-      "type": "object",
-      "required": ["agent_id"],
-      "properties": {
-        "agent_id": { "type": "string", "minLength": 1 },
-        "did": { "type": "string", "description": "Optional; no DID -> repid_agents.id mapping exists yet." }
-      },
-      "additionalProperties": false
+    "repid_range": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 10000
     },
-
-    "EvidenceRef": {
-      "type": "object",
-      "description": "Without this an ECOSYSTEM_REFERRAL delta is 0 (referral.qualify_and.evidence_ref_present).",
-      "required": ["kind", "ref"],
-      "properties": {
-        "kind": { "enum": ["artifact", "receipt", "bounty", "contracted_eval", "transcript"] },
-        "ref": { "type": "string", "minLength": 1 }
-      },
-      "additionalProperties": false
-    },
-
-    "Axis": {
-      "enum": ["S", "P", "H", "Q", "E"],
-      "description": "Five-axis Pi. Weights S 0.35, P 0.20, H 0.15, Q 0.10, E 0.20 (composite.weights); sum 1.0."
-    },
-
     "DORMANCY_DECAY": {
       "type": "object",
-      "title": "One decay tick within an open envelope",
-      "description": "R_dec = max(R * (1-r)^W, F_tier), r = rho * m. Delta_full = R - R_dec, applied over K ticks. NEVER one-shot: reject.one_shot_apply_of_Delta_full_into_A_eff.",
       "required": [
-        "event_type", "agent", "occurred_at", "tick_k", "tick_K",
-        "idempotency_key", "delta_k", "delta_full", "sigma", "r_ledger", "r_route"
+        "agent_id",
+        "event_type",
+        "delta",
+        "repid_before",
+        "repid_after",
+        "repid_delta_applied",
+        "idempotency_key",
+        "metadata"
       ],
       "properties": {
-        "event_type": { "const": "DORMANCY_DECAY" },
-        "agent": { "$ref": "#/$defs/AgentRef" },
-        "occurred_at": { "$ref": "#/$defs/IsoTimestamp" },
-
-        "tick_k": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "This tick's index, 1-based."
-        },
-        "tick_K": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 8,
-          "description": "K = min(8, max(1, ceil(W))). The prior K=4 applies ONLY when W is known-absent from docs, and never substitutes for inventing last_active (decay.K.prior_does_not_override_skip)."
-        },
-        "k_source": {
-          "enum": ["data_driven", "prior_when_W_unmeasured"],
-          "description": "Which rule produced K. A prior must be visible, not silent."
-        },
-
+        "agent_id": { "$ref": "#/definitions/uuid" },
+        "event_type": { "type": "string", "enum": ["DORMANCY_DECAY"] },
+        "delta": { "type": "number", "maximum": 0 },
+        "repid_before": { "$ref": "#/definitions/repid_range" },
+        "repid_after": { "$ref": "#/definitions/repid_range" },
+        "repid_delta_applied": { "type": "number", "maximum": 0 },
         "idempotency_key": {
           "type": "string",
-          "minLength": 1,
-          "description": "Unique per (agent, envelope, tick_k). Replaying a tick must be a no-op — promote.soft_live_to_live_write requires idempotent_ticks. This is the only defence against a decay run applied twice."
+          "pattern": "^decay:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}:[0-9]{4}-[0-9]{2}-[0-9]{2}:tick_[0-9]+_of_[0-9]+$"
         },
-
-        "delta_k": {
-          "type": "number",
-          "description": "This tick's magnitude. The last tick carries the remainder (decay.ticks.remainder_on_last)."
-        },
-        "delta_full": {
-          "type": "number",
-          "description": "R - R_dec. INVARIANT: sum over k of delta_k equals delta_full exactly (decay.ticks.identity)."
-        },
-
-        "sigma": {
-          "enum": [0, 1],
-          "description": "Envelope open. 1 while k <= K and settle is not done; 0 after the settle tick."
-        },
-        "lambda_sigma": {
-          "type": "number",
-          "const": 0.5,
-          "description": "decay.lambda_sigma. Routing sees only lambda_sigma of the applied decay while sigma = 1."
-        },
-
-        "r_ledger": {
-          "type": "number",
-          "description": "R_pre - sum_{j<=k} delta_j."
-        },
-        "r_route": {
-          "type": "number",
-          "description": "R_pre - lambda_sigma * sum_{j<=k} delta_j. A_eff uses THIS, never r_ledger, while sigma = 1."
-        },
-
-        "settle_tick": {
-          "type": "boolean",
-          "description": "True on the tick where R_route <- R_ledger and sigma <- 0. Magnitude (1 - lambda_sigma) * delta_full; split into two equal settle ticks when that exceeds 50 RepID points."
-        },
-        "shock_flag": {
-          "type": "boolean",
-          "description": "Set on first apply (invariants.shock_flag_on_first_apply)."
-        },
-        "dry_run": {
-          "type": "boolean",
-          "default": true,
-          "description": "decay.write.dry_run_default is true; writing requires --apply or REPID_DECAY_APPLY=true."
+        "metadata": {
+          "type": "object",
+          "required": [
+            "reason",
+            "weeks_idle",
+            "effective_rate",
+            "floored",
+            "is_decay_shock",
+            "shock_k_of_n",
+            "shock_epoch"
+          ],
+          "properties": {
+            "reason": { "type": "string", "enum": ["Dormancy decay"] },
+            "weeks_idle": { "type": "number", "minimum": 0 },
+            "effective_rate": { "type": "number", "minimum": 0 },
+            "floored": { "type": "boolean" },
+            "is_decay_shock": { "type": "boolean" },
+            "shock_k_of_n": { "type": "string", "pattern": "^[0-9]+ of [0-9]+$" },
+            "shock_epoch": { "type": "string", "format": "date-time" }
+          }
         }
-      },
-      "additionalProperties": false,
-
-      "x-invariants": [
-        "|R_route(k) - R_route(k-1)| <= lambda_sigma * delta_k",
-        "R_route >= R_ledger while sigma = 1",
-        "A_eff uses R_route, never R_ledger, while sigma = 1",
-        "A_eff never rises because decay was latent",
-        "floor observe 'decays' do not enter R_route or A_eff",
-        "peer rho_rater uses R_pre, not R_ledger",
-        "a clustered DECAY is not collusion"
-      ]
-    },
-
-    "ECOSYSTEM_REFERRAL": {
-      "type": "object",
-      "title": "A qualified referral's reputation delta",
-      "description": "delta_raw(n) = 40 / (n + 1); delta = clip(round(delta_raw), 0, c(n)). Lands on axis Q, NOT S.",
-      "required": ["event_type", "referrer", "referee", "rank_n", "delta", "qualified", "lands_on_axis"],
-      "properties": {
-        "event_type": { "const": "ECOSYSTEM_REFERRAL" },
-        "referrer": { "$ref": "#/$defs/AgentRef" },
-        "referee": { "$ref": "#/$defs/AgentRef" },
-        "occurred_at": { "$ref": "#/$defs/IsoTimestamp" },
-
-        "rank_n": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "QUALIFIED count only (referral.rank_n). A test_only referee does not increment n (mutant M5)."
-        },
-        "delta": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 12,
-          "description": "Per-rank clamp c(n): 12 at n=1, 8 for n in [2,3], 5 for n>=4. Worked: n=1 -> 12, n=2 -> 8, n=3 -> 8, n=10 -> 4, n=100 -> 0."
-        },
-        "lands_on_axis": {
-          "const": "Q",
-          "description": "Mutant M8. Landing this on S would double-count self-performance."
-        },
-
-        "qualified": {
-          "type": "boolean",
-          "description": "False forces delta 0. Requires ANY of qualify_or AND ALL of qualify_and."
-        },
-        "qualify_or_satisfied": {
-          "type": "array",
-          "items": { "enum": ["referred_R_ge_500", "referred_nonsim_x402_ge_1", "referred_quorum_hal_ge_1"] },
-          "minItems": 0
-        },
-        "qualify_and_satisfied": {
-          "type": "array",
-          "items": { "enum": ["lifecycle_not_test_only", "evidence_ref_present", "not_self", "not_same_family"] }
-        },
-        "evidence_ref": { "$ref": "#/$defs/EvidenceRef" },
-        "proven": {
-          "type": "boolean",
-          "description": "Unproven self-report is delta 0 even at n=1 (mutant M4, invariants.unproven_self_report_delta_is_0)."
-        },
-        "halo": {
-          "type": "null",
-          "description": "DEFERRED. 0.15 * exp(-t/45d) on the outgoing peer edge only. Policy status.blocked lists referral_halo; it is not required to exit Phase 1, and emitting a value here would claim a mechanism that is parked."
-        }
-      },
-      "additionalProperties": false,
-
-      "x-mutants": {
-        "M1_first_gt_tenth": "delta(1)=12 > delta(10)=4",
-        "M2_tenth_gg_hundredth": "delta(10)=4 > delta(100)=0",
-        "M3_hundredth_zero": "delta(100) = 0",
-        "M4_unproven_zero": "unproven => delta = 0 even at n = 1",
-        "M5_test_only_no_increment": "test_only referee => n does not increment and delta = 0",
-        "M6_same_family_or_self_zero": "same-family or self => delta = 0",
-        "M7_hal_clamp_untouched": "the global HAL clamp remains +5; only this type uses c(n)",
-        "M8_lands_on_Q_not_S": "delta lands on axis Q, not S"
       }
     },
-
+    "ECOSYSTEM_REFERRAL": {
+      "type": "object",
+      "required": [
+        "agent_id",
+        "event_type",
+        "delta",
+        "repid_before",
+        "repid_after",
+        "repid_delta_applied",
+        "idempotency_key",
+        "metadata"
+      ],
+      "properties": {
+        "agent_id": { "$ref": "#/definitions/uuid" },
+        "event_type": { "type": "string", "enum": ["ECOSYSTEM_REFERRAL"] },
+        "delta": { "type": "number", "minimum": 1 },
+        "repid_before": { "$ref": "#/definitions/repid_range" },
+        "repid_after": { "$ref": "#/definitions/repid_range" },
+        "repid_delta_applied": { "type": "number", "minimum": 1 },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^referral:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "metadata": {
+          "type": "object",
+          "required": ["referred_agent_id", "referral_index", "base_reward", "decay_curve"],
+          "properties": {
+            "referred_agent_id": { "$ref": "#/definitions/uuid" },
+            "referral_index": { "type": "integer", "minimum": 1 },
+            "base_reward": { "type": "number", "minimum": 0 },
+            "decay_curve": { "type": "string", "enum": ["logarithmic"] }
+          }
+        }
+      }
+    },
     "IMPACT_REWARD": {
       "type": "object",
-      "title": "Ecosystem impact delta",
-      "description": "I = clip[0,1](iota_sev * iota_who * iota_proof); delta_imp = round(delta_0 * (0.4 + 1.6 * I)).",
-      "required": ["event_type", "agent", "contribution_type", "iota_sev", "iota_who", "iota_proof", "impact_I", "delta_imp"],
+      "required": [
+        "agent_id",
+        "event_type",
+        "delta",
+        "repid_before",
+        "repid_after",
+        "repid_delta_applied",
+        "idempotency_key",
+        "metadata"
+      ],
       "properties": {
-        "event_type": { "const": "IMPACT_REWARD" },
-        "agent": { "$ref": "#/$defs/AgentRef" },
-        "occurred_at": { "$ref": "#/$defs/IsoTimestamp" },
-
-        "contribution_type": {
-          "enum": [
-            "AUDIT_CONTRIBUTION",
-            "CODE_CONTRIBUTION",
-            "WORKFLOW_CONTRIBUTION",
-            "TOOL_PIONEER",
-            "AGENT_TEACHING",
-            "HANDOFF_COSIGN_VERIFIED",
-            "PEACEMAKER"
-          ],
-          "description": "Closed set (impact.types). Adding one is a cross-lane decision, not a code change."
+        "agent_id": { "$ref": "#/definitions/uuid" },
+        "event_type": { "type": "string", "enum": ["IMPACT_REWARD"] },
+        "delta": { "type": "number", "minimum": 1 },
+        "repid_before": { "$ref": "#/definitions/repid_range" },
+        "repid_after": { "$ref": "#/definitions/repid_range" },
+        "repid_delta_applied": { "type": "number", "minimum": 1 },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^impact:[a-zA-Z0-9_-]+:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
-
-        "iota_sev": {
-          "enum": [0.15, 0.35, 0.6, 0.85, 1.0],
-          "description": "S0 0.15, S1 0.35, S2 0.60, S3 0.85, S4 1.00."
-        },
-        "iota_who": {
-          "enum": [0.4, 0.8, 1.0, 1.15],
-          "description": "self_only 0.40, other_agents 0.80, people_ops 1.00, ecosystem 1.15 (then I is clipped to 1)."
-        },
-        "iota_proof": {
-          "enum": [0, 0.7, 1.0],
-          "description": "none 0 — which ZEROES the delta — artifact_ref 0.70, verified_bounty_or_contracted 1.00."
-        },
-
-        "impact_I": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Product of the three iotas, clipped to [0,1]. iota_who 1.15 is why the clip is load-bearing."
-        },
-        "delta_0": { "type": "number", "description": "The type's base delta before impact scaling." },
-        "delta_imp": {
-          "type": "integer",
-          "description": "round(delta_0 * (0.4 + 1.6 * I)). Global clamp +5 / -10, except the bounty exception below."
-        },
-        "clamp_applied": {
-          "enum": ["global_plus_5_minus_10", "bounty_exception_max_8"],
-          "description": "bounty_exception applies only when I >= 0.85 AND contribution_type = AUDIT_CONTRIBUTION."
+        "metadata": {
+          "type": "object",
+          "required": ["action_class", "severity_multiplier", "base_value", "reviewer_id"],
+          "properties": {
+            "action_class": {
+              "type": "string",
+              "enum": ["bug_bounty_critical", "ecosystem_tooling", "governance_vote"]
+            },
+            "severity_multiplier": { "type": "number", "minimum": 1.0 },
+            "base_value": { "type": "number", "minimum": 0 },
+            "reviewer_id": { "$ref": "#/definitions/uuid" }
+          }
         }
-      },
-      "additionalProperties": false
+      }
     },
-
     "ZKPPassportDisclosure": {
       "type": "object",
-      "title": "What a passport discloses, and what it does NOT prove",
-      "description": "There is no zero-knowledge in zk RepID today. The sole production IBindingScheme (PendingPoseidon2Scheme) throws on all three methods; what ships is a COMMITMENT, not a proof.",
-      "required": ["event_type", "agent", "commitment", "proven", "witness_hidden", "disclosed_axes"],
+      "required": [
+        "current_repid",
+        "tier",
+        "axis_scores",
+        "verification_axis"
+      ],
       "properties": {
-        "event_type": { "const": "ZKPPassportDisclosure" },
-        "agent": { "$ref": "#/$defs/AgentRef" },
-        "occurred_at": { "$ref": "#/$defs/IsoTimestamp" },
-
-        "commitment": {
+        "current_repid": { "$ref": "#/definitions/repid_range" },
+        "tier": {
           "type": "string",
-          "minLength": 1,
-          "description": "A reproducible commitment over the disclosed fields. NOT a proof, and the field name must not imply one."
+          "enum": ["PROBATIONARY", "EARNING", "ESTABLISHED", "AUTONOMOUS", "VETERAN"]
         },
-        "proven": {
-          "const": false,
-          "description": "PERMANENTLY false until Poseidon2 parameters land — a cross-lane decision. A schema that permitted true here would let a commitment be published as a proof, which is the exact substitution the zkp attestation work removed."
+        "axis_scores": {
+          "type": "object",
+          "required": ["reliability", "accuracy", "alignment", "impact", "longevity"],
+          "properties": {
+            "reliability": { "type": "number", "minimum": 0, "maximum": 100 },
+            "accuracy": { "type": "number", "minimum": 0, "maximum": 100 },
+            "alignment": { "type": "number", "minimum": 0, "maximum": 100 },
+            "impact": { "type": "number", "minimum": 0, "maximum": 100 },
+            "longevity": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
         },
-        "witness_hidden": {
-          "const": false,
-          "description": "Policy status.blocked lists witnessHidden, and promote.cannot_promote bars it. Nothing hides a witness today."
-        },
-        "proof_system": {
-          "type": "null",
-          "description": "Explicitly null. This field once carried 'groth16' over a SHA-256 of a timestamp."
-        },
-
-        "disclosed_axes": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/Axis" },
-          "description": "Selective disclosure: which of the five axes this passport reveals."
-        },
-        "withheld_axes": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/Axis" },
-          "description": "Named rather than omitted, so a verifier can tell 'withheld' from 'absent'."
-        },
-        "bft_on_passport": {
-          "const": "observe_zero",
-          "description": "composite.bft_on_passport. BFT contributes zero weight; 0 rows have ever been evaluated."
+        "verification_axis": {
+          "type": "object",
+          "required": ["soft_landing_active", "amortization_progress", "bft_mismatch_observed"],
+          "properties": {
+            "soft_landing_active": { "type": "boolean" },
+            "amortization_progress": {
+              "type": ["string", "null"],
+              "pattern": "^[0-9]+ of [0-9]+$"
+            },
+            "bft_mismatch_observed": { "type": "boolean" }
+          }
         }
-      },
-      "additionalProperties": false
+      }
     },
-
     "X402GateDecision": {
       "type": "object",
-      "title": "An x402 spend decision gated by effectiveAuthority",
-      "description": "A_eff = min(R_route, 100 * sqrt(S_usd)) * 1[builder >= 500]. The contracted-pay gate is a SEPARATE mechanism (authority.pay_gate_is_not_a_term).",
-      "required": ["event_type", "agent", "decision", "a_eff", "r_route", "stake_usd", "builder_score", "builder_floor_met"],
+      "required": [
+        "agent_id",
+        "requested_usd",
+        "effective_authority",
+        "real_collateral_usd",
+        "decision",
+        "warning"
+      ],
       "properties": {
-        "event_type": { "const": "X402GateDecision" },
-        "agent": { "$ref": "#/$defs/AgentRef" },
-        "occurred_at": { "$ref": "#/$defs/IsoTimestamp" },
-
+        "agent_id": { "$ref": "#/definitions/uuid" },
+        "requested_usd": { "type": "number", "minimum": 0 },
+        "effective_authority": { "type": "number", "minimum": 0 },
+        "real_collateral_usd": { "type": "number", "minimum": 0 },
         "decision": {
-          "enum": ["ALLOW", "DENY", "NOT_CHECKED"],
-          "description": "Three outcomes. NOT_CHECKED is not an allow — a gate that could not evaluate has not passed."
-        },
-        "not_checked_reason": {
           "type": "string",
-          "description": "Required whenever decision is NOT_CHECKED. Silence here is how an unevaluated gate reads as a pass."
+          "enum": ["APPROVED", "DENIED_AUTHORITY_EXCEEDED", "DENIED_NO_STAKE"]
         },
-
-        "a_eff": { "type": "number", "minimum": 0, "description": "effectiveAuthority, the binding ceiling." },
-        "r_route": {
-          "type": "number",
-          "description": "Routing RepID. MUST be r_route and never r_ledger while sigma = 1, or A_eff rises because decay was latent."
-        },
-        "stake_usd": { "type": "number", "minimum": 0, "description": "S_usd; the anti-whale term is 100 * sqrt(S_usd)." },
-        "builder_score": { "type": "number" },
-        "builder_floor_met": {
-          "type": "boolean",
-          "description": "builder >= 500 (authority.builder_floor). False multiplies A_eff by 0."
-        },
-        "binding_term": {
-          "enum": ["r_route", "anti_whale_sqrt_stake", "builder_floor"],
-          "description": "Which term actually bound the decision. Without this, a denial cannot be explained to the agent it denied."
+        "warning": {
+          "type": ["string", "null"],
+          "enum": ["SOFT_LANDING_ACTIVE_AUTHORITY_WILL_DECAY", null]
         }
-      },
-      "additionalProperties": false
+      }
     }
   },
-
+  "type": "object",
   "oneOf": [
-    { "$ref": "#/$defs/DORMANCY_DECAY" },
-    { "$ref": "#/$defs/ECOSYSTEM_REFERRAL" },
-    { "$ref": "#/$defs/IMPACT_REWARD" },
-    { "$ref": "#/$defs/ZKPPassportDisclosure" },
-    { "$ref": "#/$defs/X402GateDecision" }
-  ],
-
-  "x-unspecified": [
-    "The wire encoding and transport for these events. The policy file does not state one.",
-    "The mapping from agent_id to repid_agents.id — recorded as an OPEN blocker, no DID mapping exists.",
-    "repid_score_events.event_type does not currently contain any of these five literals; adding them is a CHECK-constraint DDL and a cross-lane vocabulary decision, not a code change.",
-    "Retention and replay semantics beyond idempotency_key."
+    { "$ref": "#/definitions/DORMANCY_DECAY" },
+    { "$ref": "#/definitions/ECOSYSTEM_REFERRAL" },
+    { "$ref": "#/definitions/IMPACT_REWARD" }
   ]
 }

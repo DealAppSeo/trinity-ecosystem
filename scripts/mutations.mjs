@@ -2334,39 +2334,39 @@ export const MUTATIONS = [
     replace: "      detail: 'collateral measured as zero',",
   },
 
+  // -------------------------------------------------------------------------
+  // docs/contracts/events.v1.json — the REAL envelope, not the stand-in
+  //
+  // REPLACED 2026-08-19. Three earlier entries mutated a CC-authored stand-in's
+  // structure (`lands_on_axis`, an iota ladder, a duplicated lambda_sigma). GA's
+  // real file landed on main via #105 and is an EVENT ENVELOPE that deliberately
+  // does NOT restate the policy's constants — so all three find-strings vanished
+  // and the run reported DRIFT, which is that outcome doing its job. Retargeted
+  // at the envelope invariants the real file actually holds.
+  // -------------------------------------------------------------------------
   {
-    id: 'contract-referral-lands-on-S',
+    id: 'contract-decay-can-add-repid',
     suite: 'check:lane-files',
     file: 'docs/contracts/events.v1.json',
     protects:
-      'referral mutant M8 — the delta lands on axis Q, not S. Landing it on S double-counts a ' +
-      'referral as self-performance, and S carries weight 0.35 against Q\'s 0.10, so the mutant ' +
-      'both moves the value to the wrong axis and inflates it 3.5x. The assertion reads the axis ' +
-      'from the POLICY file, so the contract cannot ratify its own answer',
-    find: '"const": "Q",',
-    replace: '"const": "S",',
+      'DORMANCY_DECAY carries `maximum: 0` on delta and repid_delta_applied — decay can only ever ' +
+      'be negative. The mutant lifts the cap, so a decay event can carry a POSITIVE delta: a ' +
+      'reward wearing a decay label, which no downstream reader would question because the event ' +
+      'type says decay',
+    find: '"delta": { "type": "number", "maximum": 0 }',
+    replace: '"delta": { "type": "number", "maximum": 10000 }',
   },
   {
-    id: 'contract-invents-a-contribution-type',
+    id: 'contract-x402-loses-the-stake-denial',
     suite: 'check:lane-files',
     file: 'docs/contracts/events.v1.json',
     protects:
-      'impact.types is a CLOSED set of seven in the policy. Adding one here is a cross-lane ' +
-      'vocabulary change wearing a schema edit — the contract would accept an event the policy ' +
-      'has no scaling rule for, and delta_0 for it would be undefined',
-    find: '"PEACEMAKER"',
-    replace: '"PEACEMAKER",\n            "INVENTED_TYPE"',
-  },
-  {
-    id: 'contract-lambda-sigma-drifts-from-policy',
-    suite: 'check:lane-files',
-    file: 'docs/contracts/events.v1.json',
-    protects:
-      'lambda_sigma is 0.5 in the policy and the contract must not carry a second copy that can ' +
-      'drift. It sets how much of an applied decay routing sees while the envelope is open, so a ' +
-      'drifted value makes A_eff disagree with the ledger in a way no functional test would see',
-    find: '"const": 0.5,',
-    replace: '"const": 0.9,',
+      'the x402 gate distinguishes DENIED_NO_STAKE from DENIED_AUTHORITY_EXCEEDED. The mutant ' +
+      'collapses them, so an agent denied for having no collateral and one denied for exceeding ' +
+      'its ceiling get the same answer — a denial nobody can act on, and the two have opposite ' +
+      'remedies',
+    find: '"DENIED_NO_STAKE"',
+    replace: '"DENIED_AUTHORITY_EXCEEDED"',
   },
 
   // NOT REGISTERED — `portable-alias-creeps-back`, rejected 2026-08-19.

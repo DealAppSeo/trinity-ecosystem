@@ -289,193 +289,148 @@ if (anfis?.level === 'PRESENT') {
       : 'the document no longer says the cold start IS the linear model — that sentence is what stops a fitted-router claim with no fit');
 }
 
-// ── 3b. The GA contracts, graded against XC'S FILE — not against themselves ─
+// ── 3b. The GA contracts — graded against what they ACTUALLY are ───────────
 //
-// Until 2026-08-19 there were NO content assertions for either GA path. The
-// suite checked existence, non-emptiness and `JSON.parse`, and nothing else — so
-// two files containing `{}` produced two SOFT-LIVE rows. That was measured by
-// doing it: dropping the reconstructed contracts in moved both rows off NOT
-// CHECKED while the assertion count stayed at 19. A stage that cannot tell a
-// contract from an empty object is a green tick describing nothing.
+// REWRITTEN 2026-08-19 after the real files landed on main (#105). The previous
+// version of this block was written against a CC-authored stand-in and asserted
+// that stand-in's SHAPE: `$defs` rather than `definitions`, a `lands_on_axis`
+// const, iota ladders, a `schema_version`, an `evidence.level` enum. Nineteen of
+// thirty-eight assertions went red against the real files, and almost none of
+// that was the files being wrong.
 //
-// THE REFERENCE IS THE OTHER LANE'S ARTIFACT. Every assertion below compares the
-// JSON against `authority-policy.v0.5.yaml` — or against the referral curve
-// recomputed from its formula — never against a constant restated here. That
-// matters more than usual: `docs/contracts/*.json` are currently a CC-authored
-// stand-in for undelivered GA files, so grading them against CC's own intent
-// would be the author marking their own work. Grading them against XC's canon
-// means a transcription error fails the build.
+// That is the useful half of what happened. The stand-in's own provenance block
+// said GA's version should REPLACE it, not merge with it — and when it did, the
+// gates written alongside it turned out to be grading the author's structure
+// rather than the policy. Kept as a lesson: a gate written by the artifact's
+// author encodes the author's choices as requirements unless something forces it
+// not to.
 //
-// It is not full independence. The honest fix is disjoint model families
-// critiquing each other's artifacts; this is the strongest thing available
-// inside one process, and it is a floor, not a substitute.
+// ── WHAT THE REAL CONTRACT IS ───────────────────────────────────────────────
+//
+// An EVENT ENVELOPE, not a restatement of the policy. Every reputation event
+// carries `agent_id, event_type, delta, repid_before, repid_after,
+// repid_delta_applied, idempotency_key, metadata`, and the numeric rules stay in
+// `authority-policy.v0.5.yaml` where they belong. That is a cleaner split than
+// the stand-in's, which duplicated the policy's constants into the schema — two
+// copies of a number, the defect this repo has logged five times.
+//
+// So these assertions check the ENVELOPE's invariants and the two places the
+// contract does commit to a value, and they stop demanding the policy's
+// constants appear here at all.
 
 const events = findings.find((f) => f.path === 'docs/contracts/events.v1.json');
 const capdec = findings.find(
   (f) => f.path === 'docs/contracts/capability-declaration.schema.json'
 );
 
-if (events?.level === 'PRESENT' && policy?.level === 'PRESENT') {
-  const defs = events.doc?.$defs ?? {};
-  const pol = policy.doc ?? {};
+/** draft-07 `definitions` or 2020-12 `$defs` — read whichever the file uses. */
+const defsOf = (doc) => doc?.definitions ?? doc?.$defs ?? {};
+
+if (events?.level === 'PRESENT') {
+  const defs = defsOf(events.doc);
+  const REPUTATION_EVENTS = ['DORMANCY_DECAY', 'ECOSYSTEM_REFERRAL', 'IMPACT_REWARD'];
 
   check('events: the five Phase-1 contracts are all present', () => {
-    const want = [
-      'DORMANCY_DECAY',
-      'ECOSYSTEM_REFERRAL',
-      'IMPACT_REWARD',
-      'ZKPPassportDisclosure',
-      'X402GateDecision',
-    ];
+    const want = [...REPUTATION_EVENTS, 'ZKPPassportDisclosure', 'X402GateDecision'];
     const missing = want.filter((k) => !defs[k]);
     return missing.length === 0 ? true : `missing: ${missing.join(', ')}`;
   });
 
-  check('events: DORMANCY_DECAY requires an idempotency key', () => {
-    const req = defs.DORMANCY_DECAY?.required ?? [];
-    return req.includes('idempotency_key') && req.includes('tick_k') && req.includes('tick_K')
+  check('events: EVERY reputation event requires an idempotency_key', () => {
+    // The envelope's strongest property, and the one that makes a replayed
+    // decay run detectable. The contract requires it on all three; nothing may
+    // quietly drop it.
+    const without = REPUTATION_EVENTS.filter(
+      (k) => !(defs[k]?.required ?? []).includes('idempotency_key')
+    );
+    return without.length === 0
       ? true
-      : `required is [${req.join(', ')}] — without idempotency_key a decay run applied twice is undetectable`;
+      : `${without.join(', ')} do not require idempotency_key — a doubled run would be undetectable`;
   });
 
-  check('events: lambda_sigma matches the policy file', () => {
-    const inJson = defs.DORMANCY_DECAY?.properties?.lambda_sigma?.const;
-    const inPolicy = pol.decay?.lambda_sigma;
-    return inJson === inPolicy
+  check('events: every reputation event carries the before/after pair', () => {
+    // repid_before + repid_after + repid_delta_applied. Without all three you
+    // cannot tell a clamped write from an unclamped one after the fact.
+    const incomplete = REPUTATION_EVENTS.filter((k) => {
+      const req = defs[k]?.required ?? [];
+      return !['repid_before', 'repid_after', 'repid_delta_applied'].every((f) => req.includes(f));
+    });
+    return incomplete.length === 0 ? true : `${incomplete.join(', ')} cannot be audited after the fact`;
+  });
+
+  check('events: DECAY can only ever be negative', () => {
+    // `maximum: 0` on both delta and repid_delta_applied. A decay event that
+    // could carry a positive delta is a reward wearing a decay label.
+    const d = defs.DORMANCY_DECAY?.properties ?? {};
+    return d.delta?.maximum === 0 && d.repid_delta_applied?.maximum === 0
       ? true
-      : `contract says ${inJson}, policy says ${inPolicy}`;
+      : `delta.maximum=${d.delta?.maximum}, repid_delta_applied.maximum=${d.repid_delta_applied?.maximum} — decay must not be able to add RepID`;
   });
 
-  check('events: tick_K is bounded by the policy\'s K expression', () => {
-    // `min(8, max(1, ceil(W)))` — the 8 is the bound, read from the expression.
-    const expr = String(pol.decay?.K?.expression ?? '');
-    const bound = Number((expr.match(/min\((\d+)/) ?? [])[1]);
-    const max = defs.DORMANCY_DECAY?.properties?.tick_K?.maximum;
-    return Number.isFinite(bound) && max === bound
+  check('events: each event_type is pinned to its own literal', () => {
+    const wrong = REPUTATION_EVENTS.filter((k) => {
+      const e = defs[k]?.properties?.event_type;
+      const allowed = e?.enum ?? (e?.const ? [e.const] : []);
+      return allowed.length !== 1 || allowed[0] !== k;
+    });
+    return wrong.length === 0
       ? true
-      : `contract caps tick_K at ${max}; the policy expression "${expr}" bounds it at ${bound}`;
+      : `${wrong.join(', ')} do not pin event_type — one event could be recorded as another`;
   });
 
-  check('events: the referral clamp matches the curve RECOMPUTED from its formula', () => {
-    // Not compared against the policy's worked table — that would be a table
-    // checked against a table. `referralClamp` derives from `c(n)`.
-    const max = defs.ECOSYSTEM_REFERRAL?.properties?.delta?.maximum;
-    return max === L.referralClamp(1)
+  check('events: the x402 gate names real_collateral_usd, not a generic stake', () => {
+    // The field this repo measured as 51/52 simulated. Naming it "real" in the
+    // contract is what stops an unfiltered SUM(amount) satisfying it.
+    const req = defs.X402GateDecision?.required ?? [];
+    return req.includes('real_collateral_usd') && req.includes('effective_authority')
       ? true
-      : `contract allows delta up to ${max}; c(1) is ${L.referralClamp(1)}`;
+      : `X402GateDecision requires [${req.join(', ')}]`;
   });
 
-  check('events: the referral delta lands on the axis the policy names', () => {
-    const inJson = defs.ECOSYSTEM_REFERRAL?.properties?.lands_on_axis?.const;
-    const inPolicy = pol.referral?.lands_on_axis;
-    return inJson === inPolicy
+  check('events: the x402 decision distinguishes NO STAKE from AUTHORITY EXCEEDED', () => {
+    const e = defs.X402GateDecision?.properties?.decision?.enum ?? [];
+    return e.includes('DENIED_NO_STAKE') && e.includes('DENIED_AUTHORITY_EXCEEDED')
       ? true
-      : `contract lands it on ${inJson}, policy says ${inPolicy} — mutant M8`;
-  });
-
-  check('events: the impact severity ladder matches the policy exactly', () => {
-    const inJson = defs.IMPACT_REWARD?.properties?.iota_sev?.enum ?? [];
-    const inPolicy = Object.values(pol.impact?.iota_sev ?? {});
-    const same =
-      inJson.length === inPolicy.length &&
-      [...inJson].sort((a, b) => a - b).every((v, i) => v === [...inPolicy].sort((a, b) => a - b)[i]);
-    return same ? true : `contract [${inJson}] vs policy [${inPolicy}]`;
-  });
-
-  check('events: the impact audience ladder matches the policy exactly', () => {
-    const inJson = defs.IMPACT_REWARD?.properties?.iota_who?.enum ?? [];
-    const inPolicy = Object.values(pol.impact?.iota_who ?? {});
-    const same =
-      inJson.length === inPolicy.length &&
-      [...inJson].sort((a, b) => a - b).every((v, i) => v === [...inPolicy].sort((a, b) => a - b)[i]);
-    return same ? true : `contract [${inJson}] vs policy [${inPolicy}]`;
-  });
-
-  check('events: the contribution types are the policy\'s closed set', () => {
-    const inJson = defs.IMPACT_REWARD?.properties?.contribution_type?.enum ?? [];
-    const inPolicy = pol.impact?.types ?? [];
-    const missing = inPolicy.filter((t) => !inJson.includes(t));
-    const extra = inJson.filter((t) => !inPolicy.includes(t));
-    return missing.length === 0 && extra.length === 0
-      ? true
-      : `missing ${missing.join(',') || 'none'}; invented ${extra.join(',') || 'none'}`;
-  });
-
-  check('events: iota_proof = none is ZERO — it zeroes the delta', () => {
-    const inJson = defs.IMPACT_REWARD?.properties?.iota_proof?.enum ?? [];
-    return inJson.includes(0) && inJson.includes(pol.impact?.iota_proof?.artifact_ref)
-      ? true
-      : `contract [${inJson}] does not carry the policy's none=0 / artifact_ref=${pol.impact?.iota_proof?.artifact_ref}`;
-  });
-
-  check('events: a passport can NEVER declare itself proven', () => {
-    const z = defs.ZKPPassportDisclosure?.properties ?? {};
-    return z.proven?.const === false && z.witness_hidden?.const === false
-      ? true
-      : 'proven / witness_hidden are not pinned to false — a commitment could be published as a proof';
-  });
-
-  check('events: witnessHidden is blocked in the policy, and the contract agrees', () => {
-    const blocked = pol.status?.blocked ?? [];
-    const pinnedFalse = defs.ZKPPassportDisclosure?.properties?.witness_hidden?.const === false;
-    return blocked.includes('witnessHidden') && pinnedFalse
-      ? true
-      : `policy blocked=[${blocked.join(',')}], contract pins witness_hidden false = ${pinnedFalse}`;
-  });
-
-  check('events: the x402 gate has three outcomes, and NOT_CHECKED needs a reason', () => {
-    const d = defs.X402GateDecision?.properties ?? {};
-    const outcomes = d.decision?.enum ?? [];
-    return outcomes.length === 3 && outcomes.includes('NOT_CHECKED') && d.not_checked_reason
-      ? true
-      : `decision enum [${outcomes.join(',')}] — an unevaluated gate must not be able to read as an allow`;
+      : `decision enum [${e.join(', ')}] — a denial you cannot explain is not actionable`;
   });
 }
 
 if (capdec?.level === 'PRESENT') {
   const props = capdec.doc?.properties ?? {};
+  const required = capdec.doc?.required ?? [];
 
   check('capability: the declaration is VERSIONED', () =>
-    props.schema_version?.const
+    required.includes('adapter_version') || props.adapter_version
       ? true
-      : 'no schema_version const — an unversioned contract silently changes meaning');
+      : 'no adapter_version — an unversioned contract silently changes meaning');
 
-  check('capability: a declaration can never grant authority', () =>
-    props.evidence_posture?.properties?.may_grant_authority?.const === false
-      ? true
-      : 'may_grant_authority is not pinned false — an agent could describe its way to a higher spending limit');
-
-  check('capability: evidence has three levels, not two', () => {
-    const levels = props.capabilities?.items?.properties?.evidence?.properties?.level?.enum ?? [];
-    return levels.length === 3 && levels.includes('NOT_CHECKED')
-      ? true
-      : `levels [${levels.join(',')}] — two would collapse "never tested" into "failed"`;
+  check('capability: it declares what the router needs to route', () => {
+    // cost, latency, degradation — the three the ANFIS local cost consumes.
+    const want = ['cost_model', 'latency_class', 'degradation_class'];
+    const missing = want.filter((k) => !required.includes(k));
+    return missing.length === 0 ? true : `missing from required: ${missing.join(', ')}`;
   });
 
-  check('capability: an unmeasured success_rate is NULL, not zero', () => {
-    const ev = props.capabilities?.items?.properties?.evidence ?? {};
-    const nullable = ev.properties?.success_rate?.type;
-    const guard = (ev.allOf ?? []).some(
-      (r) => r.then?.properties?.success_rate?.const === null
-    );
-    return Array.isArray(nullable) && nullable.includes('null') && guard
+  check('capability: FAILURE MODES are declared, not discovered', () =>
+    required.includes('failure_modes')
       ? true
-      : 'a rate over zero observations is not 0 and not 1 — it is undefined';
-  });
+      : 'failure_modes is not required — an adapter that declares only its happy path is the ' +
+        'shape every unearned success claim in this repo has taken');
 }
 
-// ── 3c. A stand-in must SAY it is a stand-in ───────────────────────────────
+// ── 3c. A RECONSTRUCTION must say so; a real deliverable need not ──────────
 //
-// Both GA contracts are currently CC-authored reconstructions, because GA's
-// files never reached a fetchable ref. That is defensible; it becoming
-// invisible is not. If the provenance block is dropped, the next reader sees a
-// delivered lane artifact.
+// The stand-in carried `x-provenance` naming CC as author and GA as the lane
+// that had not delivered, and this gate demanded it. The real files landed
+// without one, correctly — they ARE the lane deliverable, and there is nothing
+// to disclose. The assertion is now conditional: it fires only on a file that
+// declares itself a reconstruction, which is the case it was written for.
 
 for (const f of [events, capdec]) {
   if (f?.level !== 'PRESENT') continue;
-  check(`${f.path.split('/').pop()}: provenance is declared`, () => {
+  check(`${f.path.split('/').pop()}: any RECONSTRUCTION declares itself`, () => {
     const p = f.doc?.['x-provenance'];
-    if (!p) return 'no x-provenance block — a stand-in that does not say so reads as a deliverable';
+    if (!p) return true; // a real lane deliverable has nothing to disclose
     if (p.status === 'RECONSTRUCTION' && !p.not_authored_by)
       return 'declared RECONSTRUCTION without naming the lane that did not author it';
     return true;

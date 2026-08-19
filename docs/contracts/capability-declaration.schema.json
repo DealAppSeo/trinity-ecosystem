@@ -1,172 +1,75 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://trustshell.dev/contracts/capability-declaration.schema.json",
-  "title": "Capability Declaration, v1",
-  "description": "What an agent declares it can do, and what the router is allowed to conclude from that declaration. A declaration is a CLAIM; every field that could be mistaken for evidence is typed so it cannot be.",
-
-  "x-provenance": {
-    "status": "RECONSTRUCTION",
-    "authored_by": "CC (implementation lane), 2026-08-19",
-    "not_authored_by": "GA",
-    "why": "GA's file was reported at feat/ga-2026-08-17-contracts-v1 / 33cadf72; that ref does not exist on origin and the commit is not in this repository. Authored by explicit human instruction rather than waiting for another failed delivery.",
-    "derivation": "Routing structure read from docs/policy/anfis-objective.md and docs/policy/authority-policy.v0.5.yaml at blob 2b3374bb (xc/policy-lock, d88693b). No constant here was invented; fields the policy does not specify are listed under x-unspecified.",
-    "lane_note": "Crosses the XC/GA/CC lane split by instruction. GA's authored version should REPLACE this, not merge with it."
-  },
-
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://repid.dev/schemas/capability-declaration.schema.json",
+  "title": "Adapter Capability Declaration Schema",
+  "description": "A vendor-agnostic, versioned schema that every compute, LLM, storage, or routing adapter must satisfy to integrate with the Trust Harness.",
   "type": "object",
-  "required": ["schema_version", "agent", "capabilities", "declared_at", "evidence_posture"],
-
+  "required": [
+    "adapter_version",
+    "vendor",
+    "cost_model",
+    "latency_class",
+    "degradation_class",
+    "region_edge",
+    "failure_modes"
+  ],
   "properties": {
-    "schema_version": {
+    "adapter_version": {
       "type": "string",
-      "const": "1.0.0",
-      "description": "Versioned so the router can refuse a declaration it does not understand rather than reading unknown fields as absent. An unversioned contract is the one that silently changes meaning."
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
-
-    "agent": {
+    "vendor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cost_model": {
       "type": "object",
-      "required": ["agent_id"],
+      "required": ["usd_per_1k_input", "usd_per_1k_output", "fixed_overhead_usd"],
       "properties": {
-        "agent_id": { "type": "string", "minLength": 1 },
-        "did": {
-          "type": "string",
-          "description": "Optional. No DID -> repid_agents.id mapping exists yet; this is an OPEN blocker, so the router must not key on it."
-        }
-      },
-      "additionalProperties": false
-    },
-
-    "declared_at": { "type": "string", "format": "date-time" },
-
-    "capabilities": {
-      "type": "array",
-      "minItems": 1,
-      "description": "Each entry is a claim by the agent about itself. The router weights it by evidence, never by the claim alone.",
-      "items": {
-        "type": "object",
-        "required": ["name", "declared_competence", "evidence"],
-        "properties": {
-          "name": { "type": "string", "minLength": 1 },
-          "domain": { "type": "string", "description": "Free-form; the fleet's specialisation spread has not been measured, so no enum can be honest yet." },
-
-          "declared_competence": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1,
-            "description": "SELF-REPORTED. Unproven self-report contributes 0 to reputation (authority-policy invariants.unproven_self_report_delta_is_0); the same rule applies here — this number may inform routing priors, never authority."
-          },
-
-          "evidence": {
-            "type": "object",
-            "required": ["level"],
-            "description": "Three levels, because two would collapse 'never tested' into 'failed'.",
-            "properties": {
-              "level": {
-                "enum": ["MEASURED", "NOT_CHECKED", "REFUTED"],
-                "description": "MEASURED requires observation_count > 0 AND a reference. NOT_CHECKED is the honest default for a new declaration and must NOT be read as competence 0 — it is absence of measurement, not measurement of absence."
-              },
-              "observation_count": { "type": "integer", "minimum": 0 },
-              "success_rate": {
-                "type": ["number", "null"],
-                "minimum": 0,
-                "maximum": 1,
-                "description": "NULL when observation_count is 0. Not 0, and not 1 — a rate over an empty set is undefined."
-              },
-              "measured_ref": { "type": "string", "description": "Where the measurement lives. Required for MEASURED." },
-              "recency": {
-                "type": ["string", "null"],
-                "format": "date-time",
-                "description": "Earned metrics decay with a 30-day half-life toward a prior of 0; a stale MEASURED is not a current one."
-              }
-            },
-            "allOf": [
-              {
-                "if": { "properties": { "level": { "const": "MEASURED" } }, "required": ["level"] },
-                "then": {
-                  "required": ["observation_count", "measured_ref"],
-                  "properties": { "observation_count": { "minimum": 1 } }
-                }
-              },
-              {
-                "if": { "properties": { "level": { "const": "NOT_CHECKED" } }, "required": ["level"] },
-                "then": { "properties": { "success_rate": { "const": null } } }
-              }
-            ],
-            "additionalProperties": false
-          },
-
-          "cost_hint": {
-            "type": "object",
-            "description": "Priors for the ANFIS-TS local cost. Weights (alpha_c, alpha_l, alpha_d, alpha_pi) = (0.30, 0.30, 0.20, 0.20), summing to 1 — read from docs/policy/anfis-objective.md.",
-            "properties": {
-              "unit_cost": { "type": ["number", "null"], "minimum": 0 },
-              "latency_ms": { "type": ["number", "null"], "minimum": 0, "description": "NULL is honest; no table records per-agent latency, so this is unmeasured fleet-wide." },
-              "dropout_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-              "pi_penalty": { "type": ["number", "null"], "description": "Composite-axis penalty term." }
-            },
-            "additionalProperties": false
-          }
+        "usd_per_1k_input": {
+          "type": "number",
+          "minimum": 0
         },
-        "additionalProperties": false
+        "usd_per_1k_output": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fixed_overhead_usd": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
-
-    "evidence_posture": {
-      "type": "object",
-      "required": ["router_may_use"],
-      "description": "What the ROUTER is permitted to do with this declaration. Stated on the contract rather than left to each consumer, because that is where it drifts.",
-      "properties": {
-        "router_may_use": {
-          "type": "array",
-          "items": { "enum": ["cold_start_prior", "warm_blend", "hot_measured"] },
-          "description": "ANFIS's cold start IS the linear cost model — the honest cold start, not a fitted router with no fit. A declaration alone reaches cold_start_prior only."
-        },
-        "degradation": {
-          "enum": ["hot", "warm", "cold"],
-          "description": "hot/warm/cold rules are locked in the policy; the thresholds are PRIORS, not measurements, and must not be quoted as fitted."
-        },
-        "may_grant_authority": {
-          "const": false,
-          "description": "PERMANENTLY false. A declaration never raises effectiveAuthority. A_eff = min(R_route, 100*sqrt(S_usd)) * 1[builder >= 500] and contains no self-declared term. Permitting true here would let an agent describe its way to a higher spending limit."
-        }
-      },
-      "additionalProperties": false
+    "latency_class": {
+      "type": "string",
+      "enum": ["instant", "fast", "balanced", "deep"]
     },
-
-    "supersedes": {
-      "type": ["string", "null"],
-      "description": "Prior declaration id this replaces. Declarations are append-only; a router reading only the newest must still be able to find what changed."
-    }
-  },
-
-  "additionalProperties": false,
-
-  "x-unspecified": [
-    "Signature or attestation over the declaration itself — the policy does not specify one, so nothing here binds a declaration to its declarer. Until it does, a declaration is unauthenticated input.",
-    "The capability namespace (no controlled vocabulary exists; sub-task routing granularity is OPEN and blocked on the task key).",
-    "How declarations are transported or discovered.",
-    "LASSO feature selection over declared capabilities — named in the roadmap, absent from both policy files."
-  ],
-
-  "examples": [
-    {
-      "schema_version": "1.0.0",
-      "agent": { "agent_id": "agent-sophia" },
-      "declared_at": "2026-08-19T05:00:00Z",
-      "capabilities": [
-        {
-          "name": "compliance-review",
-          "domain": "review",
-          "declared_competence": 0.8,
-          "evidence": { "level": "NOT_CHECKED", "observation_count": 0, "success_rate": null }
+    "degradation_class": {
+      "type": "object",
+      "required": ["rate_limit_behavior", "fallback_supported"],
+      "properties": {
+        "rate_limit_behavior": {
+          "type": "string",
+          "enum": ["429_backoff", "fail_closed"]
+        },
+        "fallback_supported": {
+          "type": "boolean"
         }
-      ],
-      "evidence_posture": {
-        "router_may_use": ["cold_start_prior"],
-        "degradation": "cold",
-        "may_grant_authority": false
+      }
+    },
+    "region_edge": {
+      "type": "array",
+      "items": {
+        "type": "string"
       },
-      "supersedes": null
+      "minItems": 1
+    },
+    "failure_modes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["context_length_exceeded", "content_filter_block", "timeout"]
+      }
     }
-  ]
+  }
 }
