@@ -161,6 +161,12 @@ const SECOND_FAMILY_CREDENTIAL_ENV_VARS = [
   'PERPLEXITY_API_KEY',
   'LITELLM_MASTER_KEY', // a gateway, not a family itself, but names one if set
 ];
+// LITELLM_MASTER_KEY's presence here is a ONE-TIME reachability probe for this
+// dogfood exercise, unrelated to the live provider-attrition investigation on
+// docs/PRIOR-WORK-INDEX.md's OPEN list (gemini/qwen dropping out of the HAL
+// quorum on 07-14/07-15, owned by Sean/gateway creds) -- this file does not
+// touch the fleet, does not diagnose why any provider stopped participating,
+// and checking whether the var is SET says nothing about the gateway's health.
 function hasSecondFamilyCredential(env) {
   const present = SECOND_FAMILY_CREDENTIAL_ENV_VARS.filter((name) => !!env[name]);
   return { reachable: present.length > 0, checkedVars: SECOND_FAMILY_CREDENTIAL_ENV_VARS, presentVars: present };
