@@ -256,7 +256,7 @@ if (failures.length > 0) {
 
 console.log(`VERIFIED: ${pass} assertions — the portable entry point compiles and loads with no path alias`);
 console.log(
-  `  DoD 1 (portable npm TrustShell): still NOT CHECKED — package.json private:${pkg.private === true}, ` +
-    `main:${pkg.main ?? 'none'}, exports:${pkg.exports ? 'present' : 'none'}. ` +
-    'What is now measured is that the entry point is importable, not that a package exists.'
+  `  entry point compiles and loads from the repo tree. Whether a PACKAGE installs is a ` +
+    `different question, owned by check:package-install (main:${pkg.main ?? 'none'}, ` +
+    `exports:${pkg.exports ? 'present' : 'none'}, private:${pkg.private === true}).`
 );

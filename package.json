@@ -131,7 +131,9 @@
     "check:bft-evidence-chain": "node scripts/check-bft-evidence-chain.mjs",
     "check:trust-harness-fixture": "node scripts/trust-harness-fixture.mjs",
     "check:live-callers": "node scripts/check-live-callers.mjs",
-    "check:authority-runtime": "node scripts/check-authority-runtime.mjs"
+    "check:authority-runtime": "node scripts/check-authority-runtime.mjs",
+    "build:package": "tsc -p tsconfig.package.json",
+    "check:package-install": "node scripts/check-package-install.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",
@@ -163,5 +165,17 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "main": "dist/portable.js",
+  "types": "dist/portable.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/portable.d.ts",
+      "require": "./dist/portable.js",
+      "default": "./dist/portable.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
 }

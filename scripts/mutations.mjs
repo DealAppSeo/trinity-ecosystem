@@ -2192,6 +2192,35 @@ export const MUTATIONS = [
   // both rows off NOT CHECKED while the assertion count stayed at 19.
   // -------------------------------------------------------------------------
   // -------------------------------------------------------------------------
+  // The publishable package — DoD 1, and the failure only an install can see
+  // -------------------------------------------------------------------------
+  // NOT REGISTERED — `package-ships-no-dist` and
+  // `package-exports-a-path-that-is-not-packed`, both rejected 2026-08-19.
+  //
+  // The invariants are real and the assertions DO catch them. Verified by hand:
+  // setting `files: ["README.md"]` turns check:package-install red at 3 of 12,
+  // and pointing `exports` at a path that is never emitted does the same. Both
+  // are the failure that only an install can see — the package still builds and
+  // still loads from the repo tree in each case.
+  //
+  // They cannot be SCORED here, for two independent reasons:
+  //
+  //   1. mutate.mjs marks a run INVALID when the suite's output matches
+  //      /Cannot find (module|name)/, on the sound rule that a non-compiling
+  //      mutant is not evidence. This suite's subject IS a module that cannot be
+  //      found — at the consumer, at require time, which is a different failure
+  //      from a broken build and the heuristic cannot tell them apart.
+  //   2. The mutation target would be `package.json`, which npm READS during the
+  //      run (`npm pack`, `npm install`). Mutating it mid-suite races the very
+  //      tool the suite drives, which is the concurrency hazard the mutate lock
+  //      exists to prevent — applied to the manifest that configures npm itself.
+  //
+  // Recorded rather than registered, the same disposition as the non-terminating
+  // `i += 2` mutation and `portable-alias-creeps-back`. What is missing is
+  // mutation EVIDENCE, not the assertions; saying so beats a green entry that
+  // never ran.
+
+  // -------------------------------------------------------------------------
   // collateral.ts / authority-policy.ts — what backs a spending ceiling
   // -------------------------------------------------------------------------
   {

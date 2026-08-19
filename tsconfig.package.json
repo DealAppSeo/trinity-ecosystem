@@ -1,0 +1,42 @@
+{
+  // tsconfig.package.json — builds the PORTABLE surface into a publishable
+  // package. Separate from tsconfig.json, which is the Next app's and sets
+  // `noEmit`.
+  //
+  // NO `baseUrl` AND NO `paths`, DELIBERATELY. That absence is what makes this a
+  // package build rather than an app build: a `@/` specifier is compile-time
+  // only, and tsc emits `require("@/lib/...")` verbatim — a shape that resolves
+  // in this repo and nowhere else. With `paths` unset, any module reached from
+  // the entry point that still imports through the alias fails to resolve HERE,
+  // at build time, instead of at a consumer's `require`.
+  //
+  // `lib/trustshell/portable.ts` is the only entry point. It excludes the nine
+  // host adapters (those reach `@/lib/supabase-admin` and `@/lib/trust/BFTEngine`),
+  // which is why this compiles at all — see check:package-boundary for the list.
+  "compilerOptions": {
+    "target": "es2022",
+    // `dom` is REQUIRED, not incidental: identity/did.ts uses `CryptoKeyPair` and
+    // several modules use `crypto.subtle`, which are DOM lib types. Without it the
+    // build fails with TS2552 on CryptoKeyPair. These are WebCrypto globals present
+    // in Node 18+ and every browser, so shipping them is correct — but a consumer
+    // whose own tsconfig omits `dom` will see those types as missing, which is a
+    // real constraint on the package and is recorded rather than papered over.
+    "lib": ["es2022", "dom"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+
+    // Declarations are the point of shipping types with the package.
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    "outDir": "dist",
+    "rootDir": "lib/trustshell",
+    "noEmit": false,
+    "incremental": false
+  },
+  "files": ["lib/trustshell/portable.ts"]
+}

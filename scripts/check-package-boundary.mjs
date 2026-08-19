@@ -3,10 +3,12 @@
 // Can `lib/trustshell` be shipped as an npm package — and how far is it from
 // being one?
 //
-// MVP DoD item 1 is "a portable npm TrustShell". `package.json` is
-// `"private": true`, named `trustrails`, with no `main` and no `exports`, so the
-// honest status of that item is **NOT CHECKED** — nothing has ever been
-// published and nothing has ever measured whether it could be.
+// MVP DoD item 1 is "a portable npm TrustShell". This suite answers only the
+// STRUCTURAL half — which modules could leave. Whether a package installs is
+// `check:package-install`, which builds, packs, installs into a foreign
+// directory and requires the result. Do not restate its verdict here: both
+// status lines in this file read "NOT CHECKED" for hours after the install had
+// been measured, which is the stale-status defect this repo names most often.
 //
 // ── THE CEILING, MEASURED FIRST ─────────────────────────────────────────────
 //
@@ -17,16 +19,16 @@
 //
 //   A. reaches OUTSIDE the package via `@/`            9   the real cost
 //   B. `@/` but only self-references                    0   DONE 2026-08-19
-//   C+D. npm deps only, or pure                        88  portable
+//   C+D. npm deps only, or pure                        92  portable
 //                                                     ───
-//                                                      97
+//                                                     101
 //
-// **88 of 97 are portable, and group B is now empty.** The 14 self-aliased
+// **92 of 101 are portable, and group B is now empty.** The 14 self-aliased
 // modules were rewritten to relative paths — 19 specifiers across 15 files —
 // once `check:portable-surface` proved the rewrite was REQUIRED rather than
 // cosmetic: `@/lib/trustshell/harness/types` does not resolve without the alias,
 // so the entry point could not compile outside this repo. The whole cost of
-// DoD 1 is the 8 in group A, and 7 of those reach one thing: `@/lib/supabase-admin`.
+// DoD 1 is the 9 in group A, and 7 of those reach one thing: `@/lib/supabase-admin`.
 //
 // Those are the stateful adapters a portable package should take by injection
 // anyway, so the packaging work and the dependency-inversion work are the same
@@ -218,10 +220,10 @@ check('no undeclared npm dependency', () => {
 check('the portable majority has not shrunk', () => {
   // B + C + D: everything that ships today or after a mechanical path rewrite.
   const portable = files.length - outside.size;
-  return portable >= 88
+  return portable >= 92
     ? true
     : `portable modules fell to ${portable} of ${files.length} ` +
-      '(88 of 97 on 2026-08-19 after the self-alias rewrite; 87 of 96 before it; 69 of 77 before the main merge)';
+      '(92 of 101 on 2026-08-19 after the packaging work; 88 of 97 before it; 69 of 77 at the start)';
 });
 
 // ── 3. DoD 1 is NOT CHECKED, and must say so ────────────────────────────────
@@ -263,7 +265,13 @@ console.log(
     `${selfAlias.length} self-aliased, ${pure.length} pure — ` +
     `${files.length - outside.size} portable`
 );
+// DoD 1's status is NOT decided here. This suite reads import specifiers; it
+// cannot tell whether a package installs. `check:package-install` builds, packs,
+// installs into a foreign directory and requires the result — that is the suite
+// that owns the verdict, and pointing at it beats restating a status that would
+// go stale the moment the other suite moved. It already did: both lines here read
+// "NOT CHECKED" for hours after the install was measured.
 console.log(
-  '  DoD 1 (portable npm TrustShell): NOT CHECKED — package.json is ' +
-    `private:${pkg.private === true}, main:${pkg.main ?? 'none'}, exports:${pkg.exports ? 'present' : 'none'}`
+  `  entry point: main:${pkg.main ?? 'none'}, exports:${pkg.exports ? 'present' : 'none'}, ` +
+    `private:${pkg.private === true}. DoD 1 is decided by check:package-install, not here.`
 );
