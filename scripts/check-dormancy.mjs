@@ -134,6 +134,10 @@ const DECLARED = new Map([
     'identity/poseidon2-hash2',
     'the 2-scalar Poseidon2 hash. Its consumer is `check:poseidon2`, which runs it against Plonky3\'s oracle — the parity IS the product, as with schema/decoys. It stays unwired ON PURPOSE until IBindingScheme can be implemented: the permutation is settled but the string→field and domain-tag encodings are not, and wiring a hash whose input encoding is undecided is exactly how two systems come to persist data under incompatible roots. See docs/POSEIDON2-PARAMETER-REQUEST.md.',
   ],
+  [
+    'attestation-presence',
+    'the ERC-8004 attestation shadow record (item B, 2026-08-19). Its consumer is `check:attestation-presence`, which exercises it against this session\'s own real facts — the reporting IS the product, same shape as schema/decoys. Deliberately NOT wired to the pay route or any GateRun, per the instruction that produced it ("shadow/observe first"): the collateral-eval half needs a real caller choosing to sign and submit a claim (identity/control-proof.ts already exists for that and is unwired to this file); the soft-landing-range half is structurally blocked on a real witness-hiding prover (task #75, plus hyperdag-protocol\'s own zk stack being independently non-production — see docs/ERC8004-ZK-ATTESTATION-PROPOSAL-2026-08-19.md), so wiring it now would only ever be able to answer NOT_CHECKED.',
+  ],
 ]);
 
 const results = [];
