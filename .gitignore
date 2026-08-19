@@ -163,6 +163,7 @@ lib/**/*.js
 .reward-check-*/
 .lane-files-check-*/
 .reward-idem-check-*/
+.portable-surface-check-*/
 .repid-weight-sim-*/
 .issuer-stake-check-*/
 .proof-contract-check-*/

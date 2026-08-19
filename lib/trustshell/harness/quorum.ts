@@ -19,7 +19,7 @@
 // would let a validator vote itself authoritative, which is the failure the
 // reputation layer exists to prevent.
 
-import { BPS_MAX, type Bps, type Clock, type ExpertId } from '@/lib/trustshell/harness/types';
+import { BPS_MAX, type Bps, type Clock, type ExpertId } from './types';
 
 export type Verdict = 'approve' | 'reject' | 'abstain';
 

@@ -21,7 +21,7 @@
 //     stays green — the exact "silent degradation" failure this is meant to
 //     catch.
 
-import type { Clock, ExpertId } from '@/lib/trustshell/harness/types';
+import type { Clock, ExpertId } from './types';
 
 export type BreakerState = 'closed' | 'open' | 'half_open';
 

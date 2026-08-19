@@ -38,7 +38,7 @@
 // "assume independent" would recommend panels in precisely the deployment where
 // they lose money, which is the failure this whole file is built to prevent.
 
-import type { ExpertId } from '@/lib/trustshell/harness/types';
+import type { ExpertId } from './types';
 
 /** Evidence for one ordered-insensitive pair of experts. */
 export interface PairAgreement {

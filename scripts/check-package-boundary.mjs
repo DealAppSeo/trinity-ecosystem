@@ -16,12 +16,16 @@
 // actually leave:
 //
 //   A. reaches OUTSIDE the package via `@/`            9   the real cost
-//   B. `@/` but only self-references                   14  mechanical rewrite
-//   C+D. npm deps only, or pure                        73  already portable
+//   B. `@/` but only self-references                    0   DONE 2026-08-19
+//   C+D. npm deps only, or pure                        88  portable
 //                                                     ───
-//                                                      96
+//                                                      97
 //
-// **87 of 96 are portable today or after a path rewrite.** The whole cost of
+// **88 of 97 are portable, and group B is now empty.** The 14 self-aliased
+// modules were rewritten to relative paths — 19 specifiers across 15 files —
+// once `check:portable-surface` proved the rewrite was REQUIRED rather than
+// cosmetic: `@/lib/trustshell/harness/types` does not resolve without the alias,
+// so the entry point could not compile outside this repo. The whole cost of
 // DoD 1 is the 8 in group A, and 7 of those reach one thing: `@/lib/supabase-admin`.
 //
 // Those are the stateful adapters a portable package should take by injection
@@ -214,10 +218,10 @@ check('no undeclared npm dependency', () => {
 check('the portable majority has not shrunk', () => {
   // B + C + D: everything that ships today or after a mechanical path rewrite.
   const portable = files.length - outside.size;
-  return portable >= 87
+  return portable >= 88
     ? true
     : `portable modules fell to ${portable} of ${files.length} ` +
-      '(87 of 96 on 2026-08-19 with RewardLedger added; 85 of 93 before it; 69 of 77 before the main merge)';
+      '(88 of 97 on 2026-08-19 after the self-alias rewrite; 87 of 96 before it; 69 of 77 before the main merge)';
 });
 
 // ── 3. DoD 1 is NOT CHECKED, and must say so ────────────────────────────────

@@ -2165,6 +2165,44 @@ export const MUTATIONS = [
     find: '  if (!receiptExists) return \'unreadable\';',
     replace: '  if (!receiptExists) return \'already-awarded\';',
   },
+
+  // -------------------------------------------------------------------------
+  // The portable entry point — DoD 1's actual question, asked of Node
+  // -------------------------------------------------------------------------
+  // NOT REGISTERED — `portable-alias-creeps-back`, rejected 2026-08-19.
+  //
+  // The invariant is real and load-bearing: no module reachable from
+  // `portable.ts` may import through `@/`, because `paths` is compile-time only
+  // and the emitted `require("@/lib/...")` is unresolvable by Node. The mutation
+  // that breaks it — aliasing a value import in `identity/spine.ts` — is also
+  // real: the repo's own `tsc --noEmit` still reports 0 errors with it applied,
+  // so it is a mutant that compiles.
+  //
+  // It cannot be SCORED here. `mutate.mjs` marks a run INVALID when the suite's
+  // output matches /error TS\d+/ or /Cannot find (module|name)/, on the sound
+  // rule that a mutant which does not compile is not evidence — and
+  // `check:portable-surface` is the one suite whose SUBJECT is a compile
+  // failure. Its correct red is indistinguishable from a broken build, and
+  // rewording tsc's prose until the heuristic stops matching would be evading
+  // the detector, not clarifying a message.
+  //
+  // Recorded rather than registered, the same disposition as the non-terminating
+  // `i += 2` mutation on `buildGroup`. The invariant is still protected — by the
+  // suite's first assertion, which fails with the full diagnostics naming every
+  // import that only resolves because of the alias. What is missing is mutation
+  // EVIDENCE for it, and saying so is better than a green entry that never ran.
+
+  {
+    id: 'portable-barrel-stops-reexporting',
+    suite: 'check:portable-surface',
+    file: 'lib/trustshell/index.ts',
+    protects:
+      'the app barrel re-exports the whole portable surface. The mutant drops the re-export, ' +
+      'and every consumer of @/lib/trustshell silently loses ~100 names at once — the split ' +
+      'is supposed to be invisible to them, and this is what keeps it so',
+    find: "export * from './portable';",
+    replace: "// export * from './portable';",
+  },
   // ── check:throughput — quorum diversity ───────────────────────────────────
   {
     id: 'diversity-member-loss-never-detected',

@@ -37,6 +37,8 @@ import { createChecker } from './lib/harness-compile.mjs';
 
 const { check, truthy, report } = createChecker('pay-custody-shadow');
 
+import { barrelText } from './lib/barrel-text.mjs';
+
 const read = (p) => readFileSync(p, 'utf8');
 const ROUTE = 'app/api/trustrails/pay/route.ts';
 const CUSTODY_SHADOW = 'lib/trustshell/CustodyShadow.ts';
@@ -44,7 +46,11 @@ const BARREL = 'lib/trustshell/index.ts';
 
 const route = read(ROUTE);
 const custodyShadowSrc = read(CUSTODY_SHADOW);
-const barrel = read(BARREL);
+// The barrel is TWO files since 2026-08-19: `index.ts` re-exports `portable.ts`
+// with `export *`, so reading index.ts alone reports CustodyShadow as missing
+// while every consumer of '@/lib/trustshell' still sees it. Reachability is the
+// invariant; the file was only ever the proxy.
+const barrel = barrelText(BARREL);
 
 /** Comments stripped, same technique and same reason as check-pay-brief.mjs:
  * this file's own prose mentions the exact identifiers it checks for. */

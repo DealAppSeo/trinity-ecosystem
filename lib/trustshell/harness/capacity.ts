@@ -42,7 +42,7 @@
 // separate means `available()` can go to zero without the operator seeing a
 // mysterious collapse in an expert's rated capacity.
 
-import type { Clock, ExpertId } from '@/lib/trustshell/harness/types';
+import type { Clock, ExpertId } from './types';
 
 export interface CapacityConfig {
   /** Slots when the expert is at its healthy baseline. */

@@ -59,7 +59,7 @@
 // is the measurement that diagnosed all of the above — and it lets a caller see
 // how far short a task fell rather than only whether a boolean tripped.
 
-import type { Bps, Clock } from '@/lib/trustshell/harness/types';
+import type { Bps, Clock } from './types';
 
 export type EscalationReason = 'thin_margin' | 'low_earned' | 'low_confidence';
 
