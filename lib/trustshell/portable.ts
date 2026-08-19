@@ -512,3 +512,23 @@ export {
   TIMESTAMP_HEADER,
 } from './pay-auth';
 export type { PayAuthMode, PayAuthOutcome, PayAuthVerdict, PayAuthDecision } from './pay-auth';
+
+
+/**
+ * What a public endpoint may say about regulatory compliance.
+ *
+ * A status cannot be constructed — `resolveClaim` derives it from evidence and
+ * has no parameter that sets one. It replaced four hardcoded `true` literals
+ * naming MiCA, the GENIUS Act and FATF Rec. 16 on a live route. It reports
+ * whether a NECESSARY condition is observable; it does not assess compliance,
+ * which is a legal judgement made by people with evidence this process lacks.
+ */
+export {
+  CLAIM_SPECS,
+  resolveClaim,
+  resolveAllClaims,
+  allClaimsMet,
+  complianceRate,
+  formatRate,
+} from './regulatory-claims';
+export type { ClaimStatus, ClaimEvidence, RegulatoryClaim, ComplianceRate } from './regulatory-claims';

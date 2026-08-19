@@ -3,6 +3,12 @@
 
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import {
+  resolveAllClaims,
+  allClaimsMet,
+  complianceRate,
+  formatRate,
+} from '@/lib/trustshell/regulatory-claims';
 
 
 export async function GET() {
@@ -61,6 +67,24 @@ export async function GET() {
   const blockedTxns24h  = rows.filter(r => r.bft_passed === false).length;
   const unevaluatedTxns24h = rows.filter(r => r.bft_passed === null || r.bft_passed === undefined).length;
 
+  // Evidence for the regulatory claims. Every field is counted from what is
+  // actually in the tables — nothing is defaulted, and nothing is a literal.
+  const rate = complianceRate(totalTxns24h, blockedTxns24h);
+  const regulatoryClaims = resolveAllClaims({
+    evaluatedConsensusCount: rows.length - unevaluatedTxns24h,
+    receiptCount: rows.length,
+    humanCustodyVerifiedCount: agents.filter(a => a.human_custody_verified).length,
+    agentCount: agents.length,
+    // `FireblocksPreAuth.generatePreAuth` builds a local object and logs it —
+    // there is no network call and no credential anywhere in this repo. Stated
+    // here as the observation it is, so the claim resolves to NOT MET with the
+    // reason rather than being hardcoded either way.
+    fireblocksIntegrationLive: false,
+    // `recipient_address` is an address. FATF Rec. 16 is about identification,
+    // and no column in kya_compliance_receipts records a verified counterparty.
+    verifiedCounterpartyIdentity: false,
+  });
+
   // System status
   const status =
     systemScore >= 8000 ? 'TRUSTED'    :
@@ -92,17 +116,35 @@ export async function GET() {
       paymentsExecuted: totalTxns24h,
       volumeUSDC:       totalVolume24h,
       attemptsBocked:   blockedTxns24h,
-      complianceRate:   totalTxns24h + blockedTxns24h > 0
-        ? ((totalTxns24h / (totalTxns24h + blockedTxns24h)) * 100).toFixed(1) + '%'
-        : '100%',
+      // A rate over an empty set is UNDEFINED. This fell back to '100%' when the
+      // denominator was zero — and the denominator has never been anything else:
+      // measured 2026-08-19, 0 receipts in 24 hours, 12 all time (newest
+      // 2026-04-01), every one with bft_passed = null. This endpoint published
+      // perfect compliance, from no data, for its entire existence.
+      complianceRate:       formatRate(rate),
+      complianceRateDetail: rate.detail,
     },
-    // Regulatory readiness
+    // Regulatory readiness — DERIVED, never asserted.
+    //
+    // These were four hardcoded `true` literals naming real instruments (MiCA,
+    // the GENIUS Act, FATF Rec. 16). Nothing computed them and nothing verified
+    // them, on a public route — this repo's defining defect in the one place an
+    // outside reader takes at face value.
+    //
+    // `resolveClaim` has no parameter that can set a status. Each claim states
+    // the concrete condition that is NECESSARY for it and reports NOT CHECKED
+    // when that cannot be evaluated here. Necessary is not sufficient, and none
+    // of this is a compliance assessment — that is a legal judgement made by
+    // people with evidence this process does not have.
     regulatoryStatus: {
-      micaCompliant:    true,
-      geniusActReady:   true,
-      fatfAligned:      true,
-      fireblocksPreAuth: true,
-      aminaPilotReady:  systemScore >= 7500,
+      claims: regulatoryClaims,
+      allMet: allClaimsMet(regulatoryClaims),
+      // Derived from a plain mean of stored RepID scores. That is a score
+      // threshold, not a readiness assessment, and the field name now says so.
+      aminaScoreThresholdMet: systemScore >= 7500,
+      disclaimer:
+        'Each entry reports whether a NECESSARY condition is observable in this system. ' +
+        'It is not an assessment of compliance with the named instrument.',
     },
   });
 }

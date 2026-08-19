@@ -165,6 +165,7 @@ lib/**/*.js
 .reward-idem-check-*/
 .portable-surface-check-*/
 .pay-auth-check-*/
+.regulatory-check-*/
 .repid-weight-sim-*/
 .issuer-stake-check-*/
 .proof-contract-check-*/

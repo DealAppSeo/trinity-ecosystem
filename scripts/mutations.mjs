@@ -2275,6 +2275,57 @@ export const MUTATIONS = [
     find: '  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);',
     replace: '  for (let i = 0; i < a.length; i++) { if (a.charCodeAt(i) !== b.charCodeAt(i)) return false; }',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/regulatory-claims.ts — the statement with the highest cost
+  // of being wrong
+  // -------------------------------------------------------------------------
+  {
+    id: 'regulatory-empty-window-reports-full-compliance',
+    suite: 'check:regulatory-claims',
+    file: 'lib/trustshell/regulatory-claims.ts',
+    protects:
+      'a rate over an EMPTY set is undefined — not 100%. The mutant restores the fallback that ' +
+      'shipped for this endpoint\'s entire existence: measured 2026-08-19, 0 receipts in 24h and ' +
+      '12 all time, every one with bft_passed NULL, so the denominator has never been anything ' +
+      'but zero and the route always published perfect compliance from no data',
+    find: '  if (total <= 0) {',
+    replace: '  if (total < 0) {',
+  },
+  {
+    id: 'regulatory-mica-met-without-a-consensus',
+    suite: 'check:regulatory-claims',
+    file: 'lib/trustshell/regulatory-claims.ts',
+    protects:
+      'MiCA Art. 68 is about controls that DEMONSTRABLY prevent unauthorized transactions. The ' +
+      'mutant reports it MET when transactions exist but no consensus ever ran — which is the ' +
+      'live shape exactly (12 receipts, 12 unevaluated), and is the hardcoded `true` returning ' +
+      'through a function call instead of a literal',
+    find: '      if (e.evaluatedConsensusCount === 0) {',
+    replace: '      if (e.evaluatedConsensusCount < 0) {',
+  },
+  {
+    id: 'regulatory-partial-custody-reads-as-ready',
+    suite: 'check:regulatory-claims',
+    file: 'lib/trustshell/regulatory-claims.ts',
+    protects:
+      'GENIUS Act readiness needs custody verified for EVERY transacting agent. The mutant lets ' +
+      'one verified agent carry the claim for all of them — "mostly compliant" published as ' +
+      'compliant, which is the two-outcome collapse in the field where it costs most',
+    find: '      if (e.humanCustodyVerifiedCount < e.agentCount) {',
+    replace: '      if (e.humanCustodyVerifiedCount === 0) {',
+  },
+  {
+    id: 'regulatory-all-met-ignores-not-checked',
+    suite: 'check:regulatory-claims',
+    file: 'lib/trustshell/regulatory-claims.ts',
+    protects:
+      'allClaimsMet requires every claim to be MET. The mutant counts NOT_CHECKED as good enough, ' +
+      'so a system that measured nothing reports full compliance — the exact failure this module ' +
+      'replaced, rebuilt out of the three-outcome type that was supposed to prevent it',
+    find: "  return claims.length > 0 && claims.every((c) => c.status === 'MET');",
+    replace: "  return claims.length > 0 && claims.every((c) => c.status !== 'NOT_MET');",
+  },
   // ── check:throughput — quorum diversity ───────────────────────────────────
   {
     id: 'diversity-member-loss-never-detected',
