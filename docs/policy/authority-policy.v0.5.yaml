@@ -21,6 +21,9 @@ meta:
   contracted_pay_gate: proven          # #104
   refuses_to_issue: proven
   vercel_is_not_a18: true
+  integer_delta_rule: docs/policy/integer-delta-rule.v1.md
+  phase2_predicates: docs/policy/phase2-e2e-predicates.md
+  phase2_stress: docs/policy/phase2-stress-notes.md
 
 # ---------------------------------------------------------------------------
 # Status table (authoritative)
@@ -36,6 +39,8 @@ status:
     - five_axis_pi                     # passport / routing display
     - anfis_lasso_routing              # cold start = linear L_p
     - hot_warm_cold_degradation        # rules locked; θ are priors
+    - integer_delta_rule               # ledger δ ∈ ℤ; see integer-delta-rule.v1.md
+    - phase2_e2e_predicates            # measurement contracts; not waiting on GA
   observe:
     - floor_decideFloor_write          # consult only; typical not_checked
     - bft_payment_evaluations          # 0 rows; structurally unearned
@@ -46,6 +51,17 @@ status:
     - default_weights_rebalance        # frozen until P5
     - referral_halo                    # deferred; not required to exit Phase 1
     - layers_decay_ts                  # not the survivor
+
+# ---------------------------------------------------------------------------
+# Integer-delta lock (ledger consistency)
+# ---------------------------------------------------------------------------
+integer_delta:
+  rule: "delta and repid_delta_applied are integers; ΔR = R_after - R_before = delta"
+  floats_allowed_only_in: [weeks_idle, effective_rate, I, delta_raw_before_round]
+  round: half_away_from_zero_then_type_clamp
+  zero_after_round_is_legal: true
+  source: docs/policy/integer-delta-rule.v1.md
+  ga_handoff: "tighten events.v1.json delta fields from number to integer; writers emit integers now"
 
 # ---------------------------------------------------------------------------
 # Soft-landing decay
