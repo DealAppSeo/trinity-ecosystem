@@ -158,6 +158,9 @@ lib/**/*.js
 .zk-cost-check-*/
 .poseidon2-check-*/
 .harness-extract-check-*/
+.payment-posture-check-*/
+.promotion-check-*/
+.reward-check-*/
 .repid-weight-sim-*/
 .issuer-stake-check-*/
 .proof-contract-check-*/
