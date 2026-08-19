@@ -94,35 +94,3 @@ The following configurations **must fail validation**:
 1.  **Strict Fail-Closed Enforcement:** Production-lane adapters must execute `fail_closed` whenever `routing_fail_behavior` is requested or a fatal condition is unresolvable.
 2.  **Signature Propagations:** When the adapter encounters an exception, it must map its local exception to one of the standardized `failure_modes` strings. This enables the ANFIS engine to execute deterministic recovery and penalization rules.
 3.  **Idempotency & Retries:** Retried calls under network degradation must pass identical, collision-immune idempotency keys (using deterministic hashes or deterministic UUIDv5 payloads) to avoid duplicate state-changing ledger events under clock skew or clock drift conditions.
-
----
-
-## 4. Bringing a Validator / Attestor Adapter
-
-A Validator or Attestor adapter is a specialized, pluggable verification service designed to produce cryptographic or programmatic assertions complying with `validation-attestation.v0.json`.
-
-Like standard compute/LLM adapters, a third-party validator MUST publish its configuration aligned with the `capability-declaration.schema.json` standard:
-
-*   **`vendor`:** Must uniquely identify the attestation provider (e.g., `"zk-snark-verifier-v1"`, `"hardware-tee-attestor"`, `"optimistic-slashing-arbiter"`).
-*   **`cost_model`:** Details the computational cost associated with proof generation. This metric is used by the ANFIS router to dynamically choose verification tiers based on budget constraints.
-*   **`latency_class`:** Must accurately reflect the proof computation latency (e.g., higher millisecond values for ZK-SNARK generation requiring `deep` latency classification, vs. instant millisecond values for optimistic signatures).
-*   **`degradation_class`:** In compliance with high-stakes financial and administrative security, the `routing_fail_behavior` for validator adapters MUST always default to `fail_closed` to block downstream transitions on signature verification timeouts.
-*   **`failure_modes`:** Must explicitly map validation failures to standard error signatures (specifically `signature_invalid`, `timeout`, or `upstream_error`), allowing the router to trigger rapid failover.
-
----
-
-## 5. NIST-Facing Security Controls: Structural Controls Against Abuse of Authority
-
-When deployed in governmental, enterprise, or high-stakes industrial environments, the Trust Harness implements foundational **structural controls** to mitigate risks not merely of algorithmic or "model failure," but of deliberate **abuse of administrative authority** (coercion, administrative backdoors, biased routing overrides, or score falsification).
-
-These controls align with NIST guidelines on sovereign AI security and administrative accountability:
-
-### Portable Identity
-All agents and validating nodes operate using decentralized, self-sovereign identities (**DIDs**). Because identities and reputations are cryptographically tied to key pairs rather than database-assigned host identifiers, an agent can seamlessly port its credentials across sibling nodes. This eliminates centralized host coercion or platform vendor lock-in.
-
-### Revocable Delegation
-Authorization to act or spend on-chain is governed by cryptographically bounded delegation tokens. These delegations restrict authority to specific domains, spend limits, and time epochs. Should an agent exceed these bounds or exhibit anomalous behavior, delegations are dynamically **revoked on-chain instantly**, cutting off compromised nodes before damage propagates.
-
-### Auditability and Non-Repudiation
-Every score transition, decay tick, referral reward, and gate decision is logged on an immutable ledger with unique `idempotency_key` bindings. This creates a tamper-proof audit trail. Any administrative attempt to falsify a reputation score or bypass a spending gate is instantly exposed as a signature mismatch or ledger conflict, preventing untrusted executive actions from altering network state.
-
