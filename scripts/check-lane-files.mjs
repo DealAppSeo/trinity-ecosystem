@@ -378,6 +378,68 @@ if (events?.level === 'PRESENT') {
       : `${wrong.join(', ')} do not pin event_type — one event could be recorded as another`;
   });
 
+  // ── The two CROSS-LANE laws GA's 60aeaa4 did not yet satisfy ──────────────
+  //
+  // Both were measured failures against XC's files, and both were fixed
+  // surgically rather than handed back, because XC's integer-delta rule names
+  // the exact fields and prescribes the exact change. Gated here so neither can
+  // regress, and so the next GA push is measured against the law rather than
+  // against whatever shape arrives.
+
+  check('events: ledger deltas are INTEGER — XC integer-delta rule ID4', () => {
+    // "every ledger-applied reputation delta is an integer... current_repid is an
+    // integer and score rows must round-trip without float drift". A `number`
+    // here admits 0.5 into the ledger column.
+    const bad = [];
+    for (const k of REPUTATION_EVENTS) {
+      for (const f of ['delta', 'repid_delta_applied']) {
+        const t = defs[k]?.properties?.[f]?.type;
+        if (t !== 'integer') bad.push(`${k}.${f} is "${t}"`);
+      }
+    }
+    return bad.length === 0
+      ? true
+      : `${bad.join(', ')} — integer-delta-rule.v1.md names these exact fields and prescribes "integer"`;
+  });
+
+  check('events: a ZERO delta is representable — policy locks delta(100)=0', () => {
+    // `minimum: 1` made a LEGAL, LOCKED event unencodable: referral delta(100)=0
+    // (ID3 locks 12,8,8,4,0), referral unproven=0 (mutant M4), and impact
+    // iota_proof.none=0 which "zeroes the delta". Rejecting zero would force a
+    // writer to either drop a real row or invent a nonzero delta.
+    const bad = [];
+    for (const k of ['ECOSYSTEM_REFERRAL', 'IMPACT_REWARD']) {
+      for (const f of ['delta', 'repid_delta_applied']) {
+        const min = defs[k]?.properties?.[f]?.minimum;
+        if (typeof min === 'number' && min > 0) bad.push(`${k}.${f} minimum=${min}`);
+      }
+    }
+    return bad.length === 0
+      ? true
+      : `${bad.join(', ')} — delta 0 is legal and locked; a schema that rejects it forces a writer ` +
+        'to drop a real row or invent a nonzero delta';
+  });
+
+  check('events: the referral delta ceiling matches the recomputed curve', () => {
+    // c(1) = 12 from the formula, not from the published table.
+    const max = defs.ECOSYSTEM_REFERRAL?.properties?.delta?.maximum;
+    return max === undefined || max === L.referralClamp(1)
+      ? true
+      : `schema caps referral delta at ${max}; c(1) recomputes to ${L.referralClamp(1)}`;
+  });
+
+  check('events: the decay idempotency key encodes the TICK, not just the day', () => {
+    // GA's grammar is ^decay:{uuid}:{YYYY-MM-DD}:tick_N_of_M$. That is stronger
+    // than a per-day key: it makes re-applying tick 3 of 5 unrepresentable
+    // rather than merely detectable. Worth pinning because a "simplification"
+    // to a per-day key would silently permit a double-apply within one envelope.
+    const pat = defs.DORMANCY_DECAY?.properties?.idempotency_key?.pattern ?? '';
+    return /tick_/.test(pat)
+      ? true
+      : `decay idempotency pattern "${pat}" does not encode the tick — re-applying one tick ` +
+        'of an open envelope would become representable';
+  });
+
   check('events: the x402 gate names real_collateral_usd, not a generic stake', () => {
     // The field this repo measured as 51/52 simulated. Naming it "real" in the
     // contract is what stops an unfiltered SUM(amount) satisfying it.

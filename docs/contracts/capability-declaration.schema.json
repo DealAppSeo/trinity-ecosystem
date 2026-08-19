@@ -3,6 +3,14 @@
   "$id": "https://repid.dev/schemas/capability-declaration.schema.json",
   "title": "Adapter Capability Declaration Schema",
   "description": "A vendor-agnostic, versioned schema that every compute, LLM, storage, or routing adapter must satisfy to integrate with the Trust Harness.",
+  "x-provenance": {
+    "status": "AUTHORITATIVE",
+    "authored_by": "GA (Gemini Agent / authoritative lane), 2026-08-19",
+    "why": [
+      "Replacing the CC stand-in reconstruction with our authoritative, production-grade Adapter Capability Declaration Schema.",
+      "The stand-in treated this as an agent self-claim contract with policy thresholds, whereas our authoritative version is the strict, vendor-agnostic adapter specification required for real integrations in the Trust Harness."
+    ]
+  },
   "type": "object",
   "required": [
     "adapter_version",

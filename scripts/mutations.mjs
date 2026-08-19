@@ -2345,6 +2345,31 @@ export const MUTATIONS = [
   // at the envelope invariants the real file actually holds.
   // -------------------------------------------------------------------------
   {
+    id: 'contract-delta-drops-to-float',
+    suite: 'check:lane-files',
+    file: 'docs/contracts/events.v1.json',
+    protects:
+      "XC's integer-delta rule ID4: every ledger-applied delta is an INTEGER. current_repid is an " +
+      'integer and score rows must round-trip without float drift, so a `number` here admits 0.5 ' +
+      'into the ledger column. GA @ 60aeaa4 shipped all six fields as `number`; XC names those ' +
+      'exact fields and prescribes the fix, which is why it was corrected surgically',
+    find: '"delta": {\n          "type": "integer",\n          "maximum": 0\n        },',
+    replace: '"delta": {\n          "type": "number",\n          "maximum": 0\n        },',
+  },
+  {
+    id: 'contract-zero-delta-becomes-unrepresentable',
+    suite: 'check:lane-files',
+    file: 'docs/contracts/events.v1.json',
+    protects:
+      'delta 0 is LEGAL and LOCKED — referral delta(100)=0 (ID3 locks 12,8,8,4,0), referral ' +
+      'unproven=0 (mutant M4), impact iota_proof.none=0 which zeroes the delta. The mutant ' +
+      'restores `minimum: 1`, which makes a real event unencodable and forces a writer to either ' +
+      'drop the row or invent a nonzero delta — the second being how a fabricated number enters a ' +
+      'ledger',
+    find: '"ECOSYSTEM_REFERRAL"\n          ]\n        },\n        "delta": {\n          "type": "integer",\n          "minimum": 0',
+    replace: '"ECOSYSTEM_REFERRAL"\n          ]\n        },\n        "delta": {\n          "type": "integer",\n          "minimum": 1',
+  },
+  {
     id: 'contract-decay-can-add-repid',
     suite: 'check:lane-files',
     file: 'docs/contracts/events.v1.json',
@@ -2353,8 +2378,8 @@ export const MUTATIONS = [
       'be negative. The mutant lifts the cap, so a decay event can carry a POSITIVE delta: a ' +
       'reward wearing a decay label, which no downstream reader would question because the event ' +
       'type says decay',
-    find: '"delta": { "type": "number", "maximum": 0 }',
-    replace: '"delta": { "type": "number", "maximum": 10000 }',
+    find: '"maximum": 0\n        },\n        "repid_before"',
+    replace: '"maximum": 10000\n        },\n        "repid_before"',
   },
   {
     id: 'contract-x402-loses-the-stake-denial',

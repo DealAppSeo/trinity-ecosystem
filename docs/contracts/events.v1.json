@@ -3,6 +3,36 @@
   "$id": "https://repid.dev/schemas/events.v1.json",
   "title": "RepID Score Events and ERC-8004 Passport Contracts",
   "description": "Strict, production-grade schemas for RepID ledger score events, selective-disclosure passport disclosures, and x402 spending gate contracts.",
+  "x-provenance": {
+    "status": "AUTHORITATIVE",
+    "authored_by": "GA (Gemini Agent / authoritative lane), 2026-08-19",
+    "why": [
+      "Replacing the CC stand-in reconstruction with the authoritative, production-grade schemas.",
+      "The stand-in files were conceptual math reconstructions, whereas our authoritative versions are the exact production-ready draft-07 schemas.",
+      "These match the actual database schema for RepID score events (DORMANCY_DECAY, ECOSYSTEM_REFERRAL, IMPACT_REWARD) and passport/spending gate contracts (ZKPPassportDisclosure, X402GateDecision)."
+    ],
+    "surgical_corrections": {
+      "by": "CC (implementation lane), 2026-08-19 \u2014 measured failures, not a rewrite",
+      "authority": "docs/policy/integer-delta-rule.v1.md (XC, #107) and docs/policy/authority-policy.v0.5.yaml",
+      "changes": [
+        "DORMANCY_DECAY.delta: number -> integer",
+        "DORMANCY_DECAY.repid_delta_applied: number -> integer",
+        "ECOSYSTEM_REFERRAL.delta: number -> integer",
+        "ECOSYSTEM_REFERRAL.delta: minimum 1 -> 0",
+        "ECOSYSTEM_REFERRAL.repid_delta_applied: number -> integer",
+        "ECOSYSTEM_REFERRAL.repid_delta_applied: minimum 1 -> 0",
+        "IMPACT_REWARD.delta: number -> integer",
+        "IMPACT_REWARD.delta: minimum 1 -> 0",
+        "IMPACT_REWARD.repid_delta_applied: number -> integer",
+        "IMPACT_REWARD.repid_delta_applied: minimum 1 -> 0"
+      ],
+      "why": [
+        "ID4: XC's integer-delta rule names these exact six fields and prescribes `integer`. current_repid is an integer and score rows must round-trip without float drift.",
+        "ID3/M3/M4: `minimum: 1` made delta=0 UNREPRESENTABLE, but the policy locks referral delta(100)=0, referral unproven=0, and impact iota_proof.none=0 which zeroes the delta. A legal, locked event could not be encoded. Minimum is now 0."
+      ],
+      "unchanged": "Everything else is GA authoritative content. Structure, patterns and enums untouched."
+    }
+  },
   "definitions": {
     "uuid": {
       "type": "string",
@@ -26,12 +56,29 @@
         "metadata"
       ],
       "properties": {
-        "agent_id": { "$ref": "#/definitions/uuid" },
-        "event_type": { "type": "string", "enum": ["DORMANCY_DECAY"] },
-        "delta": { "type": "number", "maximum": 0 },
-        "repid_before": { "$ref": "#/definitions/repid_range" },
-        "repid_after": { "$ref": "#/definitions/repid_range" },
-        "repid_delta_applied": { "type": "number", "maximum": 0 },
+        "agent_id": {
+          "$ref": "#/definitions/uuid"
+        },
+        "event_type": {
+          "type": "string",
+          "enum": [
+            "DORMANCY_DECAY"
+          ]
+        },
+        "delta": {
+          "type": "integer",
+          "maximum": 0
+        },
+        "repid_before": {
+          "$ref": "#/definitions/repid_range"
+        },
+        "repid_after": {
+          "$ref": "#/definitions/repid_range"
+        },
+        "repid_delta_applied": {
+          "type": "integer",
+          "maximum": 0
+        },
         "idempotency_key": {
           "type": "string",
           "pattern": "^decay:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}:[0-9]{4}-[0-9]{2}-[0-9]{2}:tick_[0-9]+_of_[0-9]+$"
@@ -48,13 +95,34 @@
             "shock_epoch"
           ],
           "properties": {
-            "reason": { "type": "string", "enum": ["Dormancy decay"] },
-            "weeks_idle": { "type": "number", "minimum": 0 },
-            "effective_rate": { "type": "number", "minimum": 0 },
-            "floored": { "type": "boolean" },
-            "is_decay_shock": { "type": "boolean" },
-            "shock_k_of_n": { "type": "string", "pattern": "^[0-9]+ of [0-9]+$" },
-            "shock_epoch": { "type": "string", "format": "date-time" }
+            "reason": {
+              "type": "string",
+              "enum": [
+                "Dormancy decay"
+              ]
+            },
+            "weeks_idle": {
+              "type": "number",
+              "minimum": 0
+            },
+            "effective_rate": {
+              "type": "number",
+              "minimum": 0
+            },
+            "floored": {
+              "type": "boolean"
+            },
+            "is_decay_shock": {
+              "type": "boolean"
+            },
+            "shock_k_of_n": {
+              "type": "string",
+              "pattern": "^[0-9]+ of [0-9]+$"
+            },
+            "shock_epoch": {
+              "type": "string",
+              "format": "date-time"
+            }
           }
         }
       }
@@ -72,24 +140,59 @@
         "metadata"
       ],
       "properties": {
-        "agent_id": { "$ref": "#/definitions/uuid" },
-        "event_type": { "type": "string", "enum": ["ECOSYSTEM_REFERRAL"] },
-        "delta": { "type": "number", "minimum": 1 },
-        "repid_before": { "$ref": "#/definitions/repid_range" },
-        "repid_after": { "$ref": "#/definitions/repid_range" },
-        "repid_delta_applied": { "type": "number", "minimum": 1 },
+        "agent_id": {
+          "$ref": "#/definitions/uuid"
+        },
+        "event_type": {
+          "type": "string",
+          "enum": [
+            "ECOSYSTEM_REFERRAL"
+          ]
+        },
+        "delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repid_before": {
+          "$ref": "#/definitions/repid_range"
+        },
+        "repid_after": {
+          "$ref": "#/definitions/repid_range"
+        },
+        "repid_delta_applied": {
+          "type": "integer",
+          "minimum": 0
+        },
         "idempotency_key": {
           "type": "string",
           "pattern": "^referral:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "metadata": {
           "type": "object",
-          "required": ["referred_agent_id", "referral_index", "base_reward", "decay_curve"],
+          "required": [
+            "referred_agent_id",
+            "referral_index",
+            "base_reward",
+            "decay_curve"
+          ],
           "properties": {
-            "referred_agent_id": { "$ref": "#/definitions/uuid" },
-            "referral_index": { "type": "integer", "minimum": 1 },
-            "base_reward": { "type": "number", "minimum": 0 },
-            "decay_curve": { "type": "string", "enum": ["logarithmic"] }
+            "referred_agent_id": {
+              "$ref": "#/definitions/uuid"
+            },
+            "referral_index": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "base_reward": {
+              "type": "number",
+              "minimum": 0
+            },
+            "decay_curve": {
+              "type": "string",
+              "enum": [
+                "logarithmic"
+              ]
+            }
           }
         }
       }
@@ -107,27 +210,61 @@
         "metadata"
       ],
       "properties": {
-        "agent_id": { "$ref": "#/definitions/uuid" },
-        "event_type": { "type": "string", "enum": ["IMPACT_REWARD"] },
-        "delta": { "type": "number", "minimum": 1 },
-        "repid_before": { "$ref": "#/definitions/repid_range" },
-        "repid_after": { "$ref": "#/definitions/repid_range" },
-        "repid_delta_applied": { "type": "number", "minimum": 1 },
+        "agent_id": {
+          "$ref": "#/definitions/uuid"
+        },
+        "event_type": {
+          "type": "string",
+          "enum": [
+            "IMPACT_REWARD"
+          ]
+        },
+        "delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repid_before": {
+          "$ref": "#/definitions/repid_range"
+        },
+        "repid_after": {
+          "$ref": "#/definitions/repid_range"
+        },
+        "repid_delta_applied": {
+          "type": "integer",
+          "minimum": 0
+        },
         "idempotency_key": {
           "type": "string",
           "pattern": "^impact:[a-zA-Z0-9_-]+:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "metadata": {
           "type": "object",
-          "required": ["action_class", "severity_multiplier", "base_value", "reviewer_id"],
+          "required": [
+            "action_class",
+            "severity_multiplier",
+            "base_value",
+            "reviewer_id"
+          ],
           "properties": {
             "action_class": {
               "type": "string",
-              "enum": ["bug_bounty_critical", "ecosystem_tooling", "governance_vote"]
+              "enum": [
+                "bug_bounty_critical",
+                "ecosystem_tooling",
+                "governance_vote"
+              ]
             },
-            "severity_multiplier": { "type": "number", "minimum": 1.0 },
-            "base_value": { "type": "number", "minimum": 0 },
-            "reviewer_id": { "$ref": "#/definitions/uuid" }
+            "severity_multiplier": {
+              "type": "number",
+              "minimum": 1.0
+            },
+            "base_value": {
+              "type": "number",
+              "minimum": 0
+            },
+            "reviewer_id": {
+              "$ref": "#/definitions/uuid"
+            }
           }
         }
       }
@@ -141,32 +278,77 @@
         "verification_axis"
       ],
       "properties": {
-        "current_repid": { "$ref": "#/definitions/repid_range" },
+        "current_repid": {
+          "$ref": "#/definitions/repid_range"
+        },
         "tier": {
           "type": "string",
-          "enum": ["PROBATIONARY", "EARNING", "ESTABLISHED", "AUTONOMOUS", "VETERAN"]
+          "enum": [
+            "PROBATIONARY",
+            "EARNING",
+            "ESTABLISHED",
+            "AUTONOMOUS",
+            "VETERAN"
+          ]
         },
         "axis_scores": {
           "type": "object",
-          "required": ["reliability", "accuracy", "alignment", "impact", "longevity"],
+          "required": [
+            "reliability",
+            "accuracy",
+            "alignment",
+            "impact",
+            "longevity"
+          ],
           "properties": {
-            "reliability": { "type": "number", "minimum": 0, "maximum": 100 },
-            "accuracy": { "type": "number", "minimum": 0, "maximum": 100 },
-            "alignment": { "type": "number", "minimum": 0, "maximum": 100 },
-            "impact": { "type": "number", "minimum": 0, "maximum": 100 },
-            "longevity": { "type": "number", "minimum": 0, "maximum": 100 }
+            "reliability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "accuracy": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "alignment": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "impact": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "longevity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
           }
         },
         "verification_axis": {
           "type": "object",
-          "required": ["soft_landing_active", "amortization_progress", "bft_mismatch_observed"],
+          "required": [
+            "soft_landing_active",
+            "amortization_progress",
+            "bft_mismatch_observed"
+          ],
           "properties": {
-            "soft_landing_active": { "type": "boolean" },
+            "soft_landing_active": {
+              "type": "boolean"
+            },
             "amortization_progress": {
-              "type": ["string", "null"],
+              "type": [
+                "string",
+                "null"
+              ],
               "pattern": "^[0-9]+ of [0-9]+$"
             },
-            "bft_mismatch_observed": { "type": "boolean" }
+            "bft_mismatch_observed": {
+              "type": "boolean"
+            }
           }
         }
       }
@@ -182,25 +364,52 @@
         "warning"
       ],
       "properties": {
-        "agent_id": { "$ref": "#/definitions/uuid" },
-        "requested_usd": { "type": "number", "minimum": 0 },
-        "effective_authority": { "type": "number", "minimum": 0 },
-        "real_collateral_usd": { "type": "number", "minimum": 0 },
+        "agent_id": {
+          "$ref": "#/definitions/uuid"
+        },
+        "requested_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "effective_authority": {
+          "type": "number",
+          "minimum": 0
+        },
+        "real_collateral_usd": {
+          "type": "number",
+          "minimum": 0
+        },
         "decision": {
           "type": "string",
-          "enum": ["APPROVED", "DENIED_AUTHORITY_EXCEEDED", "DENIED_NO_STAKE"]
+          "enum": [
+            "APPROVED",
+            "DENIED_AUTHORITY_EXCEEDED",
+            "DENIED_NO_STAKE"
+          ]
         },
         "warning": {
-          "type": ["string", "null"],
-          "enum": ["SOFT_LANDING_ACTIVE_AUTHORITY_WILL_DECAY", null]
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "SOFT_LANDING_ACTIVE_AUTHORITY_WILL_DECAY",
+            null
+          ]
         }
       }
     }
   },
   "type": "object",
   "oneOf": [
-    { "$ref": "#/definitions/DORMANCY_DECAY" },
-    { "$ref": "#/definitions/ECOSYSTEM_REFERRAL" },
-    { "$ref": "#/definitions/IMPACT_REWARD" }
+    {
+      "$ref": "#/definitions/DORMANCY_DECAY"
+    },
+    {
+      "$ref": "#/definitions/ECOSYSTEM_REFERRAL"
+    },
+    {
+      "$ref": "#/definitions/IMPACT_REWARD"
+    }
   ]
 }
