@@ -187,3 +187,4 @@ lib/**/*.js
 .phase2-status-check-*/
 .dogfood-identity-*/
 .attestation-presence-check-*/
+.dogfood-promotion-*/
