@@ -26,7 +26,9 @@ referral:
     9: 4
     10: 4
     100: 0
-  farm_30d_cap_n1_to_n10: 59
+  # n=1..10 = 12+8+8+5+5+5+5+4+4+4. 59 dropped n=7; 63 remains withdrawn.
+  farm_30d_cap_n1_to_n10: 60
+  farm_sum_terms: [12, 8, 8, 5, 5, 5, 5, 4, 4, 4]
   pair_idempotent: true
   n1_max: 12
 

@@ -27,6 +27,9 @@ meta:
   phase2_fixture_bounds: docs/policy/phase2-fixture-bounds.yaml
   events_v1_merge_path: claude/reconcile-ga-contracts-integer-delta
   stale_fork_do_not_merge: xc/policy-lock@01079a9
+  zk_attestation_predicates: docs/policy/zk-attestation-predicates.md
+  trust_ecology_profile: docs/policy/trust-ecology-profile.md
+  nist_ai_rmf_mapping: docs/policy/nist-ai-rmf-mapping.md
 
 # ---------------------------------------------------------------------------
 # Status table (authoritative)
@@ -48,6 +51,10 @@ status:
     - floor_decideFloor_write          # consult only; typical not_checked
     - bft_payment_evaluations          # 0 rows; structurally unearned
     - control_proof                    # #95 shadow; cannot approve or deny
+    - phase2_fixture_bounds            # numeric pack; farm cap 60; not events.v1.json
+    - zk_attestation_predicates        # measurement hooks; witnessHidden still blocked
+    - trust_ecology_profile            # public vs internal; not a new score
+    - nist_ai_rmf_mapping              # Measure/Manage; not certification
   blocked:
     - doer_verified_work_leaf          # BLOCKED_FOR_CROSS_LANE
     - witnessHidden
