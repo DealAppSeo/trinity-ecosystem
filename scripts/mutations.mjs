@@ -1281,6 +1281,89 @@ export const MUTATIONS = [
     find: '  if (value.trim().length < rule.minLength) return \'too_short\';',
     replace: '  if (value.trim().length <= rule.minLength) return \'too_short\';',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/reward.ts — the reputation the payment path is allowed to pay
+  // -------------------------------------------------------------------------
+  {
+    id: 'reward-trusts-observe-mode-passed-true',
+    suite: 'check:reward-earned',
+    file: 'lib/trustshell/reward.ts',
+    protects:
+      'observe mode returns `passed: true, evaluated: false` BY DESIGN — not blocked is not ' +
+      'a verdict. The mutant reads the flag the panel never set, so the default configuration ' +
+      'goes back to paying +10 RepID for a consensus that did not run. That reward is durable: ' +
+      'it rewrites repid_tier and both spending limits, raising the ceiling on the next request',
+    find: '  if (!evidence.consensusEvaluated) {',
+    replace: '  if (!evidence.consensusPassed) {',
+  },
+  {
+    id: 'reward-pays-for-a-simulated-settlement',
+    suite: 'check:reward-earned',
+    file: 'lib/trustshell/reward.ts',
+    protects:
+      'a payment that touched no chain earns no reputation. The executor simulates whenever ' +
+      'AGENT_SOPHIA_SECRET_BYTES is absent, which is every environment observed here, so the ' +
+      'mutant is not an edge case — it restores +10 per call for money that never moved, with ' +
+      'no idempotency key and no authentication on the route',
+    find: '  if (evidence.settlementSimulated) {',
+    replace: '  if (evidence.settlementSimulated && !evidence.consensusPassed) {',
+  },
+  {
+    id: 'reward-collapses-not-checked-into-failed',
+    suite: 'check:reward-earned',
+    file: 'lib/trustshell/reward.ts',
+    protects:
+      'three outcomes, never two. A broadcast transaction awaiting confirmation is NOT CHECKED; ' +
+      'the mutant charges it as a consensus FAILURE, which is the same defect this module fixes ' +
+      'pointed the other way — and it would make a provider outage indistinguishable from a ' +
+      'rejected payment in the response the caller reads',
+    find: '    outcome: failed ? \'WITHHELD_FAILED\' : \'WITHHELD_NOT_CHECKED\',',
+    replace: '    outcome: \'WITHHELD_FAILED\',',
+  },
+
+  // -------------------------------------------------------------------------
+  // scripts/lib/module-specifiers.mjs — the parser the package boundary rests on
+  //
+  // All three break the MEASUREMENT rather than the thing measured. A boundary
+  // check whose extractor under-reports prints a clean boundary, and the report
+  // is what anyone reads. These are the shapes that actually defeated it.
+  // -------------------------------------------------------------------------
+  {
+    id: 'specifiers-reads-prose-as-imports',
+    suite: 'check:package-boundary',
+    file: 'scripts/lib/module-specifiers.mjs',
+    protects:
+      'comments are stripped before specifiers are matched. Four modules in lib/trustshell ' +
+      'were once reported as carrying npm dependencies because their header prose contains ' +
+      "the word \"from\" followed by a quoted phrase — the mutant restores that reading, and " +
+      'an inflated dependency list is a boundary nobody can act on',
+    find: '      return !t.startsWith(\'//\') && !t.startsWith(\'*\');',
+    replace: '      return true;',
+  },
+  {
+    id: 'specifiers-misses-multiline-imports',
+    suite: 'check:package-boundary',
+    file: 'scripts/lib/module-specifiers.mjs',
+    protects:
+      'the SPECIFIER is matched, not the statement. Anchoring to `import`/`export` on one line ' +
+      'misses every `import {\\n … \\n} from "x"` — it filed SolanaExecutor.ts, which imports ' +
+      'two Solana packages, as having no dependencies at all. Under-reporting is the dangerous ' +
+      'direction: it prints a portable package that is not one',
+    find: '    ...code.matchAll(/\\bfrom\\s*[\'"]([^\'"]+)[\'"]/g),',
+    replace: '    ...code.matchAll(/^\\s*(?:import|export)\\b[^;\\n]*?\\bfrom\\s*[\'"]([^\'"]+)[\'"]/gm),',
+  },
+  {
+    id: 'specifiers-admits-template-phantoms',
+    suite: 'check:package-boundary',
+    file: 'scripts/lib/module-specifiers.mjs',
+    protects:
+      'a `${…}` interpolation cannot be a module path. `retargets audience from \'${a.audience}\'` ' +
+      'is an error message, and counting it invents a dependency on a package that does not exist ' +
+      '— the opposite error to the one above, and equally a wrong boundary',
+    find: '  return [...new Set(found.filter((s) => !s.includes(\'${\') && !s.includes(\' \')))];',
+    replace: '  return [...new Set(found)];',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

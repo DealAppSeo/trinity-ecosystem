@@ -1165,6 +1165,57 @@ or an outage ever claims a referral.
 
 ---
 
+## A26 — a killed mutation run leaves the repo mutated, and `| tail` throws away the verdict (2026-08-19)
+
+**[VERIFIED] — the mutated files are in `git diff`; the exit code belonged to `tail`.**
+
+Two mistakes, one run, and they compounded into a confident wrong reading of a
+green build.
+
+**1. `npm run mutate` was invoked with a flag it does not have.** The CLI takes
+`--suite` and `--only`; I passed `--id` three times. Unknown flags are ignored,
+so instead of three mutations it started **all 99**, hit the 120-second tool
+timeout, and moved to the background. `pkill -f "scripts/mutate.mjs"` then
+returned exit 144 — it killed the shell running it and **not the node process**,
+which survived orphaned for another eight minutes, applying and reverting
+mutations the whole time.
+
+**A mutation harness holds the repo in a deliberately broken state between
+apply and restore.** Killing it mid-cycle leaves that state on disk. Three
+different files were found mutated at three different moments:
+`lib/trustshell/receipt/claims.ts` (`ACKNOWLEDGES_FAILURE.test(body)` → `false`),
+`lib/hal/accuracy.ts` (tie credit 0.5 → 1), `lib/trustshell/identity/spine.ts`
+(`execution.policy.toolEffects` → a literal). None was mine.
+
+**2. The full `npm run check` that ran during those eight minutes reported
+`66 VERIFIED, 1 NOT_CHECKED, 2 FAILED` — and the two failures were not real.**
+`check:receipt-audit` and `check:zk-cost` were measuring mutated sources. Had I
+reported that, I would have published two regressions that did not exist, in a
+session whose subject was unearned claims.
+
+**3. And the run said `[exited with code 0]` anyway**, because it was invoked as
+`npm run check 2>&1 | tail -40`. **A pipeline's exit status is the LAST
+command's**, so the number I read was `tail` succeeding at printing. `check-all`
+was reporting 2 FAILED in its own summary line at the same moment. This is the
+same defect as the commit two hours earlier that chained `git commit && git push`
+after an ungated `npm run check` — one shell idiom apart, same cause.
+
+**The rules.**
+
+- *Never leave a mutation run backgrounded or half-killed.* If one is
+  interrupted, `git status` immediately and restore every tracked file it
+  touched **before** running anything that measures the tree. A green or red
+  suite over a mutated working copy is not evidence in either direction.
+- *Kill by PID, verify the PID is gone.* `pkill -f` matched this session's own
+  shell and reported success while the target lived.
+- *Never pipe a gate into anything.* Redirect to a file and read `$?`, or use
+  `set -o pipefail`. `| tail`, `| head`, `| grep` all discard the verdict and
+  return a green one.
+- *Read the summary line, not the exit code, when both are available* — and when
+  they disagree, believe the one that names counts.
+
+---
+
 ## A25 — `npm run check` was 52 VERIFIED, and CI still went red (2026-08-16)
 
 **[VERIFIED] — the run is in CI: `check` green, `test:e2e` red, same commit.**

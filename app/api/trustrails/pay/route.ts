@@ -11,6 +11,7 @@ import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
 import { EarnedMetricsRepository } from '@/lib/trustshell/EarnedMetricsRepo';
 import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
 import { TIER_LIMITS, tierForScore } from '@/lib/trustshell/repid-scoring';
+import { rewardFor, rewardReason, isPermittedReward } from '@/lib/trustshell/reward';
 
 export async function POST(req: NextRequest) {
   const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();
@@ -196,8 +197,30 @@ export async function POST(req: NextRequest) {
     // Step 5: Fireblocks Pre-Auth (demonstrates architecture)
     const fbPreAuth = await fireblocks.generatePreAuth(receipt);
 
-    // Step 6: Update RepID (reward successful compliance)
-    await kya.updateRepID(agentName, 10, `Successful compliant payment: ${amountUSDC} USDC`);
+    // Step 6: Update RepID — only if the reward has been EARNED.
+    //
+    // This was `updateRepID(agentName, 10, 'Successful compliant payment')`,
+    // unconditional, directly beneath a response that could say `bft.evaluated:
+    // false` and `settlement.simulated: true` on the same request. The payload
+    // disclosed both absences; the write asserted the opposite, and the write is
+    // the half that persists — into `repid_score`, and from there into
+    // `repid_tier` and both spending limits, which bound the NEXT request.
+    //
+    // Defaults made it the normal path, not an edge case: BFT_ENFORCEMENT_MODE
+    // defaults to observe (passed:true, evaluated:false) and the executor
+    // simulates whenever AGENT_SOPHIA_SECRET_BYTES is absent. See lib/trustshell/reward.ts.
+    const reward = rewardFor({
+      consensusEvaluated:  bftProof.evaluated,
+      consensusPassed:     bftProof.passed,
+      settlementSimulated: execution.simulated,
+      settlementConfirmed: execution.confirmed,
+    });
+    if (!isPermittedReward(reward.delta)) {
+      throw new Error(`refusing an out-of-band RepID delta on the payment path: ${reward.delta}`);
+    }
+    if (reward.delta !== 0) {
+      await kya.updateRepID(agentName, reward.delta, rewardReason(reward, amountUSDC));
+    }
 
     // Say what actually happened. "executed" for a run that touched no chain,
     // or "consensus-authorized" for a check that never ran, is the failure this
@@ -242,6 +265,15 @@ export async function POST(req: NextRequest) {
         weakestConfidence: earned.evidence.weakestConfidence,
         observationsTruncated: earned.truncated,
         detail: earned.evidence.detail,
+        // What this payment did or did not add to the score, and why. Withheld
+        // is disclosed for the same reason `bft.evaluated:false` is: a silent
+        // zero and an earned zero look identical to the caller otherwise.
+        reward: {
+          delta:    reward.delta,
+          outcome:  reward.outcome,
+          unmet:    reward.unmet,
+          reason:   reward.reason,
+        },
       },
       bft: {
         evaluated: bftProof.evaluated,

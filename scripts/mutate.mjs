@@ -83,6 +83,40 @@ if (flag('--list')) {
   process.exit(0);
 }
 
+// An unknown flag SELECTS EVERYTHING, and that is not a harmless default here.
+//
+// `npm run mutate -- --id foo --id bar --id baz` was intended as three
+// mutations. `--id` does not exist, so all three were ignored, all 99 mutations
+// ran, the invocation blew its timeout and was killed mid-cycle — which left
+// mutated sources on disk and made the next full `npm run check` report two
+// regressions that did not exist. See LESSONS A26.
+//
+// This is the same defect `scan-secrets.mjs` was repaired for on 2026-08-14: a
+// tool that ignores what it was asked to do, and does something larger instead.
+// Exit 2 (NOT CHECKED) rather than 1 — nothing was measured.
+const KNOWN_FLAGS = new Set(['--help', '--list', '--suite', '--only']);
+const VALUED_FLAGS = new Set(['--suite', '--only']);
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (!a.startsWith('--')) {
+    // A bare word is only ever the value of the flag before it.
+    if (i > 0 && VALUED_FLAGS.has(argv[i - 1])) continue;
+    console.error(`mutate: unexpected argument "${a}" — values must follow --suite or --only`);
+    process.exit(2);
+  }
+  if (!KNOWN_FLAGS.has(a)) {
+    console.error(
+      `mutate: unknown flag "${a}". Known: ${[...KNOWN_FLAGS].join(', ')}.\n` +
+        'Refusing rather than running every mutation — see LESSONS A26.'
+    );
+    process.exit(2);
+  }
+  if (VALUED_FLAGS.has(a) && (argv[i + 1] === undefined || argv[i + 1].startsWith('--'))) {
+    console.error(`mutate: ${a} requires a value`);
+    process.exit(2);
+  }
+}
+
 const suiteFilter = opt('--suite');
 const onlyFilter = opt('--only');
 const selected = MUTATIONS.filter(
