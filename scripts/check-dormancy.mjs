@@ -138,6 +138,22 @@ const DECLARED = new Map([
     'attestation-presence',
     'the ERC-8004 attestation shadow record (item B, 2026-08-19). Its consumer is `check:attestation-presence`, which exercises it against this session\'s own real facts — the reporting IS the product, same shape as schema/decoys. Deliberately NOT wired to the pay route or any GateRun, per the instruction that produced it ("shadow/observe first"): the collateral-eval half needs a real caller choosing to sign and submit a claim (identity/control-proof.ts already exists for that and is unwired to this file); the soft-landing-range half is structurally blocked on a real witness-hiding prover (task #75, plus hyperdag-protocol\'s own zk stack being independently non-production — see docs/ERC8004-ZK-ATTESTATION-PROPOSAL-2026-08-19.md), so wiring it now would only ever be able to answer NOT_CHECKED.',
   ],
+  [
+    'decay-dryrun',
+    'the Suite D dry-run decay engine (docs/policy/phase2-e2e-predicates.md, second pass 2026-08-19). Its consumer is `check:phase2-suite-d`, which exercises all 14 predicates plus both named fixtures — the gate IS the product, same shape as schema/decoys. `write: dry_run_default: true` is locked policy (authority-policy.v0.5.yaml), so this module writing nothing and having no `app/`/route caller is correct, not a gap: a real writer is a separate, later decision (`--apply`/`REPID_DECAY_APPLY=true`, per the same policy block), not something to add unasked while flipping dry-run to live is explicitly gated behind `sean_go_on_testnet`.',
+  ],
+  [
+    'impact-score',
+    'the Suite I impact-scoring engine (docs/policy/phase2-e2e-predicates.md, second pass 2026-08-19). Its consumer is `check:phase2-suite-i` — the gate IS the product. Unwired to any route because `delta_0`\'s numeric source is not specified anywhere in the locked policy docs (see this file\'s own header) — wiring a real caller would mean guessing the one input this module deliberately refuses to default.',
+  ],
+  [
+    'passport-verification-axis',
+    'the Suite P passport connector (docs/policy/phase2-e2e-predicates.md, second pass 2026-08-19), rendering `verification_axis` from decay-dryrun\'s real sigma output. Its consumer is `check:phase2-suite-p`. Unwired for the same reason decay-dryrun itself is: there is no passport-rendering route in this repo yet to attach it to, and building one was not this pass\'s task.',
+  ],
+  [
+    'x402-settlement-rules',
+    'the Suite X decision rules (docs/policy/phase2-e2e-predicates.md, second pass 2026-08-19), shaped to `x402_settlements`\'s real live schema. Its consumer is `check:phase2-suite-x`. Deliberately unwired, and says so in its own header: `x402_settlements` has zero readers or writers anywhere in this repo (confirmed by a repo-wide grep) — there is no existing caller to attach this to, only a table it was written to match.',
+  ],
 ]);
 
 const results = [];
