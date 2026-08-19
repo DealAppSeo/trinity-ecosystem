@@ -61,7 +61,19 @@ integer_delta:
   round: half_away_from_zero_then_type_clamp
   zero_after_round_is_legal: true
   source: docs/policy/integer-delta-rule.v1.md
-  ga_handoff: "tighten events.v1.json delta fields from number to integer; writers emit integers now"
+  events_v1: integer_on_delta_and_repid_delta_applied
+  exceptions_non_applied_only:
+    - weeks_idle
+    - effective_rate
+    - I
+    - delta_raw_before_round
+    - base_reward
+    - base_value
+    - severity_multiplier
+    - effective_authority
+    - requested_usd
+    - real_collateral_usd
+    - axis_scores
 
 # ---------------------------------------------------------------------------
 # Soft-landing decay

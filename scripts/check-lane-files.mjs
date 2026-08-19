@@ -358,6 +358,19 @@ if (events?.level === 'PRESENT') {
     return incomplete.length === 0 ? true : `${incomplete.join(', ')} cannot be audited after the fact`;
   });
 
+  check('events: applied deltas are JSON integers, not number', () => {
+    // Ledger law: docs/policy/integer-delta-rule.v1.md. type:number accepts 1.5.
+    // Explicit exception: weeks_idle, effective_rate, I, delta_raw, USD fields,
+    // axis_scores, A_eff — none of those are `delta` / `repid_delta_applied`.
+    const bad = REPUTATION_EVENTS.filter((k) => {
+      const d = defs[k]?.properties ?? {};
+      return d.delta?.type !== 'integer' || d.repid_delta_applied?.type !== 'integer';
+    });
+    return bad.length === 0
+      ? true
+      : `${bad.join(', ')} accept non-integer applied deltas`;
+  });
+
   check('events: DECAY can only ever be negative', () => {
     // `maximum: 0` on both delta and repid_delta_applied. A decay event that
     // could carry a positive delta is a reward wearing a decay label.
