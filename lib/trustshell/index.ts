@@ -229,6 +229,26 @@ export {
 } from './promotion';
 export type { Stage, GateRun, GateOutcome, SurfaceClaim, StageReport } from './promotion';
 
+/**
+ * The four artifacts the lanes must land, and what can be MEASURED about each.
+ *
+ * Consumed by `check:lane-files`, which feeds the findings straight into
+ * `statusTable` above — so the lane status table is derived from the same
+ * refusal-to-assert machinery as every other surface, not written by hand.
+ */
+export {
+  MANDATORY as MANDATORY_LANE_ARTIFACTS,
+  referralRaw,
+  referralClamp,
+  referralDelta,
+  referralDisagreements,
+  decidableMutants,
+  sumsToOne,
+  liveClaimsNeedingBacking,
+  bucketOverlaps,
+} from './lane-files';
+export type { Lane, MandatoryArtifact, ArtifactFinding, FindingLevel } from './lane-files';
+
 export {
   CONTRACT_DOMAIN,
   VERDICT_DOMAIN,

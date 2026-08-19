@@ -57,6 +57,7 @@
     "check:payment-fail-posture": "node scripts/check-payment-fail-posture.mjs",
     "check:reward-earned": "node scripts/check-reward-earned.mjs",
     "check:package-boundary": "node scripts/check-package-boundary.mjs",
+    "check:lane-files": "node scripts/check-lane-files.mjs",
     "check:panel-tier": "node scripts/panel-tier-test.mjs",
     "check:spine-e2e": "node scripts/spine-e2e-test.mjs",
     "check:checker-assignment": "node scripts/checker-assignment-test.mjs",

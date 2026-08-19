@@ -2078,6 +2078,43 @@ export const MUTATIONS = [
     find: '  return [...new Set(found.filter((s) => !s.includes(\'${\') && !s.includes(\' \')))];',
     replace: '  return [...new Set(found)];',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/lane-files.ts — the recomputation that grades a lane's file
+  // -------------------------------------------------------------------------
+  {
+    id: 'lane-referral-clamp-ignored',
+    suite: 'check:lane-files',
+    file: 'lib/trustshell/lane-files.ts',
+    protects:
+      'the per-rank clamp c(n) is what caps the referral delta, not the curve. At n=1 the raw ' +
+      'curve pays 20 against a clamp of 12; the mutant returns the uncapped value, so a policy ' +
+      'file publishing delta=20 would be accepted as derivable. The clamp is the anti-whale term',
+    find: '  return Math.min(Math.max(Math.round(referralRaw(n)), 0), referralClamp(n));',
+    replace: '  return Math.max(Math.round(referralRaw(n)), 0);',
+  },
+  {
+    id: 'lane-bucket-overlap-unnoticed',
+    suite: 'check:lane-files',
+    file: 'lib/trustshell/lane-files.ts',
+    protects:
+      'a surface listed in two status buckets is two incompatible claims, not a typo — whichever ' +
+      'a reader hits first wins, and `live` next to `blocked` is the worst pair. The mutant stops ' +
+      'recording the collision and the policy table silently self-contradicts',
+    find: '      if (prior) out.push(`"${item}" is in both ${prior} and ${bucket}`);',
+    replace: '      if (prior) seen.set(item, bucket);',
+  },
+  {
+    id: 'lane-live-claims-read-as-evidence',
+    suite: 'check:lane-files',
+    file: 'lib/trustshell/lane-files.ts',
+    protects:
+      'a document`s own `status.live` list is an ASSERTED stage — the exact thing promotion.ts ' +
+      'refuses. The mutant returns nothing to back, so every self-declared live surface passes ' +
+      'unexamined and the policy file grades itself',
+    find: '  return [...(status.live ?? [])];',
+    replace: '  return [];',
+  },
   // ── check:throughput — quorum diversity ───────────────────────────────────
   {
     id: 'diversity-member-loss-never-detected',
