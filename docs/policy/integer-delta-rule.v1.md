@@ -5,6 +5,10 @@
 
 **Why:** `current_repid` is an integer; `round(δ_raw)` on the referral curve is load-bearing; float round-trips drift.
 
+**Merge path:** `claude/reconcile-ga-contracts-integer-delta` @ `a328e7c` (GA additive + integer typing). Do **not** author a competing `events.v1.json`.
+
+**FLAG:** `origin/xc/policy-lock` @ `01079a9` is a pre-#108 fork. Its `docs/contracts/events.v1.json` is the smaller independent envelope from before integer-delta. Leave it. Do not merge that blob onto main.
+
 ---
 
 ## Rule

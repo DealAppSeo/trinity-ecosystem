@@ -24,6 +24,9 @@ meta:
   integer_delta_rule: docs/policy/integer-delta-rule.v1.md
   phase2_predicates: docs/policy/phase2-e2e-predicates.md
   phase2_stress: docs/policy/phase2-stress-notes.md
+  phase2_fixture_bounds: docs/policy/phase2-fixture-bounds.yaml
+  events_v1_merge_path: claude/reconcile-ga-contracts-integer-delta
+  stale_fork_do_not_merge: xc/policy-lock@01079a9
 
 # ---------------------------------------------------------------------------
 # Status table (authoritative)

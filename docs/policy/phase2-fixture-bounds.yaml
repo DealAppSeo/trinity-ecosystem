@@ -1,0 +1,60 @@
+# phase2-fixture-bounds.yaml
+# Numeric pack for executable predicates. Source of truth remains
+# integer-delta-rule.v1.md + phase2-e2e-predicates.md.
+# Not an events.v1.json. Merge path for that schema is
+# claude/reconcile-ga-contracts-integer-delta (a328e7c), not xc/policy-lock.
+
+lambda_sigma: 0.5
+K_prior: 4
+K_max: 8
+settle_split_threshold: 50
+theta_hot: 2000
+theta_warm: 500
+theta_cold: 0
+builder_floor: 500
+
+referral:
+  delta_by_n:
+    1: 12
+    2: 8
+    3: 8
+    4: 5
+    5: 5
+    6: 5
+    7: 5
+    8: 4
+    9: 4
+    10: 4
+    100: 0
+  farm_30d_cap_n1_to_n10: 59
+  pair_idempotent: true
+  n1_max: 12
+
+simultaneous_decay:
+  agents: 5
+  W: 5
+  K: 5
+  delta_full: 10
+  delta_k: 2
+  route_step_max: 1
+  settle_residual: 5
+  settle_ticks: 1
+  sigma_per_agent: true
+
+settle_split_example:
+  delta_full: 120
+  half: 60
+  settle_ticks: 2
+  settle_each: 30
+
+A_eff:
+  R1000_S100: 1000
+  R1000_S25: 500
+  builder_400: 0
+  missing_stake: NOT_CHECKED
+  missing_capability_declaration:
+    A_eff: unchanged
+    class_is_hot: false
+  degraded_HAL_missing_S_axis:
+    Pi: renormalize
+    A_eff: unchanged
