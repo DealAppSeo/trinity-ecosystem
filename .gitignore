@@ -85,6 +85,9 @@ headroom.db
 # temp compile dir for check:custody-shadow
 .custody-shadow-check-*/
 
+# temp compile dir for measure:pay-custody-shadow
+.measure-pay-shadow-*/
+
 # agent-browser runtime output (screenshots, HAR, traces, video). Derived
 # artefacts of a dev tool; the daemon writes here because ./agent-browser.json
 # sets screenshotDir. Machine-local config lives in ~/.agent-browser/, not here.
@@ -118,3 +121,51 @@ lib/**/*.js
 # check.yml), so the tracked copy bought nothing there and cost a new 2.9 MB
 # blob in history every time a run updated it, across every parallel lane.
 .secret-history-state.json
+
+# Scratch dirs written INTO the repo by check suites (mkdtemp + random suffix).
+# Two had already been committed when this block was added on 2026-08-17:
+# .durable-ledger-check-JH8rRL/ and .zk-cost-check-SZFzbE/. Enforced by
+# check:tmpdir-ignored, which also fails if one is TRACKED — an entry here does
+# not untrack what is already in the index.
+.assigned-contract-check-*/
+.auth-session-check-*/
+.checker-assign-check-*/
+.claims-check-*/
+.config-readiness-check-*/
+.criteria-draw-check-*/
+.dogfood-*/
+.durable-ledger-check-*/
+.envelope-check-*/
+.hal-accuracy-check-*/
+.hal-receipt-check-*/
+.hal-repid-linkage-check-*/
+.loud-errors-check-*/
+.m3-check-*/
+.receipt-check-*/
+.floor-decay-check-*/
+.receipt-cli-*/
+.repid-calibration-check-*/
+.verdict-provenance-check-*/
+.mutate.lock
+.repid-drift-check-*/
+.repid-marginal-check-*/
+.spine-e2e-check-*/
+.trust-harness-fixture-*/
+.live-callers-check-*/
+.spine-reachable-check-*/
+.staged-judge-check-*/
+.throughput-check-*/
+.zk-cost-check-*/
+.poseidon2-check-*/
+.harness-extract-check-*/
+.repid-weight-sim-*/
+.issuer-stake-check-*/
+.proof-contract-check-*/
+.ratchet-decay-check-*/
+
+# Scratch dirs written by check scripts into the repo root. The suffix is
+# random per run (mkdtempSync), so these MUST be globs — see
+# `npm run check:tmpdir-ignored`, which fails the build when one is missing.
+.alert-digest-check-*/
+.open-index-check-*/
+.open-work-check-*/

@@ -59,6 +59,37 @@ export interface KYAComplianceResult {
    */
   withinDailyLimit:  boolean | null;
   withinTxLimit:     boolean | null;
+  /**
+   * The per-transaction ceiling this decision was ACTUALLY MEASURED AGAINST —
+   * the stored `spending_limit_per_tx`, which is what `checkPerTxLimit` uses.
+   *
+   * ── WHY THE ENFORCED NUMBER IS EXPORTED RATHER THAN RE-DERIVED ────────────
+   *
+   * `pay/route.ts` briefs the BFT panel with a `maxWithdrawal`, and it computed
+   * that itself as `TIER_LIMITS[tierForScore(repidScore)].perTx`. That is a
+   * SECOND source for one fact, and the two disagree for any row the current
+   * ladder did not write — which is 9 of 12 live rows (see
+   * `docs/REPID-REGISTRY-DRIFT-2026-08-17.md`). Measured 2026-08-17, the brief
+   * overstated the enforced ceiling by up to **20x**: TORCH is enforced at
+   * 5,000 and the panel was told 100,000.
+   *
+   * That line already carries a comment about a FOURTH tier ladder deleted from
+   * it — `repidScore > 7500 ? 100000 : 50000` — and the note that "the panel
+   * weighs this number, so a wrong one is a wrong brief". The replacement
+   * reintroduced the same split from the other side: not a second ladder this
+   * time, but the right ladder applied to a row the ladder did not write.
+   *
+   * Exporting the enforced value is the same fix as every previous recurrence —
+   * delete the second implementation — and it is the ONLY one available here
+   * that changes no limit. Deriving the brief is what produced the divergence;
+   * reconciling row and ladder is the open operator decision and is not this.
+   *
+   * `null` when NOT EVALUATED: no profile could be read, so no ceiling was
+   * applied. Never 0 — a zero ceiling is a real policy ("this agent may spend
+   * nothing"), and collapsing unknown into it is the fail-shape this interface
+   * already refuses for `withinDailyLimit`.
+   */
+  enforcedPerTxLimit: number | null;
   insuranceCoverage: number;
   denialReason?:     string;
 }

@@ -10,7 +10,9 @@
 // PREDICATE over a hidden value — "repid >= threshold" without revealing repid
 // — needs a circuit, and that is the Plonky3 work blocked by task #75. The two
 // are different capabilities and this file must never be described as the
-// second one. `linking-proof.ts` encodes the distinction in its result type.
+// second one. `proof-provider.ts` encodes the distinction in its result type
+// (`isZeroKnowledge` on the provider, `witnessHidden` on every result), and
+// `check:proof-provider-contract` is the executable form of it.
 //
 // THE SALT IS NOT DECORATION. Without a per-claim salt, an undisclosed claim is
 // recoverable by brute force whenever its value is low-entropy — and real

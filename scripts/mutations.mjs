@@ -510,6 +510,214 @@ export const MUTATIONS = [
     replace: '    if (score > floor) return tier;',
   },
   {
+    id: 'floor-decay-skips-the-demonstrated-level',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'INVARIANT 3 — a decayed floor never falls below the level the agent is CURRENTLY ' +
+      'demonstrating. Decay removes a claim the agent has stopped supporting; it must not ' +
+      'contradict one it is supporting right now. Without the stop, a multi-step evaluation ' +
+      'walks an active agent all the way to PROBATIONARY',
+    find: '    if (next <= dbTierFloorFor(state.currentRepid)) {',
+    replace: '    if (next < 0) {',
+  },
+  {
+    id: 'floor-decay-expires-an-active-agent',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'the demonstrated-level check is asked BEFORE the clock. An agent scoring at or above ' +
+      'its floor is demonstrating that level NOW, whatever a timestamp says — ask the clock ' +
+      'first and a live, active agent is decayed for having a stale column',
+    find: '  if (state.currentRepid >= state.floor) {',
+    replace: '  if (state.currentRepid > state.peakRepid) {',
+  },
+  {
+    id: 'floor-decay-unknown-age-reads-as-sound',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'an absent last-demonstration is NOT_CHECKED, not holds. It is the most likely input in ' +
+      'production — most rows carry no such timestamp — and reporting holds says a floor was ' +
+      'examined and found sound when it was never examined at all. The two-outcome mistake in ' +
+      'the reassuring direction, on the mechanism that governs standing',
+    find: "      kind: 'not_checked',",
+    replace: "      kind: 'holds',",
+  },
+  {
+    id: 'floor-decay-steps-by-a-point-not-a-tier',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'INVARIANT 2 — decay steps by TIER, never continuously. A floor at 7,999 is not a fact ' +
+      'anyone can act on, and a continuously drifting floor is unobservable between reads. ' +
+      'One tier boundary at a time is the granularity the ladder already uses',
+    find: '  return below.length === 0 ? 0 : Math.max(...below.map((t) => t.floor));',
+    replace: '  return Math.max(0, floor - 100);',
+  },
+  {
+    id: 'ceiling-rewritten-by-reputation-update',
+    suite: 'check:ceiling-source',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'TRUST THE ROW — a reputation update writes the SCORE and never the ceiling. Restoring ' +
+      'the ladder-derived write is the measured x50: one compliant payment moved TORCH from ' +
+      '10,000 to 500,000 USDC daily, and because the delta is signed a PENALTY did the same, ' +
+      'with 5,100 points of headroom before the limit fell',
+    find: '        repid_score:           newScore,',
+    replace: '        repid_score:           newScore,\n        spending_limit_daily:  500000,',
+  },
+  {
+    id: 'ceiling-read-derived-not-stored',
+    suite: 'check:ceiling-source',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'the ENFORCED per-tx ceiling is read from the stored row. Trust-the-row has two halves ' +
+      'and this is the one a careless fix drops: stop writing the column but also stop reading ' +
+      'it, and nothing enforces anything. Reading the daily column here still type-checks and ' +
+      'still looks like a limit',
+    find: '      spendingLimitPerTx:   data.spending_limit_per_tx,',
+    replace: '      spendingLimitPerTx:   data.spending_limit_daily,',
+  },
+  {
+    id: 'dashboard-derives-tier-from-score',
+    suite: 'check:ceiling-source',
+    file: 'app/api/trustrails/system-trust/route.ts',
+    protects:
+      'the published tier distribution is the STORED tier, which labels the enforced ceiling. ' +
+      'Deriving it from the score publishes a tier the enforcer does not use — the ' +
+      'reviewer-vs-enforcer split closed on the payment path, reopened on a dashboard, and it ' +
+      'disagrees on 9 of the 12 live rows',
+    find: '  agents.forEach(a => { tiers[a.repid_tier as keyof typeof tiers]++; });',
+    replace:
+      '  agents.forEach(a => { tiers[tierForScore(a.repid_score) as keyof typeof tiers]++; });',
+  },
+  {
+    id: 'pay-brief-ceiling-optional',
+    suite: 'check:pay-brief',
+    file: 'lib/trustshell/types.ts',
+    protects:
+      'enforcedPerTxLimit stays REQUIRED on KYAComplianceResult. Required is what makes tsc — ' +
+      'not a grep — guarantee every return path in validate() sets it; make it optional and a ' +
+      'future branch omits it silently, which is exactly how `withinDailyLimit: true` came to be ' +
+      'asserted on a path that never read the spend history',
+    find: '  enforcedPerTxLimit: number | null;',
+    replace: '  enforcedPerTxLimit?: number | null;',
+  },
+  {
+    id: 'pay-brief-exports-the-wrong-limit',
+    suite: 'check:pay-brief',
+    file: 'lib/trustshell/KYAValidator.ts',
+    protects:
+      'the exported ceiling is the field checkPerTxLimit actually measured against. Exporting ' +
+      'spendingLimitDaily instead still type-checks and still looks like a limit — it briefs the ' +
+      'authorization panel with a number 20x the enforced one for the live rows, which is the ' +
+      'wrong-brief defect this whole change removes, reintroduced one identifier over',
+    find: '      withinTxLimit:     true,\n      enforcedPerTxLimit: profile.spendingLimitPerTx,',
+    replace: '      withinTxLimit:     true,\n      enforcedPerTxLimit: profile.spendingLimitDaily,',
+  },
+  {
+    id: 'pay-brief-unevaluated-ceiling-approves',
+    suite: 'check:pay-brief',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'a per-tx ceiling that was never evaluated DENIES. A guard that reports authorized:true ' +
+      'on an unevaluated limit is the two-outcome fail-open this repo keeps removing — "we did ' +
+      'not look" scored as "it passed", on the payment path',
+    find: '        authorized: false,',
+    replace: '        authorized: true,',
+  },
+
+  // -------------------------------------------------------------------------
+  // app/api/trustrails/pay/route.ts — ControlProof shadows the payment gate,
+  // NEXT.md Tier 1 §1 / SPRINT-DECISIONS-2026-08-17.md P2
+  // -------------------------------------------------------------------------
+  {
+    id: 'pay-shadow-drops-controlproof',
+    suite: 'check:pay-custody-shadow',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'controlProof is actually accepted on the request. Silently dropping it from the ' +
+      'destructure would make every caller-supplied proof vanish before it ever reaches the ' +
+      'shadow comparison, and the route would still 200 — the exact "looks wired, isn\'t reachable" ' +
+      'shape this repo keeps finding in its own barrel exports, one layer down',
+    find: 'const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } = await req.json();',
+    replace: 'const { agentName, amountUSDC, recipientAddress, purpose, signatures } = await req.json();',
+  },
+  {
+    id: 'pay-shadow-wrong-audience',
+    suite: 'check:pay-custody-shadow',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'the payment shadow is built with PAY_AUDIENCE, not VAULT_AUDIENCE. A copy-paste from ' +
+      'VaultPermission.ts that kept the vault constant would silently reject every real payment ' +
+      'ControlProof (minted for trinity:pay) as wrong-audience, making every observation read ' +
+      'shadow_stricter regardless of what the proof actually authorized — a permanent false ' +
+      'signal that adoption has begun disagreeing when it has not begun being measured at all',
+    find: 'new CustodyShadow(() => getSupabaseAdmin(), undefined, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION);',
+    replace: 'new CustodyShadow(() => getSupabaseAdmin(), undefined, VAULT_AUDIENCE, PAY_CAPABILITY, PAY_ACTION);',
+  },
+  {
+    id: 'pay-shadow-becomes-the-gate',
+    suite: 'check:pay-custody-shadow',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'THE LOAD-BEARING ONE. The observation is never captured into a variable, so nothing ' +
+      'downstream can branch on it — capturing it is the first step toward "the shadow decides", ' +
+      'which is the exact failure CustodyShadow.ts\'s own docstring exists to prevent: switching a ' +
+      'live gate on the strength of a finding is how you lock five agents out of their vaults at ' +
+      '3am, and this mutation is what that looks like one line before it ships',
+    find: '    await custodyShadow.observe({',
+    replace: '    const shadowResult = await custodyShadow.observe({',
+  },
+  {
+    id: 'custody-shadow-default-audience-drifts',
+    suite: 'check:custody-shadow',
+    file: 'lib/trustshell/CustodyShadow.ts',
+    protects:
+      'the generalised constructor still defaults `audience` to VAULT_AUDIENCE. Generalising a ' +
+      'single-purpose class into a parameterised one (2026-08-17, for the payment shadow) is ' +
+      'exactly the change that can silently move every pre-existing call site\'s behaviour — ' +
+      'VaultPermission.ts and 13 assertions in this suite construct CustodyShadow with NO audience ' +
+      'argument and rely entirely on the default staying VAULT_AUDIENCE',
+    find: 'private readonly audience: string = VAULT_AUDIENCE,',
+    replace: 'private readonly audience: string = PAY_AUDIENCE,',
+  },
+  {
+    id: 'repid-drift-headroom-from-stored-tier',
+    suite: 'check:repid-registry-drift',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'penaltyHeadroom is measured from the LOWEST floor that still sustains the stored ' +
+      'limit, not from the stored tier\'s own floor. Anchoring on the wrong floor understates ' +
+      'the headroom by a whole tier — TORCH\'s real 5,100 reported as 2,600, which is the ' +
+      'error the first SQL pass at this actually made',
+    find: '  const sustaining = ascending.find((t) => TIER_LIMITS[t.tier].daily >= storedDaily);',
+    replace: '  const sustaining = ascending.find((t) => TIER_LIMITS[t.tier].daily > storedDaily);',
+  },
+  {
+    id: 'repid-drift-unreadable-score-agrees',
+    suite: 'check:repid-registry-drift',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'an unreadable score is NOT_CHECKED. `tierForScore` answers Bronze for a non-finite ' +
+      'score — correct for a gate — so without this guard a garbage score silently AGREES ' +
+      'with any row storing Bronze, and the drift report asserts a comparison it never made',
+    find: "  if (typeof storedScore !== 'number' || !Number.isFinite(storedScore)) {",
+    replace: "  if (typeof storedScore !== 'number') {",
+  },
+  {
+    id: 'repid-drift-limit-mismatch-ignored',
+    suite: 'check:repid-registry-drift',
+    file: 'lib/trustshell/repid-scoring.ts',
+    protects:
+      'the stored TIER and the stored LIMIT are separate columns and either can drift. ' +
+      '`validate()` enforces the NUMBER, so a row carrying the right word and the wrong ' +
+      'number is the dangerous half — dropping this check passes it as agreement',
+    find: '  const limitAgrees = storedDaily === ladderDaily;',
+    replace: '  const limitAgrees = true;',
+  },
+  {
     id: 'repid-coherence-never-fails',
     suite: 'check:repid-scoring',
     file: 'lib/trustshell/repid-scoring.ts',
@@ -588,7 +796,7 @@ export const MUTATIONS = [
       'the denial reason is an OBSERVABLE CONTRACT, not prose. It lands in a compliance ' +
       "receipt's `denialReason`, and run-e2e.mjs matches /exceeds per-tx limit/i against it " +
       'over HTTP. Rewording it to read better turned CI red while `npm run check` reported ' +
-      '52 VERIFIED — LESSONS A25. The fast suite pins the regex so the next break surfaces ' +
+      '52 VERIFIED — LESSONS A24. The fast suite pins the regex so the next break surfaces ' +
       'in seconds instead of in a server boot',
     find: '      detail: `Amount ${amountUSDC} USDC exceeds per-tx limit ${limit}`,',
     replace: '      detail: `Amount ${amountUSDC} USDC exceeds the per-transaction limit of ${limit}`,',
@@ -1039,6 +1247,98 @@ export const MUTATIONS = [
       '      next.push(i + 1 < cur.length ? await scheme.hashPair(await scheme.hashPair(cur[i], cur[i + 1]), cur[i]) : cur[i]);',
   },
   {
+    id: 'earned-metrics-reads-observations-by-the-wrong-key',
+    suite: 'check:observation-identity',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'the identity space of the earned evidence. repid_agents carries `id` (uuid) AND `agent_id` ' +
+      '(text), and v_agent_earned_observations joins the FORMER. Measured 2026-08-17 the two spaces ' +
+      'are disjoint — agent_id is uuid-shaped on 0 of 176 rows — so the wrong key returns the EMPTY ' +
+      'SET rather than raising, and all 152,473 observations vanish while every agent reads as ' +
+      'having no track record. The mutant swaps the resolved uuid for the agent name, which is the ' +
+      'exact shape of the ad-hoc census that produced two figures retracted the same day',
+    find: `      .eq('agent_id', resolved.id)`,
+    replace: `      .eq('agent_id', resolved.name)`,
+  },
+  {
+    id: 'floor-decay-demotes-humans',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'the human exemption. 4 of the 12 ratcheted rows are human, and compute_tier already exempts ' +
+      'is_human from the counterparty gate for the same reason: a human\'s standing is not earned ' +
+      'through agent observations. The mutant applies an observation-driven decay to them, which ' +
+      'demotes a human for not behaving like a bot',
+    find: `  if (state.isHuman) {`,
+    replace: `  if (false && state.isHuman) {`,
+  },
+  {
+    id: 'floor-decay-asks-humans-a-question-it-cannot-answer',
+    suite: 'check:repid-floor-decay',
+    file: 'lib/trustshell/repid-floor-decay.ts',
+    protects:
+      'ORDER, which is where this rule actually binds. The mutant moves the human exemption BELOW ' +
+      'the unknown-age branch. No column feeds `lastReEarnedAt`, so every production row arrives ' +
+      'null and every human then returns not_checked forever — and an operator draining a ' +
+      'NOT_CHECKED backlog would resolve it by inventing re-attestation timestamps for people. ' +
+      'The mutant still decays nobody, so only the ordering assertion catches it',
+    find: `  if (state.isHuman) {`,
+    replace: `  if (state.isHuman && state.lastReEarnedAt !== null) {`,
+  },
+  {
+    id: 'proof-result-claims-privacy-the-provider-does-not-have',
+    suite: 'check:proof-provider-contract',
+    file: 'lib/trustshell/identity/proof-provider.ts',
+    protects:
+      'a result may not claim more privacy than its provider has. The mutant sets witnessHidden ' +
+      'true on a provider whose isZeroKnowledge is false — which is exactly the defect this seam ' +
+      'was built after: a SHA-256 of a timestamp labelled groth16 and published on-chain. It is ' +
+      'a one-word edit and it reads as an improvement',
+    find: `      witnessHidden: false,
+      predicateHolds,`,
+    replace: `      witnessHidden: true,
+      predicateHolds,`,
+  },
+  {
+    id: 'issuer-stake-credits-a-lucky-unearned-veto',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'luck is UNBANKABLE. The mutant lets an unearned veto that happened to be right classify ' +
+      'as a true positive, which is the single most tempting "improvement" to this model — it ' +
+      'looks like rewarding accuracy. 46.3% of unearned vetoes were correct, so it would let an ' +
+      'issuer buy standing with a good draw and the 41-veto behaviour would stay rational',
+    find: `  if (!v.providerAttempted) return v.vetoed ? 'unearned_veto' : 'unearned_clean';`,
+    replace: `  if (!v.providerAttempted) {
+    if (v.vetoed && v.isHallucination) return 'earned_true_positive';
+    return v.vetoed ? 'unearned_veto' : 'unearned_clean';
+  }`,
+  },
+  {
+    id: 'issuer-stake-makes-skipping-merely-unattractive',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'verification is STRICTLY DOMINANT, not merely disfavoured. The mutant prices an unearned ' +
+      'veto the same as an honest error, which restores the expected-value argument for the ' +
+      'cheap path: at 46.3% accuracy an issuer maximising EV would still skip. The penalty has ' +
+      'to exceed the cost of verifying AND being wrong, or the incentive does not bind',
+    find: `  unearned_veto: -3,`,
+    replace: `  unearned_veto: -1,`,
+  },
+  {
+    id: 'issuer-stake-refusal-lets-the-evidence-free-verdict-through',
+    suite: 'check:issuer-stake',
+    file: 'lib/trustshell/issuer-stake.ts',
+    protects:
+      'the refusal at SOURCE, which is the half the stake cannot do. A stake makes an unearned ' +
+      'verdict expensive after the fact; only this stops it being emitted. The mutant keeps the ' +
+      'function and inverts the evidence test, so an issuer that consulted nothing may still ' +
+      'emit an actionable FACTUAL_ERROR veto — exactly what produced the 41',
+    find: `  return !v.providerAttempted && v.vetoed;`,
+    replace: `  return v.providerAttempted && v.vetoed;`,
+  },
+  {
     id: 'zk-verify-asserts-membership-instead-of-checking-it',
     suite: 'check:zk-cost',
     file: 'lib/trustshell/identity/nullifier.ts',
@@ -1134,6 +1434,33 @@ export const MUTATIONS = [
     replace: '  return rows.slice();',
   },
   {
+    id: 'hal-realized-confusion-uses-the-threshold',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      "realizedConfusion scores HAL's ACTUAL veto decision, not `score >= threshold`. The two " +
+      'differ by exactly the 41 sub-threshold vetoes, and those 41 are precisely the verdicts ' +
+      'HAL cast having consulted no provider — 46.3% precise against 95.8% where one ran. ' +
+      'Model HAL as a pure cut and the entire unearned-veto finding disappears from the ' +
+      'numbers, because every unearned veto sits below the line it never reached',
+    find: '    if (r.vetoed && r.isHallucination) tp++;\n    else if (r.vetoed) fp++;',
+    replace:
+      '    if (r.score >= r.threshold && r.isHallucination) tp++;\n' +
+      '    else if (r.score >= r.threshold) fp++;',
+  },
+  {
+    id: 'hal-confusion-precision-counts-misses',
+    suite: 'check:hal-accuracy',
+    file: 'lib/hal/accuracy.ts',
+    protects:
+      'precision is tp/(tp+fp) — of the verdicts CAST, how many were right. It is the number ' +
+      'an issuer-staking design has to price, and the one that separates an unearned veto ' +
+      '(0.4634) from an earned one (0.9578). Dividing by the wrong denominator makes a veto ' +
+      'that is wrong more often than right look competent',
+    find: '  const precision = tp + fp === 0 ? null : tp / (tp + fp);',
+    replace: '  const precision = tp + fn === 0 ? null : tp / (tp + fn);',
+  },
+  {
     id: 'auditor-grant-analysed-against-a-different-map',
     suite: 'check:spine-reachable',
     file: 'lib/trustshell/identity/spine.ts',
@@ -1221,6 +1548,393 @@ export const MUTATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // lib/trustshell/priorwork/open-index.ts — the gate against re-deriving work
+  // that is already filed. Earned 2026-08-16, at the cost of most of a session.
+  // -------------------------------------------------------------------------
+  {
+    id: 'openwork-advisory-entries-fire',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'scope is OPT-IN: an entry with no [scope:] marker can NEVER fail a build. If ' +
+      'unscoped entries matched, every diff would fire on every open item — and a gate ' +
+      'that cries wolf is one people route around, which is exactly how check:prior-work ' +
+      'came to enforce only its mechanical half',
+    find: '    (e) => e.scope.length > 0 && e.scope.some((t) => scopeMatches(t, change))',
+    replace: '    (e) => e.scope.some((t) => scopeMatches(t, change)) || e.scope.length === 0',
+  },
+  {
+    id: 'openwork-token-matches-longer-name',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'a scope token matches a WHOLE word, so `repid_events` does not match ' +
+      '`trinity_repid_events` and send somebody to the wrong entry — the same near-name ' +
+      'trap check:schema-names exists for, and this repo has already paid for twice',
+    find: '  return word.test(change.diffText);',
+    replace: '  return change.diffText.includes(token);',
+  },
+  {
+    id: 'openwork-parses-closed-and-retracted',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'ONLY the OPEN section is parsed. CLOSED and RETRACTED share the table shape; ' +
+      'closed work is meant to be built on, and retracted figures are check:prior-work\'s ' +
+      'job. Pulling them in would make this fire on everything',
+    find: '    if (/^##\\s/.test(lines[i])) { end = i; break; }',
+    replace: '    if (false) { end = i; break; }',
+  },
+  {
+    id: 'openwork-everything-acknowledged',
+    suite: 'check:open-index',
+    file: 'lib/trustshell/priorwork/open-index.ts',
+    protects:
+      'acknowledgement requires naming THIS entry — a blanket pass would be a rubber ' +
+      'stamp, which is worse than no gate because it looks like diligence',
+    find: '  if (cited) return true;',
+    replace: '  if (true) return true;',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/alerts/digest.ts — 142,560 rows nobody ever read.
+  // -------------------------------------------------------------------------
+  {
+    id: 'digest-repeats-do-not-collapse',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'repeats collapse. Without number-stripping, "Time Down: 42314 minutes" and ' +
+      '"42317 minutes" are different alerts and 40,236 rows become 40,236 digests — ' +
+      'a consumer that achieves nothing while appearing to work. Measured on live ' +
+      'data the real ratio is 188:1',
+    find: "    .replace(/\\b\\d[\\d,._]*\\b/g, '<n>')",
+    replace: '    .replace(/\\b(?!)\\b/g, "<n>")',
+  },
+  {
+    id: 'digest-backlog-pages-everyone',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'a five-month-old condition never notified does NOT page. Staleness is checked ' +
+      'BEFORE first-notice, or the first run floods the channel with a backlog reaching ' +
+      'back to January and buries whatever is actually live',
+    find: "  if (ageDays > policy.staleAfterDays) return 'SUPPRESS_STALE';",
+    replace: '  if (false) return \'SUPPRESS_STALE\';',
+  },
+  {
+    id: 'digest-invents-a-subject',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'a subject is parsed only for the shape actually measured, never guessed. A wrong ' +
+      'subject routes a human to the wrong agent — the name-matching failure this repo ' +
+      'has already paid for twice. api_auth_attempt carries an EMPTY message, so a ' +
+      'guessing parser would silently emit blanks and look like it worked',
+    find: '  return null;\n}\n\nexport function digestRows',
+    replace: "  return message.split(' ')[0] ?? null;\n}\n\nexport function digestRows",
+  },
+  {
+    id: 'digest-drops-corroboration',
+    suite: 'check:alert-digest',
+    file: 'lib/trustshell/alerts/digest.ts',
+    protects:
+      'distinct reporters are retained. Three agents independently reporting one agent ' +
+      'DOWN is stronger evidence than one, and collapsing them without the count throws ' +
+      'that away',
+    find: '    if (r.agent && !d.reporters.includes(r.agent)) d.reporters.push(r.agent);',
+    replace: '    // mutated: reporters no longer accumulated',
+  },
+
+  // ── check:lesson-ids ──────────────────────────────────────────────────────
+  //
+  // These four are caught by the SELF-TEST, not by the scan of LESSONS.md, and
+  // that is the whole point. The tree currently has no duplicate IDs, so a
+  // detector that cannot fire produces the same green line as a clean file. If
+  // any of these four survived, `check:lesson-ids` would be decorative.
+  {
+    id: 'lesson-duplicate-detector-never-fires',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'the duplicate detector actually fires. On 2026-08-16 LESSONS.md carried two `A19` ' +
+      'headings and two `A20` headings on unrelated failures, with three live citations ' +
+      'pointing at those tokens — the ID is the entire reference, so following one was a ' +
+      'coin flip. Off by one in this comparison and the check passes over the exact ' +
+      'defect it was written for',
+    find: '    if (sites.length > 1) dupes.push({ id, sites });',
+    replace: '    if (sites.length > 2) dupes.push({ id, sites });',
+  },
+  {
+    id: 'lesson-series-letter-dropped-from-id',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'the series letter is part of the ID. `A19` is an agent error and `S19` would be a ' +
+      'security finding; keying on the number alone reports them as the same entry and ' +
+      'demands a renumber that would be wrong. This is the same defect as LESSONS A12 — ' +
+      'two different things agreeing on a name',
+    find: "      defs.push({ id: `${heading[1]}${heading[2]}`, line: i + 1, title: heading[3].trim() });",
+    replace: "      defs.push({ id: `${heading[2]}`, line: i + 1, title: heading[3].trim() });",
+  },
+  {
+    id: 'lesson-ambiguous-collapsed-into-nothing',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'a citation pointing at a duplicated ID is reported. A duplicate heading with no ' +
+      'citation is untidy; a duplicate heading WITH citations is a reference that resolves ' +
+      'two ways, which is the part that costs time. Returning empty here leaves the ' +
+      'duplicate report standing while hiding who is affected by it',
+    find: '  return citations.filter((c) => dupeIds.has(c.id));',
+    replace: '  return [];',
+  },
+  {
+    id: 'lesson-heading-anchor-dropped',
+    suite: 'check:lesson-ids',
+    file: 'lib/trustshell/lessons/ids.ts',
+    protects:
+      'a heading is only a definition at the start of a line. Without the anchor, an ID ' +
+      'quoted inside a table cell or a fenced block registers as a second definition of an ' +
+      'entry that is in fact defined once — the check then demands a renumber to fix a ' +
+      'duplicate that does not exist, which is how a suite loses the reader',
+    find: 'const HEADING_DEF = /^#{2,4}\\s+([A-Z])(\\d+)\\s*[—–-]\\s*(.*)$/;',
+    replace: 'const HEADING_DEF = /#{2,4}\\s+([A-Z])(\\d+)\\s*[—–-]\\s*(.*)/;',
+  },
+
+  // ── check:replay-plan ─────────────────────────────────────────────────────
+  //
+  // Every one of these lives on the resume path, which a successful first run
+  // never touches. The corpus is 147,704 rows behind a partial unique index, so
+  // a wrong first pass cannot be re-minted — these are the decisions that have
+  // to be right before the run, not after it.
+  {
+    id: 'replay-fatal-error-read-as-duplicate',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'only SQLSTATE 23505 is benign. Treating an unrecognised error as a duplicate turns a ' +
+      'permission denial or a constraint violation into a silent skip, and a skip leaves no ' +
+      'trace — the corpus goes short and the run still prints a completion line. This is the ' +
+      'house defect applied to 147,704 rows',
+    find: "  if (error.code === UNIQUE_VIOLATION) return 'duplicate';\n  return 'fatal';",
+    replace: "  if (error.code === UNIQUE_VIOLATION) return 'duplicate';\n  return 'duplicate';",
+  },
+  {
+    id: 'replay-cursor-runs-backwards',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'the cursor is a high-water mark and only ever rises. Moving it backwards on an ' +
+      'out-of-order batch makes a resumed run re-read rows it already attempted, which is ' +
+      'harmless only because of the unique index — remove that index and it double-mints',
+    find: '  for (const id of attemptedIds) if (id > max) max = id;',
+    replace: '  for (const id of attemptedIds) if (id < max) max = id;',
+  },
+  {
+    id: 'replay-interrupted-run-reads-as-verified',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'an interrupted run is NOT_CHECKED. Dropping this line collapses three outcomes into ' +
+      'two: a run that reached 40,000 of 147,704 rows and stopped reports VERIFIED, which is ' +
+      '"we did not look" printed as "it passed" — the exact substitution CLAUDE.md names as ' +
+      'the recurring defect in this codebase',
+    find: "  if (counts.remaining > 0) return 'NOT_CHECKED';",
+    replace: '  // mutated: incompleteness no longer reported',
+  },
+  {
+    id: 'replay-batch-clamps-to-zero',
+    suite: 'check:replay-plan',
+    file: 'lib/trustshell/replay/plan.ts',
+    protects:
+      'the batch floor. A batch of 0 makes the reader return no rows, the cursor never ' +
+      'advances, and the loop exits immediately with minted 0 — a run that terminates ' +
+      'cleanly having done nothing, which reads as an already-complete corpus',
+    find: '  if (n < MIN_BATCH) return MIN_BATCH;',
+    replace: '  if (n < MIN_BATCH) return n;',
+  },
+
+  // ── check:acceptance-loop ─────────────────────────────────────────────────
+  {
+    id: 'acceptance-exhausted-reads-as-delivered',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'a spent revision budget is NOT a standard met. This is the house defect in one line: ' +
+      'EXHAUSTED means the process ran out of road, and shipping on it reports an auditor ' +
+      "sign-off that never happened. `isDelivered` exists precisely so callers cannot write " +
+      "`status !== 'REVISE'` and treat running out as done",
+    find: "export function isDelivered(state: AcceptanceState): boolean {\n  return state.status === 'ACCEPTED';",
+    replace:
+      "export function isDelivered(state: AcceptanceState): boolean {\n" +
+      "  return state.status === 'ACCEPTED' || state.status === 'EXHAUSTED';",
+  },
+  {
+    id: 'acceptance-auditor-substitution-unnoticed',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      "the sticky auditor. checker-assignment.ts defeats checker-shopping AT THE DRAW, and " +
+      'both of its defences are properties of a SINGLE draw. Re-drawing per revision ' +
+      'reintroduces the entire attack — "rejected? resubmit for a new auditor" is the re-roll ' +
+      'the deterministic seed exists to prevent, and it arrives disguised as diligence',
+    find: '    if (rounds[i].auditorDid !== first) return { stable: false, at: i };',
+    replace: '    if (rounds[i].auditorDid === first) return { stable: false, at: i };',
+  },
+  {
+    id: 'acceptance-outage-consumes-revision-budget',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'only REJECTED spends budget. staged-judge.ts already holds that "a provider outage is ' +
+      'not a defect report, and must not be able to condemn the work"; one level up, letting ' +
+      "NOT_CHECKED decrement the allowance lets a flaky judge exhaust a correct doer and " +
+      'produce EXHAUSTED on work nobody ever judged',
+    find: "  const rejected = rounds.filter((r) => r.verdict === 'REJECTED');",
+    replace: "  const rejected = rounds.filter((r) => r.verdict !== 'ACCEPTED');",
+  },
+  {
+    id: 'acceptance-stall-never-detected',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'resubmitting identical bytes is its own outcome. Without it a doer that changes ' +
+      'nothing burns the budget to EXHAUSTED, which reads as "we tried" — STALLED separates ' +
+      '"could not fix it" from "did not change it", and only one of those is the doer\'s fault',
+    find: '  if (rejected.length >= 2) {',
+    replace: '  if (rejected.length >= Number.MAX_SAFE_INTEGER) {',
+  },
+  {
+    id: 'acceptance-later-rejection-unaccepts',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'acceptance is final. Scanning only the last round lets a re-review revoke a delivered ' +
+      'result, so a signed-off deliverable could be retroactively withdrawn by running the ' +
+      'auditor again — the reputation events and the envelope have already been issued',
+    find: '  for (const round of rounds) {\n    if (round.verdict === \'ACCEPTED\') {',
+    replace: '  for (const round of rounds.slice(-1)) {\n    if (round.verdict === \'ACCEPTED\') {',
+  },
+  {
+    id: 'acceptance-loop-cannot-terminate-under-an-outage',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'the SECOND bound. maxRejections alone cannot terminate the loop: "NOT_CHECKED never ' +
+      'spends the doer\'s budget" is correct, and combined with "run until terminal" it means ' +
+      'an unavailable judge yields REVISE forever. Both rules are individually right and ' +
+      'jointly non-terminating. This was found by running it — the suite hung for nine ' +
+      'minutes before it was killed — not by reading it',
+    find: '  if (rounds.length >= maxRounds) {',
+    replace: '  if (rounds.length >= Number.MAX_SAFE_INTEGER) {',
+  },
+  {
+    id: 'acceptance-unreadable-verdict-scored-as-a-rejection',
+    suite: 'check:acceptance-loop',
+    file: 'lib/trustshell/identity/acceptance-loop.ts',
+    protects:
+      'BOTH readability signals are required. A verdict bound to a different contract is not ' +
+      'the auditor faulting the work, and charging it to the revision budget spends the ' +
+      "doer's allowance on a harness bug. Dropping either half also re-opens the trap that " +
+      'hung this loop once: reading a rejection as unreadable, or an unreadable verdict as a ' +
+      'rejection, are the two ways to get this exactly backwards',
+    find: "  if (input.signatureValid !== true || input.boundToContract !== true) return 'NOT_CHECKED';",
+    replace: "  if (input.signatureValid !== true) return 'NOT_CHECKED';",
+  },
+
+  // ── check:review-session ──────────────────────────────────────────────────
+  {
+    id: 'review-doer-seed-falls-back',
+    suite: 'check:review-session',
+    file: 'lib/trustshell/review/session.ts',
+    protects:
+      'missing configuration throws and names the variable. This is the dummy-fallback defect ' +
+      'lib/CLAUDE.md removed on purpose, in its worst form: a fallback SEED does not fail ' +
+      'visibly like a fallback URL — it produces a perfectly valid Ed25519 signature attesting ' +
+      'to an identity nobody holds, and every layer above reads that as a signed contract',
+    find: '  const doerSeed = env.TRUSTSHELL_DOER_SEED?.trim();',
+    replace: "  const doerSeed = env.TRUSTSHELL_DOER_SEED?.trim() || 'fallback-doer-seed';",
+  },
+  {
+    id: 'review-single-auditor-pool-accepted',
+    suite: 'check:review-session',
+    file: 'lib/trustshell/review/session.ts',
+    protects:
+      'a pool of one is not a draw. The same reasoning as MIN_MEANINGFUL_POOL in ' +
+      'checker-assignment and MIN_MEANINGFUL_GROUP in nullifier: the mechanism runs, the proof ' +
+      'verifies, and it identifies the auditor exactly — "a named checker wearing a ' +
+      "lottery's clothes\". The draw would still be recomputable, which is what makes it " +
+      'convincing and wrong',
+    find: 'export const MIN_AUDITOR_POOL = 2;',
+    replace: 'export const MIN_AUDITOR_POOL = 1;',
+  },
+  {
+    id: 'review-exhausted-attempts-resubmit-the-last',
+    suite: 'check:review-session',
+    file: 'lib/trustshell/review/session.ts',
+    protects:
+      'running out of submissions returns null rather than repeating. Repeating the last ' +
+      'attempt makes the loop judge identical bytes twice and score STALLED — blaming the doer ' +
+      'for failing to revise work it has not yet been told about. Sessions are stateless: the ' +
+      'revision is in the NEXT request, and the honest answer is a non-terminal REVISE',
+    find: '      const submitted = request.attempts[round];',
+    replace:
+      '      const submitted = request.attempts[Math.min(round, request.attempts.length - 1)];',
+  },
+
+  // ── check:judges ──────────────────────────────────────────────────────────
+  {
+    id: 'mechanical-judge-can-say-verified',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      'THE rule of the mechanical tier: it may never return VERIFIED. It detects the ABSENCE ' +
+      'of quality and cannot establish its PRESENCE — a scan finding no TODO has learned that ' +
+      'there is no TODO, not that the work is correct. Letting it pass turns the review ' +
+      'surface into a rubber stamp that signs off on anything clean-looking, and the stamp ' +
+      'arrives wearing a contract-bound verdict',
+    find: "      return {\n        outcome: 'NOT_CHECKED',\n        detail:\n          'no mechanically decidable defect;",
+    replace: "      return {\n        outcome: 'VERIFIED',\n        score: 1,\n        detail:\n          'no mechanically decidable defect;",
+  },
+  {
+    id: 'judge-outage-condemns-the-work',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      'an unreachable model is NOT_CHECKED, never FAILED. staged-judge escalates NOT_CHECKED ' +
+      'and treats FAILED as final, so scoring an outage as FAILED lets an API error fail an ' +
+      "agent's work — and under the acceptance loop three of them reach EXHAUSTED on work no " +
+      'judge ever read',
+    find: "        return {\n          outcome: 'NOT_CHECKED',\n          detail:\n            `${label} judge was unreachable:",
+    replace: "        return {\n          outcome: 'FAILED',\n          detail:\n            `${label} judge was unreachable:",
+  },
+  {
+    id: 'judge-verified-without-a-score-accepted',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      "JudgeOpinion.score says it outright — absent is not a pass. A VERIFIED with no score " +
+      "cannot be measured against the criterion's floor, so accepting it lets a model pass " +
+      'work by asserting success without ever expressing confidence in it',
+    find: "  if (outcome === 'VERIFIED' && score === undefined) return null;",
+    replace: '  // mutated: an unscored VERIFIED is accepted',
+  },
+  {
+    id: 'judge-out-of-range-score-clamped',
+    suite: 'check:judges',
+    file: 'lib/trustshell/review/judges.ts',
+    protects:
+      'an out-of-range score is malformed, not clamped. Clamping 4.7 to 1 invents a confidence ' +
+      'the model never expressed and turns a broken response into a maximal pass',
+    find:
+      '    if (typeof o.score !== \'number\' || !Number.isFinite(o.score) || o.score < 0 || o.score > 1) {\n' +
+      '      return null;\n    }\n    score = o.score;',
+    replace:
+      '    if (typeof o.score !== \'number\' || !Number.isFinite(o.score)) {\n' +
+      '      return null;\n    }\n    score = Math.min(1, Math.max(0, o.score));',
+  },
+
   // lib/trustshell/config-readiness.ts — a PUBLIC presence report
   //
   // Registered in the same commit as the code. Leaving new code unmutated is
@@ -1363,6 +2077,485 @@ export const MUTATIONS = [
       '— the opposite error to the one above, and equally a wrong boundary',
     find: '  return [...new Set(found.filter((s) => !s.includes(\'${\') && !s.includes(\' \')))];',
     replace: '  return [...new Set(found)];',
+  },
+  // ── check:throughput — quorum diversity ───────────────────────────────────
+  {
+    id: 'diversity-member-loss-never-detected',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a lost quorum member is reported AT ALL. This is the two days of warning that sat ' +
+      'unread in hal_classifications.model: gemini went 2,653 → 0 on 07-14 while total volume ' +
+      'did NOT move, because the surviving providers absorbed the load. A row count is blind ' +
+      'to it by construction, every liveness check was green, and the earliest volume-based ' +
+      'alarm was 07-16 — two days late',
+    find: '  if (missing.length > 0) {',
+    replace: '  if (missing.length > 99) {',
+  },
+  {
+    id: 'diversity-member-loss-reported-as-quiet',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'MEMBER_LOST wakes a human. A capability loss that is detected and then filed quietly is ' +
+      'the same outcome as not detecting it — 39,788 SURVIVOR ALERTs sat at status pending ' +
+      'because no consumer ever existed',
+    find: "  'CANARY_ONLY',\n  'MEMBER_LOST',\n];",
+    replace: "  'CANARY_ONLY',\n];",
+  },
+  {
+    id: 'diversity-thin-baseline-judged-anyway',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a short baseline refuses to judge. With three days of history a member that was NEVER ' +
+      'seen is indistinguishable from one just lost, and reporting the first as MEMBER_LOST is ' +
+      'a false alarm — a gate that cries wolf is one people route around',
+    find: '  if (o.baselineDays < minDays) {',
+    replace: '  if (o.baselineDays < -1) {',
+  },
+  {
+    id: 'diversity-paused-producer-cries-wolf',
+    suite: 'check:throughput',
+    file: 'lib/trustshell/throughput/ledger.ts',
+    protects:
+      'a producer declared OFF is not loud about having no members. A paused producer has no ' +
+      'quorum BY DEFINITION, and reporting that as MEMBER_LOST makes the ledger cry wolf about ' +
+      'its own pause — which is how the cost-pause states lose their meaning',
+    find: "  if (d.state !== 'running') {\n    return out(\n      'EXPECTED_SILENCE',",
+    replace: "  if (d.state === 'running') {\n    return out(\n      'EXPECTED_SILENCE',",
+  },
+
+  // ---------------------------------------------------------------------------
+  // retry.ts — the retry_on predicate. Each of these turns the module into a
+  // plausible-looking backoff helper that has quietly stopped making the one
+  // distinction it exists to make.
+  // ---------------------------------------------------------------------------
+  {
+    id: 'retry-budget-checked-before-predicate',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'the predicate is asked BEFORE the budget. Swapped, a permanent error arriving on ' +
+      'the final attempt reports as `exhausted` — which reads as bad luck and sends the ' +
+      'reader looking for more budget instead of at a request that can never succeed',
+    find: '    if (!this.cfg.retryOn(failure)) {',
+    replace: '    if (failure.attempt < this.cfg.maxAttempts && !this.cfg.retryOn(failure)) {',
+  },
+  {
+    id: 'retry-idle-predicate-ignores-timeout-kind',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'retryIdleTimeoutsOnly consumes the run/idle attribution. Ignoring the kind retries a ' +
+      'run timeout, spending another full budget to arrive at the same wall — and makes the ' +
+      'attribution timeout.ts deliberately preserved worthless to its only consumer',
+    find: "  failure.error instanceof AttemptTimeoutError && failure.error.expiry.kind === 'idle';",
+    replace: '  failure.error instanceof AttemptTimeoutError;',
+  },
+  {
+    id: 'retry-cap-applied-after-jitter',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'maxDelayMs bounds the SCHEDULE, not the pre-jitter input to it. Dropping the cap lets a ' +
+      'jittered delay sit above a ceiling the caller believes is absolute',
+    find: '    const capped = Math.min(raw, this.cfg.maxDelayMs);',
+    replace: '    const capped = raw;',
+  },
+  {
+    id: 'retry-trusts-out-of-range-rng',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'a misbehaving Rng cannot push the delay outside its band. Trusting next() blindly means ' +
+      'the bounded-delay claim silently stops holding for any source not in [0, 1)',
+    find: '    const unit = Math.min(1, Math.max(0, this.rng.next()));',
+    replace: '    const unit = this.rng.next();',
+  },
+  {
+    id: 'retry-maxattempts-off-by-one',
+    suite: 'check:harness-retry',
+    file: 'lib/trustshell/harness/retry.ts',
+    protects:
+      'maxAttempts is a TOTAL including the first try, so maxAttempts:1 never retries. Off by one ' +
+      'and every configured budget silently buys one more attempt than it says',
+    find: '    if (failure.attempt >= this.cfg.maxAttempts) {',
+    replace: '    if (failure.attempt > this.cfg.maxAttempts) {',
+  },
+  // ---------------------------------------------------------------------------
+  // import-specifiers.mjs — what counts as reaching a module. Both mutations
+  // restore a form of under-reporting that marked modules shipped when nothing
+  // imports them (#73).
+  // ---------------------------------------------------------------------------
+  {
+    id: 'dormancy-counts-type-only-imports',
+    suite: 'check:dormancy',
+    file: 'scripts/lib/import-specifiers.mjs',
+    protects:
+      'a type-only import is erased by the compiler and cannot reach anything at runtime. ' +
+      'Counting it marks a module reachable that nothing imports — under-reporting dormancy, ' +
+      'which hides exactly what the gate exists to surface',
+    find: '    if (TYPE_ONLY_CLAUSE.test(m[1])) continue;',
+    replace: '    if (false) continue;',
+  },
+  {
+    id: 'dormancy-counts-specifiers-in-comments',
+    suite: 'check:dormancy',
+    file: 'scripts/lib/import-specifiers.mjs',
+    protects:
+      'a specifier inside a comment is prose. Counting it is not hypothetical — the router was ' +
+      'marked reachable by a comment explaining why it must not be, while building #70',
+    find: "  return src.replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ').replace(/(^|[^:])\\/\\/[^\\n]*/g, '$1');",
+    replace: '  return src;',
+  },
+
+  // -------------------------------------------------------------------------
+  // The gate that protects the gates — .github/workflows/check.yml and the
+  // checker_must_not_be_doer enforcement sites.
+  // -------------------------------------------------------------------------
+  {
+    id: 'ci-integrity-mutate-step-removed',
+    suite: 'check:ci-integrity',
+    file: '.github/workflows/check.yml',
+    protects:
+      'the mutate job actually invokes npm run mutate. Removing the run step ' +
+      '(a step whose name survives while its body is gutted, or renamed to ' +
+      'skip a different script) turns 123+ "protects:" claims in this very ' +
+      'file into comments nobody runs, with a green CI tick as cover',
+    find: '        run: npm run mutate',
+    replace: '        run: echo "mutation gate skipped"',
+  },
+  {
+    id: 'ci-integrity-mutate-softened',
+    suite: 'check:ci-integrity',
+    file: '.github/workflows/check.yml',
+    protects:
+      'the mutate job is not softened with continue-on-error. This is the exact ' +
+      'failure mode named in the job\'s own comment: "No continue-on-error and ' +
+      'no || true: this job is allowed to fail the run" — a one-line addition ' +
+      'that lets every SURVIVED mutation report green',
+    find: '  mutate:\n    runs-on: ubuntu-latest',
+    replace: '  mutate:\n    runs-on: ubuntu-latest\n    continue-on-error: true',
+  },
+  {
+    id: 'ci-integrity-restore-check-removed',
+    suite: 'check:ci-integrity',
+    file: '.github/workflows/check.yml',
+    protects:
+      'the tree-restore verification step survives beside the mutate step. ' +
+      'Without it, a mutation runner that corrupts the working tree on exit ' +
+      '(the exact failure this session hit locally when two invocations ' +
+      'collided) goes undetected in CI rather than failing the run',
+    find: '      - name: sources restored\n        run: git diff --exit-code',
+    replace: '',
+  },
+  {
+    id: 'ci-integrity-spine-guard-removed',
+    suite: 'check:ci-integrity',
+    file: 'lib/trustshell/identity/spine.ts',
+    protects:
+      'THE ONE THE COMMENT ITSELF WARNS ABOUT. spine.ts\'s checker_must_not_be_doer ' +
+      'guard exists BECAUSE "a constitutional invariant should not rest on one ' +
+      'call site" — removing this one, leaving the other three (work-contract.ts, ' +
+      'checker-assignment.ts, auditor-grant.ts) intact, is precisely the partial ' +
+      'regression normal test coverage is worst at catching, since three of four ' +
+      'call sites still pass everything',
+    find:
+      "  if (assigned.unsigned.checkerDid === assignment.doerDid) {\n" +
+      "    throw new Error(\n" +
+      "      'checker_must_not_be_doer: the drawn checker is the doer. This is ' +\n" +
+      "        'constitutional and no setting may relax it.'\n" +
+      "    );\n" +
+      "  }",
+    replace: '  // checker_must_not_be_doer guard removed',
+  },
+  {
+    id: 'ci-integrity-assignment-exclusion-unnamed',
+    suite: 'check:ci-integrity',
+    file: 'lib/trustshell/identity/checker-assignment.ts',
+    protects:
+      'the doer-exclusion in eligiblePool stays NAMED as checker_must_not_be_doer, ' +
+      'not merely present as an unexplained comparison. A future refactor that ' +
+      'keeps the exclusion but drops the name is how this invariant stops being ' +
+      'discoverable by anyone grepping for it — including this very gate',
+    find: '  /** Excluded unconditionally. `checker_must_not_be_doer`, applied at selection. */',
+    replace: '  /** Excluded unconditionally. */',
+  },
+  {
+    id: 'ci-integrity-work-contract-guard-removed',
+    suite: 'check:ci-integrity',
+    file: 'lib/trustshell/identity/work-contract.ts',
+    protects:
+      'assertContractSane still refuses a contract whose doer and checker are ' +
+      'the same identity. This is the FIRST of the four independent ' +
+      'checker_must_not_be_doer sites — a contract that never reaches this ' +
+      'check has nothing left upstream of it in the identity spine',
+    find:
+      "  if (sameDid(c.doerDid, c.checkerDid)) {\n" +
+      "    throw new Error(\n" +
+      "      `the doer and the checker are the same identity (${c.doerDid}). ` +\n" +
+      "        'verification.checker_must_not_be_doer is constitutional — no layer may waive it.'\n" +
+      "    );\n" +
+      "  }",
+    replace: '  // checker_must_not_be_doer guard removed',
+  },
+  {
+    id: 'ci-integrity-auditor-grant-guard-removed',
+    suite: 'check:ci-integrity',
+    file: 'lib/trustshell/identity/auditor-grant.ts',
+    protects:
+      'an auditor still cannot hold a grant to audit the very agent it is. ' +
+      'This is the fourth checker_must_not_be_doer site — auditor-grant.ts\'s ' +
+      'own comment names it as getting the SAME constitutional guarantee "by ' +
+      'comparing DIDs instead of trusting a flag", which this mutation removes',
+    find:
+      "  if (sameDid(input.auditor.did, input.doerDid)) {\n" +
+      "    throw new Error(\n" +
+      "      `the auditor and the doer are the same identity (${input.auditor.did}). ` +\n" +
+      "        'verification.checker_must_not_be_doer is constitutional; an agent may not hold a ' +\n" +
+      "        'grant to audit itself.'\n" +
+      "    );\n" +
+      "  }",
+    replace: '  // checker_must_not_be_doer guard removed',
+  },
+  // lib/trustshell/verdict-provenance.ts — P2, the Gate 2 schema blocker
+  // -------------------------------------------------------------------------
+  {
+    id: 'provenance-null-reads-as-unearned',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'ABSENT provenance is NOT_CHECKED, never a finding of "unearned". Every event on the ' +
+      'live scoring path has null provenance today, so reading null as false would ' +
+      'manufacture ~70,000 accusations out of a missing column — a fabricated finding at ' +
+      'scale, worse than the gap it claims to describe',
+    find: '  if (event.providerAttempted === null || event.providerAttempted === undefined) {',
+    replace: '  if (event.providerAttempted === undefined) {',
+  },
+  {
+    id: 'provenance-untraceable-counts',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'an event whose provenance cannot be established must NOT move a reputation score. ' +
+      'NOT_CHECKED and FAILED are different facts with the same consequence, and letting ' +
+      'the first one through is how "we could not tell" becomes "it passed"',
+    find: "      outcome: 'NOT_CHECKED',\n      countsTowardScore: false,",
+    replace: "      outcome: 'NOT_CHECKED',\n      countsTowardScore: true,",
+  },
+  // `provenance-abstention-punished` lived here until 2026-08-17. It pointed at
+  // `if (event.vetoed && event.providerAttempted === false)`, which the ordering
+  // fix dissolved — `vetoed` is now tested first, so that conjunction no longer
+  // exists and the runner correctly reported DRIFT rather than a pass.
+  //
+  // The invariant it protected — "only actionable verdicts stake" — is NOT gone;
+  // it moved to the `!event.vetoed` early return, where the two mutants below
+  // point at it directly. Deleted rather than re-pointed at a contrived target,
+  // because a mutant aimed at a line chosen to make it compile tests the line,
+  // not the invariant.
+  {
+    id: 'provenance-null-checked-before-vetoed',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'ORDER: `vetoed` is tested BEFORE provenance, so a NON-ACTIONABLE event owes no ' +
+      'evidence. This mutant reinstates the original bug — demanding provenance from an ' +
+      'event that stakes nothing — which drops 82,459 of 152,482 observation rows (54.1%), ' +
+      'including 100% of the x402 and latency arms, neither of which has a provider concept ' +
+      'to record. It deletes the positive evidence and keeps the accusations, and every ' +
+      'assertion that existed before 2026-08-17 stayed green through it',
+    find: '  if (!event.vetoed) {',
+    replace: '  if (!event.vetoed && event.providerAttempted !== null && event.providerAttempted !== undefined) {',
+  },
+  {
+    id: 'provenance-nonactionable-does-not-count',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'a non-actionable observation MAY move a score. It is the positive evidence — the ' +
+      'clean runs, the settled payments, the recorded latencies — and a reputation system ' +
+      'that counts only the failures is not a reputation system',
+    find: "      outcome: 'VERIFIED',\n      countsTowardScore: true,\n      detail:\n        'a non-actionable verdict; nothing is staked either way",
+    replace: "      outcome: 'VERIFIED',\n      countsTowardScore: false,\n      detail:\n        'a non-actionable verdict; nothing is staked either way",
+  },
+  {
+    id: 'provenance-near-miss-column-accepted',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'a column that merely SOUNDS like provenance does not satisfy the gate. Substring ' +
+      'matching would let a column named `provider` declare Gate 2 unblocked while carrying ' +
+      'nothing about whether one was attempted',
+    find: '  const found = PROVENANCE_COLUMN_CANDIDATES.filter((c) => columns.includes(c));',
+    replace: '  const found = PROVENANCE_COLUMN_CANDIDATES.filter((c) => columns.some((col) => c.includes(col)));',
+  },
+  {
+    id: 'provenance-parser-moved-callsite-reads-as-blocked',
+    suite: 'check:verdict-provenance',
+    file: 'scripts/check-verdict-provenance.mjs',
+    protects:
+      '"could not look" must not collapse into "found nothing". If the scorer query moves or ' +
+      'is renamed, the parser returns ok:false and the gate FAILS. Letting it return an empty ' +
+      'column list instead would make describeLinkage report NOT_CHECKED — the exact blocker ' +
+      'this gate was written to report, reached by not looking, and indistinguishable from ' +
+      'the real thing in the output',
+    find: "    return { ok: false, columns: [], detail: `no \\`.from('${VIEW}')\\` in ${REPO_SRC}` };",
+    replace: "    return { ok: true, columns: [], detail: `no \\`.from('${VIEW}')\\` in ${REPO_SRC}` };",
+  },
+  {
+    id: 'provenance-linkage-always-verified',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'the linkage report is derived from the columns actually present. A gate that reports ' +
+      'VERIFIED regardless is the unearned green this whole repository is organised against, ' +
+      'in the gate written to report a blocker',
+    find: '  if (found.length > 0) {',
+    replace: '  if (found.length >= 0) {',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/EarnedMetricsRepo.ts — the "consume" half of Gate 2:
+  // integrityObservations() / annotateProvenance(), wired 2026-08-17 per the
+  // operator's review on PR #94.
+  // -------------------------------------------------------------------------
+  {
+    id: 'earned-metrics-repo-clean-rows-demand-provenance',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'only ACTIONABLE catches (success === false) demand provenance. Checking success after ' +
+      'provenanceOf is called with the wrong `vetoed` value would exclude clean rows lacking a ' +
+      'provider — 55,616 of 149,258 rows in the measured window, the positive evidence rather ' +
+      'than the accusations, which is the exact defect this module\'s header retracts',
+    find: '    const verdict = provenanceOf({ vetoed: !success, providerAttempted });',
+    replace: '    const verdict = provenanceOf({ vetoed: true, providerAttempted });',
+  },
+  {
+    id: 'earned-metrics-repo-excluded-rows-leak-through',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'a row provenanceOf excludes must never reach measureRate. The `continue` is the only ' +
+      'thing stopping an untraceable or unearned catch from being pushed into `observations` ' +
+      'anyway, silently undoing the entire point of wiring provenanceOf in',
+    find: '      if (verdict.outcome === \'NOT_CHECKED\') excludedUntraceable += 1;\n      else excludedUnearned += 1;\n      continue;',
+    replace: '      if (verdict.outcome === \'NOT_CHECKED\') excludedUntraceable += 1;\n      else excludedUnearned += 1;',
+  },
+  {
+    id: 'earned-metrics-repo-zero-providers-read-as-attempted',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      '`quorum_providers_used = 0` must mean no provider attempted, not "at least one". Using ' +
+      '>= 0 instead of > 0 would make every zero-provider catch read as earned — the 2,443-row ' +
+      'population `refusesToIssue` exists to gate would silently pass',
+    find: '    const providerAttempted = raw === null || raw === undefined ? null : Number(raw) > 0;',
+    replace: '    const providerAttempted = raw === null || raw === undefined ? null : Number(raw) >= 0;',
+  },
+  {
+    id: 'earned-metrics-repo-annotate-fires-with-nothing-excluded',
+    suite: 'check:earned-metrics-repo',
+    file: 'lib/trustshell/EarnedMetricsRepo.ts',
+    protects:
+      'annotateProvenance must be a no-op when nothing was excluded — appending an empty note ' +
+      'to every agent\'s reason string, including the vast majority with zero exclusions, would ' +
+      'bury the signal this note exists to surface',
+    find: '  if (total === 0) return metric;',
+    replace: '  if (total < 0) return metric;',
+  },
+  {
+    id: 'fixture-accepts-a-rejected-run',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'a doer that reports success and an evaluator that rejects must surface FAILED. ' +
+      'Collapsing the reject path into VERIFIED would make the fixture a certificate ' +
+      'factory — the exact overclaim the status doc exists to prevent',
+    find: "  eq(out.loop.outcome, 'FAILED', 'independent judge overrules the agent');",
+    replace: "  eq(out.loop.outcome, 'VERIFIED', 'independent judge overrules the agent');",
+  },
+  {
+    id: 'fixture-allows-self-judge',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'checker_must_not_be_doer is the product claim. If the false-path attempt is ' +
+      'allowed to certify, the fixture would green-light the one constitutional ' +
+      'failure the harness is built to make loud',
+    find: "  truthy(threw, 'a doer-as-checker pool must refuse, never certify');",
+    replace: "  truthy(!threw, 'a doer-as-checker pool must refuse, never certify');",
+  },
+  {
+    id: 'fixture-accepts-an-amended-contract',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'a verdict bound to contract A must not remain bound after the contract is amended. ' +
+      'Treating boundToContract as true here would certify work against a contract nobody signed',
+    find: "  eq(v.boundToContract, false, 'amending the contract after work must unbind the verdict');",
+    replace: "  eq(v.boundToContract, true, 'amending the contract after work must unbind the verdict');",
+  },
+  {
+    id: 'fixture-outage-certifies',
+    suite: 'check:trust-harness-fixture',
+    file: 'scripts/trust-harness-fixture.mjs',
+    protects:
+      'an evaluator outage must not certify. Inverting this assertion would make a throw look like VERIFIED',
+    find: "  eq(out.loop.outcome === 'VERIFIED', false, 'an outage is not an accept');",
+    replace: "  eq(out.loop.outcome === 'VERIFIED', true, 'an outage is not an accept');",
+  },
+  {
+    id: 'pay-approves-without-contracted-path',
+    suite: 'check:live-callers',
+    file: 'lib/trustshell/identity/payment-contract.ts',
+    protects:
+      'a payment must not approve unless the contracted path invoked an independent ' +
+      'evaluator. Returning true from mayApproveAfterContract unconditionally is the ' +
+      'silent skip the live-caller claim exists to close',
+    find: '    d.invoked === true &&\n    d.outcome === \'VERIFIED\' &&\n    d.boundToPayment === true &&\n    d.checkerDid !== d.doerDid',
+    replace: '    true',
+  },
+  {
+    id: 'pay-approves-a-failed-evaluation',
+    suite: 'check:live-callers',
+    file: 'lib/trustshell/identity/payment-contract.ts',
+    protects:
+      'an evaluator REJECT is not an approval. Collapsing FAILED into VERIFIED would ' +
+      'make /pay a certificate factory — the same overclaim the fixture already forbids',
+    find: "    result.loop.outcome === 'VERIFIED' && verdict.outcome === 'VERIFIED' ? 'VERIFIED' : 'FAILED';",
+    replace: "    'VERIFIED';",
+  },
+  {
+    id: 'pay-route-skips-contracted-gate',
+    suite: 'check:live-callers',
+    file: 'app/api/trustrails/pay/route.ts',
+    protects:
+      'L3 wiring: /pay must call evaluateContractedPayment. Deleting the call is the ' +
+      'original gap — exists-but-not-on — and must go red',
+    find: '    if (!mayApproveAfterContract(contracted)) {',
+    replace: '    if (false) {',
+  },
+  {
+    id: 'review-route-skips-session',
+    suite: 'check:live-callers',
+    file: 'app/api/trustshell/review/route.ts',
+    protects:
+      '/review is the production Evaluator caller. If POST stops calling runReviewSession ' +
+      'the surface is a comment',
+    find: '    outcome = await runReviewSession({',
+    replace: "    outcome = { status: 'ACCEPTED', awaitingRevision: false, rounds: [] }; void ({",
+  },
+  {
+    id: 'provenance-skips-refuses-to-issue',
+    suite: 'check:verdict-provenance',
+    file: 'lib/trustshell/verdict-provenance.ts',
+    protects:
+      'refusesToIssue must be the issuer-stake function, not an inlined lookalike that ' +
+      'can drift. Replacing the call with false lets an unearned veto move a score',
+    find: '      refusesToIssue({\n        providerAttempted: false,\n        vetoed: event.vetoed,\n      })',
+    replace: '      false',
   },
 ];
 

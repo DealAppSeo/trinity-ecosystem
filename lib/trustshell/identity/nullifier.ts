@@ -126,12 +126,25 @@ export interface IBindingScheme {
 }
 
 export const MISSING_PARAMETERS =
-  'Poseidon2 parameters are not available in this lane, and inventing them is ' +
-  'refused: a guessed parameter set produces values that look correct, pass ' +
-  'their own tests, and agree with no other implementation. Required from the ' +
-  'lane with a working Plonky3 build — field, width (t), full/partial round ' +
-  'counts, S-box degree, round constants, MDS/internal matrix, sponge ' +
-  'absorption order and padding, and at least 3 input/output test vectors. ' +
+  'Poseidon2 cannot be bound to IBindingScheme yet, and inventing the missing ' +
+  'part is refused: a guessed encoding produces values that look correct, pass ' +
+  'their own tests, and agree with no other implementation. ' +
+  // NARROWED 2026-08-17. This message used to say the PARAMETERS were missing.
+  // They were not — repid-engine has held them since at least 2026-08-10, and
+  // they are now in this lane at identity/poseidon2-babybear.ts, verified
+  // bit-for-bit against Plonky3's own oracle by `npm run check:poseidon2`
+  // (12 vectors). Field, width, round counts, S-box degree, both matrices and
+  // the full constant arrays are SETTLED. Keeping the old wording would have
+  // kept a closed question open, which is how this blocker survived three days
+  // with its answer one repo away.
+  'The PERMUTATION is settled — see identity/poseidon2-babybear.ts and ' +
+  '`npm run check:poseidon2`. What remains is the ENCODING, which no KAT vector ' +
+  'answers: (1) how a `secret: string` becomes BabyBear field elements, ' +
+  '(2) the field encoding of the domain tags `zkrepid:commit:v1` / ' +
+  '`zkrepid:nullifier:v1`, and (3) the absorption layout for the 4-input ' +
+  'nullifier H(tag ‖ secret ‖ domain ‖ scope) — the oracle only fixes the ' +
+  '2-scalar case H(a,b), and a permuted order is a DIFFERENT function that ' +
+  'still verifies internally. Each needs the circuit\'s answer, not ours. ' +
   'See docs/POSEIDON2-PARAMETER-REQUEST.md.';
 
 /**

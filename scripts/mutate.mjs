@@ -55,7 +55,8 @@
 // tree is worse than a failed gate.
 
 import { execSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { MUTATIONS, SUITES } from './mutations.mjs';
 
 const argv = process.argv.slice(2);
@@ -89,7 +90,7 @@ if (flag('--list')) {
 // mutations. `--id` does not exist, so all three were ignored, all 99 mutations
 // ran, the invocation blew its timeout and was killed mid-cycle — which left
 // mutated sources on disk and made the next full `npm run check` report two
-// regressions that did not exist. See LESSONS A26.
+// regressions that did not exist. See LESSONS A31.
 //
 // This is the same defect `scan-secrets.mjs` was repaired for on 2026-08-14: a
 // tool that ignores what it was asked to do, and does something larger instead.
@@ -107,7 +108,7 @@ for (let i = 0; i < argv.length; i++) {
   if (!KNOWN_FLAGS.has(a)) {
     console.error(
       `mutate: unknown flag "${a}". Known: ${[...KNOWN_FLAGS].join(', ')}.\n` +
-        'Refusing rather than running every mutation — see LESSONS A26.'
+        'Refusing rather than running every mutation — see LESSONS A31.'
     );
     process.exit(2);
   }
@@ -128,6 +129,81 @@ const selected = MUTATIONS.filter(
 if (selected.length === 0) {
   console.error(`No mutations match --suite ${suiteFilter ?? '*'} --only ${onlyFilter ?? '*'}`);
   process.exit(2);
+}
+
+// ---------------------------------------------------------------------------
+// Single writer — two concurrent runs corrupt each other
+// ---------------------------------------------------------------------------
+//
+// MEASURED 2026-08-17, by doing it: two `mutate` runs overlapped in one session.
+// Each applies mutants to shared source files and restores its OWN bytes, so
+// they clobber one another. What that produced:
+//
+//   - a BASELINE failure in `check:throughput` — 1 of 43 assertions, reported as
+//     "the ledger no longer catches the incident it was built for". The suite is
+//     pure and passes standalone. It was red because the other run had a mutant
+//     applied to a file it reads, at that instant.
+//   - a mutant left in the working tree after the run had printed its verdict.
+//
+// The false RED cost twenty minutes. The false GREEN is the one that matters and
+// it is equally reachable: run A restores a file to its original bytes midway
+// through run B's mutant window, and run B's suite goes green against unmutated
+// source. That scores SURVIVED — a real invariant reported as unprotected — or,
+// with the restore landing the other way, CAUGHT with no assertion having fired.
+// A mutation gate that can be wrong in the flattering direction is exactly the
+// failure this file was written to detect, sitting inside the detector.
+//
+// So: one writer at a time, enforced, with the holder named. `wx` is atomic on
+// every platform we run on. A stale lock from a `kill -9` is reported with the
+// pid and the command to clear it rather than silently ignored — a lock that
+// auto-breaks is not a lock.
+const LOCK = join(process.cwd(), '.mutate.lock');
+let holdsLock = false;
+
+function acquireLock() {
+  try {
+    writeFileSync(LOCK, JSON.stringify({ pid: process.pid, started: new Date().toISOString() }), {
+      flag: 'wx',
+    });
+    holdsLock = true;
+  } catch (err) {
+    if (err.code !== 'EEXIST') throw err;
+    let holder = '(unreadable)';
+    let alive = false;
+    try {
+      const info = JSON.parse(readFileSync(LOCK, 'utf8'));
+      holder = `pid ${info.pid}, started ${info.started}`;
+      try {
+        process.kill(info.pid, 0);
+        alive = true;
+      } catch {
+        alive = false;
+      }
+    } catch {
+      /* keep the placeholder */
+    }
+    console.error(`\nREFUSING TO RUN — another mutation run holds ${LOCK}`);
+    console.error(`  holder: ${holder}${alive ? ' — STILL RUNNING' : ' — NOT running (stale)'}`);
+    console.error(
+      alive
+        ? '\n  Two concurrent runs mutate the same files and clobber each other. Wait for it.'
+        : `\n  Stale lock, most likely a kill -9. Check the tree first:\n` +
+            `    git status --short lib/ scripts/\n` +
+            `    git checkout -- lib/ scripts/   # if a mutant was orphaned\n` +
+            `    rm ${LOCK}`
+    );
+    process.exit(1);
+  }
+}
+
+function releaseLock() {
+  if (!holdsLock) return;
+  try {
+    rmSync(LOCK, { force: true });
+  } catch {
+    /* best effort; the message below is what matters */
+  }
+  holdsLock = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,14 +236,21 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(sig, () => {
     console.error(`\nInterrupted (${sig}) — restoring sources…`);
     const okRestore = restoreAll();
+    releaseLock();
     process.exit(okRestore ? 130 : 1);
   });
 }
 process.on('uncaughtException', (err) => {
   console.error(`\nUncaught: ${err?.stack ?? err}`);
   restoreAll();
+  releaseLock();
   process.exit(1);
 });
+// SIGKILL cannot be trapped, so the lock CAN be left behind. That is deliberate:
+// a kill -9 mid-run is also the case that can orphan a mutant in the tree, and a
+// stale lock is the only surviving evidence that it happened. acquireLock prints
+// the tree-check commands rather than clearing it.
+process.on('exit', releaseLock);
 
 // ---------------------------------------------------------------------------
 // Running a suite
@@ -208,14 +291,30 @@ function runSuite(suite) {
 
 const neededSuites = [...new Set(selected.map((m) => m.suite))].sort();
 
+// Before the baseline, not after: a baseline measured while another run holds a
+// mutant is the false red that motivated this.
+acquireLock();
+
 console.log(`mutation gate — ${selected.length} mutation(s), ${neededSuites.length} suite(s)\n`);
 console.log('baseline (a mutation against a red suite proves nothing):');
 
+// THREE OUTCOMES HERE TOO. `check-all.mjs` reads exit 2 as NOT_CHECKED, not as
+// failure, and several suites report it by design — a gate blocked on an
+// operator decision, or on a schema change nobody has made yet. Requiring a
+// baseline of exactly 0 made every such gate UNMUTATABLE, which is the two-
+// outcome collapse this repository exists to remove, sitting inside the tool
+// that enforces it. A baseline of 0 or 2 both mean "the assertions passed".
+const BASELINE_OK = new Set([0, 2]);
+const baselineCodes = new Map();
 const baselineBroken = [];
 for (const suite of neededSuites) {
   const r = runSuite(suite);
-  console.log(`  ${r.code === 0 ? '✓' : '✗'} ${suite}${r.code === 0 ? '' : `  exit ${r.code}`}`);
-  if (r.code !== 0) baselineBroken.push({ suite, out: r.out });
+  const ok = BASELINE_OK.has(r.code);
+  baselineCodes.set(suite, r.code);
+  const mark = r.code === 0 ? '✓' : ok ? '~' : '✗';
+  const note = r.code === 0 ? '' : ok ? '  NOT_CHECKED (exit 2) — mutatable' : `  exit ${r.code}`;
+  console.log(`  ${mark} ${suite}${note}`);
+  if (!ok) baselineBroken.push({ suite, out: r.out });
 }
 
 if (baselineBroken.length > 0) {
@@ -278,9 +377,17 @@ try {
     if (r.timedOut) {
       outcome = 'INVALID';
       detail = 'suite timed out';
-    } else if (r.code === 0) {
+    } else if (r.code === baselineCodes.get(m.suite)) {
+      // Compared against THIS SUITE'S baseline, not against 0. For a suite whose
+      // healthy state is NOT_CHECKED, an unchanged exit 2 means the mutant
+      // changed nothing observable — that is SURVIVED. Hardcoding 0 here would
+      // have scored every such mutant CAUGHT without a single assertion firing,
+      // which is a mutation gate lying in the most flattering direction.
       outcome = 'SURVIVED';
-      detail = 'suite stayed green — this invariant is not protected';
+      detail =
+        r.code === 0
+          ? 'suite stayed green — this invariant is not protected'
+          : `suite verdict unchanged (exit ${r.code}) — this invariant is not protected`;
     } else if (r.compileFailure) {
       outcome = 'INVALID';
       detail = 'mutant does not compile — not evidence (PRIOR-WORK-INDEX rule 4)';

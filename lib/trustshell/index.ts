@@ -169,6 +169,40 @@ export type {
 } from './identity/spine';
 
 /**
+ * The chain run REPEATEDLY against one drawn auditor, until it signs off.
+ *
+ * Exported beside `runContractedWork` rather than instead of it: a single
+ * judged round is a legitimate thing to want, and hiding it would push callers
+ * back to hand-assembly — the failure this barrel exists to prevent.
+ *
+ * `isDelivered` is exported deliberately. `AcceptanceState` has three terminal
+ * statuses and only one of them is a delivery; without a predicate, callers
+ * write `status !== 'REVISE'` and ship on a spent budget.
+ */
+export { runAcceptedWork } from './identity/spine';
+export type {
+  AcceptedWorkInput,
+  AcceptedWorkResult,
+  AttemptContext,
+  AttemptSubmission,
+} from './identity/spine';
+export {
+  evaluateAcceptance,
+  auditorIsStable,
+  roundVerdictFor,
+  isDelivered,
+  isTerminal,
+  DEFAULT_MAX_REJECTIONS,
+  DEFAULT_MAX_ROUNDS,
+} from './identity/acceptance-loop';
+export type {
+  Round as AcceptanceRound,
+  RoundVerdict,
+  AcceptancePolicy,
+  AcceptanceState,
+} from './identity/acceptance-loop';
+
+/**
  * What a zk RepID operation COSTS, in hash calls — the only unit that survives
  * the change of hash function. See `identity/cost.ts`: the production
  * `IBindingScheme` throws pending Poseidon2 parameters, so a millisecond figure
@@ -343,3 +377,53 @@ export type {
   ChainDefect,
   ChainVerification,
 } from './hal-chain';
+
+// The joint between the ledger and its store. Exported because a consumer needs
+// it from here — the two ends have existed for weeks with nothing between them,
+// and the ordering guard it carries (an unloaded ledger cannot be saved) is not
+// something a call site should have to remember.
+export { DurableLedger } from './persistence/durable-ledger';
+export type {
+  HydrateOutcome,
+  HydrateResult,
+  PersistOutcome,
+  PersistResult,
+} from './persistence/durable-ledger';
+
+// P1 of docs/SPRINT-DECISIONS-2026-08-17.md — the issuer is scored by the
+// standard it applies. `refusesToIssue` is the source-side half: an issuer that
+// attempted no provider may not emit an actionable verdict. The enforcement
+// point is the HAL runner, which lives in `repid-engine` and not in this repo,
+// so this barrel export is what makes the rule reachable from here.
+export { classify, scoreIssuer, refusesToIssue, STAKE_POINTS } from './issuer-stake';
+export type { IssuedVerdict, VerdictClass, IssuerStanding } from './issuer-stake';
+
+export {
+  evaluateContractedPayment,
+  mayApproveAfterContract,
+} from './identity/payment-contract';
+export type {
+  PaymentBrief,
+  PaymentContractDecision,
+} from './identity/payment-contract';
+
+// P3 of docs/SPRINT-DECISIONS-2026-08-17.md lives in `repid-floor-decay.ts`.
+// `EarnedMetricsRepo` now CONSULTS it via floor-decay-consult.ts. The barrel
+// still does not re-export decideFloor: the RATE remains NOT_CHECKED and a
+// caller must pass a window, not pick one up from an import.
+//
+// A second P3 module (`ratchet-decay.ts`) was exported from here and is now
+// removed. Two lanes implemented the same concern in parallel; the canonical
+// brief resolves it to ONE module, and the retired one carried a hardcoded
+// 30-day half-life the evidence does not support. See LESSONS A30.
+
+// P2 of docs/SPRINT-DECISIONS-2026-08-17.md — the holder path, not the circuit.
+// `CustodyShadow` was previously reachable only via a relative import from
+// inside `lib/trustshell/`, which was fine while its one caller (
+// `VaultPermission.ts`) lived there too. It now has a second caller outside
+// this directory (`app/api/trustrails/pay/route.ts`, shadowing
+// `humanCustodyBound` the same way), so it is barrel-exported for the same
+// reason `runAgentLoop` was above: unreachable to every consumer that cannot
+// import it, which was all of them.
+export { CustodyShadow, VAULT_AUDIENCE, VAULT_CAPABILITY, VAULT_ACTION, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION, SHADOW_ANALYSIS_SQL } from './CustodyShadow';
+export type { ShadowVerdict, ShadowObservation } from './CustodyShadow';

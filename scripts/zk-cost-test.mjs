@@ -116,8 +116,13 @@ await check('THE PRODUCTION SCHEME THROWS — zk RepID cannot execute here', asy
       await call();
     } catch (e) {
       threw = true;
+      // Matches `refused`, the invariant, rather than the specific reason.
+      // The reason NARROWED on 2026-08-17 — the permutation is settled and
+      // KAT-verified (check:poseidon2); only the encodings remain — and pinning
+      // a test to the old wording would have demanded the refusal keep claiming
+      // the parameters were missing after they had been found.
       truthy(
-        /parameters are not available/.test(e.message),
+        /refused/.test(e.message),
         `${name} must refuse for the stated reason, got: ${e.message}`
       );
     }

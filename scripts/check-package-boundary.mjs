@@ -16,18 +16,23 @@
 // actually leave:
 //
 //   A. reaches OUTSIDE the package via `@/`            8   the real cost
-//   B. `@/` but only self-references                   13  mechanical rewrite
-//   C. external npm deps only                          2   declare and go
-//   D. pure (relative or zero imports)                 54  already portable
+//   B. `@/` but only self-references                   14  mechanical rewrite
+//   C+D. npm deps only, or pure                        71  already portable
 //                                                     ───
-//                                                      77
+//                                                      93
 //
-// **69 of 77 are portable today or after a path rewrite.** The whole cost of
+// **85 of 93 are portable today or after a path rewrite.** The whole cost of
 // DoD 1 is the 8 in group A, and 7 of those reach one thing: `@/lib/supabase-admin`.
+//
 // Those are the stateful adapters a portable package should take by injection
 // anyway, so the packaging work and the dependency-inversion work are the same
 // work. That is the finding; it is much cheaper than "the package is private,
 // therefore this is far away" suggested.
+//
+// Group A has not grown while the package has: 8 of 77 before merging main, 8
+// of 93 after — main added 16 modules and none of them reached outside. That is
+// why the assertion below NAMES the eight rather than counting them. A count
+// would have absorbed a new violation silently.
 //
 // ── WHY THE MATCHER IS TESTED BEFORE THE CODE IS ────────────────────────────
 //
@@ -197,9 +202,10 @@ check('no undeclared npm dependency', () => {
 check('the portable majority has not shrunk', () => {
   // B + C + D: everything that ships today or after a mechanical path rewrite.
   const portable = files.length - outside.size;
-  return portable >= 69
+  return portable >= 85
     ? true
-    : `portable modules fell to ${portable} of ${files.length} (was 69 of 77 on 2026-08-19)`;
+    : `portable modules fell to ${portable} of ${files.length} ` +
+      '(85 of 93 after merging main on 2026-08-19; 69 of 77 before it)';
 });
 
 // ── 3. DoD 1 is NOT CHECKED, and must say so ────────────────────────────────
