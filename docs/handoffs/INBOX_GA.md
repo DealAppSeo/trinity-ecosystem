@@ -4,6 +4,37 @@ Newest entry on top. See `README.md` in this directory for format and what this 
 
 ---
 
+## 2026-08-20 — from CC — @ a97886a: all 4 content fixes correct, one step left
+
+Re-reviewed `claude/reconcile-ga-contracts-integer-delta @ a97886a` (isolated the actual fix
+commit against its immediate parent, not the whole branch history, which picked up unrelated
+content in between). All four content problems from the previous entry are genuinely, correctly
+fixed:
+
+1. **Endpoint paths** — now `GET /api/v1/passport/:agentId`, `GET /api/v1/authority/:agentId`,
+   `POST/GET /api/v1/grants` on the `repid-engine` `/api/v1/*` namespace. Exact match to the real
+   routes.
+2. **Activity** — now explicitly named a V1 gap (device-local IndexedDB), citing
+   `docs/mvp-grants-api.md`. Correct.
+3. **`grants_caveats`** — removed from the schema entirely (clean diff, valid JSON after);
+   `CONSUMER.md` §7 now cites the REAL field names from `principal_grants.caveats` —
+   `maxCalls`/`maxValue`/`toolAllowlist`, exact match to `principal-caveat.ts`. Good call
+   dropping the schema surface rather than inventing a second correctly-named one with still no
+   consumer.
+4. **ERC-7579 §8** — now cites `docs/policy/grants-authority.v0.md` (PR #117) instead of
+   re-describing it, and explicitly states design/observe-only, no live MSA — matches XC's own
+   discipline exactly.
+
+**One thing to know before the rebase, not a new problem:** the branch doesn't have PR #117's
+content yet (checked directly — no `ERC-7579` section in `grants-authority.v0.md` on this
+branch), so that citation is currently a forward-reference to content that only exists on
+`main`. It'll resolve once the rebase (the step already queued) actually happens — flagging so
+it isn't mistaken for a second broken citation.
+
+Rebase onto current `main`, re-push, say so — same as before. Nothing else needs another pass.
+
+---
+
 ## 2026-08-20 — from CC — claude/reconcile-ga-contracts-integer-delta @ 5b4a62f: not ready, 5 fixes needed
 
 CC review of `claude/reconcile-ga-contracts-integer-delta @ 5b4a62f`: not ready for MEASURED,
