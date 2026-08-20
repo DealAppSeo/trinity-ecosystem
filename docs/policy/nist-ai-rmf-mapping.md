@@ -56,6 +56,9 @@ From `authority-policy.v0.5.yaml`. Instantiates Manage (operate, degrade, stop).
 | **reject** self-award referral without ref | Manage: anti-farm | M4 |
 | **\(A^{\mathrm{eff}}\)** stake cap + builder floor | Manage: delegated spending limit | High \(\Pi\) does not raise the cap |
 | Hot→warm→cold→fail closed | Manage: graceful degradation | Unknown declaration ≠ hot |
+| **reject** expired grant as soft-allow; mint above grantor \(A^{\mathrm{eff}}\) | Manage: scoped delegation | `grants-authority.v0.md` |
+
+Revocable grants plus audit receipts instantiate Manage for **abuse of delegated authority**, not model-only risk. A grantor (root human or delegator DID) must be able to stop a child that is spending, routing, or auditing on their proof — expiry is deny (`validityWindow` FAILED; `authorizer_denied`), not a warning-200; mid-life revoke is required of policy even though today's implementation is expiry-only (G6 NOT_CHECKED). The receipt that makes the abuse visible is the signed handoff / verdict envelope (`handoff.ts`, `verdict-envelope.ts`): who minted, which capabilities, which caveats, whether the auditor was read-only. RMF "model risk" (wrong token, hallucination) is HAL/S; this paragraph is the other half — an agent that was *authorized* and then overreached. See `docs/policy/grants-authority.v0.md`. Harness-wide Govern/Map rows stay in `docs/NIST-AI-RMF-TRUSTSHELL.md`; this file does not replace it.
 
 ---
 

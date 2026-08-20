@@ -7,9 +7,24 @@ De Rossi: the public vector must be portable; internals stay off the passport.
 
 ---
 
+## Frozen public six (Passport strip)
+
+These six names are **frozen** as the public Trust Ecology profile. A Passport strip may show only this set. Adding a seventh, renaming one, or promoting an internal signal (BFT 0.40, floor consult, ControlProof shadow, HAL F1) onto the strip requires a policy bump, not a UI edit.
+
+1. **governability**
+2. **calibration**
+3. **multi-agent**
+4. **cost**
+5. **latency**
+6. **fail-closed rate**
+
+Internal list below stays internal. Grants remaining budget, pair-id, \(W/K/\sigma\), and circuit witnesses are not strip metrics.
+
+---
+
 ## Public Trust Ecology profile
 
-Counterparties (and ERC-8004-shaped readers) may rely on these. Each has a measurement hook.
+Counterparties (and ERC-8004-shaped readers) may rely on these. Each has a measurement hook. The Passport strip is exactly the frozen six.
 
 | Ecology slot | Our instantiation | Gate / axis | Status |
 |---|---|---|---|
@@ -41,6 +56,7 @@ Do not put on the public profile. Needed to run and to stop farming.
 | Doer-verified-work leaf | Blocked |
 | Circuit witnesses, Poseidon2 params | Cross-lane |
 | HAL volume / F1 | Ops trickle; not a product signal |
+| Grant nonce, remaining budget, parent proof bytes | Operator revoke / replay; public sees fail-closed rate, not the chain |
 
 ---
 

@@ -182,3 +182,4 @@ GateRun MEASURED / NOT_CHECKED / FAILED only. No circuits. No new soft-live surf
 | `docs/policy/zk-attestation-predicates.md` | Z1–Z5 (axis range); ZR1–ZR5 (\(A^{\mathrm{eff}}\) used \(S_{\mathrm{real}}\) only). `provenWithoutSecret` stays blocked. |
 | `docs/policy/trust-ecology-profile.md` | public vs internal profile |
 | `docs/policy/nist-ai-rmf-mapping.md` | Measure / Manage for promote/park/reject and \(A^{\mathrm{eff}}\) |
+| `docs/policy/grants-authority.v0.md` | G1–G8 mint floors / attenuation / revoke / expiry deny. Observe. |
