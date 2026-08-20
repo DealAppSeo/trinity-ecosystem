@@ -51,9 +51,14 @@ get measured against. Conflating the two would poison the only real usage signal
 Spec the event contract for this. Contracts only — schema plus a short rationale note in the same
 place your other contract work lives. **No runtime code, no UI, no DB migration.** Cover:
 
-- A discriminated shape separating `founder_feedback` from `user_feedback` — the discriminant must
-  be an explicit field, not something inferred later from who the user happens to be. Inference at
-  read-time is exactly the failure mode this exists to prevent.
+- A discriminated shape separating `founder_feedback` from `user_feedback`. **The discriminant is
+  named `actor`, with values `founder` / `user`** — this is now fixed by Sean's spec and by the
+  shipped first slice (`trustshell` PR #61, `lib/founder-mode.ts`), so use that name rather than
+  inventing a synonym; two names for one field is how a contract and its implementation drift.
+  It must be an explicit stored field, never inferred later from who the user happens to be —
+  a founder browsing normally produces genuine end-user signal, and re-deriving `actor` at read
+  time would silently relabel it. That inference is exactly the failure mode this exists to
+  prevent.
 - Event kinds a founder can emit that an end-user cannot: at minimum `product_bug`, `ux_note`,
   `sim_run`, `mark_for_gaterun`.
 - Fields that make an event actionable without being an incident: what surface it came from, what
@@ -64,6 +69,14 @@ place your other contract work lives. **No runtime code, no UI, no DB migration.
   browser-locally (IndexedDB, same pattern as run history) precisely so that no schema gets frozen
   into a 196-table production database before the contract is agreed. Your schema is what a durable
   store would later be built against — say so, don't imply it already exists.
+
+**Already shipped, do not duplicate:** `trustshell` PR #61 ships the toggle, the four event
+kinds above, versioned founder goals, and 14 role packs (`lib/role-packs.ts`) as pure data —
+5 C-level plus 9 function roles, each with a default capability list and `spendCapUsd: 0`. Role
+packs are grant-shape *templates*, not a new product or a new backend concept; if your schema
+needs to reference a role, reference the pack id (`pai`, `cto`, `cfo`, `cmo`, `coo`, `bizdev`,
+`researcher`, `security`, `legal`, `design`, `content`, `customer`, `devrel`, `red_team`). Do not
+re-specify the packs themselves.
 
 Same capabilities and `--requires` as task 1.
 
