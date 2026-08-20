@@ -4,6 +4,76 @@ Newest entry on top. See `README.md` in this directory for format and what this 
 
 ---
 
+## 2026-08-20 — from CC — task 2: trust-state DISPLAY policy (adversarial, policy-only)
+
+Second task, independent of G1+G3 below — take whichever you want first. This one is your
+adversarial-review lane rather than a build lane, and it is the policy layer under a UI that
+already exists, so it is a real dependency and not a paper exercise.
+
+**The situation.** `trustshell.dev` is growing a founder-facing surface (`trustshell` PR #61: a
+PAI chat, a Founder Mode toggle, versioned goals, and links to the live Passport / Authority /
+Grants / Activity pages). CC wrote it. A UI is where a verdict gets *presented*, and presentation
+is where an honest verdict quietly becomes a dishonest claim — a green tick that means "we did not
+look", a badge that says VERIFIED when the underlying check was NOT_CHECKED. `LESSONS.md` and
+`CLAUDE.md` both name this as the recurring defect in this system: **a system reporting success it
+has not earned.** Nobody has written down what a *surface* may and may not claim.
+
+Write that policy. Files only, no UI code, no React — this is `docs/policy/`, your usual shape.
+
+**What CC decided unilaterally, which you should attack rather than ratify.** The most load-bearing
+call in the shipped UI is: **`NOT_CHECKED` is rendered neutral and achromatic (dashed grey), not
+amber.** The reasoning was that amber reads as "caution, something is wrong", when the truth is
+"nobody looked" — so amber implies a failure that was never measured, exactly as a green tick would
+imply a success that was never measured. The claim is that neutral is the only treatment that
+implies neither. **That may be wrong.** A plausible counter: an absence of measurement on a
+high-`value_at_risk` action IS a hazard, and rendering it as visually inert trains a founder to
+scroll past the one state that should stop them. Decide which is right, on the evidence, and say so
+— if CC is wrong, say CC is wrong and PR #61 gets changed.
+
+Cover at minimum:
+
+- **The claim ceiling per state.** For each of MEASURED / NOT_CHECKED / FAILED: the strongest thing
+  a surface is permitted to assert, and the specific words that overclaim it. "Verified",
+  "Trusted", "Safe" and a bare ✓ are the obvious candidates for banning — say which, and why.
+- **Evidence reachability.** Whether a surface displaying a state must be able to name the check
+  that produced it. CC's position: a verdict a user cannot trace to a named check is an assertion
+  wearing a measurement's clothes. Test that.
+- **Never color-only.** Status must survive greyscale and every common colour-vision deficiency —
+  so an icon and a word, always, and no red/green pair anywhere in the triad. CC shipped
+  teal / neutral-dashed / rose. Check that triad for deuteranopia AND protanopia AND tritanopia
+  rather than assuming teal-vs-rose is safe because it isn't green-vs-red.
+- **Staleness.** A state read 40 minutes ago and still on screen. Does a surface have to say when
+  it measured, or may it show a bare verdict? Relevant precedent inlined below.
+- **The approximation case — the hard one.** `repid-engine`'s A_eff is computed from an explicitly
+  named approximation: it cannot compute the real sigma-adjusted `R_route`, so it passes the
+  LEDGER value and stamps every result `rRouteIsLedgerApproximation: true`. That file states the
+  consequence itself: G1/G3 are "MEASURED against this conservative-in-name-only proxy, and
+  explicitly NOT MEASURED against the true locked formula." **So what may a UI show?** It is not
+  MEASURED and it is not NOT_CHECKED. If the answer is a fourth state, name it and define it. If
+  the answer is that MEASURED must always carry its caveat inline, say that. This is the case most
+  likely to produce a quietly false badge, and it is unresolved.
+
+**Inlined so you need no `cross_repo_read`** (all quoted, not paraphrased):
+- `trinity-ecosystem/CLAUDE.md`: *"Three outcomes, never two. VERIFIED / NOT CHECKED / FAILED. Two
+  outcomes collapse 'we did not look' into 'it passed.'"* and *"If a tool cannot return it, write
+  UNVERIFIED."*
+- Same file, on staleness: *"A 200 from a domain proves the site is up, not that it is running the
+  commit you just merged"* — a live-looking surface over stale evidence is the same class of error.
+- `repid-engine/src/services/effective-authority.ts` header: *"Every `EffectiveAuthority` this
+  function returns is stamped `rRouteIsLedgerApproximation: true` so nothing downstream can present
+  it as the real, sigma-adjusted figure."*
+- `grants-authority.v0.md` (this repo, yours): G6 is MEASURED; G1/G3 are NOT_CHECKED pending the
+  mint-floor caller — which is the other task below.
+
+Capabilities: `reasoning, repo_read, repo_write`. `--requires reasoning,repo_read,repo_write`.
+No `db_read`, no `cross_repo_read` — every cross-repo fact is quoted above.
+
+Land it as a PR in **this** repo (`docs/policy/`). CC will change PR #61 to match whatever you
+conclude, including reversing the neutral-NOT_CHECKED call if you show it's wrong. Farm cap 60
+still holds; don't author `events.v1.json`.
+
+---
+
 ## 2026-08-20 — from CC — next task: G1+G3 mint-floor GateRun check (repid-engine)
 
 Director mode is now standing (Sean). This is a real dispatch, not a status note — land it as a
