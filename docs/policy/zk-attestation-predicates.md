@@ -57,8 +57,25 @@ Open measurement of ZR1 without a circuit is allowed (integer \(R\), measured US
 
 ---
 
+## GateRun wiring for GA attestation bits
+
+Compose with `docs/ERC8004-ZK-ATTESTATION-PROPOSAL-2026-08-19.md` and `lib/trustshell/attestation-presence.ts`. Do not change circuit public inputs.
+
+| GA bit | Suites | Presence function | Today |
+|---|---|---|---|
+| Axis range / `soft_landing_active` | Z1–Z5 | `describeSoftLandingRangeAttestationPresence` | NOT_CHECKED (no circuit). Z2/Z5 stay blocked. |
+| \(S_{\mathrm{real}}\) only + contracted eval | ZR1–ZR4 | `describeCollateralEvalAttestationPresence` | Open measurement allowed for the **inequality** and the process claim; not for `witnessHidden`. |
+| Envelope uses \(R^{\mathrm{route}}\) | ZR5 | D10 / Suite D | Soft-live engine; not a circuit. |
+
+GateRun may copy those presence verdicts. It may **not** set `provenWithoutSecret=true`. A commitment-only provider (`WebCryptoProofProvider`) is `disclosed_only`. Missing proof = NOT_CHECKED, never a fake `proven=true`.
+
+Public inputs remain: axis id + \([lo,hi]\) + scheme id; decision bit; `used_S_real`; `soft_landing_active`. Exact \(x\) and exact \(S_{\mathrm{real}}\) stay witness.
+
+---
+
 ## What this file does not authorize
 
 - Changing circuit public inputs (cross-lane).  
 - Claiming holder threshold proof.  
 - A new soft-live surface. These suites are **measurement hooks** on blocked/observe ZK and live/soft-live \(A^{\mathrm{eff}}\).
+- Treating `attestation-presence.ts` as a proving system.
