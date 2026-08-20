@@ -194,3 +194,6 @@ lib/**/*.js
 .phase2-suite-i-check-*/
 .phase2-suite-p-check-*/
 .phase2-suite-x-check-*/
+
+# Suite R undecidable-mutants (M4-M8) check script (2026-08-19, third pass).
+.phase2-suite-r-check-*/
