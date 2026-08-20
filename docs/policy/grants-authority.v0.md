@@ -78,6 +78,22 @@ G6 flips to **MEASURED** iff G6a–G6e all MEASURED on this fixture (or a docume
 
 Suggested check name: `check:g6-grantor-revoke`. Must not import a stub that always returns denied. `#116` `scripts/dogfood-grant-attempt.mjs` is the mint sibling, not this pack.
 
+**MEASURED 2026-08-20 (CC).** `repid-engine`'s `principal_grants` is the registry caller this
+section names as the trigger condition — it exists now, not "if a registry is added." `F-G6` run
+against its real `decideRevoke`/`isChainLive`/`decideAuthorization` (not a stub, per the
+requirement above): G6a–G6e all MEASURED, both in CI and live against production. Evidence:
+`repid-engine#443` (merged); the check itself — `scripts/verify/checks/g6-grantor-revoke.ts` in
+that repo, run via `npm run verify:crosscheck -- --only g6-grantor-revoke` (not a trinity-ecosystem
+`check:*` script — the registry lives in the other repo, so the measurement does too); and a live
+production run (mint with a real EIP-712 signature → authorized use → revoke → denied, with a
+durable audit-trail receipt), `repid-engine/reports/2026-08-20/DOGFOOD_GRANT_MINT_USE_REVOKE_DENIED.md`.
+
+One divergence from G6b's text above, not silently resolved: `principal_grants`' `decideRevoke()`
+is stricter than "the grantor (or root human)" — only the direct grantor of one specific link may
+revoke that link; a root human's actual power is G6c's cascade (revoke the root, every unexpired
+descendant denied), not a reach-down override on a grandchild's own row. Same end state for the
+grantee presenting a revoked grant, different, more auditable mechanism.
+
 ---
 
 ## Expired grant is deny, not soft-allow
@@ -107,7 +123,7 @@ A session may outlive its authority; the authority does not stretch to cover it 
 | G7 | auditor ≠ doer and read-only computed | `delegateAuditorGrant` refuses otherwise | self-audit grant or write-reachable grant exists | auditor path unused |
 | G8 | grant does not approve/deny pay | `#95` shadow still observe | ControlProof grant used as pay gate | — |
 
-G2, G4, G5, G7 are backed by existing tests (`check:identity` / `check:auditor-grant` / loop-authorizer / `#116` mint). G1, G3 need a mint-floor caller. **G6 is ready for measurement** via `F-G6` above — still NOT_CHECKED until that check exists.
+G2, G4, G5, G7 are backed by existing tests (`check:identity` / `check:auditor-grant` / loop-authorizer / `#116` mint). G1, G3 need a mint-floor caller. **G6 is MEASURED** — `F-G6` ran clean against a real registry caller (`repid-engine#443`); see the dated note above.
 
 ---
 
