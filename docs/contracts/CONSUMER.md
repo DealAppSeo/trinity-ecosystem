@@ -126,3 +126,26 @@ Authorization to act or spend on-chain is governed by cryptographically bounded 
 ### Auditability and Non-Repudiation
 Every score transition, decay tick, referral reward, and gate decision is logged on an immutable ledger with unique `idempotency_key` bindings. This creates a tamper-proof audit trail. Any administrative attempt to falsify a reputation score or bypass a spending gate is instantly exposed as a signature mismatch or ledger conflict, preventing untrusted executive actions from altering network state.
 
+---
+
+## 6. MVP Trust Kernel Endpoints
+
+To maintain strict security isolation, the Trust Kernel exposes exactly four core endpoints as its entire external consumer interface. Sibling features or adjacent application domains are excluded by design to prevent cross-domain contamination:
+
+1.  **Passport Endpoint (`/api/trustrails/passport`):** Resolves an agent's five-axis reputation scores, tier standings, and active selective-disclosure commitments.
+2.  **Authority Endpoint (`/api/trustrails/authority`):** Computes and returns spending limit and authorization decisions gated by `effectiveAuthority` ($A_{eff}$).
+3.  **Grants Endpoint (`/api/trustrails/grants`):** Tracks, delegates, and evaluates principal-to-principal capability scopes.
+4.  **Activity Endpoint (`/api/trustrails/activity`):** Receives signed scoring events (`DORMANCY_DECAY`, `ECOSYSTEM_REFERRAL`, `IMPACT_REWARD`) and writes them directly to the ledger.
+
+---
+
+## 7. Grants-Aware Adapter Capabilities
+
+To integrate seamlessly with the Trust Kernel's principal-to-principal delegation system, tool and compute adapters can publish resource constraints under the `grants_caveats` property of their capability declarations:
+
+*   **`max_calls` (integer):** Establishes the maximum allowed invocation limit under this delegated grant.
+*   **`max_value_usd` (number):** Declares the aggregate transactional valuation ceiling authorized by this capability.
+
+When evaluating a delegated execution request, the Trust Kernel's Grants gate checks these caveats against current usage, automatically executing `fail_closed` and propagating a `rate_limit` error if any caveat thresholds are exceeded.
+
+

@@ -1,4 +1,4 @@
-# Validation Attestation Contract, v0 (Draft)
+# Validation Attestation Contract, v0.1
 
 This specification defines the strict contract requirements for **Validation-Registry-Compatible Attestations** required to authorize high-stakes payout or reward operations. 
 
@@ -6,13 +6,13 @@ Under the ERC-8004 posture, security is proportional to the value at risk (**Sec
 
 ---
 
-## 1. Schema Specification (`validation-attestation.v0.json`)
+## 1. Schema Specification (`validation-attestation.v0.1.json`)
 
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://repid.dev/schemas/validation-attestation.v0.json",
-  "title": "Validation Registry Attestation Contract, v0",
+  "$id": "https://repid.dev/schemas/validation-attestation.v0.1.json",
+  "title": "Validation Registry Attestation Contract, v0.1",
   "description": "Validation-Registry-compatible attestation required for high-stakes pay/reward lanes, enforcing security ∝ value at risk.",
   "type": "object",
   "required": [
@@ -127,4 +127,4 @@ Under ERC-8004, the required verification mechanisms are dynamically selected ba
 |---|---|---|---|
 | **Low-Stakes** | `< $500` | `STAKE_REEXECUTION` | Optimistic resolution backed by slashable collateral. Anyone can dispute and trigger a full re-execution within the dispute window. |
 | **Medium-Stakes** | `$500 - $10,000` | `TEE_ATTESTATION` | Hardware-gated execution. Requires a valid cryptographic hardware quote (AWS Nitro Enclave, SGX, or AMD SEV) verifying the unmutated router logic was run. |
-| **High-Stakes** | `> $10,000` | `ZK_PROOF` | Zero-Knowledge succint proof (e.g., Groth16 over poseidon hash system). Verifies that a mathematically sound and private correctness proof was generated and posted to the ledger, guaranteeing zero-leakage. |
+| **High-Stakes** | `> $10,000` | `ZK_PROOF` | Zero-Knowledge succinct proof (e.g., Groth16 over poseidon hash system). Verifies that a mathematically sound and private correctness proof was generated and posted to the ledger, guaranteeing zero-leakage. |
