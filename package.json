@@ -136,6 +136,7 @@
     "check:promotion-attribution": "node scripts/exercise-promotion-attribution.mjs",
     "check:phase2-predicate-status": "node scripts/check-phase2-predicate-status.mjs",
     "dogfood:improve-harness": "node scripts/dogfood-improve-harness.mjs",
+    "dogfood:grant-attempt": "node scripts/dogfood-grant-attempt.mjs",
     "check:attestation-presence": "node scripts/exercise-attestation-presence.mjs",
     "check:phase2-suite-d": "node scripts/phase2-suite-d-test.mjs",
     "check:phase2-suite-i": "node scripts/phase2-suite-i-test.mjs",
