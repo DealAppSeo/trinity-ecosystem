@@ -1,0 +1,33 @@
+{
+  "surface": "repid-engine + supabase project qnnpjhlxljtqyigedwkb (repid_agents)",
+  "collectedAt": "2026-08-17T02:40:00.000Z",
+  "collectedBy": "claude-code session claude/trust-layer-red-team-ujpq6a",
+  "collectedVia": "service-role SQL (trigger/function introspection + a deterministic behavioural clamp test on a throwaway, deleted in-block)",
+  "authorization": "Follow-up to the user-authorized repid-engine griefing test; investigating the event-vs-live-score divergence it surfaced.",
+  "question": "Is the divergence (event stores repid_after=990/repid_delta_applied=-10 while live current_repid stays 1000) an intended protection or a ledger bug?",
+  "answer": "BOTH: a GOOD protective control (the earned floor) causes a LOW ledger-accuracy defect (the event overstates the applied penalty).",
+  "mechanism_verified": {
+    "trigger": "trg_repid_earned_floor — BEFORE UPDATE OF current_repid ON repid_agents",
+    "trigger_body": "NEW.peak_repid := greatest(NEW.peak_repid, OLD.peak_repid, NEW.current_repid); v_floor := coalesce(NEW.floor_override, tier_lower_bound(NEW.peak_repid)); IF NEW.current_repid < v_floor THEN NEW.current_repid := v_floor; END IF;",
+    "tier_lower_bound": ">=8000->8000, >=5000->5000, >=1000->1000, >=500->500, else 0",
+    "two_floors_root_cause": "The JS pipeline (src/scoring/pipeline.ts) writes the event's repid_after/repid_delta_applied from its own applyToScore()+clampRepidLoud(), which clamps to a GLOBAL REPID_MIN. It then UPDATEs repid_agents.current_repid=new_repid, which the DB trigger re-clamps to the PEAK-based tier_lower_bound(peak_repid). When tier_lower_bound(peak) > REPID_MIN, the two disagree and only the DB one binds — so the event records movement against the wrong (looser) floor."
+  },
+  "behavioural_proof_pure_sql": [
+    { "step": "baseline", "wrote": null, "live_current": 1000, "live_peak": 1000 },
+    { "step": "write 990 (penalty, peak1000 floor1000)", "wrote": 990, "live_current": 1000, "live_peak": 1000, "note": "clamped UP to floor" },
+    { "step": "write 1200 (reward)", "wrote": 1200, "live_current": 1200, "live_peak": 1200, "note": "reward sticks, peak ratchets" },
+    { "step": "write 950 (penalty, peak1200 floor1000)", "wrote": 950, "live_current": 1000, "live_peak": 1200, "note": "clamped to earned floor 1000" },
+    { "step": "write 400 (deep penalty)", "wrote": 400, "live_current": 1000, "live_peak": 1200, "note": "clamped to earned floor 1000" }
+  ],
+  "event_vs_live_sample_from_grief_test": {
+    "event_repid_after": 990,
+    "event_repid_delta_applied": -10,
+    "live_current_repid_after": 1000,
+    "actual_movement": 0,
+    "overstatement": -10
+  },
+  "reconciliation_tripwire_blindspot": "appliedScoreReconciles() checks the JS decomposition's internal consistency (before + decay + delta + clamp == after); it does NOT compare the JS after against the post-trigger live current_repid, so it cannot catch this class.",
+  "severity": "Low — audit/ledger-accuracy, not exploitable; arises from a PARTIAL control (the earned floor CAPS a griefing drain at the floor — corrected 2026-08-17: it does NOT zero it; 164/176 agents have a drainable gap above their floor, REPID-ENG-001). But repid_score_events cannot be summed to reconstruct current_repid, and repid_delta_applied overstates movement at/near the earned floor.",
+  "recommended_fix": "Make the JS applier clamp to the same floor the DB trigger uses — coalesce(floor_override, tier_lower_bound(peak_repid)) — so the event's repid_after/repid_delta_applied equal the actual post-trigger movement; or store BOTH calculated and true-applied (post-clamp) with distinct labels. The DB trigger is the source of truth; the event should mirror it.",
+  "cleanup": "Both throwaways deleted (grief agent by id; floor-proof agent inside its DO block). The 3 remaining 'redteam'-named rows (trinity-redteam-synth-finder/subject/accuser, created 2026-06-03) are the repid-engine team's pre-existing fixtures — NOT created or touched by this session."
+}

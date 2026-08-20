@@ -115,6 +115,16 @@ const RETRACTED = [
       'the query counted only policies naming anon and dropped PUBLIC-role policies; ' +
       'effective access is 193 readable / 60 writable of 621 tables',
   },
+  {
+    id: 'repid-drain-zero',
+    pattern: /zero\s+live-score\s+drain|live-score\s+drain\s+(?:magnitude\s+)?(?:is\s+|of\s+)?zero|griefing[^.\n]{0,40}magnitude\s+(?:is\s+)?zero/i,
+    claim: 'the unauthenticated score-event path causes zero live-score drain (REPID-ENG-001)',
+    truth:
+      'measured on a throwaway agent sitting exactly on its earned floor, so its drainable gap was zero ' +
+      'by construction. trg_repid_earned_floor only clamps current_repid UP to the floor; a penalty above ' +
+      'it applies in full. Measured 2026-08-17: 164/176 agents (93%) have a drainable gap (avg 295, max ' +
+      '2000 pts) and CAN be drained down to their earned floor by the unauthenticated path',
+  },
 ];
 
 /**
@@ -138,6 +148,11 @@ const ALLOWED = new Set([
   // Records the 137/4 figures in order to retract them, in the same document
   // that first published them.
   'docs/FULL-STACK-E2E-ASSESSMENT-2026-08-14.md',
+  // Record the 'zero live-score drain' figure in order to retract it and carry
+  // the corrected magnitude (REPID-ENG-001, retracted 2026-08-17).
+  'docs/RED-TEAM-REPID-ENGINE-2026-08-17.md',
+  'docs/RED-TEAM-EXECUTIVE-SUMMARY-2026-08-17.md',
+  'scripts/redteam/ledger.json',
   // Carry the 2026-08-17 floor-census retraction, naming the withdrawn figure
   // beside the corrected one because a reader who met the old number needs to
   // recognise it; that is the whole function of those lines.

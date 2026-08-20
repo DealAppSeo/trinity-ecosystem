@@ -101,6 +101,22 @@ const chain = (n, startId = 1) => {
   return out;
 };
 
+/**
+ * A GENUINELY anchored run: entry 0 is a true genesis (null link, dated
+ * BEFORE the cutover — proven adoption, not a placeholder), and every entry
+ * after it chains normally under `hasher`. Distinct from `chain()`, whose
+ * entry 0 carries a synthetic external link standing in for a page boundary.
+ */
+const genesisChain = (n, startId = 1) => {
+  const out = [entry(startId, { created_at: BEFORE, previous_entry_hash: null })];
+  for (let i = 1; i < n; i += 1) {
+    const e = entry(startId + i);
+    e.previous_entry_hash = hasher(out[i - 1]);
+    out.push(e);
+  }
+  return out;
+};
+
 // ── the assertion that carries the file ─────────────────────────────────────
 
 check('A STRUCTURALLY SOUND CHAIN WITH NO HASHER IS NOT_CHECKED', () => {
@@ -114,29 +130,54 @@ check('A STRUCTURALLY SOUND CHAIN WITH NO HASHER IS NOT_CHECKED', () => {
   match(r.detail, /Structure is not integrity/, 'and name the distinction');
 });
 
-check('supplying the formula turns the same chain VERIFIED', () => {
-  // Proves the NOT_CHECKED above is about missing evidence, not a verifier that
-  // can never pass.
+check('an UNANCHORED window stays NOT_CHECKED even with every inside link matching (HAL-001)', () => {
+  // `chain()`'s entry 0 carries a synthetic external link — standing in for a
+  // real chain's first row when a query only returns a PAGE of it. Every link
+  // INSIDE the window recomputes and matches, but the window's own beginning
+  // was never shown to this verifier — indistinguishable from a truncation
+  // attack (delete the head, the tail is still internally consistent). Until
+  // 2026-08-17 this asserted VERIFIED here, which was HAL-001: the red team's
+  // reachability search found that was the ONLY way this function could ever
+  // reach VERIFIED, meaning every VERIFIED it emitted was over an unanchorable
+  // window. Fixed by capping the outcome on `windowStartUnverifiable`, below.
   const r = verifyHalChain(chain(5), { hasher });
-  eq(r.outcome, 'VERIFIED', 'a fully recomputed chain verifies');
-  eq(r.linksVerified, 4, 'four links between five entries');
-  eq(r.linksNotChecked, 0, 'nothing checkable was left unchecked');
-  // The first entry's inbound link points OUTSIDE the window. Reported, but not
-  // counted as a gap — counting it made VERIFIED unreachable for every possible
-  // window, which this assertion is what caught.
+  eq(r.outcome, 'NOT_CHECKED', 'an unanchored window must not claim VERIFIED, however clean the inside is');
+  eq(r.linksVerified, 4, 'four links between five entries still recomputed and matched');
+  eq(r.linksNotChecked, 0, 'nothing INSIDE the window was left unchecked — the cap is about the boundary');
   eq(r.windowStartUnverifiable, true, 'the window boundary is reported, not hidden');
+  match(r.detail, /UNANCHORED/, 'the detail must name why, not just say NOT_CHECKED');
+});
+
+check('a TRUE GENESIS window — provably the beginning — reaches VERIFIED (HAL-001)', () => {
+  // The other half of the fix: entry 0 here is a real pre-cutover adoption row
+  // (null link, dated before chaining began), which is NOT the same fact as
+  // `chain()`'s synthetic external link above — there is nothing behind this
+  // null to hide, because chaining did not exist yet, and the row's own
+  // timestamp is the proof. Every link past it recomputes and matches, and now
+  // nothing caps the outcome. This is the counterexample that used to be
+  // unreachable: an anchored VERIFIED that HAL-001's search could not find.
+  const r = verifyHalChain(genesisChain(6), { hasher });
+  eq(r.outcome, 'VERIFIED', 'a genuinely anchored, fully recomputed chain verifies');
+  eq(r.linksVerified, 5, 'five links between six entries');
+  eq(r.linksNotChecked, 0, 'the genesis entry is not a gap — there was nothing there to check');
+  eq(r.windowStartUnverifiable, false, 'the start is anchored — proven, not merely assumed');
 });
 
 check('A PARTIALLY VERIFIED CHAIN IS NOT A VERIFIED ONE', () => {
-  // One unrecomputable link in the middle caps the whole run.
+  // One unrecomputable link in the middle caps the whole run. Built on
+  // genesisChain (anchored), not chain (unanchored), so this isolates the
+  // mid-window-gap failure from the boundary failure two tests up — otherwise
+  // an unanchored window with an ALSO-flaky hasher would report "UNANCHORED",
+  // not this message, and the assertion below would be testing the wrong path.
   // A formula that cannot render ONE entry: realistic, and the only way to get
   // a genuine mid-window gap without also breaking the chain.
-  const c = chain(5);
-  const flaky = (e) => { if (e.id === c[2].id) throw new Error('shape not supported'); return hasher(e); };
+  const c = genesisChain(6);
+  const flaky = (e) => { if (e.id === c[3].id) throw new Error('shape not supported'); return hasher(e); };
   const r = verifyHalChain(c, { hasher: flaky });
   truthy(r.linksVerified > 0, 'some links were checked');
   truthy(r.linksNotChecked > 0, 'and some were not');
   eq(r.outcome, 'NOT_CHECKED', 'so the run is not verified');
+  eq(r.windowStartUnverifiable, false, 'this window IS anchored — the failure is the gap, not the boundary');
   match(r.detail, /partially verified chain is not a verified one/, 'reason');
 });
 

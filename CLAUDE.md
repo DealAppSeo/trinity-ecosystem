@@ -50,6 +50,7 @@ already been wrong once — see LESSONS A4.
 | `*.vercel.app` for this repo | Vercel project `ai-trinity-symphony-landing` (`prj_EtbAAh789ySdcT0AZc8cgZNui3lt`) |
 | `trustrails.dev`, `www.trustrails.dev` | Vercel project **`trustrails`** (`prj_y0aIbpcHHJfGd8TcruunVxVYmLVI`) — **NOT `trustrails-dev`** |
 | `hyperdag.org` | Vercel project **`hyperdag-trust`** — **NOT `hyperdag-org`** |
+| `trustshell.dev`, `www.trustshell.dev` | Vercel project **`trustshell-landing`** (`prj_ye1cqfvwyj9axPMXZBdkfB7YCE0k`), repo `DealAppSeo/trustshell` — here the name match **is** real, verified against the `domains` array, not a decoy |
 
 **Two projects here are named after a domain they do not serve, and both have
 already cost a wrong finding** [VERIFIED 2026-08-15 against the Vercel API]:
@@ -67,6 +68,19 @@ already cost a wrong finding** [VERIFIED 2026-08-15 against the Vercel API]:
 
 **Before concluding anything about a live domain from a Vercel project, check the
 project's `domains` array.** Matching the name is not evidence.
+
+**`trustshell.dev` is the case where checking the array CONFIRMED the name-match**
+[VERIFIED 2026-08-16 against the Vercel API] — do not reflexively treat
+`trustshell-landing` as a third decoy just because the two rows above are. Its
+`domains` array holds `trustshell.dev` and `www.trustshell.dev`, it is a Next.js
+app built from `DealAppSeo/trustshell`, and the production deployment serving the
+domain (`dpl_J53jTJ3cXfRJPuQcoV3XtSPzEwC5`, `main` @ `6cfd2d3`) is the current
+production target — production is **not** stale here, unlike `trustrails.dev`. The
+newest *build* is a `target: null` preview, which is the ordinary preview/production
+split, not a drought. **One gap:** `trustshell.dev` has **no `/api/version`**
+[VERIFIED 2026-08-16 via pg_net — 404], so "which commit is live / is a required
+secret set" is not observable from the outside the way it is on the aitrinitysymphony
+surfaces — the Vercel API is the only way to answer it for this domain.
 
 The same Next app runs in **both places with separate environment variables.** A
 200 from the custom domain says nothing about the Vercel deployment, and vice

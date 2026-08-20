@@ -1,0 +1,29 @@
+{
+  "surface": "trustshell.dev",
+  "url": "https://www.trustshell.dev/ (SSR) + 6 entry JS chunks under /_next/static/chunks/",
+  "collectedAt": "2026-08-16T20:18:00.000Z",
+  "collectedBy": "claude-code session claude/trust-layer-red-team-ujpq6a",
+  "collectedVia": "supabase pg_net (net.http_get), response ids 5106 + 5113-5118 (bundles) + 5119 (live auth test); direct curl/browser proxy-denied 403 from this session",
+  "note": "PASSIVE keyless recon. Bundles are world-readable static assets. The Supabase anon key is public by design; the raw token is NOT stored here (it would trip check:secrets and adds nothing) — the decoded claims and the live auth-test result are the observation.",
+  "observations": {
+    "ssrDocument": { "statusCode": 200, "bytes": 126125, "embedsSupabaseRef": false, "embedsAnyKey": false, "sourceMapRefs": 0 },
+    "entryChunksChecked": 6,
+    "entryChunkBytes": 741641,
+    "note_on_coverage": "the 6 JS chunks referenced by the initial SSR document were checked; route-level chunks loaded lazily after hydration were NOT fetched",
+    "backendHostsInBundle": [
+      "https://qnnpjhlxljtqyigedwkb.supabase.co",
+      "https://repid-engine-production.up.railway.app"
+    ],
+    "supabaseKey": {
+      "format": "legacy_jwt",
+      "isNewPublishableOrSecret": false,
+      "claims": { "iss": "supabase", "ref": "qnnpjhlxljtqyigedwkb", "role": "anon", "iat": 1751939591, "exp": 2067515591 }
+    },
+    "liveAuthTest": {
+      "url": "https://qnnpjhlxljtqyigedwkb.supabase.co/rest/v1/",
+      "method": "GET with apikey + Authorization: Bearer <embedded token>",
+      "statusCode": 401,
+      "serverMessage": "Legacy API keys are disabled. Your legacy API keys (anon, service_role) were disabled on 2026-08-04T05:44:42.411291+00:00."
+    }
+  }
+}

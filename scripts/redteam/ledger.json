@@ -1,0 +1,70 @@
+{
+  "_readme": [
+    "Triaged red team findings. An entry here means: the attack still succeeds, somebody owns it,",
+    "and there is a date by which it will be fixed or re-argued. It does NOT mean the finding is closed.",
+    "",
+    "Every entry needs `owner`, `reason` and `reviewBy`, and `scripts/check-redteam.mjs` refuses to run",
+    "without all three. Past `reviewBy` the run FAILS \u2014 a caveat is a debt and this file is where the",
+    "debts are recorded, not where they are forgiven. Removing an entry whose probe still breaches just",
+    "turns the finding back into a NEW_FINDING on the next run, and a probe that starts HOLDING while its",
+    "entry is still here fails too, so the record cannot rot in either direction.",
+    "",
+    "To close a finding: fix the code, watch the probe go HELD, then delete the entry."
+  ],
+  "findings": [
+    {
+      "id": "PAY-001",
+      "owner": "Sean",
+      "severity": "High",
+      "reason": "The dual-signature gate on the payment path counts distinct caller-supplied role strings and verifies no cryptographic material. Accepted for now because (a) both live surfaces currently FAIL CLOSED on receipt minting (LIVE-001), so the path is not issuing receipts, and (b) the fix changes a live authorization gate, which is Sean-gated by the preflight fences. The repo already ships the primitive the fix needs \u2014 countersignContract in lib/trustshell/identity/work-contract.ts is a two-party signature over canonical bytes, which is exactly the shape a CFO/CTO co-signature is.",
+      "reviewBy": "2026-09-15",
+      "firstSeen": "2026-08-16",
+      "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
+    },
+    {
+      "id": "RCPT-001",
+      "owner": "unassigned",
+      "severity": "Low",
+      "reason": "requireAuditSecret compares against the abandoned default with an exact-string equality after trim, so case variants of the same published constant are accepted. No live surface holds a variant today (LIVE-001 evidence, 2026-08-16). One-line fix: normalise case before comparing.",
+      "reviewBy": "2026-09-15",
+      "firstSeen": "2026-08-16",
+      "report": "docs/RED-TEAM-BASELINE-2026-08-16.md"
+    },
+    {
+      "id": "LIVE-002",
+      "owner": "Sean",
+      "severity": "Medium",
+      "reason": "trustshell.dev's client bundle embeds a LEGACY anon Supabase JWT (project qnnpjhlxljtqyigedwkb, decoded role:anon) confirmed DISABLED by a live PostgREST test \u2014 401 'Legacy API keys are disabled' (2026-08-16). SOURCE-CONFIRMED 2026-08-17 in DealAppSeo/trustshell@6cfd2d3 lib/supabase.ts (createClient reads NEXT_PUBLIC_SUPABASE_ANON_KEY). EXTENDS to the server path: supabaseConfigured() checks key PRESENCE not validity, so submitSuggestion (service_role insert) and the /market + /repid sbSelect reads also 401 IF SUPABASE_SERVICE_ROLE_KEY is the legacy service_role JWT (disabled same date) \u2014 server env NOT CHECKED. Fails CLOSED (nil confidentiality; anon key is public and dead); cost is availability \u2014 any Supabase feature silently broken, same root cause as the 217-day-dead aitrinitysymphony lead form. Fix: redeploy DealAppSeo/trustshell with NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_ AND SUPABASE_SERVICE_ROLE_KEY=sb_secret_ (Sean; repo not push-attached here).",
+      "reviewBy": "2026-09-15",
+      "firstSeen": "2026-08-16",
+      "report": "docs/RED-TEAM-TRUSTSHELL-DEV-2026-08-16.md, docs/RED-TEAM-TRUSTSHELL-SOURCE-2026-08-17.md"
+    },
+    {
+      "id": "REPID-ENG-001",
+      "owner": "Sean",
+      "severity": "Medium",
+      "reason": "repid-engine's PUBLIC score-event path /api/v1/agents-external/:id/score-event has no auth (rate-limit only, no ownership check) \u2014 live-confirmed 2026-08-17: an unauthenticated POST reached the scoring handler (HTTP 400 'prompt is required', not 401) against deployed_commit 0b4b391 which matches the reviewed source. The score itself is HAL-computed server-side (a caller cannot write a delta or outcome), so this is an ATTRIBUTION hole, not score fabrication: anyone with an agent UUID (public via /passport + leaderboard) can inject HAL-scored decisions into that agent's history \u2014 polluting hallucination stats, dragging it toward the floor with bad answers, or burning HAL/LLM cost (60/IP/min). Impact bounded by HAL (can't fabricate a high score; penalties need a fact-check quorum + penalty-guard trigger + floor). The code's own comment says 'Sprint A8 will harden auth' \u2014 a known alpha gap. Fix already exists on the sibling bearer path: requireApiKey(['score_event']) + agent_id ownership check (403 on mismatch); apply it here or restrict the public path to an allowlisted importer. Not applied here \u2014 repid-engine is a separate repo, not push-attached, and hardening a live auth path is Sean's. GRIEFING MAGNITUDE MEASURED 2026-08-17 (user-authorized throwaway agent, created+attacked+deleted, 0 rows left): two UNAUTHENTICATED submissions each scored vetoed/hal_score=1/delta -10 (HTTP 200) and were ATTRIBUTED to the victim; the throwaway's LIVE current_repid held at 1000. CORRECTED 2026-08-17 (cross-checked via PR #81's repid_agents map, then measured): the throwaway sat EXACTLY on its earned floor (peak=current=1000=tier_lower_bound(1000)), so its drainable gap was ZERO BY CONSTRUCTION \u2014 the measurement sampled its floor, not the path. trg_repid_earned_floor only raises current_repid UP to coalesce(floor_override, tier_lower_bound(peak_repid)) (verified from the trigger source); a penalty landing ABOVE that floor applies in full, and a session with app.bypass_repid_floor='true' skips the clamp via an early RETURN NEW. VERIFIED against live repid_agents 2026-08-17: 164/176 agents (93%) have a drainable gap (current_repid > floor), avg 295 pts, max 2000, 48438 total drainable points; only 12/176 sit at floor like the throwaway did. So the earlier 'live-drain ZERO / drain-to-floor REFUTED' claim is RETRACTED \u2014 do not cite it: an unauthenticated caller CAN drain a targeted agent's current_repid down to its earned floor (bounded by the drainable gap, NOT to zero; cannot go below floor, cannot fabricate a high score). Confirmed impact: unauthenticated ATTRIBUTION + history/stats pollution (hallucination_rate, passport/card history) + BOUNDED live-score drain to the earned floor for 93% of agents, all at 60/IP/min + real HAL cost-burn. Severity Medium, ARGUABLY HIGH \u2014 the drain is unauthenticated, widespread (164/176, up to 2000 pts) and a targeted griefing/defamation vector; bounded-to-floor + HAL-veto-gating keep it below Critical, escalation is the open call. Ledger divergence tracked separately as REPID-ENG-003.",
+      "reviewBy": "2026-09-17",
+      "firstSeen": "2026-08-17",
+      "report": "docs/RED-TEAM-REPID-ENGINE-2026-08-17.md"
+    },
+    {
+      "id": "REPID-ENG-003",
+      "owner": "unassigned",
+      "severity": "Low",
+      "reason": "The score-event ledger OVERSTATES applied penalties vs the live score, VERIFIED 2026-08-17. Root cause: TWO FLOORS, only one binds. The JS pipeline writes repid_score_events.repid_after/repid_delta_applied from applyToScore()+clampRepidLoud() (clamps to a GLOBAL REPID_MIN), then UPDATEs repid_agents.current_repid; the DB trigger trg_repid_earned_floor (BEFORE UPDATE OF current_repid) re-clamps UP to the PEAK-based tier_lower_bound(peak_repid). When tier_lower_bound(peak) > REPID_MIN (any agent that earned above the bottom tier), a below-floor penalty is absorbed (live moves 0) but the event keeps the full negative delta. Proven behaviourally: writes of 990/950/400 to an agent at earned floor 1000 all clamped to 1000; the grief-test event stored repid_after=990/delta_applied=-10 while live current_repid=1000 (actual movement 0). appliedScoreReconciles() is blind to it \u2014 it checks the JS decomposition's internal consistency, not JS-after vs post-trigger live. Severity LOW: audit-accuracy, not exploitable, and it arises from a PARTIAL control (the earned floor CAPS griefing's live-score drain at the floor — zero only for the 12/176 agents already at floor, bounded but NONZERO for the other 93%; see REPID-ENG-001's 2026-08-17 correction, which retracts the earlier 'magnitude ZERO' reading). But repid_score_events cannot be summed to reconstruct current_repid, and it feeds REPID-ENG-001's event-log pollution. Fix: clamp the JS applier to the same floor the trigger uses (coalesce(floor_override, tier_lower_bound(peak_repid))) so the event mirrors the actual movement, or store calculated AND true-applied with distinct labels. Left unassigned: the fix is a repid-engine code change (separate repo, not push-attached), not a Sean-gated infra action.",
+      "reviewBy": "2026-10-17",
+      "firstSeen": "2026-08-17",
+      "report": "docs/RED-TEAM-REPID-ENGINE-2026-08-17.md"
+    },
+    {
+      "id": "ERC8004-001",
+      "owner": "Sean",
+      "severity": "Medium",
+      "reason": "Two deployer/attestor keys in this repo's git history are LIVE and FUNDED on Base Sepolia (84532), the operative chain for the ERC-8004 identities \u2014 VERIFIED read-only 2026-08-17 via pg_net JSON-RPC. 0xf6eE1768 (committed 2026-05-11 in src/services/repid-attestation.ts, fallback removed 2026-07-31 but key persists in history): nonce 120, 0.0367 ETH, and it is the on-chain MINTER of the ERC-8004 agent identities (mint tx 0xa9e991 -> IdentityRegistry 0x8004a818). 0xdf6b8215 (CLAUDE.md DEPLOYER_KEY / deployer_wallet): nonce 111, 0.0596 ETH. CORRECTS CLAUDE.md's OPEN item, which says 0xdf6b8215 has 'balance 0, nonce 0' \u2014 that is MAINNET; on the operative testnet chain both are active+funded, so the exposure is real, not inert. MITIGANTS (held): reputation-write authority is ROTATED to 0xb2426888 (not leaked), so reputation writes aren't forgeable via these keys; and value at risk is testnet ETH only (mainnet inert). Impact: identity-anchor control on the operative chain \u2014 anyone with repo history holds the funded key that minted the identities. Escalates to High/Critical if this moves to mainnet unrotated. FIX: rotate the keys per docs/KEY-ROTATION.md. BLOCKED_FOR_SEAN \u2014 CLAUDE.md is explicit no agent session runs the rotation (needs the live key in a transcripted context, which is how it leaked). NOT CHECKED: whether the current EIP-712 attestation signer HYPERDAG_ATTESTOR_PRIVATE_KEY is the rotated key or still 0xf6eE (off-chain, env-only). ATTESTOR SIGNER \u2014 investigated 2026-08-17 (asked to confirm with Sean): the ACTIVE public attestation (/repid/verify + /repid/:id/attest) uses ed25519 SIGNING_KEY_DEV, NOT the leaked EVM key. The EIP-712 EVM attestor (HYPERDAG_ATTESTOR_PRIVATE_KEY) is wired ONLY on x402-inbound (generateAttestation, emitted in the X-HYPERDAG-REPID-ATTESTATION header after a settled payment) and is NOT persisted (reputation_attestations holds 2 deferred placeholders, signing_address 0x0). So whether it is the leaked 0xf6eE or rotated is NOT observable without settling an x402 payment or reading the Railway env \u2014 BLOCKED_FOR_SEAN. Exact question: is HYPERDAG_ATTESTOR_PRIVATE_KEY the key for 0xf6eE1768, or fresh? Sean verifies via the boot log '[RepIdAttestationService] Attestor Address: 0x...' or HYPERDAG_ATTESTOR_ADDRESS. If 0xf6eE -> ESCALATE to High (forgeable x402 attestations); if fresh -> stays Medium.",
+      "reviewBy": "2026-09-17",
+      "firstSeen": "2026-08-17",
+      "report": "docs/RED-TEAM-ERC8004-2026-08-17.md"
+    }
+  ]
+}
