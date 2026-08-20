@@ -139,7 +139,7 @@
     },
     "grants_caveats": {
       "type": "object",
-      "description": "Optional grants-aware adapter limits specifying principal-to-principal capability limits and delegation constraints.",
+      "description": "Optional grants-aware adapter limits specifying principal-to-principal capability limits, delegation constraints, and revocation behaviors.",
       "properties": {
         "max_calls": {
           "type": "integer",
@@ -150,6 +150,16 @@
           "type": "number",
           "minimum": 0,
           "description": "Maximum aggregate USD value of transactions or payouts authorized under this grant."
+        },
+        "require_active_grant": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, the adapter must perform an on-chain or gateway check to verify the grant ID has not been revoked. Adapters MUST execute fail_closed immediately if a grant is revoked."
+        },
+        "enforce_expiration": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, the adapter must evaluate the grant validity period, executing fail_closed immediately if the current block/time exceeds the grant expiration bounds."
         }
       },
       "additionalProperties": false

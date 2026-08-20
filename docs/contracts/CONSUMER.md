@@ -148,4 +148,17 @@ To integrate seamlessly with the Trust Kernel's principal-to-principal delegatio
 
 When evaluating a delegated execution request, the Trust Kernel's Grants gate checks these caveats against current usage, automatically executing `fail_closed` and propagating a `rate_limit` error if any caveat thresholds are exceeded.
 
+---
+
+## 8. ERC-7579 Modular Account Integration
+
+To achieve maximum operational safety and prevent key theft or unauthorized asset drain defects, the preferred execution host for a delegated grant is an **ERC-7579 Compatible Modular Smart Account**.
+
+Under this architecture:
+1.  **Permission Isolation over Key Sharing:** Autonomous agents never receive direct custody of private key material. Sharing private key credentials presents severe security vulnerabilities.
+2.  **Scoped Modular Executors:** Instead, the agent's decentralized identity (`did`) is registered as an authorized modular executor or custom validator module on the principal’s smart account.
+3.  **On-Chain Caveat Reinforcement:** The smart account's execution module strictly enforces delegation boundaries, verifying that each transactional invocation respects the maximum invocation count (`max_calls`) and aggregate value limit (`max_value_usd`) of the active grant.
+4.  **Instant Cryptographic Revocation:** Revocations or expirations declared within the Trust Kernel's Grants endpoint map directly to modular smart contract state switches, immediately disabling the agent module’s execution permissions on-chain.
+
+
 

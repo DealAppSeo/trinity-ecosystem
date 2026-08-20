@@ -89,6 +89,29 @@ Under the ERC-8004 posture, security is proportional to the value at risk (**Sec
         }
       ]
     },
+    "zkvm_pipeline": {
+      "type": "object",
+      "description": "Optional zkVM execution pipeline parameters required for high-stakes ZK_PROOF verification.",
+      "properties": {
+        "guest_program_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$",
+          "description": "The cryptographic hash of the compiled guest program executed inside the zkVM (e.g., RISC0, SP1)."
+        },
+        "snark_verifier_id": {
+          "type": "string",
+          "pattern": "^did:[a-zA-Z0-9_.:%-]+$",
+          "description": "The decentralized identifier or contract address of the on-chain SNARK verifier."
+        },
+        "public_input_order": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The deterministic sequence of public inputs exposed by the zkVM guest program."
+        }
+      },
+      "required": ["guest_program_hash", "snark_verifier_id", "public_input_order"],
+      "additionalProperties": false
+    },
     "metadata": {
       "type": "object",
       "required": [
