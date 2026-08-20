@@ -37,6 +37,8 @@ import { createChecker } from './lib/harness-compile.mjs';
 
 const { check, truthy, report } = createChecker('pay-custody-shadow');
 
+import { barrelText } from './lib/barrel-text.mjs';
+
 const read = (p) => readFileSync(p, 'utf8');
 const ROUTE = 'app/api/trustrails/pay/route.ts';
 const CUSTODY_SHADOW = 'lib/trustshell/CustodyShadow.ts';
@@ -44,7 +46,11 @@ const BARREL = 'lib/trustshell/index.ts';
 
 const route = read(ROUTE);
 const custodyShadowSrc = read(CUSTODY_SHADOW);
-const barrel = read(BARREL);
+// The barrel is TWO files since 2026-08-19: `index.ts` re-exports `portable.ts`
+// with `export *`, so reading index.ts alone reports CustodyShadow as missing
+// while every consumer of '@/lib/trustshell' still sees it. Reachability is the
+// invariant; the file was only ever the proxy.
+const barrel = barrelText(BARREL);
 
 /** Comments stripped, same technique and same reason as check-pay-brief.mjs:
  * this file's own prose mentions the exact identifiers it checks for. */
@@ -56,8 +62,22 @@ const routeCode = stripComments(route);
 // ── the request accepts a proof ─────────────────────────────────────────────
 
 check('controlProof is destructured from the request body', () => {
-  truthy(/const\s*\{[^}]*\bcontrolProof\b[^}]*\}\s*=\s*await\s+req\.json\(\)/.test(routeCode),
-    'controlProof must be read from the same destructure as agentName/amountUSDC');
+  // The INVARIANT is that controlProof comes out of the same destructure as
+  // agentName and amountUSDC — one read of one body, so a proof cannot be taken
+  // from a different source than the payment it authorises.
+  //
+  // The MECHANISM changed on 2026-08-19 and this assertion was pinned to it.
+  // Request signing needs the raw bytes: `req.json()` consumes the stream, and a
+  // signature computed over a re-serialised object verifies a different string
+  // than the caller signed, because key order and whitespace do not survive the
+  // round trip. So the route now reads `req.text()` once and `JSON.parse`s it.
+  // Both forms are accepted here; the destructure is what is asserted.
+  truthy(
+    /const\s*\{[^}]*\bcontrolProof\b[^}]*\}\s*=\s*(await\s+req\.json\(\)|JSON\.parse\(rawBody\))/.test(
+      routeCode
+    ),
+    'controlProof must be read from the same destructure as agentName/amountUSDC'
+  );
 });
 
 // ── the shadow is imported and constructed with the PAY identity, not the

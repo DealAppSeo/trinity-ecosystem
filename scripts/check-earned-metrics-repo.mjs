@@ -24,7 +24,11 @@ import { localTsc } from './local-tsc.mjs';
 // inline verdict-provenance's actual source so the real provenanceOf runs,
 // rather than a second reimplementation drifting from it.
 const outDir = mkdtempSync(join(tmpdir(), 'trustshell-earned-metrics-repo-'));
-const provenanceSrc = readFileSync('lib/trustshell/verdict-provenance.ts', 'utf8');
+const issuerSrc = readFileSync('lib/trustshell/issuer-stake.ts', 'utf8');
+const provenanceSrc = readFileSync('lib/trustshell/verdict-provenance.ts', 'utf8').replace(
+  "import { refusesToIssue } from './issuer-stake';",
+  ''
+);
 const metricsSrc = readFileSync('lib/trustshell/EarnedMetrics.ts', 'utf8');
 const repoSrc = readFileSync('lib/trustshell/EarnedMetricsRepo.ts', 'utf8')
   .replace(
@@ -37,9 +41,14 @@ const repoSrc = readFileSync('lib/trustshell/EarnedMetricsRepo.ts', 'utf8')
     'const getSupabaseAdmin = (): any => { const c: any = new Proxy(() => c, { get: () => c }); return c; };'
   )
   .replace(/^import \{[\s\S]*?\} from '\.\/EarnedMetrics';\n/m, '')
-  .replace("import { provenanceOf } from './verdict-provenance';", '');
+  .replace("import { provenanceOf } from './verdict-provenance';", '')
+  .replace(
+    "import { consultFloor } from './floor-decay-consult';",
+    'const consultFloor = (..._args: unknown[]): any => ({ kind: "not_checked", floor: 0, reason: "isolated-suite stub" });'
+  )
+  .replace("import type { FloorDecision } from './repid-floor-decay';", 'type FloorDecision = any;');
 
-writeFileSync(join(outDir, 'EarnedMetricsRepo.ts'), `${provenanceSrc}\n${metricsSrc}\n${repoSrc}`);
+writeFileSync(join(outDir, 'EarnedMetricsRepo.ts'), `${issuerSrc}\n${provenanceSrc}\n${metricsSrc}\n${repoSrc}`);
 
 let m;
 try {

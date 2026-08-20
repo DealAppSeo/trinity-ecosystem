@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://repid.dev/schemas/capability-declaration.schema.json",
+  "title": "Adapter Capability Declaration Schema",
+  "description": "A vendor-agnostic, versioned schema that every compute, LLM, storage, or routing adapter must satisfy to integrate with the Trust Harness.",
+  "x-provenance": {
+    "status": "AUTHORITATIVE",
+    "authored_by": "GA (Gemini Agent / authoritative lane), 2026-08-19",
+    "why": [
+      "Replacing the CC stand-in reconstruction with our authoritative, production-grade Adapter Capability Declaration Schema.",
+      "The stand-in treated this as an agent self-claim contract with policy thresholds, whereas our authoritative version is the strict, vendor-agnostic adapter specification required for real integrations in the Trust Harness.",
+      "Hardened to support precise ANFIS routing optimization metrics and secure fail-closed operational behaviors."
+    ],
+    "reconciled": {
+      "on": "2026-08-19",
+      "against": "main @ 39670f4",
+      "why": "Checked against main for the same kind of collision found in events.v1.json. All of GA's changes here are additive or strictly tightening (additionalProperties:false, currency, max_budget_limit_usd, routing_fail_behavior, an expanded failure_modes enum) except one real shape break: latency_class changes from a plain string enum (main) to a required object {classification, expected_latency_ms, p95_latency_ms} (this version). A grep of both repos' TypeScript for `latency_class` found no current consumer, so today's blast radius is zero -- kept as GA wrote it, flagged here so whoever wires the first real consumer picks the object shape deliberately rather than discovering the break at runtime."
+    }
+  },
+  "type": "object",
+  "required": [
+    "adapter_version",
+    "vendor",
+    "cost_model",
+    "latency_class",
+    "degradation_class",
+    "region_edge",
+    "failure_modes"
+  ],
+  "properties": {
+    "adapter_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "vendor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cost_model": {
+      "type": "object",
+      "required": ["usd_per_1k_input", "usd_per_1k_output", "fixed_overhead_usd"],
+      "properties": {
+        "usd_per_1k_input": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The cost in USD per 1,000 input tokens."
+        },
+        "usd_per_1k_output": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The cost in USD per 1,000 output tokens."
+        },
+        "fixed_overhead_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Flat connection or initiation overhead fee in USD per invocation."
+        },
+        "currency": {
+          "type": "string",
+          "default": "USD",
+          "enum": ["USD"],
+          "description": "Billing currency standard."
+        },
+        "max_budget_limit_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum allowed cost ceiling per single invocation to prevent runaway billing loop defects."
+        }
+      },
+      "additionalProperties": false
+    },
+    "latency_class": {
+      "type": "object",
+      "required": ["classification", "expected_latency_ms", "p95_latency_ms"],
+      "description": "Quantitative and qualitative latency profile to support ANFIS routing optimization.",
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": ["instant", "fast", "balanced", "deep"],
+          "description": "Qualitative speed category."
+        },
+        "expected_latency_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mean/expected response duration under nominal load conditions."
+        },
+        "p95_latency_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "95th percentile latency cutoff threshold. The router will trigger timeout fallbacks exceeding this limit."
+        }
+      },
+      "additionalProperties": false
+    },
+    "degradation_class": {
+      "type": "object",
+      "required": ["rate_limit_behavior", "routing_fail_behavior", "fallback_supported"],
+      "description": "Rules governing degraded network states and fail-closed behaviors.",
+      "properties": {
+        "rate_limit_behavior": {
+          "type": "string",
+          "enum": ["429_backoff", "fail_closed"]
+        },
+        "routing_fail_behavior": {
+          "type": "string",
+          "enum": ["fail_closed", "degrade_with_penalty", "bypass"],
+          "description": "Routing lane fail-closed policy. 'fail_closed' is standard and mandatory for production-security lanes to prevent unmonitored silent bypasses."
+        },
+        "fallback_supported": {
+          "type": "boolean",
+          "description": "Whether the adapter can seamlessly fail over to a local/sibling node without throwing a fatal exception."
+        }
+      },
+      "additionalProperties": false
+    },
+    "region_edge": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "failure_modes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "context_length_exceeded",
+          "content_filter_block",
+          "timeout",
+          "rate_limit",
+          "auth_failure",
+          "upstream_error",
+          "signature_invalid"
+        ]
+      },
+      "minItems": 1,
+      "description": "Explicit list of standard failure signatures the adapter can return, allowing the router to execute precise recovery steps."
+    }
+  }
+}

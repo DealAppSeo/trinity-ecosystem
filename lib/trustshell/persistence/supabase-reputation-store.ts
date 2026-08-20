@@ -34,7 +34,7 @@
 // Applying it is Sean's call.
 
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import type { ReputationRecord, ReputationStore } from '@/lib/trustshell/harness/reputation';
+import type { ReputationRecord, ReputationStore } from '../harness/reputation';
 
 const TABLE = 'agent_repid';
 const ID_COLUMN = 'agent_name';

@@ -22,7 +22,7 @@
 // `max_retry_exceeded` branch. An exception gets caught somewhere generic and
 // attributed to the wrong component; a named state stays traceable.
 
-import type { Clock } from '@/lib/trustshell/harness/types';
+import type { Clock } from './types';
 
 /**
  * Deep-clone checkpoint state.

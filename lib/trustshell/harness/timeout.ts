@@ -60,7 +60,7 @@
 // The alternative — expiring the ledger on a timer — would make the leak
 // invisible again, which is the failure mode this whole file exists to catch.
 
-import type { Clock, ExpertId } from '@/lib/trustshell/harness/types';
+import type { Clock, ExpertId } from './types';
 
 /**
  * Which deadline fired.

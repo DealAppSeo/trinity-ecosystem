@@ -27,9 +27,9 @@ import {
   type RoutingDecision,
   type Task,
   cosineSimilarity,
-} from '@/lib/trustshell/harness/types';
-import type { CapacityGovernor } from '@/lib/trustshell/harness/capacity';
-import type { LeakyBucketLimiter } from '@/lib/trustshell/harness/leaky-bucket';
+} from './types';
+import type { CapacityGovernor } from './capacity';
+import type { LeakyBucketLimiter } from './leaky-bucket';
 
 export interface RouterConfig {
   /** Relative pull of capability/embedding fit. */

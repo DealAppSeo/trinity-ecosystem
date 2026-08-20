@@ -1,0 +1,26 @@
+{
+  "_generated": {
+    "from": "docs/policy/authority-policy.v0.5.yaml",
+    "by": "scripts/generate-policy-json.mjs",
+    "warning": "DO NOT EDIT. Regenerate from the YAML; check:authority-runtime fails on drift."
+  },
+  "meta": {
+    "version": "0.5"
+  },
+  "authority": {
+    "A": "min(R, 100 * sqrt(S_usd))",
+    "builder_floor": 500
+  },
+  "decay": {
+    "lambda_sigma": 0.5
+  },
+  "composite": {
+    "weights": {
+      "S": 0.35,
+      "P": 0.2,
+      "H": 0.15,
+      "Q": 0.1,
+      "E": 0.2
+    }
+  }
+}

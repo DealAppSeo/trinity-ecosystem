@@ -57,9 +57,9 @@
 // time. Jitter draws from an injected `Rng` for the same reason — a schedule
 // that calls `Math.random()` cannot be asserted on.
 
-import type { Rng } from '@/lib/trustshell/harness/router';
-import { AttemptTimeoutError } from '@/lib/trustshell/harness/timeout';
-import type { Clock, ExpertId } from '@/lib/trustshell/harness/types';
+import type { Rng } from './router';
+import { AttemptTimeoutError } from './timeout';
+import type { Clock, ExpertId } from './types';
 
 /**
  * What the caller knows at the moment a failure arrives.

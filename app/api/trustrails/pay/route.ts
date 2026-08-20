@@ -11,10 +11,26 @@ import {
 import { bftEnforcementMode } from '@/lib/trustshell/BFTAuthorizer';
 import { EarnedMetricsRepository } from '@/lib/trustshell/EarnedMetricsRepo';
 import { toScoringInputs } from '@/lib/trustshell/EarnedMetrics';
+import { rewardFor, rewardReason, isPermittedReward } from '@/lib/trustshell/reward';
+import { idempotentDecision } from '@/lib/trustshell/reward-idempotency';
+import { RewardLedger } from '@/lib/trustshell/RewardLedger';
+import { loadAuthorityPolicy, effectiveAuthority } from '@/lib/trustshell/authority-policy';
+import { CollateralRepository } from '@/lib/trustshell/CollateralRepository';
+import POLICY_DOC from '@/lib/trustshell/authority-policy.generated.json';
+import { payAuthMode, payAuthDecision, verifyPaySignature, SIGNATURE_HEADER, TIMESTAMP_HEADER } from '@/lib/trustshell/pay-auth';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import {
+  evaluateContractedPayment,
+  mayApproveAfterContract,
+} from '@/lib/trustshell/identity/payment-contract';
 
 export async function POST(req: NextRequest) {
-  const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } = await req.json();
+  // The RAW body, read once. `req.json()` consumes the stream, so a signature
+  // computed over a re-serialised object would verify a DIFFERENT string than the
+  // caller signed — key order and whitespace are not preserved by a round trip.
+  const rawBody = await req.text();
+  const { agentName, amountUSDC, recipientAddress, purpose, signatures, controlProof } =
+    JSON.parse(rawBody);
 
   const kya        = new KYAValidator();
   const bft        = new BFTAuthorizer();
@@ -24,6 +40,8 @@ export async function POST(req: NextRequest) {
   const zkp        = new ZKPAttestationService();
   const calc       = new RepIDCalculator();
   const earnedMetrics = new EarnedMetricsRepository();
+  const rewardLedger = new RewardLedger();
+  const collateral = new CollateralRepository();
   // Lazy client, per lib/CLAUDE.md — a getter, not a field initialiser holding a
   // live client, so nothing is constructed at import time.
   const custodyShadow = new CustodyShadow(() => getSupabaseAdmin(), undefined, PAY_AUDIENCE, PAY_CAPABILITY, PAY_ACTION);
@@ -35,6 +53,35 @@ export async function POST(req: NextRequest) {
   const paymentId = crypto.randomUUID();
 
   try {
+    // ---- STEP 0: AUTHENTICATION, IN OBSERVE MODE -------------------------
+    //
+    // This route has never had authentication. The only barrier is that
+    // `agentName` must exist in `agent_kya_registry` — a lookup, not a
+    // credential, and agent names are not secret.
+    //
+    // Whether the route should be callable by anyone is a POLICY question, so
+    // this ships the same way ControlProof and BFT did on this same route:
+    // evaluate, disclose, change nothing. `allow` is true for every verdict
+    // while PAY_AUTH_MODE is observe. What it produces is
+    // `wouldDenyUnderEnforcement` — the number nobody can currently answer, and
+    // the reason flipping the switch would otherwise be a guess.
+    const authVerdict = await verifyPaySignature({
+      rawBody,
+      signature: req.headers.get(SIGNATURE_HEADER),
+      timestamp: req.headers.get(TIMESTAMP_HEADER),
+      secret: process.env.TRUSTRAILS_HMAC_SECRET,
+      now: Date.now(),
+    });
+    const auth = payAuthDecision(authVerdict, payAuthMode(process.env));
+    if (!auth.allow) {
+      return NextResponse.json({
+        approved: false,
+        stage: 'authentication',
+        reason: auth.detail,
+        auth: { mode: auth.mode, outcome: auth.outcome },
+      }, { status: 401 });
+    }
+
     // Step 1: KYA Validation
     const kyaResult = await kya.validate(agentName, amountUSDC);
     if (!kyaResult.kya_verified) {
@@ -108,6 +155,41 @@ export async function POST(req: NextRequest) {
         thresholdSource: repidResult.thresholdSource,
       }, { status: 503 });
     }
+
+    // ---- effectiveAuthority, IN OBSERVE MODE --------------------------------
+    //
+    // The FIRST live consumer of docs/policy/authority-policy.v0.5.yaml. That
+    // file sat at soft-live because nothing in the runtime read it — a policy
+    // nothing reads is a document. This reads it (through the generated JSON
+    // mirror, which check:authority-runtime fails on if it drifts from the YAML)
+    // and computes A_eff = min(R_route, 100*sqrt(S_usd)) * 1[builder >= 500].
+    //
+    // It DECIDES NOTHING. Same posture as the ControlProof shadow and the auth
+    // check on this route: evaluate, disclose, change no outcome. Two reasons,
+    // and the second is the interesting one:
+    //
+    //   1. Turning a new ceiling on unilaterally could deny live payments.
+    //   2. IT WOULD DENY EVERY PAYMENT ANYWAY, because S_usd is NOT_CHECKED for
+    //      every agent — there is no join key from an agent to its deposits, and
+    //      `agent_kya_registry.collateral_staked` is a LITERAL (50.000000 for
+    //      all 12 agents, summing to 600 USDC against the 50 that exists).
+    //      Enforcing against unknown backing would be correct and would also
+    //      stop the product; reporting it is what makes the gap visible.
+    const policyLoad = loadAuthorityPolicy(POLICY_DOC);
+    const agentCollateral = await collateral.forAgent(agentName);
+    const authority = policyLoad.ok
+      ? effectiveAuthority(
+          {
+            // r_route, not r_ledger: A_eff must never rise because decay was
+            // latent. No decay envelope is open today, so these coincide — the
+            // distinction is recorded before it can start mattering silently.
+            rRoute: repidResult.repidScore,
+            stakeUsd: agentCollateral.usd,
+            builderScore: repidResult.repidScore,
+          },
+          policyLoad.policy
+        )
+      : null;
 
     // Addendum 2: KYA commitment. NOT a zero-knowledge proof — it never was.
     // The object used to carry proofSystem 'groth16' over a SHA-256 of a
@@ -201,6 +283,30 @@ export async function POST(req: NextRequest) {
     }
     const maxWithdrawal = kyaResult.enforcedPerTxLimit;
 
+    // LIVE CALLER. The spine existed; this route used to approve without it.
+    // Fail closed if the contracted path is not invoked or does not VERIFIED.
+    // BFT stays observe-only after this — this is not flipping #95 or BFT.
+    const contracted = await evaluateContractedPayment({
+      brief: {
+        paymentId,
+        agentName,
+        amountUSDC,
+        recipientAddress,
+        purpose: purpose ?? '',
+      },
+      env: process.env,
+    });
+    if (!mayApproveAfterContract(contracted)) {
+      return NextResponse.json({
+        approved: false,
+        stage: 'contracted_evaluation',
+        reason: contracted.invoked
+          ? `contracted evaluator ${contracted.outcome}`
+          : contracted.reason,
+        contracted,
+      }, { status: contracted.invoked ? 403 : 503 });
+    }
+
     // The panel needs the actual decision context, not just an amount — the
     // recipient, the stated purpose and the agent's standing are what a
     // reviewer weighs. In observe mode this returns immediately without
@@ -267,8 +373,47 @@ export async function POST(req: NextRequest) {
     // Step 5: Fireblocks Pre-Auth (demonstrates architecture)
     const fbPreAuth = await fireblocks.generatePreAuth(receipt);
 
-    // Step 6: Update RepID (reward successful compliance)
-    await kya.updateRepID(agentName, 10, `Successful compliant payment: ${amountUSDC} USDC`);
+    // Step 6: Update RepID — only if the reward has been EARNED.
+    //
+    // This was `updateRepID(agentName, 10, 'Successful compliant payment')`,
+    // unconditional, directly beneath a response that could say `bft.evaluated:
+    // false` and `settlement.simulated: true` on the same request. The payload
+    // disclosed both absences; the write asserted the opposite, and the write is
+    // the half that persists — into `repid_score`, and from there into
+    // `repid_tier` and both spending limits, which bound the NEXT request.
+    //
+    // Defaults made it the normal path, not an edge case: BFT_ENFORCEMENT_MODE
+    // defaults to observe (passed:true, evaluated:false) and the executor
+    // simulates whenever AGENT_SOPHIA_SECRET_BYTES is absent. See lib/trustshell/reward.ts.
+    const reward = rewardFor({
+      consensusEvaluated:  bftProof.evaluated,
+      consensusPassed:     bftProof.passed,
+      settlementSimulated: execution.simulated,
+      settlementConfirmed: execution.confirmed,
+    });
+    if (!isPermittedReward(reward.delta)) {
+      throw new Error(`refusing an out-of-band RepID delta on the payment path: ${reward.delta}`);
+    }
+    // EARNED is not the same as PAYABLE. `updateRepID` has no key and no
+    // constraint, so replaying one accepted payment pays again — and the write
+    // recomputes the tier and both spending limits, raising the ceiling for the
+    // next request. The claim below is one conditional UPDATE against
+    // `kya_compliance_receipts`, whose `receipt_id` is already UNIQUE, so two
+    // concurrent replays cannot both win. See lib/trustshell/reward-idempotency.ts.
+    //
+    // Withholds on an unreadable or absent ledger, and says which. The columns
+    // arrive with 20260819013000_repid_reward_idempotency.sql, deliberately
+    // UNAPPLIED — until then this reports WITHHELD_LEDGER_ABSENT rather than
+    // paying a reward it cannot record.
+    const claim =
+      reward.delta === 0
+        ? { state: 'claimed' as const, detail: 'not consulted; nothing was earned' }
+        : await rewardLedger.claim(receipt.receiptId, reward.delta);
+    const payout = idempotentDecision(reward.delta, claim.state);
+
+    if (payout.award) {
+      await kya.updateRepID(agentName, reward.delta, rewardReason(reward, amountUSDC));
+    }
 
     // Say what actually happened. "executed" for a run that touched no chain,
     // or "consensus-authorized" for a check that never ran, is the failure this
@@ -313,6 +458,53 @@ export async function POST(req: NextRequest) {
         weakestConfidence: earned.evidence.weakestConfidence,
         observationsTruncated: earned.truncated,
         detail: earned.evidence.detail,
+        // What this payment did or did not add to the score, and why. Withheld
+        // is disclosed for the same reason `bft.evaluated:false` is: a silent
+        // zero and an earned zero look identical to the caller otherwise.
+        reward: {
+          // What was EARNED...
+          delta:    payout.award ? reward.delta : 0,
+          outcome:  reward.outcome,
+          unmet:    reward.unmet,
+          reason:   reward.reason,
+          // ...and whether it was PAYABLE. Two separate questions, disclosed
+          // separately: an earned-but-duplicate reward and an unearned one are
+          // both zero and mean entirely different things.
+          paid:     payout.award,
+          payout:   payout.outcome,
+          payoutReason: payout.reason,
+          // True when a human needs to look — a ledger outage, or the unapplied
+          // migration. Surfaced rather than logged, for the same reason
+          // `bft.evaluated:false` is.
+          needsOperator: payout.needsOperator,
+        },
+      },
+      contracted,
+      floorDecay: earned.floorDecay ?? null,
+      // effectiveAuthority, computed from the policy FILE and disclosed. Nothing
+      // here gated this payment — see the observe-mode note at the call site.
+      effectiveAuthority: {
+        mode:          'observe',
+        policyVersion: policyLoad.ok ? policyLoad.policy.version : null,
+        policyLoaded:  policyLoad.ok,
+        aEff:          authority?.aEff ?? null,
+        outcome:       authority?.outcome ?? 'NOT_CHECKED',
+        bindingTerm:   authority?.bindingTerm ?? null,
+        detail:        authority?.detail ?? (policyLoad.ok ? 'not computed' : policyLoad.detail),
+        collateral: {
+          usd:     agentCollateral.usd,
+          outcome: agentCollateral.outcome,
+          detail:  agentCollateral.detail,
+        },
+      },
+      // What authentication decided, and what it WOULD have decided. Disclosed
+      // for the same reason `bft.evaluated:false` is: an observe-mode allow and
+      // a genuine pass are indistinguishable to a caller otherwise.
+      auth: {
+        mode:      auth.mode,
+        outcome:   auth.outcome,
+        wouldDenyUnderEnforcement: auth.wouldDenyUnderEnforcement,
+        detail:    auth.detail,
       },
       bft: {
         evaluated: bftProof.evaluated,

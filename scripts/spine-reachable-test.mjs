@@ -36,6 +36,7 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { localTsc } from './local-tsc.mjs';
+import { barrelText } from './lib/barrel-text.mjs';
 
 let passed = 0;
 const failures = [];
@@ -96,7 +97,11 @@ const SPINE = [
   'handoff',
 ];
 
-const barrel = readFileSync('lib/trustshell/index.ts', 'utf8');
+// TWO files since 2026-08-19: `index.ts` is `export * from './portable'` plus
+// the host adapters. Every spine module moved to portable.ts and stayed exactly
+// as reachable from '@/lib/trustshell' — reading index.ts alone reported all
+// eleven as unreachable, which was the measurement breaking, not the property.
+const barrel = barrelText('lib/trustshell/index.ts');
 for (const mod of SPINE) {
   truthy(
     barrel.includes(`'./identity/${mod}'`),

@@ -96,6 +96,8 @@
 //
 // The view's `bft` arm is dead: `bft_payment_evaluations` has 0 rows.
 
+import { refusesToIssue } from './issuer-stake';
+
 /** Three outcomes. Two would collapse "cannot tell" into "fine". */
 export type ProvenanceOutcome = 'VERIFIED' | 'NOT_CHECKED' | 'FAILED';
 
@@ -171,16 +173,23 @@ export function provenanceOf(event: ScoringEvent): ProvenanceVerdict {
     };
   }
   if (event.providerAttempted === false) {
-    return {
-      outcome: 'FAILED',
-      countsTowardScore: false,
-      detail:
-        'an ACTIONABLE verdict issued having consulted no provider. This is ' +
-        '`refusesToIssue` from issuer-stake.ts, applied at the point the verdict would ' +
-        'move a score. Measured on the live scoring path there are 2,443 zero-provider ' +
-        'events and ZERO of them are actionable catches — so today this branch fires on ' +
-        'nothing, and the gate exists to keep it that way.',
-    };
+    if (
+      refusesToIssue({
+        providerAttempted: false,
+        vetoed: event.vetoed,
+      })
+    ) {
+      return {
+        outcome: 'FAILED',
+        countsTowardScore: false,
+        detail:
+          'an ACTIONABLE verdict issued having consulted no provider. This is ' +
+          '`refusesToIssue` from issuer-stake.ts, applied at the point the verdict would ' +
+          'move a score. Measured on the live scoring path there are 2,443 zero-provider ' +
+          'events and ZERO of them are actionable catches — so today this branch fires on ' +
+          'nothing, and the gate exists to keep it that way.',
+      };
+    }
   }
   return {
     outcome: 'VERIFIED',

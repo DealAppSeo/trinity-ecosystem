@@ -20,9 +20,11 @@
 // is genuinely unreachable here, and forcing it green would be the lie.
 
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync, statSync, readdirSync } from 'node:fs';
 import { join as pathJoin } from 'node:path';
 import assert from 'node:assert/strict';
+import bs58 from 'bs58';
 import { createPostgrestStub } from './postgrest-stub.mjs';
 import { VerificationLedger } from './ledger.mjs';
 import { buildSeed, AGENTS } from './seed.mjs';
@@ -174,6 +176,11 @@ try {
     // uses, and it must not re-enable the abandoned default (which is refused
     // by name).
     TRUSTRAILS_HMAC_SECRET: 'e2e-audit-hmac-secret-not-a-real-one',
+    // Live /pay now fail-closes without contracted-evaluation seeds.
+    // These are e2e-only identities, not production keys.
+    TRUSTSHELL_DOER_SEED: bs58.encode(randomBytes(32)),
+    TRUSTSHELL_AUDITOR_SEEDS: `${bs58.encode(randomBytes(32))},${bs58.encode(randomBytes(32))}`,
+    TRUSTSHELL_MIN_AUDITOR_TIER: '0',
     // Left unset on purpose, and asserted below:
     //   AGENT_SOPHIA_SECRET_BYTES -> SolanaExecutor must report simulated
     //   BFT_ENFORCEMENT_MODE      -> observe mode, verdict NOT CHECKED
@@ -223,6 +230,9 @@ try {
     assert.equal(torch.body.repid.fullyMeasured, true,
       `expected all four signals measured, got unmeasured=${JSON.stringify(torch.body.repid.unmeasured)}`);
     assert.ok(torch.body.repid.score > 0, 'measured agent scored 0');
+    assert.equal(torch.body.contracted.invoked, true, 'approved payment skipped the contracted path');
+    assert.equal(torch.body.contracted.outcome, 'VERIFIED');
+    assert.notEqual(torch.body.contracted.checkerDid, torch.body.contracted.doerDid);
     return `score=${torch.body.repid.score} tier=${torch.body.repid.tier}`;
   });
 
