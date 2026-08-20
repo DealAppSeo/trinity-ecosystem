@@ -4,6 +4,87 @@ Newest entry on top. See `README.md` in this directory for format and what this 
 
 ---
 
+## 2026-08-20 — from CC — sprint: rebase + open PR, then Founder Mode event schema
+
+Director mode is standing (Sean). Two tasks, in order. Task 1 is the one step still blocking the
+work you already did correctly; task 2 is new.
+
+### Task 1 — rebase onto current main and open a PR (blocking)
+
+`claude/reconcile-ga-contracts-integer-delta @ a97886a` has all four content fixes correct
+(verified — see the entry below). What it does **not** have is a current base. Measured just now:
+merge-base is `16bec68` (PR #115), and main has since gained **#117, #118, #119, #120** — you are
+3 commits behind. There is also **no open PR** for this branch: #110 was its only PR and it is
+*closed*, not merged. So none of your work is currently reviewable or mergeable.
+
+Exact commands, from a clone of `trinity-ecosystem`:
+
+```
+git fetch origin main
+git checkout claude/reconcile-ga-contracts-integer-delta
+git rebase origin/main
+# resolve conflicts if any, then:
+git push --force-with-lease origin claude/reconcile-ga-contracts-integer-delta
+```
+
+Then open a **new** PR against `main` (do not try to reopen #110 — a closed PR cannot track new
+work). Title it for the contracts reconciliation; in the body list the four fixes.
+
+**One thing the rebase will change, in your favour:** `CONSUMER.md` cites PR #117 for the Modular
+Smart Account / ERC-7579 policy. On your current base that is a *forward reference* — #117 wasn't
+in your history yet, so the citation pointed at something the branch couldn't see. After the
+rebase it resolves for real, because #117 (`e52558b`) is now an ancestor. Confirm that after
+rebasing rather than assuming it.
+
+Capabilities: `reasoning, repo_read, repo_write`. If dispatched via `run-agent.mjs`, use
+`--requires reasoning,repo_read,repo_write`. No `db_read`, no `cross_repo_read` — everything above
+is inlined and this task touches only this repo.
+
+### Task 2 — Founder Mode event schema (contracts only, no runtime)
+
+New product surface being built on `trustshell.dev`: a **Founder Mode** toggle, off by default.
+When a user (initially Sean, as user #1) flips it ON, feedback and simulation actions they take
+must be recorded as **founder** events — deliberate product/ops signal from the person building
+the system — and must never be mixed into **end-user** telemetry, which is what product decisions
+get measured against. Conflating the two would poison the only real usage signal the product has.
+
+Spec the event contract for this. Contracts only — schema plus a short rationale note in the same
+place your other contract work lives. **No runtime code, no UI, no DB migration.** Cover:
+
+- A discriminated shape separating `founder_feedback` from `user_feedback`. **The discriminant is
+  named `actor`, with values `founder` / `user`** — this is now fixed by Sean's spec and by the
+  shipped first slice (`trustshell` PR #61, `lib/founder-mode.ts`), so use that name rather than
+  inventing a synonym; two names for one field is how a contract and its implementation drift.
+  It must be an explicit stored field, never inferred later from who the user happens to be —
+  a founder browsing normally produces genuine end-user signal, and re-deriving `actor` at read
+  time would silently relabel it. That inference is exactly the failure mode this exists to
+  prevent.
+- Event kinds a founder can emit that an end-user cannot: at minimum `product_bug`, `ux_note`,
+  `sim_run`, `mark_for_gaterun`.
+- Fields that make an event actionable without being an incident: what surface it came from, what
+  the founder was trying to do, free-text note. **Do not** put credentials, provider API keys, raw
+  prompt bodies, or any wallet private material in the schema — `trustshell` is a public repo and
+  the vault (`lib/vault.ts`) deliberately never lets keys leave the browser.
+- An explicit statement of what is NOT yet decided: durable storage. The first slice stores these
+  browser-locally (IndexedDB, same pattern as run history) precisely so that no schema gets frozen
+  into a 196-table production database before the contract is agreed. Your schema is what a durable
+  store would later be built against — say so, don't imply it already exists.
+
+**Already shipped, do not duplicate:** `trustshell` PR #61 ships the toggle, the four event
+kinds above, versioned founder goals, and 14 role packs (`lib/role-packs.ts`) as pure data —
+5 C-level plus 9 function roles, each with a default capability list and `spendCapUsd: 0`. Role
+packs are grant-shape *templates*, not a new product or a new backend concept; if your schema
+needs to reference a role, reference the pack id (`pai`, `cto`, `cfo`, `cmo`, `coo`, `bizdev`,
+`researcher`, `security`, `legal`, `design`, `content`, `customer`, `devrel`, `red_team`). Do not
+re-specify the packs themselves.
+
+Same capabilities and `--requires` as task 1.
+
+Land task 1 first — it's blocking. When either lands, open/push the PR; that's what wakes CC.
+CC verifies MEASURED-vs-claimed, wires it, and issues the next sprint.
+
+---
+
 ## 2026-08-20 — from CC — @ a97886a: all 4 content fixes correct, one step left
 
 Re-reviewed `claude/reconcile-ga-contracts-integer-delta @ a97886a` (isolated the actual fix
