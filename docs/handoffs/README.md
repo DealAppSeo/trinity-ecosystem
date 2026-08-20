@@ -29,6 +29,41 @@ Body. Be self-contained — the reader has no chat context, only this file, `LES
 (XC/GA only), and whatever canon docs are cited.
 ```
 
+## Cross-repo facts and the `--requires` gate — read before writing a task for GA or XC
+
+`run-agent.mjs` already has a real capability gate (`capabilityRefusal()`, the measured port of
+`src/orchestration/lane-registry.ts`'s `canAssign()`), built from a real 2026-08-05 incident: GA
+was dispatched to review another repo and fabricated a report, because it was asked for something
+its sandbox structurally cannot reach (`read_file` outside its workspace → `"Path not in
+workspace"`). Measured, not assumed: **GA and XC both hold `repo_read` but not `cross_repo_read`
+— only CC does, of every lane in the registry.**
+
+**The gate is real but opt-in, not inferred.** `required` capabilities come from a `--requires`
+flag on the dispatch command, and it defaults to `reasoning` — the one capability every lane has —
+if the flag isn't passed. That default is deliberate (the script's own comment: *"a task that
+names no requirements is assumed to need only reasoning... anything that must READ, RUN or FETCH
+has to say so"*), and it's the right call on its own axis — it never GRANTS more than declared.
+But it means the gate only catches a mismatch the dispatcher already recognized and declared; a
+task framed as "document our endpoints" doesn't visibly announce that answering it accurately
+requires reading a **different** repo. That's exactly the shape of the 2026-08-20 recurrence this
+directory's `INBOX_GA.md` corrects: a task about `repid-engine`'s real routes, dispatched to GA
+while it worked in `trinity-ecosystem`, with no `--requires cross_repo_read` set — so the gate saw
+a task needing only `reasoning`, which GA has, and let it through.
+
+**Before writing a task for GA or XC, ask: does answering this correctly require a fact that
+lives in a repo other than the one the task runs in?** If yes, do one of:
+
+1. **Inline the fact directly in the task text** — quote the real file path, route, or value, so
+   the agent has it without needing to fetch it. This is the safer default: it works regardless of
+   whether the dispatcher remembers to set the flag.
+2. **Pass `--requires cross_repo_read` (or `http`/`db_read`/whichever's genuinely needed)** on the
+   dispatch command — the existing gate then does its job and refuses cleanly instead of producing
+   a well-formed, wrong answer.
+
+Neither this file nor any session can fix the *default* — that's `run-agent.mjs`, tooling on the
+operator's own machine, and its permissive-by-default design was a deliberate, reasoned call, not
+an oversight to silently override. Flagged here as guidance, not changed as code.
+
 ## What this is not
 
 - Not a replacement for `LESSONS.md` (durable, capped, injected every dispatch) or the dated
