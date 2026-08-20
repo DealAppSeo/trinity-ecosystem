@@ -73,9 +73,47 @@ Public inputs remain: axis id + \([lo,hi]\) + scheme id; decision bit; `used_S_r
 
 ---
 
+## Suite ZB — zkVM public-input binding (ZR* + attestation bits)
+
+Policy for a future zkVM guest (RISC-V image / program id). **Does not change circuit public inputs** (cross-lane). GateRun only.
+
+Let \(\mathrm{PI}\) be the public-input vector the verifier binds. Let \(C(S_{\mathrm{real}})\) be a hiding commitment to real collateral, not the value.
+
+\[
+\mathrm{PI} = \bigl(
+  \texttt{used\_S\_real},\;
+  \texttt{builder\_ok},\;
+  \texttt{decision},\;
+  C(S_{\mathrm{real}}),\;
+  \texttt{axis\_id},\;
+  [lo,hi],\;
+  \texttt{scheme\_id},\;
+  \texttt{soft\_landing\_active},\;
+  \texttt{program\_id}
+\bigr)
+\]
+
+Witness (never in \(\mathrm{PI}\)): exact \(S_{\mathrm{real}}\), exact \(R^{\mathrm{route}}\), exact axis \(x\), signing key.
+
+| id | predicate | MEASURED iff | FAILED iff | NOT_CHECKED iff |
+|---|---|---|---|---|
+| ZB1 | \(\mathrm{PI}\) omits exact \(S_{\mathrm{real}}\) and \(R^{\mathrm{route}}\) | guest transcript has them only in witness | either value appears in \(\mathrm{PI}\) or receipt body | no zkVM guest |
+| ZB2 | `used_S_real` in \(\mathrm{PI}\) binds \(C(S_{\mathrm{real}})\) | flipping the bit or the commitment invalidates the proof | `used_S_real=true` with simulated-only \(C\) (ZR2/ZR4) | no proof |
+| ZB3 | `decision` bit = \(A^{\mathrm{eff}}\le 100\sqrt{S_{\mathrm{real}}}\) and builder \(\ge 500\) | open measurement or proof of ZR1 | decision true while inequality fails | \(S_{\mathrm{real}}\) unmeasured (A3) |
+| ZB4 | axis range bits bind Z1/Z4 without revealing \(x\) | \(\mathrm{PI}\) has axis id + \([lo,hi]\) only | \(x\) in \(\mathrm{PI}\) (Z2 FAILED) | no circuit (Z1 NOT_CHECKED) |
+| ZB5 | `program_id` / image id is public and pinned | verifier rejects a different image | proof verifies against an unbound program | no guest |
+| ZB6 | `provenWithoutSecret=false` on this path | field false or absent | field true | claims ZK without the field |
+
+ZB1–ZB6 cannot leave NOT_CHECKED into MEASURED without a zkVM guest that actually binds \(\mathrm{PI}\). Open measurement of ZR1 (integer \(R\), measured USD) still counts MEASURED for the **inequality**, never for ZB1/ZB4 (`witnessHidden`).
+
+Attestation bits: `describeCollateralEvalAttestationPresence` → ZB2 + ZR1–ZR4; `describeSoftLandingRangeAttestationPresence` → ZB4 + Z1–Z5. Copy presence into GateRun. Do not set `provenWithoutSecret`.
+
+---
+
 ## What this file does not authorize
 
 - Changing circuit public inputs (cross-lane).  
 - Claiming holder threshold proof.  
 - A new soft-live surface. These suites are **measurement hooks** on blocked/observe ZK and live/soft-live \(A^{\mathrm{eff}}\).
 - Treating `attestation-presence.ts` as a proving system.
+- Shipping a zkVM guest or changing circuit public inputs to match \(\mathrm{PI}\) without cross-lane.
