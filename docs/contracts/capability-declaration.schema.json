@@ -136,33 +136,6 @@
       },
       "minItems": 1,
       "description": "Explicit list of standard failure signatures the adapter can return, allowing the router to execute precise recovery steps."
-    },
-    "grants_caveats": {
-      "type": "object",
-      "description": "Optional grants-aware adapter limits specifying principal-to-principal capability limits, delegation constraints, and revocation behaviors.",
-      "properties": {
-        "max_calls": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Maximum allowed invocation count under this delegated grant."
-        },
-        "max_value_usd": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Maximum aggregate USD value of transactions or payouts authorized under this grant."
-        },
-        "require_active_grant": {
-          "type": "boolean",
-          "default": true,
-          "description": "If true, the adapter must perform an on-chain or gateway check to verify the grant ID has not been revoked. Adapters MUST execute fail_closed immediately if a grant is revoked."
-        },
-        "enforce_expiration": {
-          "type": "boolean",
-          "default": true,
-          "description": "If true, the adapter must evaluate the grant validity period, executing fail_closed immediately if the current block/time exceeds the grant expiration bounds."
-        }
-      },
-      "additionalProperties": false
     }
   }
 }

@@ -130,35 +130,38 @@ Every score transition, decay tick, referral reward, and gate decision is logged
 
 ## 6. MVP Trust Kernel Endpoints
 
-To maintain strict security isolation, the Trust Kernel exposes exactly four core endpoints as its entire external consumer interface. Sibling features or adjacent application domains are excluded by design to prevent cross-domain contamination:
+To maintain strict security isolation and prevent cross-domain contamination between the application and reputation lanes, the Trust Kernel's MVP services operate entirely on the `repid-engine` namespace under `/api/v1/*`. There are exactly three live remote API endpoints exposing the MVP Trust Kernel surface:
 
-1.  **Passport Endpoint (`/api/trustrails/passport`):** Resolves an agent's five-axis reputation scores, tier standings, and active selective-disclosure commitments.
-2.  **Authority Endpoint (`/api/trustrails/authority`):** Computes and returns spending limit and authorization decisions gated by `effectiveAuthority` ($A_{eff}$).
-3.  **Grants Endpoint (`/api/trustrails/grants`):** Tracks, delegates, and evaluates principal-to-principal capability scopes.
-4.  **Activity Endpoint (`/api/trustrails/activity`):** Receives signed scoring events (`DORMANCY_DECAY`, `ECOSYSTEM_REFERRAL`, `IMPACT_REWARD`) and writes them directly to the ledger.
+1.  **Passport Endpoint (`GET /api/v1/passport/:agentId`):** Resolves an agent's current reputation standings, five-axis Pi scores, and active selective-disclosure commitments.
+2.  **Authority Endpoint (`GET /api/v1/authority/:agentId`):** Computes and returns spending limit and routing authorization decisions gated by effective repid and staked collateral ($A_{eff}$).
+3.  **Grants Endpoint (`POST /api/v1/grants` & `GET /api/v1/grants`):** Registers, tracks, and evaluates active principal-to-principal capability delegations.
 
----
-
-## 7. Grants-Aware Adapter Capabilities
-
-To integrate seamlessly with the Trust Kernel's principal-to-principal delegation system, tool and compute adapters can publish resource constraints under the `grants_caveats` property of their capability declarations:
-
-*   **`max_calls` (integer):** Establishes the maximum allowed invocation limit under this delegated grant.
-*   **`max_value_usd` (number):** Declares the aggregate transactional valuation ceiling authorized by this capability.
-
-When evaluating a delegated execution request, the Trust Kernel's Grants gate checks these caveats against current usage, automatically executing `fail_closed` and propagating a `rate_limit` error if any caveat thresholds are exceeded.
+### Activity Sync Note (V1 Gap)
+There is **no live remote Activity Endpoint** in the Trust Kernel today. In compliance with the MVP specification documented in `docs/mvp-grants-api.md` (on `repid-engine`), agent activity log entry scoring remains device-local in an IndexedDB store. This is a recognized V1 integration gap; there is no live remote API route writing activity records directly to the ledger.
 
 ---
 
-## 8. ERC-7579 Modular Account Integration
+## 7. Grants-Aware Capability Constraints
 
-To achieve maximum operational safety and prevent key theft or unauthorized asset drain defects, the preferred execution host for a delegated grant is an **ERC-7579 Compatible Modular Smart Account**.
+To integrate with the Trust Kernel's principal-to-principal delegation gateway, capability executions must map directly to the canonical **`principal_grants.caveats`** vocabulary defined on the `repid-engine` ledger:
 
-Under this architecture:
-1.  **Permission Isolation over Key Sharing:** Autonomous agents never receive direct custody of private key material. Sharing private key credentials presents severe security vulnerabilities.
-2.  **Scoped Modular Executors:** Instead, the agent's decentralized identity (`did`) is registered as an authorized modular executor or custom validator module on the principal’s smart account.
-3.  **On-Chain Caveat Reinforcement:** The smart account's execution module strictly enforces delegation boundaries, verifying that each transactional invocation respects the maximum invocation count (`max_calls`) and aggregate value limit (`max_value_usd`) of the active grant.
-4.  **Instant Cryptographic Revocation:** Revocations or expirations declared within the Trust Kernel's Grants endpoint map directly to modular smart contract state switches, immediately disabling the agent module’s execution permissions on-chain.
+*   **`maxCalls` (integer):** The absolute invocation limit permitted under the delegated grant.
+*   **`maxValue` (number):** The aggregate spending or transaction valuation ceiling authorized by this grant.
+*   **`toolAllowlist` (array of strings):** Explicit list of permitted tools or endpoint slugs the delegate is authorized to execute.
+
+When evaluating a delegated execution request, the Trust Kernel's Grants gate checks incoming capability requests against these active ledger constraints. If the grant has been revoked, has expired, or if any caveat thresholds are exceeded, the gateway executes `fail_closed` immediately.
+
+---
+
+## 8. ERC-7579 Modular Account Integration (Design-Only)
+
+For long-term policy alignment, security planning, and NIST compliance, modular smart accounts represent the preferred target execution host for autonomous agent delegations. 
+
+Developers should consult the official, merged section in **`docs/policy/grants-authority.v0.md` (PR #117)** for the comprehensive security guidelines on ERC-7579 modular account permission boundaries.
+
+### Operational Status (Observe-Only)
+In compliance with the project's engineering discipline, note that the ERC-7579 Modular Smart Account integration is currently a **design and observe-only framework**. No active MSA Solidity modules, smart contract state switches, or execution contracts exist within the live codebase today. It remains a conceptual policy and structural control guide, with no active smart contract runtime enforcing permissions.
+
 
 
 
