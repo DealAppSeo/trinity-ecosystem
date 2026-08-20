@@ -5,19 +5,24 @@
 // real-collateral rules)" -- docs/policy/phase2-e2e-predicates.md, 6 suites
 // (D, R, I, P, X, A), ~40 named predicates.
 //
-// This is NOT a suite of 40 runnable predicates. Building a decay dry-run
-// engine, an impact-scoring pipeline, and a passport/settlement renderer
-// from scratch in one pass -- to satisfy suites D, I, P, X -- is a
-// multi-session undertaking, and a rushed version of it is exactly the
-// "fabricated coverage" this repo's whole culture exists to refuse. What
-// this script does instead: use promotion.ts's own SurfaceClaim/GateRun
-// machinery (the same tool exercise-promotion-attribution.mjs exercised)
-// to say, PER SUITE, precisely what already runs, what it covers, and what
-// is honestly NOT_CHECKED and why -- so "runnable" stops being one vague
-// unmet ask and becomes a structured, re-runnable map with a stage per
-// suite, not silence.
+// UPDATED 2026-08-19 (second pass): D, I, P and X are now real engines, not
+// placeholders -- lib/trustshell/decay-dryrun.ts, impact-score.ts,
+// passport-verification-axis.ts, x402-settlement-rules.ts, each exercised by
+// its own check:phase2-suite-* script against every named predicate AND (for
+// D) the two named fixtures (F-DECAY-SIM, F-DECAY-SETTLE-SPLIT). This did
+// NOT require inventing data the codebase doesn't have: the locked policy
+// doc (authority-policy.v0.5.yaml) turned out to fully specify D's formulas
+// once read in full, I's formula was already complete bar one parameter
+// (delta_0, taken as a required input rather than guessed -- see
+// impact-score.ts's header), P is a thin real connector on D's own sigma
+// output, and X's X1-X4 are a real (honestly UNWIRED -- x402_settlements has
+// no writer anywhere in this repo) rules module while X5 is verified
+// against app/api/trustrails/pay/route.ts's REAL control-flow order. What
+// remains genuinely unbuilt is named below (Suite R's undecidable M4-M8) --
+// this script's job is still to report precisely what runs and what does
+// not, not to declare the whole spec closed.
 //
-// Two suites turned out to already be substantially covered, found by
+// Three suites were already substantially covered before this pass, found by
 // checking rather than assuming:
 //
 //   Suite A (A^eff, shared)      -- check:authority-runtime (fixture) +
@@ -121,28 +126,49 @@ const suites = [
       'referrer/referee family/self relationship -- lane-files.ts is zero-imports by design and ' +
       'cannot see any of these; no such processor was located in this session\'s research',
   ),
-  uncoveredSuite(
+  coveredSuite(
     'Suite D -- decay soft-landing (D1-D14)',
-    'needs a decay dry-run producer that yields idle-week counts and per-tick deltas for real ' +
-      'agents (D4-D11 are a state machine over K ticks, not a pure formula); ' +
-      'docs/policy/phase2-e2e-predicates.md notes the suite must fail closed -- NOT_CHECKED, not a ' +
-      'pass -- exactly when a dry-run cannot produce W, which is the state today',
+    'check:phase2-suite-d',
+    'VERIFIED',
+    false, // 'm' in r=rho*m has no stated formula anywhere locked; decay_rate is read, not derived -- see decay-dryrun.ts header
+    'lib/trustshell/decay-dryrun.ts computes W/K/per-tick integer deltas/the sigma-R_route-R_ledger ' +
+      'envelope/settle-tick split exactly from authority-policy.v0.5.yaml\'s decay: section. ' +
+      'D10/D13 call the REAL effectiveAuthority() (no second A_eff formula); D14 calls the REAL ' +
+      'decideFloor() to show the two decay mechanisms are structurally independent. Both named ' +
+      'fixtures (F-DECAY-SIM, F-DECAY-SETTLE-SPLIT) pass exactly. 24/24 in phase2-suite-d-test.mjs.',
   ),
-  uncoveredSuite(
+  coveredSuite(
     'Suite I -- impact (I1-I6)',
-    'needs the impact-scoring pipeline (iota_sev/iota_who/iota_proof -> I -> delta_imp); ' +
-      'no implementation of this composite was located, only its target formula in the spec',
+    'check:phase2-suite-i',
+    'VERIFIED',
+    false, // delta_0's numeric source is not stated anywhere in the locked docs -- taken as a required param, never guessed
+    'lib/trustshell/impact-score.ts implements I=clip[0,1](iota_sev*iota_who*iota_proof), ' +
+      'delta_imp=round(delta_0*(0.4+1.6*I)), the [-10,+5] clamp and the AUDIT_CONTRIBUTION+I>=0.85 ' +
+      '+8 exception, all against the full locked parameter table. I1 is implemented as the override ' +
+      'it actually is (unproven => 0 outright, not the formula\'s nonzero I=0 floor). 13/13 in ' +
+      'phase2-suite-i-test.mjs.',
   ),
-  uncoveredSuite(
+  coveredSuite(
     'Suite P -- passport soft_landing_active (P1-P5)',
-    'needs the passport-rendering path to assert the field is present (P4) and tracks sigma from ' +
-      'Suite D (P1-P3); depends on Suite D existing first',
+    'check:phase2-suite-p',
+    'VERIFIED',
+    false, // built on Suite D, which is itself not coversWholeClaim
+    'lib/trustshell/passport-verification-axis.ts renders verification_axis.{soft_landing_active,' +
+      'amortization_progress} directly from Suite D\'s real sigma output -- no second sigma ' +
+      'computation. P4 (field always present) is enforced by the return TYPE, not merely tested. ' +
+      'Matches docs/contracts/events.v1.json\'s existing ZKPPassportDisclosure schema. 11/11 in ' +
+      'phase2-suite-p-test.mjs.',
   ),
-  uncoveredSuite(
+  coveredSuite(
     'Suite X -- x402 real-collateral (X1-X5)',
-    'needs the settlement-processing path (simulated vs real) wired to RepID deltas; ' +
-      'CustodyShadow and evaluateContractedPayment observe the payment gate itself but this ' +
-      'session did not locate where a settlement outcome turns into an S/Q/E axis delta',
+    'check:phase2-suite-x',
+    'VERIFIED',
+    false, // X1-X4's rules module is honestly UNWIRED -- x402_settlements has no writer anywhere in this repo
+    'X1-X4: lib/trustshell/x402-settlement-rules.ts, a real decision-rules module shaped to ' +
+      'x402_settlements\'s live schema (is_simulated boolean, confirmed against information_schema) ' +
+      '-- not wired to any caller, and says so. X5: verified against app/api/trustrails/pay/' +
+      'route.ts\'s REAL source order -- the contracted-eval deny (403/503) textually precedes Solana ' +
+      'execution, receipt generation, and every RepID write. 13/13 in phase2-suite-x-test.mjs.',
   ),
 ];
 

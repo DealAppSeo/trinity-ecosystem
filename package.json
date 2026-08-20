@@ -137,6 +137,10 @@
     "check:phase2-predicate-status": "node scripts/check-phase2-predicate-status.mjs",
     "dogfood:improve-harness": "node scripts/dogfood-improve-harness.mjs",
     "check:attestation-presence": "node scripts/exercise-attestation-presence.mjs",
+    "check:phase2-suite-d": "node scripts/phase2-suite-d-test.mjs",
+    "check:phase2-suite-i": "node scripts/phase2-suite-i-test.mjs",
+    "check:phase2-suite-p": "node scripts/phase2-suite-p-test.mjs",
+    "check:phase2-suite-x": "node scripts/phase2-suite-x-test.mjs",
     "build:package": "tsc -p tsconfig.package.json",
     "check:package-install": "node scripts/check-package-install.mjs",
     "check:verifier-independence": "node scripts/check-verifier-independence.mjs"
