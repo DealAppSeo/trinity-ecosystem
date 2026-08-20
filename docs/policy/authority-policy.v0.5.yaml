@@ -31,6 +31,7 @@ meta:
   trust_ecology_profile: docs/policy/trust-ecology-profile.md
   nist_ai_rmf_mapping: docs/policy/nist-ai-rmf-mapping.md
   grants_authority: docs/policy/grants-authority.v0.md
+  progressive_onboarding: docs/policy/progressive-onboarding.v0.md
 
 # ---------------------------------------------------------------------------
 # Status table (authoritative)
@@ -57,6 +58,9 @@ status:
     - trust_ecology_profile            # public vs internal; not a new score
     - nist_ai_rmf_mapping              # Measure/Manage; not certification
     - grants_authority_v0              # mint floors / attenuation / revoke / expiry deny
+    - erc7579_attenuation              # install=mint, uninstall=revoke; observe until G6
+    - zkvm_public_input_binding        # ZB1–ZB6; no circuit change
+    - progressive_onboarding           # no root key to PAI; first spend needs grant
   blocked:
     - doer_verified_work_leaf          # BLOCKED_FOR_CROSS_LANE
     - witnessHidden
@@ -301,6 +305,10 @@ reject:
   - using_shadow_control_proof_to_approve
   - treating_expired_grant_as_soft_allow
   - minting_grant_above_grantor_A_eff
+  - handing_pai_a_root_key
+  - first_spend_without_explicit_grant
+  - constitution_qa_emits_keys
+  - counting_G5_expiry_as_G6_revoke
   - claiming_best_in_class
   - treating_vercel_as_a18
 

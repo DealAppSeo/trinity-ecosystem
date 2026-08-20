@@ -179,7 +179,8 @@ GateRun MEASURED / NOT_CHECKED / FAILED only. No circuits. No new soft-live surf
 
 | file | suites |
 |---|---|
-| `docs/policy/zk-attestation-predicates.md` | Z1–Z5 (axis range); ZR1–ZR5 (\(A^{\mathrm{eff}}\) used \(S_{\mathrm{real}}\) only). `provenWithoutSecret` stays blocked. |
-| `docs/policy/trust-ecology-profile.md` | public vs internal profile |
+| `docs/policy/zk-attestation-predicates.md` | Z1–Z5, ZR1–ZR5, **ZB1–ZB6** zkVM public-input binding. `provenWithoutSecret` blocked. |
+| `docs/policy/trust-ecology-profile.md` | public vs internal profile; frozen six |
 | `docs/policy/nist-ai-rmf-mapping.md` | Measure / Manage for promote/park/reject and \(A^{\mathrm{eff}}\) |
-| `docs/policy/grants-authority.v0.md` | G1–G8 mint floors / attenuation / revoke / expiry deny. Observe. |
+| `docs/policy/grants-authority.v0.md` | G1–G8; **G6a–G6e** (`F-G6`) ready for measurement; ERC-7579 install=mint / uninstall=revoke observe. |
+| `docs/policy/progressive-onboarding.v0.md` | O1–O3. Observe. |
