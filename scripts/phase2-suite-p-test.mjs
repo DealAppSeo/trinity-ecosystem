@@ -59,7 +59,7 @@ const WEEK = 7 * 24 * 60 * 60 * 1000;
 const R_PRE = 3217;
 
 const decaying = Decay.dryRunDecay(
-  { lastActiveAt: NOW - 5.3 * WEEK, lifecycleStatus: 'active', decayRate: 0.02, currentRepid: R_PRE },
+  { lastObservedAt: NOW - 5.3 * WEEK, lifecycleStatus: 'active', decayRate: 0.02, currentRepid: R_PRE },
   NOW
 );
 const ticks = Decay.decayEnvelopeTicks(decaying, R_PRE);
@@ -99,11 +99,11 @@ check('P2: after the settle tick (the same one D11 checks), soft_landing_active 
 
 // ── P3: skip (D1-D3) => soft_landing_active = false ─────────────────────────
 
-const skippedD1 = Decay.dryRunDecay({ lastActiveAt: null, lifecycleStatus: 'active', decayRate: 0.02, currentRepid: 1000 }, NOW);
-const skippedD2 = Decay.dryRunDecay({ lastActiveAt: NOW - WEEK, lifecycleStatus: 'test_only', decayRate: 0.02, currentRepid: 1000 }, NOW);
-const skippedD3 = Decay.dryRunDecay({ lastActiveAt: NOW - WEEK, lifecycleStatus: 'active', decayRate: null, currentRepid: 1000 }, NOW);
+const skippedD1 = Decay.dryRunDecay({ lastObservedAt: null, lifecycleStatus: 'active', decayRate: 0.02, currentRepid: 1000 }, NOW);
+const skippedD2 = Decay.dryRunDecay({ lastObservedAt: NOW - WEEK, lifecycleStatus: 'test_only', decayRate: 0.02, currentRepid: 1000 }, NOW);
+const skippedD3 = Decay.dryRunDecay({ lastObservedAt: NOW - WEEK, lifecycleStatus: 'active', decayRate: null, currentRepid: 1000 }, NOW);
 
-for (const [label, skipped] of [['D1 (last_active_at null)', skippedD1], ['D2 (lifecycle != active)', skippedD2], ['D3 (decay_rate null)', skippedD3]]) {
+for (const [label, skipped] of [['D1 (last-observed timestamp null)', skippedD1], ['D2 (lifecycle != active)', skippedD2], ['D3 (decay_rate null)', skippedD3]]) {
   check(`P3: skip via ${label} => soft_landing_active = false`, () => {
     if (skipped.kind !== 'skip') return `fixture did not skip: kind=${skipped.kind}`;
     const axis = Passport.renderVerificationAxis(skipped);
@@ -114,7 +114,7 @@ for (const [label, skipped] of [['D1 (last_active_at null)', skippedD1], ['D2 (l
 // ── P4: field present on the passport object (missing field => FAIL, not false) ──
 
 check('P4: soft_landing_active key is present on every code path (skip, not_checked, open, closed)', () => {
-  const notChecked = Decay.dryRunDecay({ lastActiveAt: NOW + WEEK, lifecycleStatus: 'active', decayRate: 0.02, currentRepid: 1000 }, NOW);
+  const notChecked = Decay.dryRunDecay({ lastObservedAt: NOW + WEEK, lifecycleStatus: 'active', decayRate: 0.02, currentRepid: 1000 }, NOW);
   const cases = [
     Passport.renderVerificationAxis(skippedD1),
     Passport.renderVerificationAxis(notChecked),

@@ -29,6 +29,26 @@
 // tsconfig instead of one, the same way `pay-auth.ts` imports from
 // `receipt-audit.ts`.
 //
+// ── WHY THE FIELD IS `lastObservedAt`, NOT `repid_agents.last_active_at` ────
+//
+// D1's own predicate text names its input "`last_active_at`" — the CONCEPT of
+// when an agent was last active, not a specific column. Reading it as the
+// literal `repid_agents.last_active_at` column would repeat a trap this
+// codebase already measured and gates on: `check:observation-identity`
+// (`scripts/check-observation-identity.mjs`) FAILS any code that keys
+// recency off that column, because it is written by exactly one narrow
+// database function (`apply_linked_bet_resolution`), by zero lines of this
+// repo, is NULL on 11 of the 12 ratcheted rows, and understates 30-day
+// activity roughly four-fold fleet-wide — "fails in the expensive
+// direction", per that check's own header, because a rule keyed on it
+// expires standing for agents that are demonstrably active. The admissible
+// source, per the same file, is `v_agent_earned_observations.observed_at`
+// (joined on `repid_agents.id`, the uuid key — see `EarnedMetricsRepo.ts`
+// and `check:observation-identity`'s own reasoning on why `agent_id`, the
+// disjoint text column, is the wrong key too). So `DecayAgentState`'s field
+// is named — and must be sourced — for that view's column, not the
+// tempting, textually-matching, and wrong one.
+//
 // ── WHAT IS DIRECTLY SPECIFIED VS WHAT IS THE NARROWEST REASONABLE READING ──
 //
 // D1–D9, D11 and the two named fixtures (F-DECAY-SIM, F-DECAY-SETTLE-SPLIT)
@@ -42,10 +62,10 @@
 //   module does NOT invent one. It reads the agent's own stored `decay_rate`
 //   column directly as `r` (the already-combined per-week rate), matching D3's
 //   own framing ("`decay_rate` NULL ⇒ skip") — `decay_rate` is read, not
-//   derived, the same way `last_active_at` is read, not derived. If `ρ · m`
-//   is ever computed separately from a stored `decay_rate`, this function's
-//   `state.decayRate` input is exactly the seam to feed that in — no code
-//   here needs to change.
+//   derived, the same way `lastObservedAt` is read (from the admissible
+//   view, not derived from anything). If `ρ · m` is ever computed separately
+//   from a stored `decay_rate`, this function's `state.decayRate` input is
+//   exactly the seam to feed that in — no code here needs to change.
 //
 //   The intra-settle σ value during a >50-point SPLIT settle (two ticks) is
 //   not stated — the doc gives both settle-magnitude ENDPOINTS (one tick:
@@ -81,8 +101,14 @@ export const LAMBDA_SIGMA = 0.5;
 export const SETTLE_SPLIT_THRESHOLD_POINTS = 50;
 
 export interface DecayAgentState {
-  /** ms epoch, or null. NULL ⇒ skip (D1) — never invented. */
-  readonly lastActiveAt: number | null;
+  /**
+   * ms epoch, or null. NULL ⇒ skip (D1) — never invented. MUST be sourced
+   * from `v_agent_earned_observations.observed_at` (joined on
+   * `repid_agents.id`) — NEVER from `repid_agents.last_active_at`, which
+   * `check:observation-identity` already measured to be unreliable (NULL on
+   * 11 of 12 ratcheted rows). See this file's header.
+   */
+  readonly lastObservedAt: number | null;
   /** Must equal 'active' to proceed (D2). */
   readonly lifecycleStatus: string;
   /** r, the per-week rate, read directly from the agent row. NULL ⇒ skip (D3). */
@@ -115,8 +141,8 @@ export type DecayDryRunResult =
  * integer split? Pure; produces a result, never writes.
  */
 export function dryRunDecay(state: DecayAgentState, now: number): DecayDryRunResult {
-  if (state.lastActiveAt === null) {
-    return { kind: 'skip', reason: 'last_active_at is NULL (D1) — never invent a timestamp' };
+  if (state.lastObservedAt === null) {
+    return { kind: 'skip', reason: 'last-observed timestamp is NULL (D1) — never invent one' };
   }
   if (state.lifecycleStatus !== 'active') {
     return { kind: 'skip', reason: `lifecycle is "${state.lifecycleStatus}", not "active" (D2)` };
@@ -130,11 +156,11 @@ export function dryRunDecay(state: DecayAgentState, now: number): DecayDryRunRes
   if (!Number.isFinite(state.decayRate) || state.decayRate < 0 || state.decayRate >= 1) {
     return { kind: 'not_checked', reason: `decay_rate ${state.decayRate} is out of the valid [0,1) range for (1-r)^W` };
   }
-  if (now < state.lastActiveAt) {
-    return { kind: 'not_checked', reason: 'last_active_at is in the future; the clock is unusable' };
+  if (now < state.lastObservedAt) {
+    return { kind: 'not_checked', reason: 'last-observed timestamp is in the future; the clock is unusable' };
   }
 
-  const W = (now - state.lastActiveAt) / MS_PER_WEEK;
+  const W = (now - state.lastObservedAt) / MS_PER_WEEK;
   const K = Math.min(8, Math.max(1, Math.ceil(W))); // D4
 
   const r = state.decayRate;

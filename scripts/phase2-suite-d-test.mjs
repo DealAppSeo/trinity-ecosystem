@@ -66,18 +66,18 @@ const WEEK = 7 * 24 * 60 * 60 * 1000;
 
 // ── D1-D3: skip paths ───────────────────────────────────────────────────────
 
-check('D1: last_active_at NULL -> skip', () => {
-  const r = Decay.dryRunDecay({ lastActiveAt: null, lifecycleStatus: 'active', decayRate: 0.0015, currentRepid: 1000 }, NOW);
+check('D1: last-observed timestamp NULL -> skip', () => {
+  const r = Decay.dryRunDecay({ lastObservedAt: null, lifecycleStatus: 'active', decayRate: 0.0015, currentRepid: 1000 }, NOW);
   return r.kind === 'skip' ? true : `expected skip, got ${r.kind}`;
 });
 
 check('D2: lifecycle != active -> skip', () => {
-  const r = Decay.dryRunDecay({ lastActiveAt: NOW - WEEK, lifecycleStatus: 'test_only', decayRate: 0.0015, currentRepid: 1000 }, NOW);
+  const r = Decay.dryRunDecay({ lastObservedAt: NOW - WEEK, lifecycleStatus: 'test_only', decayRate: 0.0015, currentRepid: 1000 }, NOW);
   return r.kind === 'skip' ? true : `expected skip, got ${r.kind}`;
 });
 
 check('D3: decay_rate NULL -> skip', () => {
-  const r = Decay.dryRunDecay({ lastActiveAt: NOW - WEEK, lifecycleStatus: 'active', decayRate: null, currentRepid: 1000 }, NOW);
+  const r = Decay.dryRunDecay({ lastObservedAt: NOW - WEEK, lifecycleStatus: 'active', decayRate: null, currentRepid: 1000 }, NOW);
   return r.kind === 'skip' ? true : `expected skip, got ${r.kind}`;
 });
 
@@ -93,7 +93,7 @@ const kCases = [
 for (const { weeks, expectedK } of kCases) {
   check(`D4: W=${weeks} weeks -> K=${expectedK}`, () => {
     const r = Decay.dryRunDecay(
-      { lastActiveAt: NOW - weeks * WEEK, lifecycleStatus: 'active', decayRate: 0.0015, currentRepid: 3000 },
+      { lastObservedAt: NOW - weeks * WEEK, lifecycleStatus: 'active', decayRate: 0.0015, currentRepid: 3000 },
       NOW
     );
     if (r.kind !== 'decay') return `expected kind=decay, got ${r.kind}`;
@@ -104,7 +104,7 @@ for (const { weeks, expectedK } of kCases) {
 // ── D5, D6: integer per-tick deltas, remainder on last, sum = deltaFull ─────
 
 const midAgent = Decay.dryRunDecay(
-  { lastActiveAt: NOW - 5.3 * WEEK, lifecycleStatus: 'active', decayRate: 0.02, currentRepid: 3217 },
+  { lastObservedAt: NOW - 5.3 * WEEK, lifecycleStatus: 'active', decayRate: 0.02, currentRepid: 3217 },
   NOW
 );
 
