@@ -141,6 +141,7 @@
     "check:phase2-suite-i": "node scripts/phase2-suite-i-test.mjs",
     "check:phase2-suite-p": "node scripts/phase2-suite-p-test.mjs",
     "check:phase2-suite-x": "node scripts/phase2-suite-x-test.mjs",
+    "check:phase2-suite-r-undecidable": "node scripts/phase2-suite-r-undecidable-test.mjs",
     "build:package": "tsc -p tsconfig.package.json",
     "check:package-install": "node scripts/check-package-install.mjs",
     "check:verifier-independence": "node scripts/check-verifier-independence.mjs"

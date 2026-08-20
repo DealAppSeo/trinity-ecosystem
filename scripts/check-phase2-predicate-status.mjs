@@ -17,13 +17,23 @@
 // impact-score.ts's header), P is a thin real connector on D's own sigma
 // output, and X's X1-X4 are a real (honestly UNWIRED -- x402_settlements has
 // no writer anywhere in this repo) rules module while X5 is verified
-// against app/api/trustrails/pay/route.ts's REAL control-flow order. What
-// remains genuinely unbuilt is named below (Suite R's undecidable M4-M8) --
-// this script's job is still to report precisely what runs and what does
-// not, not to declare the whole spec closed.
+// against app/api/trustrails/pay/route.ts's REAL control-flow order.
 //
-// Three suites were already substantially covered before this pass, found by
-// checking rather than assuming:
+// UPDATED again, same day (third pass): Suite R's undecidable M4-M8 are now
+// real too -- lib/trustshell/referral-event-processor.ts, resolving
+// evidence.ref / referee lifecycle_status / self / same-family from
+// repid_agents' actual schema and feeding lane-files.ts's already-locked
+// referralDelta() rather than re-deriving the curve. This is the last suite
+// this script's own history named as genuinely unbuilt -- ALL SEVEN
+// suite-groups now have a real gate behind at least part of them. That does
+// NOT mean the spec is closed: every entry below still states its own
+// coversWholeClaim honestly, and several (Suite A's live-network half,
+// Suite X's X1-X4 unwired half) stay NOT fully covered on purpose. This
+// script's job remains reporting precisely what runs and what does not, not
+// declaring victory.
+//
+// Three suites were already substantially covered before the second pass,
+// found by checking rather than assuming:
 //
 //   Suite A (A^eff, shared)      -- check:authority-runtime (fixture) +
 //                                    check:collateral-live (live, this
@@ -120,11 +130,18 @@ const suites = [
       'delta(n)=clip(round(40/(n+1)),0,c(n)); decidableMutants() asserts M1 (delta(1)>delta(10)), ' +
       'M2 (delta(10)>delta(100)=0), M3 (delta(100)=0). 32/32 in check-lane-files.mjs.',
   ),
-  uncoveredSuite(
+  coveredSuite(
     'Suite R -- referral, undecidable (M4-M8)',
-    'needs a real referral-event processor with evidence.ref, referee lifecycle_status, and ' +
-      'referrer/referee family/self relationship -- lane-files.ts is zero-imports by design and ' +
-      'cannot see any of these; no such processor was located in this session\'s research',
+    'check:phase2-suite-r-undecidable',
+    'VERIFIED',
+    false, // exercised against constructed events shaped to the real schema, not a live event stream -- repid_score_events holds 0 ECOSYSTEM_REFERRAL rows
+    'lib/trustshell/referral-event-processor.ts resolves evidence.ref (M4), referee lifecycle_status ' +
+      '(M5), and referrer/referee self/same-family (M6, via repid_agents.builder_id/squad_id -- ' +
+      'confirmed live columns, not agent_kya_registry\'s differently-named lifecycle_state) into a ' +
+      'real qualified-count sequence, feeding every qualifying referral through lane-files.ts\'s ' +
+      'already-locked referralDelta() rather than re-deriving the curve. M7 (HAL clamp separation) ' +
+      'and M8 (axis Q, never S) asserted directly. M1-M3 re-confirmed THROUGH this new layer, not ' +
+      'just in lane-files.ts directly. 16/16 in phase2-suite-r-undecidable-test.mjs.',
   ),
   coveredSuite(
     'Suite D -- decay soft-landing (D1-D14)',

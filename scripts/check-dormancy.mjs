@@ -154,6 +154,10 @@ const DECLARED = new Map([
     'x402-settlement-rules',
     'the Suite X decision rules (docs/policy/phase2-e2e-predicates.md, second pass 2026-08-19), shaped to `x402_settlements`\'s real live schema. Its consumer is `check:phase2-suite-x`. Deliberately unwired, and says so in its own header: `x402_settlements` has zero readers or writers anywhere in this repo (confirmed by a repo-wide grep) — there is no existing caller to attach this to, only a table it was written to match.',
   ],
+  [
+    'referral-event-processor',
+    'the Suite R undecidable-mutants (M4-M8) processor (docs/policy/phase2-e2e-predicates.md, third pass 2026-08-19), resolving evidence.ref/lifecycle_status/self/same-family from `repid_agents`\' real schema. Its consumer is `check:phase2-suite-r-undecidable` — the gate IS the product, same shape as schema/decoys. Unwired for the same reason `x402-settlement-rules` is: `repid_score_events` holds zero `ECOSYSTEM_REFERRAL` rows (measured live this session), so there is no real event stream to attach a caller to yet.',
+  ],
 ]);
 
 const results = [];
