@@ -188,6 +188,7 @@ lib/**/*.js
 .dogfood-identity-*/
 .attestation-presence-check-*/
 .dogfood-promotion-*/
+.dogfood-grant-*/
 
 # Suite D/I/P/X real-engine check scripts (2026-08-19, second pass).
 .phase2-suite-d-check-*/
