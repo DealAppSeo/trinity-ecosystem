@@ -14,7 +14,7 @@ Everything below marked **MEASURED** was read or run in this session. Everything
 
 ### F1 — Three unrelated constraints all demand the same artifact: a published harness package
 
-The Gloo rule (see §6 for its verification status) is that teams **may build on existing
+The Gloo rule (see §7 for its verification status) is that teams **may build on existing
 technology**, but are **judged on code written during the window**. That single sentence
 decides the architecture:
 
@@ -79,7 +79,7 @@ vision documents imply.
 | **x402** | Built, ~15 modules | facilitator · gate · settlement-verifier · deferred-settlement · recovery-worker · outbound-client · outcome-link · release-retry-worker |
 | **ERC-8004** | Built | canonical-writer · minter · poster · reputation · `zkp/erc8004-linkage.ts` · agent-passport · onchain-outbox |
 | **Outcome + just-culture scoring** | Built and invariant-tested | `outcome-classification.ts` (7 classes) · `repid-confession.ts` (NASA-ASRS, discount 0.4) · `effective-authority.ts` · `x402-outcome-link.ts` (no-proof-no-pay) |
-| **Role → capability → binding contract** | **In flight, this week** | PR #469 (2026-08-22). Aimed explicitly at *"a PAI acting as CMO"*. See §4 |
+| **Role → capability → binding contract** | **In flight, this week** | PR #469 (2026-08-22). Aimed explicitly at *"a PAI acting as CMO"*. See §5 |
 
 **What is NOT ready, stated as gaps rather than omitted:**
 
@@ -233,7 +233,89 @@ installing fifteen.
 
 ---
 
-## 4. The PAI roles — and where I'd push back
+## 4. The publication boundary, and the agent stack
+
+### 4a. Nothing public for ONE ANOTHER until Sept 8 — and why the harness is not that
+
+**Sean's constraint, 2026-08-22:** build nothing public for ONE ANOTHER until the window
+opens. Plan, logic, content and backend only, and be compliant *under any interpretation of
+the rules.* Adopted. Everything ONE ANOTHER — repo, domain, collateral — is drafted and held.
+Drafting is the same work either way, so the hold costs nothing.
+
+**The harness package is a different object, and the distinction is load-bearing.** It is not
+ONE ANOTHER: it is existing TrustShell infrastructure, it already has other consumers
+(TrustTrader, TrustRails, TrustChat), and it names no hackathon project. Publishing it before
+the window makes compliance **stronger**, not weaker:
+
+> An npm publish timestamp is third-party, tamper-evident evidence that this technology
+> predates the window. Without one, the claim rests on a git log a judge is asked to take on
+> faith.
+
+The condition is absolute and cheap: **the package must mention ONE ANOTHER nowhere** — not in
+the README, not in an example, not in a keyword. Under that condition F1 survives Sean's
+constraint intact. (The rule it turns on is still `[UNVERIFIED]` — see §7.)
+
+### 4b. Gloo AI Studio is a provider behind the broker, not a replacement for it
+
+**[UNVERIFIED — every Gloo domain is egress-blocked from an agent session.** `gloo.com`,
+`docs.gloo.com` and `studio.ai.gloo.com` all return `EGRESS_BLOCKED`. What follows is from web
+search summaries only and must be confirmed against the product itself before it is built on.]
+
+Reported capabilities: **drop-in compatibility with OpenAI SDKs**, streaming, tool calling,
+provider failover, spend controls, model routing across OpenAI / Google / Anthropic and open
+models, plus a **Data Engine** for RAG over your own content. Roughly $25/month pay-as-you-go;
+Data Engine on the Pro tier.
+
+The consequence is the useful part. Gloo is **OpenAI-compatible**, which means it is a
+*provider* that sits behind this ecosystem's existing broker — not an alternative to it. That
+is exactly the direction `openai-compat.ts` already argued for:
+
+> The OmniRoute plan has us CONSUME a gateway. This has us BE one. … Both can be true at once —
+> OmniRoute behind us, clients in front — but only this direction acquires users.
+
+Gloo satisfies the Agents Track requirement; TrustShell keeps the verification layer Gloo has
+no equivalent of. Neither displaces the other.
+
+### 4c. The stack questions were mostly already answered
+
+Four of the five questions on the table are settled in this repo already. Re-researching them
+is exactly the cost `PRIOR-WORK-INDEX.md` exists to prevent.
+
+| Question | Answer | Where |
+|---|---|---|
+| LangGraph as the runtime? | **Settled: NO.** Mined four times; four ideas taken (`retry_on`, the run/idle `TimeoutPolicy` split, replay semantics, the error taxonomy). *"Do not review it a fifth."* One future adapter, nothing more | `PRIOR-WORK-INDEX.md` |
+| OpenClaw? | **Adopt as the PAI shell.** Largest community in the category, device-local, model-agnostic. Build the trust layer that plugs into it; do not rebuild the layer | tooling triage |
+| The universal socket? | **Already built** — `repid-engine/src/routes/v1/openai-compat.ts`. Any OpenAI client changes one base URL and gets HAL scoring, family resolution and a receipt, with zero code change on its side | `repid-engine` |
+| BYOK onboarding? | **Already built** — `src/services/byok-custody.ts`, flag-gated `BYOK_CUSTODY_ENABLED` **default OFF**. Three enforced rules: stored only after a probe says LIVE, never returned by any endpoint, decrypted only at point of use | `repid-engine` |
+| Which providers? | **13 already**: anthropic · openai · gemini · groq · cerebras · deepseek · cohere · openrouter · sambanova · ollama · plus SLM tiers, `resilient-llm` and `router` | `src/providers/` |
+
+**Route by role, not by vendor.** Vendor is not a property of a task, so it gives a router
+nothing to route on. Three roles with real selection rules — **Reason** (frontier tier, slow and
+expensive is fine), **Execute** (optimise tokens/sec and cost; local or fast-inference), and
+**Verify**, which carries the one constraint worth defending: *the verifier must be a different
+model family from whoever authored.* That is not a preference — it is what makes the check mean
+anything, and `run-agent.mjs` already refuses to auto-commit for exactly this reason. Encode it
+in the binding and it holds without anyone remembering.
+
+**Turnkey and deeply-customisable are one mechanism, not two.** The OpenAI-compatible surface is
+the socket. Turnkey = the default binding points at Gloo. Custom = BYOK swaps base URL and key
+per role. Same contract, different binding — which is precisely what PR #469's binding record
+is for, and why that contract has to survive a change of model, runtime and database.
+
+### 4d. The real gap is that all of it is inert
+
+Almost nothing above needs building. BYOK sits behind a default-OFF flag. The index records
+*"no production caller"* against harness module after harness module and calls that **the
+harness-wide state**, not a per-module gap.
+
+So Sept 8 readiness is **wiring and switching on**, not greenfield — a materially smaller job
+than it looks, and one that is fully testable now, before the window, on existing technology.
+It is also the exact shape of LESSONS 3: a mechanism wired at one end only is worse than an
+absent one, because it converts a known gap into false coverage.
+
+---
+
+## 5. The PAI roles — and where I'd push back
 
 Sean asked for CMO, COO and CTO, and whether there are others.
 
@@ -259,7 +341,7 @@ set with explicit denials.
 | **CMO** — runs now, Aug 22 → Sept 7 | reasoning · repo_read · publish (draft) | spend · db_write · custody · publish (send) | Drafts everything; a human sends. Marketing that can publish unattended is the fastest way to put a retracted number in public. |
 | **CTO** — runs Sept 8+ | reasoning · repo_read · shell-evidence · db_read | publish · custody · spend · db_write (prod) | Builds and proves. Cannot deploy or move money. Needs something it lacks → opens a PR, which *is* the request path. |
 | **Auditor** — runs continuously | reasoning · repo_read · shell-evidence | **all write** | **The role Sean did not name, and the one I would add first.** |
-| **Care Steward** — *human, not a PAI* | approval authority | — | The product's human authority. §4.1. |
+| **Care Steward** — *human, not a PAI* | approval authority | — | The product's human authority. §5.1. |
 
 ### 4.1 Two things worth arguing for
 
@@ -298,7 +380,7 @@ conflict. A field added now costs a line; added after migration it costs a migra
 
 ---
 
-## 5. Between now and Sept 7 — the collateral
+## 6. Between now and Sept 7 — the collateral
 
 **The nearest deadline is not Sept 8. It is Aug 26** — the "How to Win" session, four days out.
 The one-page positioning document should be ready for it. Everything else has 16 days.
@@ -317,7 +399,7 @@ Ordered by what unblocks what:
 4. **Four outreach sequences** — tech builders · Christian influencers and pastors · nonprofit
    and ministry leaders · corporate purpose and sponsors. The recruiting brief already has the
    pilot question per audience; those are the openers.
-5. **The technical recruiting cut (90s)** — for the identity and ZK builders. §7 below is why
+5. **The technical recruiting cut (90s)** — for the identity and ZK builders. §8 below is why
    this one is more urgent than it looks.
 
 Production guardrails from the video pack are non-negotiable and worth restating because they
@@ -327,7 +409,7 @@ human steward *before* showing automation move resources; end on people.
 
 ---
 
-## 6. What I could not verify — and it is load-bearing
+## 7. What I could not verify — and it is load-bearing
 
 **[UNVERIFIED] The Gloo build-window rule.** `gloo.com` is **blocked by the network egress
 proxy** from this session, so I could not read the FAQ. A web search returned the structure —
@@ -355,7 +437,7 @@ writing from `hackathon@gloo.us` before relying on it.
 
 ---
 
-## 7. What the competitive read actually says
+## 8. What the competitive read actually says
 
 The most useful item in the 37-repo triage was not a tool. It was the `agent-identity` topic
 page, and it is a scoreboard.
@@ -377,7 +459,7 @@ church coordinate care without turning a person into a public story.
 
 ---
 
-## 8. The one-line summary
+## 9. The one-line summary
 
 The Trust Harness does not need to be *finished* before Sept 8. It needs to be **published,
 pinned, and provable by a stranger** — because that is simultaneously what the contest rules
