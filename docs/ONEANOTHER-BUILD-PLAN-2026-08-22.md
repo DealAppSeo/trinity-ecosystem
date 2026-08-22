@@ -112,6 +112,31 @@ requirement on the Proof-of-Care issuer, and add a check that fails the build if
 it. Fixing the schema properly is a settlement-semantics decision and belongs to whoever owns
 that; the interface requirement does not wait for it.
 
+### 1b. The agents that would build this are not running
+
+Sean's stated goal is to *"factually say that I used my custom local agents using my
+TrustShell harness to build this."* That ambition has a dependency the rest of this plan
+assumed away, and it is owned by Sean.
+
+[MEASURED 2026-08-22, direct query] `trinity_tasks` holds **363,040 rows all-time and 12 in
+the last 7 days**, latest at **09:15:00 UTC** — which is the `e2e_smoke_nightly` cron
+(`jobid 8`, `15 9 * * *`), not work. `repid_score_events`: **27 rows in 7 days** against
+152,174 all-time. This matches the OPEN entry
+`hal-volume-stopped-2026-07-17` exactly, and confirms it still holds **36 days on**: the
+pipeline stopped 2026-07-17 22:18 UTC, HAL is downstream of it rather than the cause, and
+every survivor alert since says *"Manual redeploy required. Autonomous redeploy disabled."*
+
+**This is not a HAL problem and not a code problem.** It is a Railway redeploy that only Sean
+can perform. Until it happens:
+
+- The CMO PAI cannot run the Aug 22 → Sept 7 collateral lane on the swarm.
+- "Built by my own agents" is not a claim that can be made truthfully about work the swarm did
+  not do — and it is exactly the class of claim this ecosystem exists to keep honest.
+
+It belongs **ahead of everything in §3**, because it gates the labour that does the rest. The
+open entry also names four causes it already ruled out by evidence; read it before
+re-diagnosing anything (`npm run why:open trinity_tasks`).
+
 ---
 
 ## 2. The clean-slate repo: `DealAppSeo/oneanother`
@@ -180,6 +205,8 @@ gets a directory, not an argument.
 Ordered by what unblocks what. Items 1 and 2 are the critical path; nothing else matters if
 they slip.
 
+0. **Redeploy the Trinity fleet on Railway.** `BLOCKED_FOR_SEAN`. Gates the agent labour that
+   does items 1–6 and the collateral lane. See §1b.
 1. **Publish the public wrapper.** `BLOCKED_FOR_SEAN`. Ships only public endpoints — never
    the scoring formula. `repid-engine`'s `prepublishOnly` refusal stays exactly as it is; the
    wrapper is a separate package. Tag and pin a version. This is F1.
