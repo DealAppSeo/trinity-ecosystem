@@ -1,0 +1,250 @@
+<title>ONE ANOTHER Positioning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Archivo:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  --ground:#FAF8F4; --surface:#FFFFFF; --raised:#F3F1EB;
+  --ink:#101A18; --body:#2C3733; --muted:#5E6B67; --faint:#8A9591;
+  --rule:#DCD8CE; --rule-soft:#E9E5DC;
+  --pine:#1B4D40; --pine-deep:#123329; --pine-soft:#E4EDE9; --pine-line:#B9D0C7;
+  --on-pine:#EAF2EE; --on-pine-dim:#9FBCB0;
+  --gold:#7D6018; --gold-soft:#F4EDD9; --gold-line:#D9C88E;
+  --claret:#8C2F33; --claret-soft:#F7E6E5; --claret-line:#E0B0AE;
+  --shadow:0 1px 2px rgba(16,26,24,.04),0 10px 28px -16px rgba(16,26,24,.14);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1513; --surface:#141F1C; --raised:#18241F;
+    --ink:#EDF1EE; --body:#C6CFCA; --muted:#8D9A94; --faint:#6B7873;
+    --rule:#25332E; --rule-soft:#1D2A26;
+    --pine:#5FB79A; --pine-deep:#0F2A22; --pine-soft:#152A24; --pine-line:#2A5347;
+    --on-pine:#E6F1EC; --on-pine-dim:#8FB3A5;
+    --gold:#CDA64F; --gold-soft:#2A2415; --gold-line:#544522;
+    --claret:#DE8286; --claret-soft:#2B1719; --claret-line:#5A2E31;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -16px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1513; --surface:#141F1C; --raised:#18241F;
+  --ink:#EDF1EE; --body:#C6CFCA; --muted:#8D9A94; --faint:#6B7873;
+  --rule:#25332E; --rule-soft:#1D2A26;
+  --pine:#5FB79A; --pine-deep:#0F2A22; --pine-soft:#152A24; --pine-line:#2A5347;
+  --on-pine:#E6F1EC; --on-pine-dim:#8FB3A5;
+  --gold:#CDA64F; --gold-soft:#2A2415; --gold-line:#544522;
+  --claret:#DE8286; --claret-soft:#2B1719; --claret-line:#5A2E31;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -16px rgba(0,0,0,.55);
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--body);
+  font-family:Archivo,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.page{max-width:1160px;margin:0 auto;padding:26px 24px 56px}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;color:var(--ink);margin:0;text-wrap:balance}
+p{margin:0}
+strong{color:var(--ink);font-weight:600}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+:focus-visible{outline:2px solid var(--pine);outline-offset:3px}
+
+/* ── header lockup ── */
+.hero{background:var(--pine-deep);border-radius:12px;padding:30px 34px;color:var(--on-pine);
+  display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:30px;align-items:end}
+.hero h1{font-size:clamp(1.9rem,3.6vw,2.6rem);line-height:1.04;color:#fff;font-weight:600;
+  letter-spacing:.01em}
+.kick{font-family:"JetBrains Mono",monospace;font-size:.63rem;font-weight:600;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--on-pine-dim);margin-bottom:14px}
+.tag{font-family:Fraunces,Georgia,serif;font-size:1.02rem;line-height:1.4;color:var(--on-pine);
+  margin-top:12px;font-weight:400}
+.thesis{border-left:2px solid rgba(255,255,255,.28);padding-left:18px}
+.thesis p{font-family:Fraunces,Georgia,serif;font-size:1.06rem;line-height:1.42;color:#fff}
+.thesis .sub{font-family:Archivo,sans-serif;font-size:.83rem;line-height:1.5;
+  color:var(--on-pine-dim);margin-top:11px}
+
+/* ── module grid ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;margin-top:16px}
+.mod{background:var(--surface);border:1px solid var(--rule);border-radius:10px;
+  padding:20px 22px;box-shadow:var(--shadow)}
+.mod.wide{grid-column:1/-1}
+.mod h2{font-size:1.02rem;line-height:1.25;font-weight:600;margin-bottom:3px}
+.lede{font-size:.82rem;color:var(--muted);margin-bottom:14px}
+.mod h3{font-size:.84rem;font-weight:600;margin:14px 0 7px}
+
+/* ── ordered beats: absolute markers, never grid cells ── */
+ol.beats{list-style:none;counter-reset:b;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+ol.beats li{counter-increment:b;position:relative;padding-left:26px;font-size:.875rem;
+  overflow-wrap:break-word}
+ol.beats li::before{content:counter(b);position:absolute;left:0;top:0;
+  font-family:"JetBrains Mono",monospace;font-size:.66rem;font-weight:600;
+  color:var(--pine);line-height:2.05}
+ul.ticks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+ul.ticks li{position:relative;padding-left:19px;font-size:.875rem;overflow-wrap:break-word}
+ul.ticks li::before{content:"";position:absolute;left:0;top:.58em;width:5px;height:5px;
+  border-radius:50%;background:var(--pine-line)}
+ul.ticks.no li::before{background:var(--claret-line)}
+
+table{border-collapse:collapse;width:100%;font-size:.83rem}
+th{text-align:left;font-family:"JetBrains Mono",monospace;font-size:.6rem;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  padding:0 12px 7px 0;border-bottom:1px solid var(--rule);vertical-align:bottom}
+td{padding:9px 12px 9px 0;border-bottom:1px solid var(--rule-soft);vertical-align:top;line-height:1.45}
+tr:last-child td{border-bottom:none}
+td:first-child,th:first-child{padding-left:0}
+.who{color:var(--ink);font-weight:600;white-space:nowrap}
+.ours td{background:var(--pine-soft)}
+.ours .who{color:var(--pine)}
+.scroll{overflow-x:auto}
+.scroll table{min-width:560px}
+
+.pct{font-family:"JetBrains Mono",monospace;font-size:.68rem;font-weight:600;color:var(--pine);
+  white-space:nowrap}
+.chip{display:inline-block;font-family:"JetBrains Mono",monospace;font-size:.58rem;font-weight:600;
+  letter-spacing:.09em;text-transform:uppercase;padding:2px 6px;border-radius:3px;border:1px solid;
+  vertical-align:.09em}
+.c-p{color:var(--pine);background:var(--pine-soft);border-color:var(--pine-line)}
+.c-u{color:var(--gold);background:var(--gold-soft);border-color:var(--gold-line)}
+.c-n{color:var(--claret);background:var(--claret-soft);border-color:var(--claret-line)}
+
+.callout{background:var(--pine-soft);border:1px solid var(--pine-line);border-radius:9px;
+  padding:15px 17px;margin-top:14px}
+.callout p{font-family:Fraunces,Georgia,serif;font-size:.98rem;line-height:1.4;color:var(--ink)}
+.outcome{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.outcome span{font-size:.78rem;background:var(--raised);border:1px solid var(--rule-soft);
+  border-radius:100px;padding:4px 11px;color:var(--ink)}
+
+footer{margin-top:20px;padding-top:16px;border-top:1px solid var(--rule);
+  font-size:.76rem;color:var(--faint);display:flex;flex-wrap:wrap;gap:6px 20px}
+
+@media (max-width:720px){
+  .hero{grid-template-columns:1fr;gap:22px;padding:24px}
+  .page{padding:18px 16px 44px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="page">
+
+<header class="hero">
+  <div>
+    <div class="kick">Positioning · How to Win · 26 Aug 2026</div>
+    <h1>ONE ANOTHER</h1>
+    <p class="tag">Human generosity. Agentically orchestrated. Verifiably delivered.</p>
+  </div>
+  <div class="thesis">
+    <p>The world does not only have a generosity problem. It has a <strong style="color:#fff">coordination</strong> problem.</p>
+    <p class="sub">Money, skills, time and relationships already exist. They rarely find each other in the right combination.</p>
+  </div>
+</header>
+
+<div class="grid">
+
+  <section class="mod">
+    <h2>What it is</h2>
+    <p class="lede">One sentence, and the category it creates.</p>
+    <p><strong>ONE ANOTHER turns willingness to help into verified help.</strong> Trusted agents understand a real burden, assemble the people and resources that can carry it, protect privacy, and return consequential decisions to human stewards.</p>
+    <div class="callout"><p>We don't just raise money. We assemble help.</p></div>
+    <h3>The category: Impact Orchestration</h3>
+    <p style="font-size:.875rem">Not crowdfunding. Not volunteer scheduling. Not a referral directory. The north-star metric is <strong>burdens borne together</strong> — not dollars raised, hours logged, or referrals sent.</p>
+  </section>
+
+  <section class="mod">
+    <h2>The demo, in five beats</h2>
+    <p class="lede">Fictional composite. One burden in, one verified outcome out.</p>
+    <ol class="beats">
+      <li>A single mother's car fails. She types one message, in her own words, to her church.</li>
+      <li><strong>Listen agent</strong> decomposes it: transportation · employment risk · childcare · financial · relational.</li>
+      <li><strong>Resource agent</strong> assembles: a verified volunteer mechanic, temporary rides, a corporate Impact Pool, a benevolence grant.</li>
+      <li><strong>Trust gate</strong> checks credential, eligibility and policy. A <strong>human steward</strong> approves.</li>
+      <li><strong>Proof of Care</strong> records the outcome — without publishing the person.</li>
+    </ol>
+    <div class="outcome">
+      <span>Transportation restored</span><span>Job preserved</span><span>Childcare bridged</span><span>Someone showed up</span>
+    </div>
+    <p style="font-size:.83rem;color:var(--muted);margin-top:11px">The outcome is not “$550 raised.” No single donor, volunteer or nonprofit solved it — they carried it together.</p>
+  </section>
+
+  <section class="mod wide">
+    <h2>Why the existing platforms don't cover this</h2>
+    <p class="lede">The useful question is not which has better features. It is what each one optimises — and what is left over.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th style="width:23%">Category</th><th style="width:30%">Optimises</th><th>What remains unsolved</th></tr></thead>
+        <tbody>
+          <tr><td class="who">Crowdfunding<br><span style="font-weight:400;color:var(--muted);font-size:.92em">GoFundMe</span></td><td>Story → audience → money</td><td>Requires reach and publicity; rarely assembles non-financial help around the need</td></tr>
+          <tr><td class="who">Fundraising OS<br><span style="font-weight:400;color:var(--muted);font-size:.92em">Givebutter, BetterWorld</span></td><td>Campaigns, donors, CRM, events</td><td>Excellent fundraising rails — but not a cross-resource outcome orchestrator</td></tr>
+          <tr><td class="who">Volunteer coordination<br><span style="font-weight:400;color:var(--muted);font-size:.92em">SignUpGenius</span></td><td>Slots and scheduling</td><td>The opportunity must already be defined by a human before anyone can sign up</td></tr>
+          <tr><td class="who">Skills volunteering<br><span style="font-weight:400;color:var(--muted);font-size:.92em">Catchafire</span></td><td>Professional-to-nonprofit projects</td><td>Matches discrete projects, not a dynamically assembled multi-resource care plan</td></tr>
+          <tr><td class="who">Corporate purpose<br><span style="font-weight:400;color:var(--muted);font-size:.92em">Benevity</span></td><td>Giving, matching, volunteering, grants</td><td>Huge enterprise rails; aligning impact with real nonprofit demand stays hard</td></tr>
+          <tr><td class="who">Social care<br><span style="font-weight:400;color:var(--muted);font-size:.92em">Findhelp, Unite Us</span></td><td>Service discovery and referral</td><td>Coordinates institutional services; does not activate latent human generosity as supply</td></tr>
+          <tr class="ours"><td class="who">ONE ANOTHER</td><td>Verified outcomes</td><td>Builds the solution from money + people + skills + goods + relationships, with trust and proof</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="mod">
+    <h2>Mapped to the judging rubric</h2>
+    <p class="lede">Five criteria, evenly weighted. Where each one is earned.</p>
+    <table>
+      <tbody>
+        <tr><td class="who" style="width:33%">Concept / Product <span class="pct">20%</span></td><td>One human story: a burden becomes coordinated help</td></tr>
+        <tr><td class="who">Innovation <span class="pct">20%</span></td><td>Multi-resource orchestration + privacy-preserving trust + outcome proof</td></tr>
+        <tr><td class="who">Impact &amp; Execution <span class="pct">20%</span></td><td>Local church wedge now; corporate and foundation expansion after</td></tr>
+        <tr><td class="who">Use of AI <span class="pct">20%</span></td><td>Agents decompose, discover, plan, verify and coordinate tools under human control</td></tr>
+        <tr><td class="who">Teamwork / Presentation <span class="pct">20%</span></td><td>The architecture itself demonstrates humans and agents building together</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="mod">
+    <h2>MVP scope — what must work live</h2>
+    <p class="lede">One vertical slice. Seven things, and nothing else.</p>
+    <ul class="ticks">
+      <li>Private natural-language intake — no category picker</li>
+      <li>Agent decomposition into interdependent needs</li>
+      <li>Multi-resource discovery: money + helper + ride + service</li>
+      <li>One selective-disclosure credential flow</li>
+      <li>A human approval gate that fails closed</li>
+      <li>One real action — something actually created, sent, bought or scheduled</li>
+      <li>A Proof of Care, verifiable without exposing the person</li>
+    </ul>
+  </section>
+
+  <section class="mod">
+    <h2>Track strategy</h2>
+    <p class="lede">One product. Do not dilute into two.</p>
+    <ul class="ticks">
+      <li><span class="chip c-p">Primary</span> <strong>Agents Track</strong> — built on Gloo AI Studio.</li>
+      <li><span class="chip c-p">Secondary</span> <strong>Ministry Resourcing</strong> — the same system, told as donor engagement and sustainable giving, if a compatible bounty appears.</li>
+      <li><span class="chip c-u">Unverified</span> A <strong>third track exists</strong> — Bible / YouVersion. Found in search; absent from our current documents. Confirm before locking strategy.</li>
+      <li><span class="chip c-u">Unverified</span> <strong>Cross-track eligibility.</strong> The site says you may build across tracks; the FAQ does not confirm one identical submission may compete in both. Get it in writing.</li>
+    </ul>
+  </section>
+
+  <section class="mod">
+    <h2>Non-negotiable</h2>
+    <p class="lede">The lines that make the product defensible — and that we will be asked about.</p>
+    <ul class="ticks no">
+      <li><strong>The person receiving help is never the product.</strong> No public marketplace of vulnerable people.</li>
+      <li><strong>Need is not reputation.</strong> Agents, providers and organisations earn scores. People in need are never scored.</li>
+      <li><strong>Public proof never means public hardship.</strong> Proof is about the integrity of the process, not the person.</li>
+      <li><strong>Mercy is not gamified.</strong> Food, shelter and safety never sit behind “complete three tasks to unlock care.”</li>
+      <li><strong>Web3 must solve a real cross-organisation trust problem</strong> — or it does not belong in the MVP.</li>
+    </ul>
+  </section>
+
+  <section class="mod wide" style="background:var(--raised)">
+    <h2>The one thing to decide on the 26th</h2>
+    <p style="margin-top:6px">The build window is the whole contest. Everything that exists before it is <em>existing technology</em>; everything after is the submission. That makes the boundary an architectural decision, not an administrative one — the trust harness enters as a <strong>version-pinned dependency</strong>, never as pasted-in code, so “what did you build in 30 days” is answered by pointing at directories rather than arguing from a git log.</p>
+    <p style="margin-top:10px;font-size:.86rem;color:var(--muted)">Three things gate the rest and only Sean can move them: <strong>redeploy the dormant agent fleet</strong> (36 days down — it gates all agent labour), <strong>confirm the FAQ wording</strong> on dates and pre-existing code, and <strong>make the harness-publish call</strong>.</p>
+  </section>
+
+</div>
+
+<footer>
+  <span><strong style="color:var(--muted)">Internal working document.</strong> Nothing public until the window opens.</span>
+  <span>Sources: ONE ANOTHER vision kit · Gloo hackathon FAQ <span class="chip c-u">Unverified</span></span>
+</footer>
+
+</div>
