@@ -48,6 +48,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Release ordering, order-dependent steps | `docs/SHIP-CHECKLIST.md` | — |
 | Context/token budget, measured | `docs/CONTEXT-BUDGET.md` | — |
 | Key rotation, and why legacy keys stay disabled | `docs/KEY-ROTATION.md` | — |
+| How to run the MoneyPrinterTurbo video pipeline, what it needs, where output lands (operator-only; not vendored) | `docs/CONTENT-PIPELINE.md` | the upstream repo — do not clone it into this repo |
 | End-to-end audit, 2026-08-12 | `docs/E2E-AUDIT.md` | — |
 | Ten-subsystem health scores against executed evidence, 2026-08-14 | `docs/ECOSYSTEM-HEALTH-2026-08-14.md` | re-scoring the subsystems yourself |
 | All seven products from DNS to repo — what is live, what is stale, what is unreproducible, 2026-08-14 (scope revised 2026-08-15: TrustMedical.dev out, TrustChat.dev and AISocialMirror.com in). **Also the only record that the TrustChat/AISocialMirror rating signal is currently retained nowhere** — §1a | `docs/FULL-STACK-E2E-ASSESSMENT-2026-08-14.md` | re-probing the domains yourself |
