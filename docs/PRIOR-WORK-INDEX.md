@@ -45,6 +45,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | TrustShell spec and milestone ledger — M1–M6 built, every one having falsified something the spec asserted | `docs/TRUSTSHELL-V1.md` | the spec's own unbuilt half, which is a plan not a description |
 | Agent memory: recall path, both halves of the bug | `docs/AGENT-MEMORY-SPEC.md` | — |
 | MCP fleet discovery endpoint | `docs/MCP-FLEET.md` | — |
+| The scoped first slice of the PAI/Founder-OS "one recursive experiment" directive — what's built already, what's deferred, who owns what | `docs/NEXUS-BRAIN-SPRINT-PLAN.md` | re-deriving a 12-table memory schema before the one loop it's meant to serve has run once |
 | Release ordering, order-dependent steps | `docs/SHIP-CHECKLIST.md` | — |
 | Context/token budget, measured | `docs/CONTEXT-BUDGET.md` | — |
 | Key rotation, and why legacy keys stay disabled | `docs/KEY-ROTATION.md` | — |
