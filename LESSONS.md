@@ -1919,3 +1919,77 @@ consumer, for as long as nobody asks "who reads this?" rather than "does this
 compile?". The same question that catches a dormant TypeScript module
 (`check:dormancy`) catches a dormant schema column just as well; this repo
 only had the check for one of the two.
+
+---
+
+## A33 — a "10 days stale" writer that wasn't broken, sitting next to a real one that was (2026-08-26)
+
+Continuing the full-stack wiring sweep, re-investigated issue #131 (filed
+earlier this same session, assigned XC, zero lane activity) myself rather
+than wait. It asked two questions about ERC-8004 and answers both — and
+found a third, unrelated defect neither question anticipated.
+
+**Question 1 — is `erc8004_data_packets` (5 rows, last 2026-04-08) a dead
+pipeline?** No. All 5 rows share the exact same `created_at`
+(`2026-04-08 05:53:54.216277+00`) and each is a distinct `packet_type`
+(`identity_signal`/`capability_packet`/`fiduciary_record`/`medical_record`/
+`sovereign_identity`) whose `packet_schema` describes a tier-access *shape*,
+not a per-agent event. The table has no `agent_id` column at all — confirmed
+against `information_schema.columns`. This is a one-time-seeded catalog of
+five packet-type definitions, not a stream anything ever fed rows into after
+launch. "5 rows since April" is completeness, not staleness. Closed.
+
+**Question 2 — is the `erc8004_reputation_writes` staleness (91 rows, last
+2026-08-16) a broken writer?** No, and the earlier framing of this same sweep
+("x402 is the healthiest live subsystem") is corrected below — the two
+findings turned out to be one. `erc8004_reputation_writes.created_at` tracks
+real x402 settlement volume almost exactly: write #91
+(`2026-08-16 12:04:20.768774+00`) sits 12 seconds before the most recent
+*settled* `x402_settlements` row (`delivered_at 2026-08-16 12:04:32.422+00`),
+same `provider_agent_id` (`9c0dc740-…`). Matched every settled x402 row
+against a reputation write within ±5 minutes for the same agent: **22/45**
+settlements-with-a-known-provider overall, but **17/19 (89%)** in August
+alone — the low overall rate is the pipeline's May rollout tail, not present
+breakage. One write (#91) was verified genuinely on-chain: `pg_net` against
+Base Sepolia's public RPC (`eth_getTransactionReceipt` on
+`tx_hash 0x4cb8832d…`) returned `status: "0x1"`, a real mined transaction
+whose log data decodes to `tier:ESTABLISHED` and a `trustrepid.dev` payload
+URL. The reputation-write path is live, wired to settlements, and correct.
+It went quiet on 08-16 because settlement volume itself did. Closed.
+
+**The unasked third question is the real defect.** `x402_settlements.status`
+has been `authorized` — never `settled` — for **8 consecutive daily rows**,
+one created every ~24h from **2026-08-17 through 2026-08-26 (today, at
+measurement time)**, all for the **same** `provider_agent_id`
+(`57a2f83a-e071-4901-bbfd-1ebe15ce0be5`, `agent_id: trinity-gcm`,
+`agent_type: external`, `prediction_topic: verification`). Every one of the 8
+has `settlement_attempt_count = 0` — not "tried and failed," never attempted
+at all. Two tables exist specifically to catch this and both are silent:
+`x402_settlement_failures` logs nothing for this agent and has logged
+**nothing at all since 2026-08-16 12:04:16** (14 rows total, ever), and
+`x402_recovery_worker_runs` — a table shaped exactly for a retry-with-
+circuit-breaker sweep (`rows_examined`/`rows_recovered`/`rows_abandoned`/
+`circuit_breaker_tripped`) — has **zero rows, ever**. Whatever is supposed to
+retry a stuck authorization has never run once in this database's history,
+and whatever authorizes `trinity-gcm`'s daily verification payment is still
+running fine (a fresh row lands every day, including today) while whatever
+is supposed to settle it stopped being invoked on 08-17. **Neither table has
+a writer anywhere in `app/` or `lib/`** (repo-wide grep, zero hits for
+either name outside this entry and the doc index) — this is, again, the
+"writer lives outside this repo" shape (`x402_settlements`, `llm_call_log`,
+`agent_heartbeat` before it), so nothing here is fixable from
+`trinity-ecosystem`. Filed as a new issue rather than folded into #131,
+since it needs Railway-side access none of the ERC-8004 investigation did.
+
+### What generalises
+
+**A user-corrected framing is a debt until it's repaid with a number.** The
+session's own earlier claim — "x402 is the healthiest live subsystem" — was
+true in aggregate (406/416 settled) and false about the one agent whose
+payment has failed silently, unlogged, and unretried for 8 straight days.
+Aggregate health and a specific live failure are not in tension; a sweep
+that only reports the aggregate will miss the failure every time. The three
+tables that would have caught this in real time (`x402_settlement_failures`,
+`x402_recovery_worker_runs`, and a HITL-style expiry reaper) already exist in
+this schema, unused, in exactly the shape A32 found `expires_at` in: correct,
+typed, indexed where it matters, and never wired to anything that reads it.
