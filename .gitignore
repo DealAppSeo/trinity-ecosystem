@@ -198,3 +198,10 @@ lib/**/*.js
 
 # Suite R undecidable-mutants (M4-M8) check script (2026-08-19, third pass).
 .phase2-suite-r-check-*/
+
+# Python bytecode cache. __pycache__/*.pyc got committed under trinity-science/
+# by the 2026-04-17 "restore: full trinity-ecosystem codebase" commit, alongside
+# the .py sources it belongs to — stale bytecode from whatever Python build ran
+# that restore, not something any checkout should ship or rebuild from.
+__pycache__/
+*.pyc

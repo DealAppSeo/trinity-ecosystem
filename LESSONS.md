@@ -1993,3 +1993,74 @@ tables that would have caught this in real time (`x402_settlement_failures`,
 `x402_recovery_worker_runs`, and a HITL-style expiry reaper) already exist in
 this schema, unused, in exactly the shape A32 found `expires_at` in: correct,
 typed, indexed where it matters, and never wired to anything that reads it.
+
+---
+
+## A34 — Railway deploy logs found three live defects the DB-only sweep couldn't (2026-08-26)
+
+Everything in A32/A33 came from querying Supabase. This entry is what turned up
+the moment the user pasted actual Railway deploy-log screenshots instead — proof
+that a DB-only sweep, however thorough, has a whole class of blind spot: state
+that never gets written to a table at all.
+
+**1. Every deployed agent service has been silently failing against a dead Redis
+endpoint, for days.** `trinity-gcm`, `trinity-sophia`, `trinity-hdm` (and by
+extension `trinity-torch`, `trinity-veritas` — same shared code) each log
+`[agent-controls] redis cache read/write failed: fetch failed` on an unbroken
+loop — trinity-hdm's log shows it going back to at least 2026-08-20. Traced to
+`trinity-symphony-shared/lib/agent-controls.js`: `UPSTASH_REDIS_REST_URL` is
+set (otherwise `getRedis()` returns `null` before ever calling the API, and no
+warning would print at all) but the endpoint it names is unreachable. **Not a
+correctness bug** — `isAgentEnabled()` already falls through to an in-process
+cache then a direct Postgres read, so the enable/disable gate answered
+correctly the whole time — but every call paid a live network round-trip to a
+known-dead host and logged a warning for it, forever, on five services at once.
+Fixed with the same circuit-breaker shape `direct-pg.js` already uses for its
+own Postgres pool: 3 consecutive failures open a 5-minute cooldown, logged once
+instead of per-call. `trinity-symphony-shared` PR #43.
+
+**2. `py-brain`'s Railway build has failed the last 50 builds in a row**,
+because `trinity-science/requirements.txt` doesn't exist. It used to: a March
+commit history (`fix(py-brain): add matplotlib dependency`, `nuclear dependency
+reset for py-brain v7.5`, five more `fix: resolve build failures v2..v7`
+commits) shows a real `requirements.txt` + `pyproject.toml` + `app/` subtree
+existed and was actively maintained. The 2026-04-17 commit titled `restore:
+full trinity-ecosystem codebase` re-added `trinity-science/backtest.py`,
+`signal_fetcher.py`, `veto_engine.py` — plus their **compiled `__pycache__/
+*.pyc` files, committed** — but not the manifest that used to accompany them.
+Every build since has had three files importing `requests`, `numpy`, and
+`supabase` with nothing telling the builder to install any of them. Fixed with
+a new, minimal `requirements.txt` matching what the CURRENT three files
+actually import — not a resurrection of the old, much larger dependency set
+(`crewai`, `pydantic`, `opentelemetry`, `arize-phoenix`, coinbase cdp sdk),
+none of which anything in the tree imports today. Also removed the committed
+`.pyc` files and gitignored `__pycache__/` so this can't recur the same way.
+
+**3. `attestation-minter`'s cron crashed with zero diagnostic output** — the
+Railway log ends right after an `escrowed` line with no `[mint-attestation]
+FAIL` and no stack trace, which is only possible from an uncaught
+exception/unhandled rejection that never reaches the script's own
+`main().catch()`. The same screenshot's log line (`provider=trinity-gcm`)
+independently confirmed the agent identity behind the A33 x402 stall finding —
+this cron IS the daily job creating those stuck authorizations, and it picks
+the "least-recently-attested" provider by design, which degenerates into
+always picking the SAME never-completing provider once one exists, because a
+failed run's timestamp never advances. Fixed the silent-crash half
+(`uncaughtException`/`unhandledRejection` handlers, per-attempt loop logging)
+in `repid-engine` PR #477; documented but deliberately did not fix the
+rotation-degeneration half in the same PR — excluding a repeatedly-failing
+candidate needs a decision about failure-handling semantics this session
+shouldn't make unilaterally in a live proof-generation script, so it stays
+with XC on issue #134.
+
+### What generalises
+
+**A DB sweep and a log sweep catch different failure classes, and neither
+substitutes for the other.** All three of today's live defects
+(Upstash-unreachable, missing Python manifest, silent-crash cron) are things no
+SQL query could ever have surfaced — none of them write to any table at all.
+The A32/A33 sweep was thorough on its own terms and still missed one whole
+axis. When a live surface is reachable (here: pasted Railway screenshots), read
+it — the same "run it, don't read it" instinct that catches a dormant TypeScript
+module applies to a service's own stdout, which nothing in this repo's tooling
+ever fetches on its own.
