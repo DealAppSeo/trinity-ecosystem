@@ -1868,3 +1868,54 @@ effect, the single largest swing available in that metric today. Reported on
 PR #94 rather than fixed here: that lane owns `verdict-provenance.ts`, is
 already mid-flight on this exact view, and duplicating the consumer-side fix in
 parallel would recreate tonight's P3 collision (A30) one gate over.
+
+## A32 — a schema column with no consumer, since the day it was added (2026-08-26)
+
+Investigating agent handoff/verify/dispute wiring for a full-stack check,
+found `trinity_hitl_requests` sitting at **259,456 pending, 1 ever approved**,
+oldest pending since **2026-02-08**.
+
+**Root cause, measured, not guessed:** the table got an `expires_at` column in
+migration `v16_hitl_requests_expires_at` (2026-05-27). Nothing since has ever
+read it — no trigger, no `cron.job`, no application route. `grep` across the
+whole tree for the table name outside migrations returns exactly two BFT
+routes reading an unrelated `hitl_required` boolean, and zero writers of any
+kind — this table, like `x402_settlements` and `llm_call_log` before it, is
+fed by something outside this repo entirely.
+
+**It was not an active runaway.** Daily volume: 7,000–11,000 rows/day from
+2026-07-12 through 2026-07-28 — the same window as the already-documented
+mid-July Railway outage — then 1–3/day since. The flood stopped three weeks
+before this was found. The backlog just sat there, because closing an expired
+request was never built, in either direction: not the code that should have
+consumed `expires_at`, and not an operator process to review the pile by hand.
+
+**Fixed with the pattern this exact schema already uses elsewhere.**
+`trinity_reap_expired_claims()` (pg_cron jobid 14, every 5 minutes) frees
+expired `trinity_tasks` leases. `reap_expired_hitl_requests()` is that pattern
+applied here: closes `status='pending' AND expires_at < now()` rows to a new
+terminal `status='expired'` — never approves, never deletes, never touches
+`decision_metadata` — and logs every run to `trinity_changelog` with a working
+`rollback_sql`, which the existing reaper doesn't bother with despite the
+column being there. Scheduled daily (jobid 17); daily volume post-flood is
+1–3 rows, so this will never need to batch again.
+
+**The first production run of the fix hit the same wall the defect describes.**
+One `UPDATE` across 259,456 rows, built via an `id = ANY(array)` round-trip,
+timed out. Not wrong logic — wrong scale assumption, the exact genre of error
+`check:prior-work`'s retracted-claims table exists to catch, just in
+infrastructure instead of a measurement. Fixed by adding a `p_batch_size`
+parameter (default 5000) and calling it repeatedly (5,000 / 30,000 / 50,000 /
+50,000 / 60,000 / 64,456 — the last batch returning short confirmed the drain
+was complete) rather than assuming one call scales to whatever the backlog
+turns out to be.
+
+### What generalises
+
+A column can exist, be correctly typed, be indexed (`trinity_hitl_requests`
+already had a partial index on exactly `status='pending' AND expires_at IS
+NOT NULL` — built for a query that had never been run), and still have no
+consumer, for as long as nobody asks "who reads this?" rather than "does this
+compile?". The same question that catches a dormant TypeScript module
+(`check:dormancy`) catches a dormant schema column just as well; this repo
+only had the check for one of the two.
