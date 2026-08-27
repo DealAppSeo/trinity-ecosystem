@@ -162,7 +162,16 @@ Design constraints worth stating:
 ## Open questions, honestly unresolved
 
 - **Who reads the inbox, and where does it run?** Nothing today reads `ai_dispatch`. The
-  runner would need scheduling, credentials, and a home. This is the largest unknown.
+  runner would need scheduling, credentials, and a home. This is the largest unknown, and
+  it is larger than it first looks: **the obvious home is not currently available.** The
+  index entry `hal-volume-stopped-2026-07-17` records the Trinity fleet on Railway as
+  stopped since 2026-07-17 22:18 UTC, root-caused as an operational outage awaiting a
+  manual redeploy, with an XC re-measurement on 2026-08-17 still showing only the nightly
+  smoke trickle. That is the last measurement in the index, **not a fresh reading** — but
+  it means "we will run the reader on the existing fleet" is an assumption to re-verify
+  before it is scheduled, not a given. Sequencing consequence: whoever picks up the reader
+  should confirm a live host first, because a reader with no home leaves `ever_read` at
+  zero for exactly the same reason the mailbox already sits unread.
 - **What does a fulfilment cost, and who pays?** x402 makes per-fulfilment payment possible,
   but the free-tier arithmetic already established for HAL applies here too: an unbounded
   number of captures times a per-capture provider call is an unbounded bill.
