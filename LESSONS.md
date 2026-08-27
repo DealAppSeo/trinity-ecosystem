@@ -1868,3 +1868,199 @@ effect, the single largest swing available in that metric today. Reported on
 PR #94 rather than fixed here: that lane owns `verdict-provenance.ts`, is
 already mid-flight on this exact view, and duplicating the consumer-side fix in
 parallel would recreate tonight's P3 collision (A30) one gate over.
+
+## A32 — a schema column with no consumer, since the day it was added (2026-08-26)
+
+Investigating agent handoff/verify/dispute wiring for a full-stack check,
+found `trinity_hitl_requests` sitting at **259,456 pending, 1 ever approved**,
+oldest pending since **2026-02-08**.
+
+**Root cause, measured, not guessed:** the table got an `expires_at` column in
+migration `v16_hitl_requests_expires_at` (2026-05-27). Nothing since has ever
+read it — no trigger, no `cron.job`, no application route. `grep` across the
+whole tree for the table name outside migrations returns exactly two BFT
+routes reading an unrelated `hitl_required` boolean, and zero writers of any
+kind — this table, like `x402_settlements` and `llm_call_log` before it, is
+fed by something outside this repo entirely.
+
+**It was not an active runaway.** Daily volume: 7,000–11,000 rows/day from
+2026-07-12 through 2026-07-28 — the same window as the already-documented
+mid-July Railway outage — then 1–3/day since. The flood stopped three weeks
+before this was found. The backlog just sat there, because closing an expired
+request was never built, in either direction: not the code that should have
+consumed `expires_at`, and not an operator process to review the pile by hand.
+
+**Fixed with the pattern this exact schema already uses elsewhere.**
+`trinity_reap_expired_claims()` (pg_cron jobid 14, every 5 minutes) frees
+expired `trinity_tasks` leases. `reap_expired_hitl_requests()` is that pattern
+applied here: closes `status='pending' AND expires_at < now()` rows to a new
+terminal `status='expired'` — never approves, never deletes, never touches
+`decision_metadata` — and logs every run to `trinity_changelog` with a working
+`rollback_sql`, which the existing reaper doesn't bother with despite the
+column being there. Scheduled daily (jobid 17); daily volume post-flood is
+1–3 rows, so this will never need to batch again.
+
+**The first production run of the fix hit the same wall the defect describes.**
+One `UPDATE` across 259,456 rows, built via an `id = ANY(array)` round-trip,
+timed out. Not wrong logic — wrong scale assumption, the exact genre of error
+`check:prior-work`'s retracted-claims table exists to catch, just in
+infrastructure instead of a measurement. Fixed by adding a `p_batch_size`
+parameter (default 5000) and calling it repeatedly (5,000 / 30,000 / 50,000 /
+50,000 / 60,000 / 64,456 — the last batch returning short confirmed the drain
+was complete) rather than assuming one call scales to whatever the backlog
+turns out to be.
+
+### What generalises
+
+A column can exist, be correctly typed, be indexed (`trinity_hitl_requests`
+already had a partial index on exactly `status='pending' AND expires_at IS
+NOT NULL` — built for a query that had never been run), and still have no
+consumer, for as long as nobody asks "who reads this?" rather than "does this
+compile?". The same question that catches a dormant TypeScript module
+(`check:dormancy`) catches a dormant schema column just as well; this repo
+only had the check for one of the two.
+
+---
+
+## A33 — a "10 days stale" writer that wasn't broken, sitting next to a real one that was (2026-08-26)
+
+Continuing the full-stack wiring sweep, re-investigated issue #131 (filed
+earlier this same session, assigned XC, zero lane activity) myself rather
+than wait. It asked two questions about ERC-8004 and answers both — and
+found a third, unrelated defect neither question anticipated.
+
+**Question 1 — is `erc8004_data_packets` (5 rows, last 2026-04-08) a dead
+pipeline?** No. All 5 rows share the exact same `created_at`
+(`2026-04-08 05:53:54.216277+00`) and each is a distinct `packet_type`
+(`identity_signal`/`capability_packet`/`fiduciary_record`/`medical_record`/
+`sovereign_identity`) whose `packet_schema` describes a tier-access *shape*,
+not a per-agent event. The table has no `agent_id` column at all — confirmed
+against `information_schema.columns`. This is a one-time-seeded catalog of
+five packet-type definitions, not a stream anything ever fed rows into after
+launch. "5 rows since April" is completeness, not staleness. Closed.
+
+**Question 2 — is the `erc8004_reputation_writes` staleness (91 rows, last
+2026-08-16) a broken writer?** No, and the earlier framing of this same sweep
+("x402 is the healthiest live subsystem") is corrected below — the two
+findings turned out to be one. `erc8004_reputation_writes.created_at` tracks
+real x402 settlement volume almost exactly: write #91
+(`2026-08-16 12:04:20.768774+00`) sits 12 seconds before the most recent
+*settled* `x402_settlements` row (`delivered_at 2026-08-16 12:04:32.422+00`),
+same `provider_agent_id` (`9c0dc740-…`). Matched every settled x402 row
+against a reputation write within ±5 minutes for the same agent: **22/45**
+settlements-with-a-known-provider overall, but **17/19 (89%)** in August
+alone — the low overall rate is the pipeline's May rollout tail, not present
+breakage. One write (#91) was verified genuinely on-chain: `pg_net` against
+Base Sepolia's public RPC (`eth_getTransactionReceipt` on
+`tx_hash 0x4cb8832d…`) returned `status: "0x1"`, a real mined transaction
+whose log data decodes to `tier:ESTABLISHED` and a `trustrepid.dev` payload
+URL. The reputation-write path is live, wired to settlements, and correct.
+It went quiet on 08-16 because settlement volume itself did. Closed.
+
+**The unasked third question is the real defect.** `x402_settlements.status`
+has been `authorized` — never `settled` — for **8 consecutive daily rows**,
+one created every ~24h from **2026-08-17 through 2026-08-26 (today, at
+measurement time)**, all for the **same** `provider_agent_id`
+(`57a2f83a-e071-4901-bbfd-1ebe15ce0be5`, `agent_id: trinity-gcm`,
+`agent_type: external`, `prediction_topic: verification`). Every one of the 8
+has `settlement_attempt_count = 0` — not "tried and failed," never attempted
+at all. Two tables exist specifically to catch this and both are silent:
+`x402_settlement_failures` logs nothing for this agent and has logged
+**nothing at all since 2026-08-16 12:04:16** (14 rows total, ever), and
+`x402_recovery_worker_runs` — a table shaped exactly for a retry-with-
+circuit-breaker sweep (`rows_examined`/`rows_recovered`/`rows_abandoned`/
+`circuit_breaker_tripped`) — has **zero rows, ever**. Whatever is supposed to
+retry a stuck authorization has never run once in this database's history,
+and whatever authorizes `trinity-gcm`'s daily verification payment is still
+running fine (a fresh row lands every day, including today) while whatever
+is supposed to settle it stopped being invoked on 08-17. **Neither table has
+a writer anywhere in `app/` or `lib/`** (repo-wide grep, zero hits for
+either name outside this entry and the doc index) — this is, again, the
+"writer lives outside this repo" shape (`x402_settlements`, `llm_call_log`,
+`agent_heartbeat` before it), so nothing here is fixable from
+`trinity-ecosystem`. Filed as a new issue rather than folded into #131,
+since it needs Railway-side access none of the ERC-8004 investigation did.
+
+### What generalises
+
+**A user-corrected framing is a debt until it's repaid with a number.** The
+session's own earlier claim — "x402 is the healthiest live subsystem" — was
+true in aggregate (406/416 settled) and false about the one agent whose
+payment has failed silently, unlogged, and unretried for 8 straight days.
+Aggregate health and a specific live failure are not in tension; a sweep
+that only reports the aggregate will miss the failure every time. The three
+tables that would have caught this in real time (`x402_settlement_failures`,
+`x402_recovery_worker_runs`, and a HITL-style expiry reaper) already exist in
+this schema, unused, in exactly the shape A32 found `expires_at` in: correct,
+typed, indexed where it matters, and never wired to anything that reads it.
+
+---
+
+## A34 — Railway deploy logs found three live defects the DB-only sweep couldn't (2026-08-26)
+
+Everything in A32/A33 came from querying Supabase. This entry is what turned up
+the moment the user pasted actual Railway deploy-log screenshots instead — proof
+that a DB-only sweep, however thorough, has a whole class of blind spot: state
+that never gets written to a table at all.
+
+**1. Every deployed agent service has been silently failing against a dead Redis
+endpoint, for days.** `trinity-gcm`, `trinity-sophia`, `trinity-hdm` (and by
+extension `trinity-torch`, `trinity-veritas` — same shared code) each log
+`[agent-controls] redis cache read/write failed: fetch failed` on an unbroken
+loop — trinity-hdm's log shows it going back to at least 2026-08-20. Traced to
+`trinity-symphony-shared/lib/agent-controls.js`: `UPSTASH_REDIS_REST_URL` is
+set (otherwise `getRedis()` returns `null` before ever calling the API, and no
+warning would print at all) but the endpoint it names is unreachable. **Not a
+correctness bug** — `isAgentEnabled()` already falls through to an in-process
+cache then a direct Postgres read, so the enable/disable gate answered
+correctly the whole time — but every call paid a live network round-trip to a
+known-dead host and logged a warning for it, forever, on five services at once.
+Fixed with the same circuit-breaker shape `direct-pg.js` already uses for its
+own Postgres pool: 3 consecutive failures open a 5-minute cooldown, logged once
+instead of per-call. `trinity-symphony-shared` PR #43.
+
+**2. `py-brain`'s Railway build has failed the last 50 builds in a row**,
+because `trinity-science/requirements.txt` doesn't exist. It used to: a March
+commit history (`fix(py-brain): add matplotlib dependency`, `nuclear dependency
+reset for py-brain v7.5`, five more `fix: resolve build failures v2..v7`
+commits) shows a real `requirements.txt` + `pyproject.toml` + `app/` subtree
+existed and was actively maintained. The 2026-04-17 commit titled `restore:
+full trinity-ecosystem codebase` re-added `trinity-science/backtest.py`,
+`signal_fetcher.py`, `veto_engine.py` — plus their **compiled `__pycache__/
+*.pyc` files, committed** — but not the manifest that used to accompany them.
+Every build since has had three files importing `requests`, `numpy`, and
+`supabase` with nothing telling the builder to install any of them. Fixed with
+a new, minimal `requirements.txt` matching what the CURRENT three files
+actually import — not a resurrection of the old, much larger dependency set
+(`crewai`, `pydantic`, `opentelemetry`, `arize-phoenix`, coinbase cdp sdk),
+none of which anything in the tree imports today. Also removed the committed
+`.pyc` files and gitignored `__pycache__/` so this can't recur the same way.
+
+**3. `attestation-minter`'s cron crashed with zero diagnostic output** — the
+Railway log ends right after an `escrowed` line with no `[mint-attestation]
+FAIL` and no stack trace, which is only possible from an uncaught
+exception/unhandled rejection that never reaches the script's own
+`main().catch()`. The same screenshot's log line (`provider=trinity-gcm`)
+independently confirmed the agent identity behind the A33 x402 stall finding —
+this cron IS the daily job creating those stuck authorizations, and it picks
+the "least-recently-attested" provider by design, which degenerates into
+always picking the SAME never-completing provider once one exists, because a
+failed run's timestamp never advances. Fixed the silent-crash half
+(`uncaughtException`/`unhandledRejection` handlers, per-attempt loop logging)
+in `repid-engine` PR #477; documented but deliberately did not fix the
+rotation-degeneration half in the same PR — excluding a repeatedly-failing
+candidate needs a decision about failure-handling semantics this session
+shouldn't make unilaterally in a live proof-generation script, so it stays
+with XC on issue #134.
+
+### What generalises
+
+**A DB sweep and a log sweep catch different failure classes, and neither
+substitutes for the other.** All three of today's live defects
+(Upstash-unreachable, missing Python manifest, silent-crash cron) are things no
+SQL query could ever have surfaced — none of them write to any table at all.
+The A32/A33 sweep was thorough on its own terms and still missed one whole
+axis. When a live surface is reachable (here: pasted Railway screenshots), read
+it — the same "run it, don't read it" instinct that catches a dormant TypeScript
+module applies to a service's own stdout, which nothing in this repo's tooling
+ever fetches on its own.

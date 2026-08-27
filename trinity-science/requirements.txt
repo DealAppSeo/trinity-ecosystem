@@ -1,0 +1,10 @@
+# trinity-science — dependencies for backtest.py / signal_fetcher.py / veto_engine.py
+#
+# This file did not exist in the tree (see LESSONS.md for how it was lost and
+# what it broke). Rebuilt from what the three current files actually import —
+# not from the much larger dependency set (crewai, pydantic, opentelemetry,
+# arize-phoenix, coinbase cdp sdk...) an earlier, larger version of this
+# service once needed, none of which any current file imports.
+requests>=2.31.0,<3
+numpy>=1.26.0,<2.3
+supabase>=2.4.0,<3

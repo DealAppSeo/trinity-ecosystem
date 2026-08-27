@@ -1,0 +1,497 @@
+<title>ONE ANOTHER Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Archivo:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  --ground:#FAF8F4; --surface:#FFFFFF; --raised:#F3F1EB;
+  --ink:#101A18; --body:#2C3733; --muted:#5E6B67; --faint:#8A9591;
+  --rule:#DCD8CE; --rule-soft:#E9E5DC;
+  --pine:#1B4D40; --pine-soft:#E4EDE9; --pine-line:#B9D0C7;
+  --gold:#7D6018; --gold-soft:#F4EDD9; --gold-line:#D9C88E;
+  --claret:#8C2F33; --claret-soft:#F7E6E5; --claret-line:#E0B0AE;
+  --shadow:0 1px 2px rgba(16,26,24,.04),0 8px 24px -12px rgba(16,26,24,.10);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1513; --surface:#141F1C; --raised:#18241F;
+    --ink:#EDF1EE; --body:#C6CFCA; --muted:#8D9A94; --faint:#6B7873;
+    --rule:#25332E; --rule-soft:#1D2A26;
+    --pine:#5FB79A; --pine-soft:#152A24; --pine-line:#2A5347;
+    --gold:#CDA64F; --gold-soft:#2A2415; --gold-line:#544522;
+    --claret:#DE8286; --claret-soft:#2B1719; --claret-line:#5A2E31;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1513; --surface:#141F1C; --raised:#18241F;
+  --ink:#EDF1EE; --body:#C6CFCA; --muted:#8D9A94; --faint:#6B7873;
+  --rule:#25332E; --rule-soft:#1D2A26;
+  --pine:#5FB79A; --pine-soft:#152A24; --pine-line:#2A5347;
+  --gold:#CDA64F; --gold-soft:#2A2415; --gold-line:#544522;
+  --claret:#DE8286; --claret-soft:#2B1719; --claret-line:#5A2E31;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--body);
+  font-family:Archivo,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:16.5px; line-height:1.68; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1040px;margin:0 auto;padding:0 28px 96px}
+.col{max-width:672px}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;color:var(--ink);text-wrap:balance;margin:0}
+h1{font-size:clamp(2.1rem,4.6vw,3.1rem);line-height:1.08;font-weight:600;letter-spacing:-.015em}
+h2{font-size:clamp(1.35rem,2.4vw,1.72rem);line-height:1.2;font-weight:600;letter-spacing:-.01em}
+h3{font-size:1.06rem;line-height:1.35;font-weight:600;letter-spacing:-.005em}
+p{margin:0}
+a{color:var(--pine);text-underline-offset:3px;text-decoration-thickness:1px}
+strong{color:var(--ink);font-weight:600}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,monospace}
+code{font-size:.855em;background:var(--raised);border:1px solid var(--rule-soft);
+  border-radius:4px;padding:.08em .34em;color:var(--ink);word-break:break-word}
+:focus-visible{outline:2px solid var(--pine);outline-offset:3px;border-radius:3px}
+
+/* ── masthead ── */
+.mast{padding:74px 0 0}
+.eyebrow{font-family:"JetBrains Mono",monospace;font-size:.68rem;font-weight:600;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--pine);margin-bottom:22px}
+.deck{font-family:Fraunces,Georgia,serif;font-size:1.22rem;line-height:1.48;
+  color:var(--muted);margin-top:20px;font-weight:400}
+.mast-meta{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:30px;
+  font-family:"JetBrains Mono",monospace;font-size:.72rem;color:var(--faint);
+  padding-top:20px;border-top:1px solid var(--rule)}
+
+/* ── epistemic chips: the document's backbone ── */
+.chip{display:inline-flex;align-items:center;gap:5px;font-family:"JetBrains Mono",monospace;
+  font-size:.635rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  padding:2px 7px;border-radius:3px;border:1px solid;white-space:nowrap;vertical-align:.08em}
+.c-m{color:var(--pine);background:var(--pine-soft);border-color:var(--pine-line)}
+.c-u{color:var(--gold);background:var(--gold-soft);border-color:var(--gold-line)}
+.c-b{color:var(--claret);background:var(--claret-soft);border-color:var(--claret-line)}
+.c-g{color:var(--muted);background:var(--raised);border-color:var(--rule)}
+
+/* ── sections ── */
+section{margin-top:66px}
+.shead{display:flex;gap:16px;align-items:baseline;margin-bottom:22px}
+.snum{font-family:"JetBrains Mono",monospace;font-size:.74rem;font-weight:600;
+  color:var(--faint);padding-top:.3em;flex:none;letter-spacing:.04em}
+.stack{display:flex;flex-direction:column;gap:17px}
+
+/* ── finding blocks ── */
+.finding{background:var(--surface);border:1px solid var(--rule);border-radius:9px;
+  padding:26px 28px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:15px}
+.finding.crit{border-color:var(--claret-line)}
+.ftag{display:flex;align-items:center;gap:10px}
+.fkey{font-family:"JetBrains Mono",monospace;font-size:.8rem;font-weight:600;color:var(--pine)}
+.finding.crit .fkey{color:var(--claret)}
+
+/* ── convergence diagram ── */
+.conv{margin:4px 0 0;padding:22px 0 6px;border-top:1px solid var(--rule-soft)}
+.conv svg{width:100%;height:auto;display:block;max-width:560px;margin:0 auto}
+.cv-label{font-family:"JetBrains Mono",monospace;font-size:9.2px;font-weight:600;
+  letter-spacing:.06em;fill:var(--muted)}
+.cv-node{font-family:Archivo,sans-serif;font-size:11px;font-weight:600;fill:var(--ink)}
+.cv-out{font-family:"JetBrains Mono",monospace;font-size:9.6px;font-weight:600;
+  letter-spacing:.07em;fill:var(--pine)}
+
+/* ── pull ── */
+.pull{border-left:2px solid var(--pine);padding:2px 0 2px 20px;
+  font-family:Fraunces,Georgia,serif;font-size:1.08rem;line-height:1.5;color:var(--ink)}
+.pull cite{display:block;font-family:"JetBrains Mono",monospace;font-size:.68rem;
+  font-style:normal;color:var(--faint);margin-top:9px;letter-spacing:.04em}
+
+/* ── wide band for tables ── */
+.band{margin:0 -28px;padding:0 28px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:600px;font-size:.895rem}
+caption{text-align:left;font-family:"JetBrains Mono",monospace;font-size:.68rem;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--faint);padding-bottom:11px}
+th{text-align:left;font-family:"JetBrains Mono",monospace;font-size:.66rem;font-weight:600;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+  padding:0 16px 9px 0;border-bottom:1px solid var(--rule);vertical-align:bottom}
+td{padding:13px 16px 13px 0;border-bottom:1px solid var(--rule-soft);vertical-align:top;line-height:1.55}
+tr:last-child td{border-bottom:none}
+td:first-child,th:first-child{padding-left:0}
+.t-key{color:var(--ink);font-weight:600}
+
+/* ── timeline ── */
+.tl{display:grid;gap:0;margin-top:4px}
+.tl-row{display:grid;grid-template-columns:82px 1fr;gap:20px;padding:15px 0;
+  border-bottom:1px solid var(--rule-soft);align-items:baseline}
+.tl-row:last-child{border-bottom:none}
+.tl-d{font-family:"JetBrains Mono",monospace;font-size:.73rem;font-weight:600;
+  color:var(--pine);letter-spacing:.02em}
+.tl-row.soon .tl-d{color:var(--claret)}
+.tl-t{color:var(--ink);font-weight:600;font-size:.95rem}
+.tl-s{color:var(--muted);font-size:.9rem;margin-top:2px}
+
+/* ── file tree ── */
+.tree{background:var(--surface);border:1px solid var(--rule);border-radius:9px;
+  padding:22px 24px;overflow-x:auto;box-shadow:var(--shadow)}
+.tree pre{margin:0;font-family:"JetBrains Mono",monospace;font-size:.775rem;
+  line-height:1.85;color:var(--body);white-space:pre}
+.tree .jd{color:var(--pine);font-weight:600}
+.tree .cm{color:var(--faint)}
+.tree .dp{color:var(--gold);font-weight:600}
+
+/* ── ordered work list ── */
+/* Markers are absolutely positioned, NOT grid tracks. A grid list item puts every
+   element child — each <strong>, each chip, each bare text run — into its own cell,
+   which overflows to implicit rows and renders one fragment per line. */
+ol.work{list-style:none;counter-reset:w;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+ol.work.zero{counter-reset:w -1}
+ol.work li{counter-increment:w;position:relative;padding-left:34px;overflow-wrap:break-word}
+ol.work li::before{content:counter(w);position:absolute;left:0;top:0;
+  font-family:"JetBrains Mono",monospace;font-size:.72rem;font-weight:600;
+  color:var(--faint);line-height:1.9}
+ol.work li.hot::before{color:var(--claret)}
+
+ul.plain{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px}
+ul.plain li{position:relative;padding-left:20px;overflow-wrap:break-word}
+ul.plain li::before{content:"";position:absolute;left:0;top:.62em;width:5px;height:5px;
+  border-radius:50%;background:var(--pine-line)}
+
+.note{background:var(--gold-soft);border:1px solid var(--gold-line);border-radius:9px;
+  padding:22px 24px;display:flex;flex-direction:column;gap:13px}
+.note h3{color:var(--ink)}
+
+hr.rule{border:none;border-top:1px solid var(--rule);margin:0}
+.kicker{font-family:"JetBrains Mono",monospace;font-size:.67rem;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+footer{margin-top:78px;padding-top:26px;border-top:1px solid var(--rule);
+  font-size:.83rem;color:var(--faint);display:flex;flex-direction:column;gap:9px}
+
+@media (max-width:640px){
+  .wrap{padding:0 20px 72px} .band{margin:0 -20px;padding:0 20px}
+  .shead{gap:12px} .tl-row{grid-template-columns:70px 1fr;gap:14px}
+  body{font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="mast col">
+  <div class="eyebrow">Build plan · 22 August 2026</div>
+  <h1>ONE ANOTHER</h1>
+  <p class="deck">Two findings reorder the roadmap. Neither is about the product — both are about the boundary around it, and both get expensive the moment there are users.</p>
+  <div class="mast-meta">
+    <span>Gloo Hackathon · Agents Track</span>
+    <span>Window opens Sept 8</span>
+    <span>Boulder Oct 6–8</span>
+  </div>
+</header>
+
+<section class="col">
+  <div class="shead"><span class="snum">00</span><h2>The finding that decides the architecture</h2></div>
+  <div class="stack">
+    <p>The Gloo rule is that teams <strong>may build on existing technology</strong> but are <strong>judged on code written during the window</strong>. That single sentence settles a question that looks like engineering taste and isn't.</p>
+    <p>Harness code imported as a <strong>version-pinned dependency</strong> is unambiguously existing technology, and every line written after Sept 8 is judged work. Harness code <em>pasted into the repo</em> during the window is ambiguous at best — it either inflates the judged diff with work that predates the contest, or forces you to argue provenance to a judge from a git log.</p>
+
+    <div class="finding">
+      <div class="ftag"><span class="fkey">F1</span><span class="chip c-b">Blocked on Sean</span></div>
+      <h3>Three unrelated constraints demand the same artifact</h3>
+      <p>Contest rules are only the first of three. Two more arrive from completely different directions and land on the identical deliverable:</p>
+      <ul class="plain">
+        <li><strong>Growth.</strong> The tooling triage measured the ranking directly — skill packs and drop-ins (openclaw 387k, superpowers 276k, mattpocock/skills 230k) outrun genuinely good frameworks (swarms 7.1k, AgentStack 2.2k) by one to two orders of magnitude. The mechanism is switching cost. An SDK asks for a rewrite; a drop-in works in ten seconds and costs nothing to abandon.</li>
+        <li><strong>Secret containment.</strong> <span class="chip c-m">Measured</span> <code>repid-engine/package.json</code> carries a <code>prepublishOnly</code> hook that <strong>hard-refuses <code>npm publish</code></strong>, because the repo is public and holds the scoring formula. A separate public wrapper is not the nicest way to let <code>oneanother.dev</code> consume the harness — it is the only way that neither copies nor leaks it.</li>
+      </ul>
+
+      <div class="conv" role="img" aria-label="Diagram: three constraints — contest rules, growth mechanics, and secret containment — converge on one deliverable, a published version-pinned harness package.">
+        <svg viewBox="0 0 560 172" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke="var(--pine-line)" stroke-width="1.25">
+            <path d="M132 26 C 226 26, 236 78, 300 84"/>
+            <path d="M132 84 L 300 84"/>
+            <path d="M132 142 C 226 142, 236 90, 300 84"/>
+          </g>
+          <g class="cv-label" text-anchor="end">
+            <text x="120" y="23">CONTEST RULES</text>
+            <text x="120" y="81">GROWTH DATA</text>
+            <text x="120" y="139">SECRET CONTAINMENT</text>
+          </g>
+          <g class="cv-label" text-anchor="end" opacity=".72" font-size="8.4">
+            <text x="120" y="36">judged-window boundary</text>
+            <text x="120" y="94">drop-in beats framework</text>
+            <text x="120" y="152">formula must not travel</text>
+          </g>
+          <circle cx="308" cy="84" r="4.5" fill="var(--pine)"/>
+          <line x1="316" y1="84" x2="344" y2="84" stroke="var(--pine)" stroke-width="1.25"/>
+          <rect x="344" y="62" width="200" height="45" rx="6" fill="var(--pine-soft)" stroke="var(--pine-line)" stroke-width="1.25"/>
+          <text class="cv-node" x="358" y="80">Published harness package</text>
+          <text class="cv-out" x="358" y="95">VERSION-PINNED · PUBLIC SURFACE ONLY</text>
+        </svg>
+      </div>
+
+      <p>Contest rules, growth mechanics and secret containment are three independent arguments for one deliverable. That makes it the critical path — and <span class="chip c-m">Measured</span> <code>VISION_VS_VERIFIED.md</code> records it as <strong><code>BLOCKED_FOR_SEAN: npm publish</code></strong>. Nothing downstream moves until that call is made. It is the highest-leverage unblock on the board.</p>
+    </div>
+
+    <div class="finding crit">
+      <div class="ftag"><span class="fkey">F2</span><span class="chip c-b">Decide before first record</span></div>
+      <h3>The product's central promise is falsifiable by view-source today</h3>
+      <p>ONE ANOTHER's non-negotiable is that <em>no one becomes a public fundraising story</em> and <em>the person receiving help is never the product</em>.</p>
+      <p><span class="chip c-m">Measured 2026-08-16</span> Against <code>pg_policies</code>: the Supabase project carries <strong>198 policies over 196 distinct tables</strong> readable by <code>anon</code> or <code>PUBLIC</code> with qualifier literally <code>true</code>. The publishable key maps to the <code>anon</code> Postgres role and <strong>ships in the browser bundle by design</strong>. Anyone who views source reads every row and column of all 196 — not the aggregates a UI renders.</p>
+      <p>There are <strong>zero beneficiary records today</strong>. That is exactly why this is the moment to decide it, and the governing principle is already written down in your own E2E plan:</p>
+      <div class="pull">The organising principle is irreversibility, not visibility: the system has zero users today, and the decisions that get expensive after users are the ones to make now.<cite>docs/E2E-TRUST-LOOP-PLAN.md</cite></div>
+      <p>So <code>oneanother.dev</code> must not write beneficiary data into that schema on its current posture — either a separate project, or a dedicated schema that is deny-by-default <strong>and proven so by a check that fails the build</strong>, before the first burden record exists. A privacy promise resting on nobody having looked is not a privacy promise, and this is the one claim the product cannot afford to have retracted.</p>
+    </div>
+  </div>
+</section>
+
+<section class="col">
+  <div class="shead"><span class="snum">01</span><h2>The nearest deadline is not Sept 8</h2></div>
+  <div class="tl">
+    <div class="tl-row soon"><span class="tl-d">Aug 26</span><div><div class="tl-t">“How to Win” session</div><div class="tl-s">Four days out. The one-page positioning document should be finished for it.</div></div></div>
+    <div class="tl-row"><span class="tl-d">Sept 7</span><div><div class="tl-t">Collateral complete · harness published</div><div class="tl-s">Landing page live, 60-second recruiting film cut, four outreach sequences loaded. Package tagged and pinned.</div></div></div>
+    <div class="tl-row"><span class="tl-d">Sept 8</span><div><div class="tl-t">Build window opens</div><div class="tl-s">First judged commit. Everything before this is existing technology; everything after is the submission.</div></div></div>
+    <div class="tl-row"><span class="tl-d">Oct 6–8</span><div><div class="tl-t">Boulder, on site</div><div class="tl-s">Limelight Conference Center. $250,000 across three tracks.</div></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="col shead"><span class="snum">02</span><h2>What is actually built</h2></div>
+  <div class="col stack" style="margin-bottom:26px">
+    <p>Read directly from the four repositories this session. It is substantially more than the vision documents imply — the harness is not a plan, it runs.</p>
+  </div>
+  <div class="band">
+    <table>
+      <caption>Verified by reading source, 2026-08-22</caption>
+      <thead><tr><th style="width:20%">Piece</th><th style="width:16%">State</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td class="t-key">Trust harness, 7 legs</td><td><span class="chip c-m">Built</span></td><td><code>scripts/demo/trust-harness-e2e.mjs</code>, 540 lines. HAL quorum · keyless RepID read · ZK range proof <strong>verified locally against a real STARK verifier</strong> · Poseidon2 scoped nullifier · Base Sepolia anchor · outcome classify + fold · dual-auth gate</td></tr>
+        <tr><td class="t-key">zkRepID</td><td><span class="chip c-m">Built</span></td><td><code>src/zkrepid/{index,boundary,disclosure}.ts</code>. Name canonical 2026-08-17; the boundary is <strong>machine-checked in both directions</strong>, so the doc drifting from the code turns the build red</td></tr>
+        <tr><td class="t-key">x402</td><td><span class="chip c-m">Built</span></td><td>~15 modules — facilitator · gate · settlement-verifier · deferred-settlement · recovery-worker · outbound-client · outcome-link</td></tr>
+        <tr><td class="t-key">ERC-8004</td><td><span class="chip c-m">Built</span></td><td>canonical-writer · minter · poster · reputation · <code>zkp/erc8004-linkage.ts</code> · agent-passport · onchain-outbox</td></tr>
+        <tr><td class="t-key">Outcome + just-culture scoring</td><td><span class="chip c-m">Invariant-tested</span></td><td><code>outcome-classification.ts</code> (7 classes) · <code>repid-confession.ts</code> (NASA-ASRS, discount 0.4) · <code>x402-outcome-link.ts</code> (no-proof-no-pay)</td></tr>
+        <tr><td class="t-key">Role → capability → binding</td><td><span class="chip c-m">In flight</span></td><td>repid-engine PR #469, landed yesterday. First named consumer is <em>“a PAI acting as CMO”</em></td></tr>
+        <tr><td class="t-key">Public package</td><td><span class="chip c-b">Blocked</span></td><td><code>BLOCKED_FOR_SEAN: npm publish</code> — F1's critical path</td></tr>
+        <tr><td class="t-key"><code>presentProof</code> surface</td><td><span class="chip c-g">Gap</span></td><td>A third party cannot yet verify a proof without our API key. This is precisely what a <em>Proof of Care</em> needs to be a demonstration rather than an assertion</td></tr>
+        <tr><td class="t-key">Harness green today</td><td><span class="chip c-u">Unverified</span></td><td>Last recorded green <strong>2026-08-07</strong>, 15 days ago. <code>demo:harness</code> needs live Railway and Supabase; both are proxy-denied from an agent session. Re-run before it is demoed or quoted</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="col">
+  <div class="shead"><span class="snum">03</span><h2>The agents that would build this are not running</h2></div>
+  <div class="finding crit">
+    <div class="ftag"><span class="chip c-m">Measured today</span><span class="chip c-b">Blocked on you</span></div>
+    <h3>36 days dormant, and it gates the labour for everything below</h3>
+    <p>Your stated goal is to say <em>factually</em> that your own agents, on your own harness, built ONE ANOTHER. That ambition has a dependency the rest of this plan quietly assumed.</p>
+    <p><strong>Queried directly, 22 August.</strong> <code>trinity_tasks</code> holds <strong>363,040 rows all-time and 12 in the last seven days</strong> — latest at <strong>09:15:00 UTC</strong>, which is the <code>e2e_smoke_nightly</code> cron, not work. <code>repid_score_events</code>: <strong>27 rows in seven days</strong> against 152,174 all-time.</p>
+    <p>That matches the open entry exactly and confirms it still holds: the pipeline stopped <strong>2026-07-17 at 22:18 UTC</strong>, HAL is downstream of it rather than the cause, and every survivor alert since reads <em>“Manual redeploy required. Autonomous redeploy disabled.”</em></p>
+    <p><strong>Not a HAL problem and not a code problem</strong> — a Railway redeploy only you can perform. Until it happens the CMO PAI cannot run the collateral lane on the swarm, and “built by my own agents” is not a claim that can be made truthfully about work the swarm did not do. That is exactly the class of claim this whole ecosystem exists to keep honest.</p>
+    <p>It sits <strong>ahead of everything</strong> in the pre-Sept-8 list. The open entry also names four causes it already ruled out by evidence — read it before re-diagnosing anything: <code>npm run why:open trinity_tasks</code>.</p>
+  </div>
+</section>
+
+<section class="col">
+  <div class="shead"><span class="snum">04</span><h2>One landmine sits directly on the Proof-of-Care path</h2></div>
+  <div class="note">
+    <div class="ftag"><span class="chip c-m">Measured</span><span class="chip c-g">Found, not fixed</span></div>
+    <h3>An unanchored score event fails its <em>entire</em> INSERT</h3>
+    <p><code>agent_repid_history.payment_proof_hash</code> carries a <strong>UNIQUE constraint</strong>. The apply trigger fills it from a three-step fallback — the event's transaction hash, then its idempotency reference, then a <strong>hardcoded placeholder</strong>. That placeholder already occupies the unique slot.</p>
+    <p>So any trigger-applied score event with neither a transaction hash nor an idempotency key fails the whole event, not just the history row. Two in a row is all it takes.</p>
+    <p><strong>A Proof of Care is exactly that shape</strong> — care delivered by a person rather than a payment has no transaction behind it. Make <code>idempotency_key</code> a hard interface requirement on the issuer, with a check that fails the build if a writer omits it. Fixing the schema is a settlement-semantics decision owned elsewhere; the interface requirement does not wait for it.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col shead"><span class="snum">05</span><h2>The clean-slate repository</h2></div>
+  <div class="col stack" style="margin-bottom:26px">
+    <p>You asked for a build without the misfires, conflicts and file-naming confusion of the last one. Those are on record, with dates. Every rule below names the incident it prevents — a rule whose reason is written down survives a rewrite; one that reads as tidiness does not.</p>
+  </div>
+  <div class="band">
+    <table>
+      <caption>Each decision, and the incident that earned it</caption>
+      <thead><tr><th style="width:34%">Decision</th><th>The incident it prevents</th></tr></thead>
+      <tbody>
+        <tr><td class="t-key">One repo. Not a monorepo, not a split.</td><td><code>cross_repo_read</code> is a capability an agent must <em>hold and have measured</em>. An agent lacking it, asked a cross-repo question, returns a <strong>plausible answer, not a failure</strong>. One repo means every agent needs only <code>repo_read</code> — the confusion is designed out rather than policed.</td></tr>
+        <tr><td class="t-key">Harness enters as a pinned dependency. Never a copy.</td><td>F1. Plus a <code>check:harness-provenance</code> that fails the build if harness source appears in-tree, so the judged boundary cannot erode by accident under deadline.</td></tr>
+        <tr><td class="t-key"><code>check:*</code> auto-discovery from commit one.</td><td>A hand-maintained check chain was <em>one shared line</em> that <strong>five PRs conflicted over in a single night</strong>, and it silently kept <strong>5 suites / 145 assertions</strong> out of CI, because adding one meant editing that line.</td></tr>
+        <tr><td class="t-key">Three outcomes, encoded before there is anything to check.</td><td>Exit <code>0</code> VERIFIED · <code>2</code> NOT_CHECKED · else FAILED. The recurring defect across this ecosystem is a system reporting success it has not earned — three instances in one session, three unrelated components. A boolean cannot express “nobody looked”, so no status field is a boolean.</td></tr>
+        <tr><td class="t-key">One test root. One jest config.</td><td>repid-engine has <strong>three</strong> categories of test directory and only two run — six <code>__tests__</code> folders jest never sees, yet <code>tsc</code> still compiles them into <code>dist/</code>. It also has two jest configs, so a bare <code>npx jest</code> aborts. Neither is discoverable from a green run.</td></tr>
+        <tr><td class="t-key"><code>.gitignore</code> written first, every rule naming its incident.</td><td><code>/_scratch-*</code> exists because a scratch file appeared in the repo root carrying <code>.env.master</code> loading and a live signing key. <code>*.tsbuildinfo</code> stays untracked — it is rewritten by every <code>tsc</code>, which made a <code>git stash pop</code> conflict, and the pop failed silently into <code>/dev/null</code> and reverted the working tree.</td></tr>
+        <tr><td class="t-key">Root holds ≤ 8 files. Dated work in <code>reports/&lt;date&gt;/</code>.</td><td>repid-engine's root carries <strong>37 report files</strong> and the repo holds <strong>116 dated reports</strong> — a state its own CLAUDE.md calls “the 117th report nobody reads”. Filing a lesson has never prevented recurrence; only putting it in front of the worker has.</td></tr>
+        <tr><td class="t-key">One naming convention, mechanically checked.</td><td>The literal ask. <code>kebab-case.ts</code> · <code>kebab-case.md</code> under <code>docs/</code> · <code>SCREAMING-KEBAB.md</code> for the few root docs, with <code>check:naming</code> enforcing it. And if lane globs appear, they are tested <em>pairwise</em> for overlap — the first draft of the existing set collided on <strong>all 21 pairs</strong>, and the fix is the input, never the checker.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col stack" style="margin-top:34px">
+    <p class="kicker">Layout</p>
+    <p>The layout has one job beyond organisation: <strong>make “what was built during the window” answerable by pointing at directories</strong>, rather than by arguing from a git log.</p>
+    <div class="tree"><pre>oneanother/
+├── <span class="cm">CLAUDE.md          # only facts NOT discoverable from code. One screen.</span>
+├── <span class="cm">LESSONS.md         # injected into every dispatch. Hard cap.</span>
+├── <span class="cm">package.json       # check:* auto-discovered</span>
+│
+├── <span class="jd">agents/</span>            <span class="cm">─── JUDGED CORE. Built in the window. ───</span>
+│   ├── <span class="jd">listen/</span>        <span class="cm">burden (free text) → decomposed need graph</span>
+│   ├── <span class="jd">resource/</span>      <span class="cm">need graph → candidate capacity</span>
+│   ├── <span class="jd">verify/</span>        <span class="cm">eligibility + credential, via the adapter</span>
+│   └── <span class="jd">steward-gate/</span>  <span class="cm">human approval. Fail-closed.</span>
+│
+├── <span class="jd">app/</span>               <span class="cm">─── JUDGED. The four surfaces. ───</span>
+│   ├── <span class="jd">need/</span> <span class="jd">help/</span> <span class="jd">give/</span> <span class="jd">steward/</span>
+│
+├── lib/
+│   ├── <span class="dp">harness/</span>       <span class="cm">THIN adapter over the dependency. No logic. Ever.</span>
+│   ├── care/         <span class="cm">Burden · CarePlan · Capacity</span>
+│   └── proof/        <span class="cm">Proof of Care (idempotency_key REQUIRED — §04)</span>
+│
+├── scripts/check/    <span class="cm">every check:* lives here</span>
+├── tests/            <span class="cm">ONE root</span>
+└── docs/</pre></div>
+    <p><span class="chip c-m">Judged</span> <code>agents/</code> and <code>app/</code> are the window's work. <span class="chip c-u">Pre-existing</span> <code>lib/harness/</code> is adapter-only, and the dependency's only entry point. A judge asking what you built in 30 days gets a directory, not an argument.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col shead"><span class="snum">06</span><h2>The PAI roles — and where I'd push back</h2></div>
+  <div class="col stack" style="margin-bottom:26px">
+    <p>You asked for CMO, COO and CTO, and whether there are others. <strong>The contract for this already exists and landed yesterday.</strong> repid-engine PR #469 specifies role → capability → binding, and its first named consumer is <em>“a PAI acting as CMO — content, brand and publishing reach, deliberately without spend authority, database write, or custody.”</em> Its Phase 4 asks for exactly three worked examples: CMO, CTO, and auditor. Don't specify a parallel scheme — finish that one.</p>
+    <p>The pushback is on the <em>axis</em>, not the titles. Executive titles are an org chart. The contract already uses a better axis, and it is worth stating plainly because it is what makes a role load-bearing:</p>
+    <div class="pull">A role is defined by what claim it licenses — and, the half that actually matters, what an agent lacking it must say instead. A capability whose absence has no defined utterance is how confabulation gets in.<cite>docs/dispatch/INBOX_GA_CAPABILITY.md</cite></div>
+    <p>Titles are fine as labels. They are not fine as definitions.</p>
+  </div>
+  <div class="band">
+    <table>
+      <caption>Each role as a capability set with explicit denials</caption>
+      <thead><tr><th style="width:19%">Role</th><th style="width:24%">Holds</th><th style="width:24%">Explicitly denied</th><th>Why the denial is safe</th></tr></thead>
+      <tbody>
+        <tr><td class="t-key">CMO<br><span class="mono" style="font-size:.72rem;color:var(--pine)">runs now → Sept 7</span></td><td>reasoning · repo_read · publish <em>(draft)</em></td><td>spend · db_write · custody · publish <em>(send)</em></td><td>Drafts everything; a human sends. Marketing that can publish unattended is the fastest way to put a retracted number in public.</td></tr>
+        <tr><td class="t-key">CTO<br><span class="mono" style="font-size:.72rem;color:var(--pine)">runs Sept 8+</span></td><td>reasoning · repo_read · shell-evidence · db_read</td><td>publish · custody · spend · db_write <em>(prod)</em></td><td>Builds and proves; cannot deploy or move money. Needs something it lacks → opens a PR, which <em>is</em> the request path.</td></tr>
+        <tr><td class="t-key">Auditor<br><span class="mono" style="font-size:.72rem;color:var(--claret)">add this first</span></td><td>reasoning · repo_read · shell-evidence</td><td><strong>all write</strong></td><td>The role you didn't name, and the one I'd add ahead of a COO. See below.</td></tr>
+        <tr><td class="t-key">Care Steward<br><span class="mono" style="font-size:.72rem;color:var(--gold)">human, not a PAI</span></td><td>approval authority</td><td>—</td><td>The product's human authority. Needs a <code>requires_human_occupancy</code> field on the role record.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col stack" style="margin-top:34px">
+    <h3>Add the Auditor before adding the COO</h3>
+    <p>The recurring defect across every repo here is <em>a system reporting success it has not earned</em> — and <code>sprint-daemon.mjs</code> currently trusts an agent's own handoff. LongHorizon-Harness's three-role split (Manager plans · Executor acts · <strong>Auditor independently verifies before anything becomes checkpointed state</strong>) is the structural cure: a claim and its verdict come from different agents. That is worth more to this build than any additional executive.</p>
+    <p>Your harness already contains the sharper version of the idea, and it should be preserved rather than rediscovered: <strong>the agent never gets <code>shell</code></strong> — the harness runs the allowlisted command and injects the real output into the prompt. The agent gets true test results and <em>cannot fabricate them, because they are already in front of it</em>. <span class="chip c-m">Measured 2026-08-05</span> <code>grok --allow 'Bash(node:*)'</code> was asked to <code>rm</code> a file — nowhere in its rule — and deleted it. <code>--allow</code> is auto-approve, not a fence.</p>
+    <p><strong>Fold COO into CTO for now.</strong> There is no operation to run yet. A role whose denials don't bite is org-chart theatre, and each added role multiplies the pairwise-conflict surface the contract must check. Add it when a recurring operation exists that a human is doing by hand — that is the signal, not the org chart.</p>
+
+    <h3 style="margin-top:16px">The one field the vision document requires</h3>
+    <p>Your §16 locks the language, and one of the forbidden phrases is <strong>“autonomous AI pastor.”</strong> §9 states that consequential decisions return to human stewards. Right now that is a principle. The capability contract is where it becomes mechanical: a <code>requires_human_occupancy: boolean</code> on the role record, set true for Care Steward and Pastor. Then “an agent cannot occupy this role” is enforced by the same fail-closed check that governs every other capability, instead of by everyone remembering.</p>
+    <p>This is the cheapest possible moment — the contract is being specified this week, and Phase 4 already asks whether a role can hold another and what happens when two conflict. A field added now costs a line; added after migration it costs a migration.</p>
+  </div>
+</section>
+
+<section class="col">
+  <div class="shead"><span class="snum">07</span><h2>The harness, before Sept 8</h2></div>
+  <ol class="work zero">
+    <li class="hot"><strong>Redeploy the Trinity fleet on Railway.</strong> <span class="chip c-b">Blocked on you</span> Gates the agent labour that does everything below, and the collateral lane. See §03.</li>
+    <li class="hot"><strong>Publish the public wrapper.</strong> <span class="chip c-b">Blocked on you</span> Ships public endpoints only, never the scoring formula. <code>repid-engine</code>'s refusal stays exactly as it is — the wrapper is a separate package. Tag and pin a version.</li>
+    <li class="hot"><strong>Decide the data posture.</strong> Separate project, or deny-by-default schema proven by a check. Before any burden record exists.</li>
+    <li><strong>Close <code>presentProof</code>.</strong> A reviewer must verify a Proof of Care standalone, without your API key. This is the sentence the whole pitch rests on.</li>
+    <li><strong>Make <code>idempotency_key</code> a hard interface requirement</strong> on the Proof-of-Care issuer, with a check.</li>
+    <li><strong>Re-run <code>demo:harness</code></strong> on a machine that reaches Railway and Supabase, and record the date.</li>
+    <li><strong>Settle the reputation ratchet.</strong> An agent that touches VETERAN once is permanently insulated below 8000 regardless of later behaviour — defensible for just culture, indefensible for a bad actor. Not urgent for the hackathon, but it should not be <em>discovered</em> on stage.</li>
+  </ol>
+  <div class="stack" style="margin-top:22px">
+    <p><strong>One tool is worth installing before the window, and only one:</strong> <code>promptfoo</code> — declarative LLM eval and red-teaming, fully local. Your <code>trust-red-team</code> skill promises evidence-backed findings and has no executable substrate under it. This is that substrate, it runs in CI, and adversarial suites become regression tests. Everything else on the 37-repo list is reading material and will still be there in October. The failure mode is installing fifteen.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col shead"><span class="snum">08</span><h2>The publication boundary, and the stack</h2></div>
+  <div class="col stack" style="margin-bottom:26px">
+    <h3>Nothing public for ONE ANOTHER — and why the harness is not that</h3>
+    <p>Hold every ONE ANOTHER artifact — repo, domain, collateral — until the window opens. Drafting is the same work either way, so the hold costs nothing.</p>
+    <p><strong>The harness package is a different object, and the distinction is load-bearing.</strong> It is not ONE ANOTHER: it is existing TrustShell infrastructure, it already has other consumers, and it names no hackathon project. Publishing it before the window makes compliance <em>stronger</em>:</p>
+    <div class="pull">An npm publish timestamp is third-party, tamper-evident evidence that this technology predates the window. Without one, the claim rests on a git log a judge is asked to take on faith.</div>
+    <p>The condition is absolute and free: <strong>the package mentions ONE ANOTHER nowhere</strong> — not the README, not an example, not a keyword. Under that condition F1 survives intact.</p>
+
+    <h3 style="margin-top:18px">Gloo AI Studio is a provider behind the broker, not a replacement</h3>
+    <p><span class="chip c-u">Unverified</span> Every Gloo domain — <code>gloo.com</code>, <code>docs.gloo.com</code>, <code>studio.ai.gloo.com</code> — returns <code>EGRESS_BLOCKED</code> from an agent session. What follows is web-search summary only, and must be confirmed against the product before anything is built on it.</p>
+    <p>Reported: <strong>drop-in compatibility with OpenAI SDKs</strong>, streaming, tool calling, provider failover, spend controls, routing across OpenAI / Google / Anthropic and open models, plus a <strong>Data Engine</strong> for RAG. ~$25/month pay-as-you-go; Data Engine on Pro.</p>
+    <p>The consequence is the useful half. Being OpenAI-compatible makes Gloo a <em>provider that sits behind</em> your existing broker — not an alternative to it. Which is the direction <code>openai-compat.ts</code> already argued for: <em>“OmniRoute behind us, clients in front — but only this direction acquires users.”</em> Gloo satisfies the Agents Track; TrustShell keeps the verification layer Gloo has no equivalent of.</p>
+  </div>
+  <div class="band">
+    <table>
+      <caption>Four of five stack questions were already settled in-repo</caption>
+      <thead><tr><th style="width:20%">Question</th><th style="width:56%">Answer</th><th>Where</th></tr></thead>
+      <tbody>
+        <tr><td class="t-key">LangGraph as runtime?</td><td><strong>Settled: NO.</strong> Mined four times; four ideas already taken. <em>“Do not review it a fifth.”</em> One future adapter, nothing more</td><td><code>PRIOR-WORK-INDEX</code></td></tr>
+        <tr><td class="t-key">OpenClaw?</td><td><strong>Adopt as the PAI shell.</strong> Device-local, model-agnostic, largest community in the category. Build the trust layer that plugs in; don't rebuild the layer</td><td>tooling triage</td></tr>
+        <tr><td class="t-key">The universal socket?</td><td><strong>Already built</strong> — any OpenAI client changes one base URL and gets HAL scoring, family resolution and a receipt, zero code change on its side</td><td><code>openai-compat.ts</code></td></tr>
+        <tr><td class="t-key">BYOK onboarding?</td><td><strong>Already built</strong>, flag-gated default OFF. Stored only after a probe says LIVE · never returned by any endpoint · decrypted only at point of use</td><td><code>byok-custody.ts</code></td></tr>
+        <tr><td class="t-key">Which providers?</td><td><strong>13 already</strong> — anthropic · openai · gemini · groq · cerebras · deepseek · cohere · openrouter · sambanova · ollama · SLM tiers · resilient-llm · router</td><td><code>src/providers/</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col stack" style="margin-top:30px">
+    <h3>Route by role, not by vendor</h3>
+    <p>Vendor is not a property of a task, so it gives a router nothing to route on. Three roles with real selection rules — <strong>Reason</strong> (frontier tier; slow and expensive is fine), <strong>Execute</strong> (optimise tokens/sec and cost; local or fast-inference), and <strong>Verify</strong>, which carries the one constraint worth defending: <em>the verifier must be a different model family from whoever authored.</em> Not a preference — it is what makes the check mean anything, and <code>run-agent.mjs</code> already refuses to auto-commit for exactly this reason.</p>
+    <p><strong>Turnkey and deeply-customisable are one mechanism, not two.</strong> The OpenAI-compatible surface is the socket. Turnkey = the default binding points at Gloo. Custom = BYOK swaps base URL and key per role. Same contract, different binding — precisely what PR #469's binding record is for.</p>
+    <div class="note">
+      <div class="ftag"><span class="chip c-g">The real gap</span></div>
+      <h3>It is all inert</h3>
+      <p>Almost none of this needs building. BYOK sits behind a default-OFF flag, and the index records <em>“no production caller”</em> against module after module — calling that <strong>the harness-wide state</strong>, not a per-module gap.</p>
+      <p>So Sept 8 readiness is <strong>wiring and switching on</strong>, not greenfield. A materially smaller job than it looks, fully testable now, on existing technology. It is also LESSONS 3 exactly: a mechanism wired at one end only is worse than an absent one, because it converts a known gap into false coverage.</p>
+    </div>
+  </div>
+</section>
+
+<section class="col">
+  <div class="shead"><span class="snum">09</span><h2>Collateral to Sept 7</h2></div>
+  <div class="stack">
+    <p>The CMO PAI is the right vehicle precisely because of what it is <em>denied</em>. Content, brand and publishing reach with no spend, no database write and no custody — marketing collateral is the one workload where that capability set is complete rather than crippled.</p>
+    <ol class="work">
+      <li class="hot"><strong>One-page positioning</strong> — mission, category, differentiators, MVP scope. <em>For Aug 26.</em></li>
+      <li><strong>Landing page at oneanother.dev</strong> — the recruiting CTA needs somewhere to land before any outreach goes out.</li>
+      <li><strong>60-second recruiting film</strong> — your video pack names this as the recommended public launch, ahead of the 2.5-minute film and the teaser. Cut that one first.</li>
+      <li><strong>Four outreach sequences</strong> — builders · Christian influencers and pastors · nonprofit and ministry leaders · corporate purpose. The recruiting brief already has the pilot question per audience; those are the openers.</li>
+      <li><strong>The 90-second technical cut</strong> — for identity and ZK builders. §10 is why this is more urgent than it looks.</li>
+    </ol>
+    <p>Production guardrails from the video pack are non-negotiable, and worth restating because a generative pipeline erodes them silently: no implication that a fictional composite is a real beneficiary; no poverty imagery as leverage; no crypto iconography; show the human steward <em>before</em> showing automation move resources; end on people.</p>
+  </div>
+</section>
+
+<section class="col">
+  <div class="shead"><span class="snum">10</span><h2>The competitive set is a scoreboard, and it is open</h2></div>
+  <div class="stack">
+    <p>The most useful item in the 37-repo triage wasn't a tool. It was the <code>agent-identity</code> topic page.</p>
+    <p>Seven independent projects are building pieces of agent identity — DID-based identity with W3C Verifiable Credentials, agent credential gateways, cryptographic identity with scoped permissions and tamper-evident audit, an open standard for persistent agent identity. <strong>The largest has 82 stars.</strong></p>
+    <p>That cuts both ways and both halves matter. Seven independent teams reached for this problem, so the need is real and is not being invented here. And <strong>nobody has won it</strong> — no incumbent, no default, no distribution. Your competition for attention is not the identity establishment; it is seven repositories with two-digit star counts, against live ERC-8004 contracts and a scoring engine with real events behind it.</p>
+    <p>That window will not stay open. ONE ANOTHER is an unusually good vehicle for it: a trust layer nobody adopts <em>because it is a trust layer</em> gets adopted when it is the thing that let a church coordinate care without turning a person into a public story.</p>
+  </div>
+</section>
+
+<section class="col">
+  <div class="shead"><span class="snum">11</span><h2>What I could not verify</h2></div>
+  <div class="note">
+    <div class="ftag"><span class="chip c-u">Unverified</span><span class="chip c-u">Load-bearing</span></div>
+    <h3>The Gloo build-window rule itself</h3>
+    <p><code>gloo.com</code> is <strong>blocked by the network egress proxy</strong> from this session, so I could not read the FAQ. A web search returned the structure — <em>“Teams had a 30-day window prior to the event… they could build on existing technology. However, they were judged only on code written and progress made during the actual hackathon”</em> — and confirmed Oct 6–8 in Boulder with $250,000 in prizes.</p>
+    <p>But that text is <strong>past tense and appears to describe a prior year's event</strong>, and it says the pre-build period begins <em>“sometime in September”</em> rather than naming Sept 8. The Sept 8 date comes from your own documents citing the FAQ.</p>
+    <p><strong>Section 00 rests entirely on this rule.</strong> It is cheap to settle and expensive to assume — read the FAQ directly and confirm both the date and the exact wording on pre-existing code. If the rule is looser, the packaging work is still correct for the other two reasons. If it is stricter, the boundary matters more, not less.</p>
+  </div>
+  <div class="stack" style="margin-top:20px">
+    <ul class="plain">
+      <li><span class="chip c-u">Unverified</span> <strong>A third track exists.</strong> The search surfaced <em>three</em> challenge tracks — Agents, Ministry Resourcing, and a <strong>Bible Track</strong> (YouVersion platform and Bible data). Your documents name only the first two. Worth knowing before track strategy is locked.</li>
+      <li><span class="chip c-u">Unverified</span> <strong>Cross-track eligibility.</strong> Your own vision document already flags this correctly — the public site says participants may build across tracks, but the FAQ doesn't confirm that <em>one identical submission</em> may compete in both. Get it in writing before relying on it.</li>
+      <li><span class="chip c-u">Unverified</span> <strong>The harness was not re-run.</strong> It needs live Railway and Supabase, both proxy-denied from an agent session. Last recorded green is 2026-08-07.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="col">
+  <div class="shead"><span class="snum">12</span><h2>In one line</h2></div>
+  <div class="finding">
+    <p style="font-family:Fraunces,Georgia,serif;font-size:1.16rem;line-height:1.5;color:var(--ink)">The Trust Harness does not need to be <em>finished</em> before Sept 8. It needs to be <strong>published, pinned, and provable by a stranger</strong> — because that is simultaneously what the contest rules reward, what the growth data says travels, and what keeps the scoring formula out of a public repository.</p>
+    <p>Everything else on this page is downstream of that one artifact.</p>
+  </div>
+</section>
+
+<footer class="col">
+  <div>Grounded against <code>repid-engine</code>, <code>hyperdag-protocol</code>, <code>trinity-ecosystem</code> and <code>trinity-symphony-shared</code> — read directly, 22 August 2026.</div>
+  <div>Full plan: <code>docs/ONEANOTHER-BUILD-PLAN-2026-08-22.md</code> · trinity-ecosystem PR #125 · <code>check:prior-work</code> VERIFIED, 574 passed.</div>
+  <div style="color:var(--muted);margin-top:4px"><span class="chip c-m">Measured</span> read or run this session. <span class="chip c-u">Unverified</span> not checked, instrument named. <span class="chip c-b">Blocked</span> needs your decision.</div>
+</footer>
+
+</div>
