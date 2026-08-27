@@ -1,11 +1,22 @@
 # Agent dispatch engine — one mechanism, many policies
 
-**Status: DESIGN, NOT YET IMPLEMENTED (2026-08-26).** This is the architecture
-approved before building the cloud migration for XC and GA. It generalizes two
-things that already exist and work — `repid-engine`'s `scripts/dispatch/run-agent.mjs`
-(the local XC/GA dispatcher) and `.github/workflows/build-loop-cloud.yml` (T12's
-cloud loop, live since Beat 63/64) — into one reusable engine, rather than a third
-independent reimplementation.
+**Status (2026-08-27): rollout step 3 BUILT, NOT YET RUN.** This is the
+architecture approved before building the cloud migration for XC and GA. It
+generalizes two things that already exist and work — `repid-engine`'s
+`scripts/dispatch/run-agent.mjs` (the local XC/GA dispatcher) and
+`.github/workflows/build-loop-cloud.yml` (T12's cloud loop, live since Beat
+63/64) — into one reusable engine, rather than a third independent
+reimplementation.
+
+`repid-engine`'s `.github/workflows/dispatch-agent-cloud.yml` and
+`docs/CLOUD_DISPATCH_SETUP.md` now exist (rollout step 3, below) — wrapping
+`run-agent.mjs` unmodified, `workflow_dispatch`-only, no schedule. It has **not
+yet had its first real run**: the agent CLI package names it installs
+(`@xai-official/grok`, `@google/gemini-cli`) are verified against the public
+registries, not against this workflow executing them. Do not cite this as
+"XC/GA are live in the cloud" until a `workflow_dispatch` run has actually
+produced a transcript PR — the setup doc's "Test before trusting it" section is
+the bar, mirroring Beat 63's role for T12.
 
 Parent plan: `docs/NEXUS-BRAIN-SPRINT-PLAN.md` P1 (Tool Capability Registry) and
 P2/P6 (the long-loop executor / harness-for-harnesses). This doc is the concrete
@@ -213,8 +224,12 @@ discipline as everything else in this sprint's index.
 
 ## What this document is not
 
-Not a claim that any of this is built. `run-agent.mjs` and `build-loop-cloud.yml`
-are real and live; the shared engine, the policy-file mechanism, and the XC/GA
-cloud workflows described above do not exist yet. This is the approved shape
-to build them in, so step 3 above doesn't become a third independent
-reimplementation.
+Not a claim that all of this is built, or proven. `run-agent.mjs` and
+`build-loop-cloud.yml` are real and live. `repid-engine`'s
+`dispatch-agent-cloud.yml` (rollout step 3) is now real but **unexercised** — it
+wraps the mechanism, it has not yet completed a real run. The shared-mechanism
+extraction (step 1) and a formal `lean.yaml` policy file (step 2) do not exist
+yet — the lean policy is currently implicit in the workflow (no auto-merge, no
+schedule) rather than a named config a second workflow could point to. This
+doc remains the approved shape to build the rest in, so nothing here becomes a
+third independent reimplementation.
