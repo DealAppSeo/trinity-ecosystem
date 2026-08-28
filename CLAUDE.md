@@ -77,10 +77,23 @@ app built from `DealAppSeo/trustshell`, and the production deployment serving th
 domain (`dpl_J53jTJ3cXfRJPuQcoV3XtSPzEwC5`, `main` @ `6cfd2d3`) is the current
 production target — production is **not** stale here, unlike `trustrails.dev`. The
 newest *build* is a `target: null` preview, which is the ordinary preview/production
-split, not a drought. **One gap:** `trustshell.dev` has **no `/api/version`**
-[VERIFIED 2026-08-16 via pg_net — 404], so "which commit is live / is a required
-secret set" is not observable from the outside the way it is on the aitrinitysymphony
-surfaces — the Vercel API is the only way to answer it for this domain.
+split, not a drought.
+
+**The "no `/api/version`" gap is CLOSED — the route exists now** [MEASURED
+2026-08-28 with plain `curl`]. This paragraph read *"`trustshell.dev` has no
+`/api/version` [VERIFIED 2026-08-16 via pg_net — 404] … the Vercel API is the only
+way to answer it for this domain."* That was true when written and is not true now;
+someone shipped the route in between. `GET https://www.trustshell.dev/api/version`
+returns 200 with `{commit, commit_short, platform, environment, region,
+responded_at}`, `cache-control: no-store`, `x-vercel-id` present — the same shape
+the aitrinitysymphony surfaces expose. Checked against `origin/main` on 2026-08-28:
+both `827ba78`, so production is running current main.
+
+**The lesson is the dating convention, not the route.** A `[VERIFIED <date>]` tag
+records when something was true, and a *negative* finding — "this does not exist" —
+decays faster than a positive one, because anyone may add the missing thing without
+touching this file. Re-probe a negative before repeating it; nothing fails loudly
+when it goes stale.
 
 The same Next app runs in **both places with separate environment variables.** A
 200 from the custom domain says nothing about the Vercel deployment, and vice
@@ -95,10 +108,13 @@ are **publicly reachable**, and they are the only way to observe the Vercel
 deployment when the Vercel API is unavailable — which is exactly the situation
 that surfaced them.
 
-**Publicly reachable is not the same as reachable from here.** All three custom
-domains are proxy-denied to `curl` and to the browser tool from an agent session;
-`pg_net` reaches them. See *Network, in cloud/remote sessions* below before
-concluding a domain is down.
+**Publicly reachable is not the same as reachable from here** — but as of
+2026-08-28 these three ARE reachable from here. This paragraph said all three
+custom domains were proxy-denied to `curl` and only reachable via `pg_net`. Plain
+`curl` now gets **200** from `app.` and `www.`, and **307** from the apex. Do not
+reach for `pg_net` first any more; try the direct request, and fall back only on an
+actual `CONNECT tunnel failed`. See *Network, in cloud/remote sessions* below for
+the full re-measurement before concluding a domain is down.
 
 Vercel `ssoProtection` is `all_except_custom_domains`, so every `.vercel.app` URL
 302s to `vercel.com/sso-api`. You cannot fetch a preview URL from an agent
@@ -121,8 +137,10 @@ repid-engine has the same thing at `GET /health` → `deployed_commit`.
 
 ### Reaching these hosts from a sandboxed agent session
 
-`curl` from the container is proxy-denied for most external hosts, but **Supabase
-`pg_net` is not** — it egresses from Supabase infrastructure:
+**Try `curl` FIRST.** As of 2026-08-28 it reaches every surface in this document
+except `railway.app` and `api.uptimerobot.com`. `pg_net` remains the fallback for
+a host the proxy genuinely refuses — it egresses from Supabase infrastructure, so
+it is a different path, not a better one:
 
 ```sql
 select net.http_get(url := 'https://www.aitrinitysymphony.com/api/version',
@@ -256,42 +274,54 @@ Tell the two apart by the failure shape, and never by this file:
 Any ordinary HTTP status — including `401` or `403` **in the response body** — means
 you connected and the *server* answered.
 
-These hosts were **denied by the sandbox proxy** (`connect_rejected`, gateway 403 to
-CONNECT) when last measured. This is not an auth failure — do not rotate a
-credential over it:
+### RE-MEASURED 2026-08-28 — most of what this list called denied now answers
 
-- `repid-engine-production.up.railway.app`
-- ~~`qnnpjhlxljtqyigedwkb.supabase.co`~~ — **REACHABLE as of 2026-08-27.** Plain
-  `curl` to `/rest/v1/` returns **HTTP 401** (PostgREST's own "no API key"), and
-  Node `fetch` agrees. It was genuinely denied on 2026-08-15; the sandbox's
-  allowlist changed. **Consequence:** a PostgREST call with a real key now works
-  from a sandboxed session, so `whoami()` and any direct REST check are back on
-  the table — the Supabase MCP is no longer the only path.
-- `api.uptimerobot.com` — denied 2026-08-27 (`CONNECT tunnel failed, 403`)
-- `railway.app` — denied 2026-08-27. But **`backboard.railway.app` (the GraphQL
-  API) is REACHABLE** — it answers `HTTP 403` to an unauthenticated GET, which is
-  Railway's own reply, not the proxy's. The apex being blocked says nothing about
-  the API host.
-- `app.aitrinitysymphony.com` — verified 2026-08-15
-- `www.aitrinitysymphony.com` — verified 2026-08-15
+Every host below was probed with plain `curl` from a sandboxed session on
+2026-08-28. **Five of the seven rows had gone stale, all in the same direction:**
+the list said blocked, the host answers. The warning above was doing its job and
+was still not enough, because a reader who takes "denied" at face value never runs
+the probe that would correct it. So the current state, measured:
 
-The Supabase **MCP tools work** (different path), so SQL queries succeed while
-direct PostgREST calls fail. The npm registry and GitHub are reachable.
+| host | 2026-08-28 | previously listed as |
+|---|---|---|
+| `repid-engine-production.up.railway.app` | **HTTP 200** | denied |
+| `app.aitrinitysymphony.com` | **HTTP 200** | denied (2026-08-15) |
+| `www.aitrinitysymphony.com` | **HTTP 200** | denied (2026-08-15) |
+| `aitrinitysymphony.com` (apex) | **HTTP 307** → `www` | NOT CHECKED |
+| `qnnpjhlxljtqyigedwkb.supabase.co` | **HTTP 401** (PostgREST's own) | already corrected 2026-08-27 |
+| `backboard.railway.app` | **HTTP 200** | reachable (was 403) |
+| `www.trustshell.dev` | **HTTP 200** | — |
+| `api.uptimerobot.com` | **PROXY-DENIED** | denied — still true |
+| `railway.app` | **PROXY-DENIED** | denied — still true |
 
-**The last two are denied to `curl` and to the browser tool, but reachable via
-`pg_net`** — those are different egress paths, and only `pg_net` leaves Supabase
-infrastructure. The browser fails as `net::ERR_TUNNEL_CONNECTION_FAILED`, which
-looks like a site outage and is not one; `curl` gives the usual
-`CONNECT tunnel failed, response 403`. Until 2026-08-15 this section listed only
-the first two hosts while the topology section called the custom domains
-reachable, so a denial on `www` read as "the deploy is down."
+**The consequence is larger than a table refresh: an agent session can now read
+production directly.** `repid-engine-production` serves `/health` (with
+`deployed_commit`) and a keyless `POST /api/v1/hal/evaluate` returns the live
+`provider_health`, including which providers were skipped and why. That answers
+"is the quorum degraded, and what exactly is wrong" in one request, with no
+dashboard and no `pg_net` round trip. It was used exactly that way on 2026-08-28
+to establish that one of three Railway variables had not taken effect — a question
+that had previously been bounced back to a human to check by hand.
 
-This is why **no agent session can observe these pages after hydration.** `pg_net`
-returns the SSR HTML and any static asset, so "which commit, which surface" and
-"is this string in the shipped bundle" are answerable; anything that only appears
-once React mounts is **NOT CHECKABLE from here** — say so rather than inferring it
-from healthy-looking SSR HTML, which renders identically whether or not a
-client-side effect throws.
+The `pg_net` path still works and is still the fallback. It is no longer the only
+way in.
+
+The Supabase **MCP tools work** (a different path again), so SQL queries succeed
+independently of any of the above.
+
+**Post-hydration behaviour remains NOT CHECKABLE from here.** `curl` and `pg_net`
+both return SSR HTML and static assets, so "which commit, which surface" and "is
+this string in the shipped bundle" are answerable; anything that only appears once
+React mounts is not. Say so rather than inferring it from healthy-looking SSR HTML,
+which renders identically whether or not a client-side effect throws.
+
+**Read a failure by its shape, never by this table** — that is the part that does
+not go stale. `curl: (56) CONNECT tunnel failed, response 403` is the **proxy**
+refusing. Any ordinary HTTP status — including `401` or `403` **in the response
+body** — means you connected and the *server* answered. A 3xx is also a connection:
+`trustshell.dev` returns **308** to `www`, 15 bytes, and reading that as "the page
+has no `og:image`" was a real error made and caught on 2026-08-28. Follow redirects
+before concluding anything about a page's contents.
 
 The apex `aitrinitysymphony.com` was **NOT CHECKED** against the proxy — do not
 assume it matches `www` either way.
