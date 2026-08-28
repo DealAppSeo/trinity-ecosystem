@@ -246,11 +246,32 @@ migration — ask `pg_policies`.
 
 ## Network, in cloud/remote sessions
 
-These hosts are **denied by the sandbox proxy** (`connect_rejected`, gateway 403 to
-CONNECT). This is not an auth failure — do not rotate a credential over it:
+**THIS LIST GOES STALE AND HAS. Re-test before quoting it** — a denial is a fact
+about the sandbox on a given day, not a property of the host. Two rows below were
+denied on 2026-08-15 and one of them answers today; a session that trusted the
+list would have reported a working path as blocked.
+
+Tell the two apart by the failure shape, and never by this file:
+`curl: (56) CONNECT tunnel failed, response 403` is the **proxy** refusing.
+Any ordinary HTTP status — including `401` or `403` **in the response body** — means
+you connected and the *server* answered.
+
+These hosts were **denied by the sandbox proxy** (`connect_rejected`, gateway 403 to
+CONNECT) when last measured. This is not an auth failure — do not rotate a
+credential over it:
 
 - `repid-engine-production.up.railway.app`
-- `qnnpjhlxljtqyigedwkb.supabase.co`
+- ~~`qnnpjhlxljtqyigedwkb.supabase.co`~~ — **REACHABLE as of 2026-08-27.** Plain
+  `curl` to `/rest/v1/` returns **HTTP 401** (PostgREST's own "no API key"), and
+  Node `fetch` agrees. It was genuinely denied on 2026-08-15; the sandbox's
+  allowlist changed. **Consequence:** a PostgREST call with a real key now works
+  from a sandboxed session, so `whoami()` and any direct REST check are back on
+  the table — the Supabase MCP is no longer the only path.
+- `api.uptimerobot.com` — denied 2026-08-27 (`CONNECT tunnel failed, 403`)
+- `railway.app` — denied 2026-08-27. But **`backboard.railway.app` (the GraphQL
+  API) is REACHABLE** — it answers `HTTP 403` to an unauthenticated GET, which is
+  Railway's own reply, not the proxy's. The apex being blocked says nothing about
+  the API host.
 - `app.aitrinitysymphony.com` — verified 2026-08-15
 - `www.aitrinitysymphony.com` — verified 2026-08-15
 
