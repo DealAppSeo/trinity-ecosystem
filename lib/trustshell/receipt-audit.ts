@@ -181,3 +181,112 @@ export function requireAuditSecret(env: Record<string, string | undefined>): str
   return secret;
 }
 
+
+// ── THE AUDIT HASH IS NOT VERIFIABLE BY ANYONE BUT THE ISSUER ───────────────
+//
+// Found 2026-08-29 by `trinity-nexus` in a threat-modelling pass, and confirmed
+// against this file rather than relayed: `audit_hash` is an HMAC keyed by
+// `TRUSTRAILS_HMAC_SECRET`, so re-deriving it requires the secret, so only the
+// issuer can check it. A receipt exists to be shown to somebody else. "The
+// receipt is authentic" therefore collapses to "the issuer says it is", which
+// is the trust relationship the receipt was supposed to remove.
+//
+// The HMAC is not useless and is NOT being removed — it is what makes the row
+// tamper-EVIDENT to the issuer, who is the party that would have to be the
+// forger for silent modification to matter. What it cannot do is travel.
+//
+// **THE FIX IS ADDITIVE, AND THAT IS THE WHOLE DESIGN.** A second hash over the
+// same fields with NO KEY. Every field in the preimage is a stored column, so a
+// third party holding nothing but the row and this function reproduces it
+// exactly — no secret, no API call, no trust in us. Existing `audit_hash`
+// consumers are untouched; nothing reinterprets an old row.
+//
+// The two live in separate hash spaces by domain tag, so a value from one can
+// never be presented as a value from the other.
+//
+// What this deliberately does NOT claim: re-deriving the commitment proves the
+// row has not changed since it was written. It does not prove the row was ever
+// TRUE — that the payment happened, that BFT really passed. Binding a receipt
+// to reality is the on-chain tx hash and the attestation, not a hash of our own
+// assertions. A commitment over a lie reproduces perfectly.
+
+/** Domain tag for the keyless commitment. Distinct from the HMAC's by design. */
+export const PAYMENT_COMMITMENT_DOMAIN = 'payment_receipt_commitment/v1';
+
+/**
+ * The exact string a payment receipt's KEYLESS commitment is taken over.
+ *
+ * Same fields and same order as `paymentAuditPreimage` — deliberately, so the
+ * two answer questions about identical content and a reader comparing them has
+ * only the domain tag to account for. It is a separate function rather than a
+ * parameter on that one because the domain tag must not be caller-supplied:
+ * a caller who could pass it could compute a commitment in the HMAC's space.
+ */
+export function paymentCommitmentPreimage(input: PaymentAuditInput): string {
+  return [
+    JSON.stringify(PAYMENT_COMMITMENT_DOMAIN),
+    JSON.stringify(input.receiptId),
+    JSON.stringify(input.agentName),
+    JSON.stringify(input.repidScore),
+    JSON.stringify(input.amountUSDC),
+    JSON.stringify(input.recipientAddress),
+    JSON.stringify(input.bftPassed),
+    JSON.stringify(input.consensusWeight),
+    JSON.stringify(input.solanaTxHash),
+    JSON.stringify(input.ruleHash),
+  ].join(':');
+}
+
+/**
+ * Reconstruct the commitment input from a stored row.
+ *
+ * This is the function a third-party verifier actually needs, and it is the
+ * reason the commitment is worth anything: it names, in one place, exactly
+ * which columns the commitment covers and how a raw row maps onto them. Without
+ * it every verifier re-derives that mapping by reading the mint path, and any
+ * one of them getting `bft_passed`'s three states wrong reports tampering.
+ *
+ * Numeric columns come back from PostgREST as strings (`numeric` is not a JS
+ * number), so they are coerced here rather than at each call site. A verifier
+ * that skipped this would hash "5" where the mint hashed 5 and report FAILED on
+ * an untouched row.
+ */
+export function paymentAuditInputFromRow(row: {
+  receipt_id: string;
+  agent_name: string;
+  agent_repid_score: number | string | null;
+  payment_amount_usdc: number | string | null;
+  recipient_address: string | null;
+  bft_passed: boolean | null;
+  bft_consensus_weight: number | string | null;
+  solana_tx_hash: string | null;
+  rule_hash: string | null;
+}): PaymentAuditInput {
+  const num = (v: number | string | null): number => (v === null ? 0 : Number(v));
+  return {
+    receiptId: row.receipt_id,
+    agentName: row.agent_name,
+    repidScore: num(row.agent_repid_score),
+    amountUSDC: num(row.payment_amount_usdc),
+    recipientAddress: row.recipient_address ?? '',
+    // Three states. `null` is "the panel did not evaluate", NOT `false`.
+    bftPassed: row.bft_passed,
+    consensusWeight: row.bft_consensus_weight === null ? null : num(row.bft_consensus_weight),
+    solanaTxHash: row.solana_tx_hash,
+    ruleHash: row.rule_hash ?? '',
+  };
+}
+
+/**
+ * Commitments written before this encoding do not exist.
+ *
+ * Unlike `PRE_V1_HASHES_DO_NOT_REPRODUCE`, there is no ambiguity to warn about:
+ * `commitment_hash` is NULL on every row minted before this column, and NULL
+ * means NOT CHECKED — no commitment was computed. It does not mean the row
+ * failed verification, and a verifier that renders it as a failure is asserting
+ * something nobody measured.
+ */
+export const NULL_COMMITMENT_IS_NOT_CHECKED =
+  'commitment_hash is NULL on receipts minted before payment_receipt_commitment/v1. ' +
+  'That is NOT_CHECKED — no keyless commitment was written — and it is not evidence ' +
+  'of tampering. Such a row can only be verified by the issuer, via audit_hash.';

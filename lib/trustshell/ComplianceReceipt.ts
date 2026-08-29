@@ -8,10 +8,22 @@ import {
   halReceiptRow,
   type HalClassificationInput,
 } from './hal-receipt';
-import { paymentAuditPreimage, requireAuditSecret } from './receipt-audit';
+import {
+  paymentAuditPreimage,
+  paymentCommitmentPreimage,
+  requireAuditSecret,
+  type PaymentAuditInput,
+} from './receipt-audit';
 
 export { halReceiptAuditPreimage, halReceiptRow, type HalClassificationInput };
-export { paymentAuditPreimage, requireAuditSecret } from './receipt-audit';
+export {
+  paymentAuditPreimage,
+  paymentCommitmentPreimage,
+  paymentAuditInputFromRow,
+  requireAuditSecret,
+  PAYMENT_COMMITMENT_DOMAIN,
+  NULL_COMMITMENT_IS_NOT_CHECKED,
+} from './receipt-audit';
 
 export class ComplianceReceiptGenerator {
   private get supabase() { return getSupabaseAdmin(); }
@@ -37,19 +49,29 @@ export class ComplianceReceiptGenerator {
     // it was never tested, and both defects hal-receipt.ts had already fixed for
     // the HAL preimage were still live: an absent tx hash rendered as the
     // literal 'no_tx' collided with a real tx hash of that value.
-    const auditHash = await this.auditHmac(
-      paymentAuditPreimage({
-        receiptId,
-        agentName: params.kyaResult.agentName,
-        repidScore: params.kyaResult.repidScore,
-        amountUSDC: params.amountUSDC,
-        recipientAddress: params.recipientAddress,
-        // Three states, matching what is stored in `bft_passed`.
-        bftPassed: params.bftProof.evaluated ? params.bftProof.passed : null,
-        consensusWeight: params.bftProof.consensusWeight ?? null,
-        solanaTxHash: params.solanaTxHash,
-        ruleHash: params.ruleHash,
-      })
+    // Built ONCE and handed to both hashes. Two call sites constructing this
+    // separately is the defect waiting to happen: the commitment and the audit
+    // hash would silently cover different content, and every third-party
+    // verification would report tampering on an untouched row.
+    const auditInput: PaymentAuditInput = {
+      receiptId,
+      agentName: params.kyaResult.agentName,
+      repidScore: params.kyaResult.repidScore,
+      amountUSDC: params.amountUSDC,
+      recipientAddress: params.recipientAddress,
+      // Three states, matching what is stored in `bft_passed`.
+      bftPassed: params.bftProof.evaluated ? params.bftProof.passed : null,
+      consensusWeight: params.bftProof.consensusWeight ?? null,
+      solanaTxHash: params.solanaTxHash,
+      ruleHash: params.ruleHash,
+    };
+
+    const auditHash = await this.auditHmac(paymentAuditPreimage(auditInput));
+
+    // The keyless half. Needs no secret, so it cannot fail for configuration
+    // reasons and is computed unconditionally — that is the point of it.
+    const commitmentHash = await this.commitmentSha256(
+      paymentCommitmentPreimage(auditInput)
     );
 
     const receipt: ComplianceReceipt = {
@@ -111,6 +133,8 @@ export class ComplianceReceiptGenerator {
       solana_explorer_url:  receipt.solanaExplorerUrl,
       fireblocks_preauth_id: receipt.fireblocksPreAuthId,
       audit_hash:           receipt.auditHash,
+      // The third-party verification path. See receipt-audit.ts.
+      commitment_hash:      commitmentHash,
       on_chain_verified:    params.confirmed === true && params.simulated !== true,
       tx_verification_status: txStatus,
     });
@@ -197,5 +221,22 @@ export class ComplianceReceiptGenerator {
       .createHmac('sha256', requireAuditSecret(process.env))
       .update(preimage)
       .digest('hex');
+  }
+
+  /**
+   * The keyless commitment. Plain SHA-256, no secret, deliberately.
+   *
+   * It takes no secret because a third party has none. That is not a weaker
+   * version of `auditHmac` — it answers a different question. The HMAC asks
+   * "did the issuer write these bytes"; this asks "do these bytes still hash
+   * to what the row claims", and anyone can ask it.
+   *
+   * Named for what it computes, following the same rule that renamed `sha256`
+   * to `auditHmac` here: this one genuinely IS a bare SHA-256, so a reader who
+   * checks it with `sha256sum` over the preimage gets a match.
+   */
+  private async commitmentSha256(preimage: string): Promise<string> {
+    const crypto = await import('crypto');
+    return crypto.createHash('sha256').update(preimage).digest('hex');
   }
 }
