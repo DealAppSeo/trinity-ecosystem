@@ -43,7 +43,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createHmac } from 'node:crypto';
+import { createHmac, createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { localTsc } from './local-tsc.mjs';
 
@@ -84,7 +84,7 @@ try {
 }
 
 const { classifyInsert, advance, clampBatch, verdictOf, summarize } = plan;
-const { halReceiptAuditPreimage, halReceiptRow } = halReceipt;
+const { halReceiptAuditPreimage, halCommitmentPreimage, halReceiptRow } = halReceipt;
 const { requireAuditSecret } = receiptAudit;
 
 const BATCH = clampBatch(Number(arg('--batch', 250)));
@@ -129,6 +129,13 @@ const db = createClient(url, key, { auth: { persistSession: false } });
 
 /** The one line not reused from ComplianceReceipt.ts, which imports the `@/` alias. */
 const auditHmac = (preimage) => createHmac('sha256', SECRET).update(preimage).digest('hex');
+// KEYLESS, and that is load-bearing here specifically. The replay's documented
+// irreversibility trap is that a run under a BAD secret writes an audit_hash
+// nobody can verify, which the partial UNIQUE index then refuses to let anyone
+// re-mint. This hash takes no secret, so it is correct on those rows regardless
+// and they stay third-party verifiable. It bounds that damage; it does not
+// remove it -- audit_hash stays permanently wrong, so the checklist still holds.
+const commitmentSha256 = (preimage) => createHash('sha256').update(preimage).digest('hex');
 
 const counts = { minted: 0, skipped: 0, failed: 0, remaining: 0 };
 let cursor = { afterId: Number.isFinite(AFTER) ? AFTER : 0 };
@@ -163,6 +170,7 @@ while (attempted < LIMIT && !fatal) {
 
     const receiptId = crypto.randomUUID();
     const hash = auditHmac(halReceiptAuditPreimage(row, receiptId));
+    const commitment = commitmentSha256(halCommitmentPreimage(row, receiptId));
 
     if (DRY_RUN) {
       counts.minted += 1;
@@ -171,7 +179,7 @@ while (attempted < LIMIT && !fatal) {
 
     const { error } = await db
       .from('kya_compliance_receipts')
-      .insert(halReceiptRow(row, receiptId, hash));
+      .insert(halReceiptRow(row, receiptId, hash, commitment));
 
     const outcome = classifyInsert(error);
     if (outcome === 'minted') counts.minted += 1;

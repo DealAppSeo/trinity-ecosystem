@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import type { ComplianceReceipt, KYAComplianceResult, BFTConsensusProof } from './types';
 import {
   halReceiptAuditPreimage,
+  halCommitmentPreimage,
   halReceiptRow,
   type HalClassificationInput,
 } from './hal-receipt';
@@ -15,7 +16,7 @@ import {
   type PaymentAuditInput,
 } from './receipt-audit';
 
-export { halReceiptAuditPreimage, halReceiptRow, type HalClassificationInput };
+export { halReceiptAuditPreimage, halCommitmentPreimage, halReceiptRow, type HalClassificationInput };
 export {
   paymentAuditPreimage,
   paymentCommitmentPreimage,
@@ -185,10 +186,12 @@ export class ComplianceReceiptGenerator {
   ): Promise<{ receiptId: string; auditHash: string }> {
     const receiptId = crypto.randomUUID();
     const auditHash = await this.auditHmac(halReceiptAuditPreimage(c, receiptId));
+    // Keyless, so it cannot fail for configuration reasons — that is the point.
+    const commitmentHash = await this.commitmentSha256(halCommitmentPreimage(c, receiptId));
 
     const { error } = await this.supabase
       .from('kya_compliance_receipts')
-      .insert(halReceiptRow(c, receiptId, auditHash));
+      .insert(halReceiptRow(c, receiptId, auditHash, commitmentHash));
 
     // Idempotent by construction: a partial unique index on
     // hal_classification_id makes a repeat mint fail rather than duplicate.
