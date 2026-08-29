@@ -45,6 +45,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | TrustShell spec and milestone ledger — M1–M6 built, every one having falsified something the spec asserted | `docs/TRUSTSHELL-V1.md` | the spec's own unbuilt half, which is a plan not a description |
 | Agent memory: recall path, both halves of the bug | `docs/AGENT-MEMORY-SPEC.md` | — |
 | MCP fleet discovery endpoint | `docs/MCP-FLEET.md` | — |
+| The `/canvas` tldraw editor: what is installed, and why persistence and agent access are absent | `docs/CANVAS.md` | the tldraw docs site, which is proxy-blocked here and describes a different version |
 | The scoped first slice of the PAI/Founder-OS "one recursive experiment" directive — what's built already, what's deferred, who owns what | `docs/NEXUS-BRAIN-SPRINT-PLAN.md` | re-deriving a 12-table memory schema before the one loop it's meant to serve has run once |
 | The agent dispatch engine's architecture — one mechanism (10 fixed steps) + a swappable policy layer (risk ladder + tier presets) so XC/GA's cloud migration, and any future agent, reuses one design instead of a third independent reimplementation | `docs/AGENT-DISPATCH-ENGINE-DESIGN.md` | building the risk-ladder classifier or a `regulated.yaml` policy tier before a second real vertical or regulatory need exists to size it against |
 | Release ordering, order-dependent steps | `docs/SHIP-CHECKLIST.md` | — |
