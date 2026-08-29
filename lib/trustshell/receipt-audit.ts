@@ -204,11 +204,35 @@ export function requireAuditSecret(env: Record<string, string | undefined>): str
 // The two live in separate hash spaces by domain tag, so a value from one can
 // never be presented as a value from the other.
 //
-// What this deliberately does NOT claim: re-deriving the commitment proves the
-// row has not changed since it was written. It does not prove the row was ever
-// TRUE — that the payment happened, that BFT really passed. Binding a receipt
-// to reality is the on-chain tx hash and the attestation, not a hash of our own
-// assertions. A commitment over a lie reproduces perfectly.
+// ── THE CEILING, NARROWED AFTER AN ADVERSARIAL REVIEW ───────────────────────
+//
+// This paragraph first claimed re-derivation proves "the row has not changed
+// since it was written". `trinity-hdm` attacked exactly that on 2026-08-29 and
+// was right: the commitment lives in the SAME ROW as the fields it covers, and
+// nothing anchors it outside the database. Whoever can write the row rewrites
+// both, and every verifier still returns VERIFIED. The prover is the database.
+//
+// The accurate claim: a match detects modification by anyone who could change
+// the covered fields but NOT the commitment column — a partial edit, a bad
+// migration, alteration in transit — and it lets any holder of a copy detect
+// alteration by comparing commitments. Anchoring it on chain would extend that
+// to the row's own writer. That is not built, and the gap is stated rather than
+// papered over: an unanchored commitment beats an issuer-only HMAC and is not
+// proof.
+//
+// Under any reading it does not prove the row was ever TRUE — that the payment
+// happened, that BFT really passed. Binding a receipt to reality is the on-chain
+// tx hash and the attestation, not a hash of our own assertions. A commitment
+// over a lie reproduces perfectly.
+//
+// ── WHY receipt_id MUST BE NOT NULL, AND WAS NOT ───────────────────────────
+//
+// Same review, same session. The non-collision argument leads with receiptId
+// and rests on it being unique and present. It carried a UNIQUE index and was
+// declared NULLABLE — and Postgres permits any number of NULLs under UNIQUE, so
+// two receipts could both be NULL and collide on identical other fields. Closed
+// by migration `receipt_id_not_null_closes_commitment_collision` (measured
+// first: 12 rows, 0 null, 0 duplicate).
 
 /** Domain tag for the keyless commitment. Distinct from the HMAC's by design. */
 export const PAYMENT_COMMITMENT_DOMAIN = 'payment_receipt_commitment/v1';

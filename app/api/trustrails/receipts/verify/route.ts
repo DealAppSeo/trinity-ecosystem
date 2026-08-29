@@ -131,6 +131,10 @@ export async function GET(req: NextRequest) {
       verification: {
         domain: PAYMENT_COMMITMENT_DOMAIN,
         algorithm: 'sha256',
+        // Said in the payload, not just the prose, so a machine consumer can
+        // see it. An unanchored commitment is a real improvement over an
+        // issuer-only HMAC and is not the same thing as proof.
+        externally_anchored: false,
         // Keyless. Said out loud because it is the entire point: a caller does
         // not have to trust us, ask us, or hold anything of ours.
         keyed: false,
@@ -142,10 +146,13 @@ export async function GET(req: NextRequest) {
         note:
           preimage === null
             ? NULL_COMMITMENT_IS_NOT_CHECKED
-            : 'sha256 of `preimage` must equal `receipt.commitment_hash`. This proves the ' +
-              'covered fields are unchanged since minting. It does NOT prove the payment ' +
-              'occurred — that is the on-chain transaction, not a hash of our own claims. ' +
-              'Fields outside covered_fields are not bound by the commitment.',
+            : 'sha256 of `preimage` must equal `receipt.commitment_hash`. A match means the ' +
+              'covered fields still agree with the stored commitment. It does NOT bind whoever ' +
+              'holds write access to this row: the commitment and the fields share the row and ' +
+              'nothing anchors it externally, so a writer changes both together. Compare against ' +
+              'your own recorded copy to close that. It does NOT prove the payment occurred — ' +
+              'that is the on-chain transaction, not a hash of our own claims. Fields outside ' +
+              'covered_fields are not bound at all.',
         how: 'node scripts/verify-receipt.mjs --file <this response\'s `receipt` object>',
       },
     });

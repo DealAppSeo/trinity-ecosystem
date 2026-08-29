@@ -20,13 +20,33 @@
 //
 // ── WHAT A PASS DOES AND DOES NOT MEAN ──────────────────────────────────────
 //
-// VERIFIED means: these bytes have not changed since the commitment was written.
+// This section said "VERIFIED means these bytes have not changed since the
+// commitment was written." **That was overstated, and `trinity-hdm` caught it
+// adversarially reviewing this very file on 2026-08-29.** Its argument holds:
+// the commitment and the fields it covers live in the SAME ROW. Anyone who can
+// write that row rewrites both, and this script still prints VERIFIED. The
+// prover is the database itself, and there is no external anchor.
 //
-// It does NOT mean the receipt was ever TRUE. A commitment over a false claim
-// reproduces perfectly. Whether the payment happened is the on-chain tx hash;
-// whether BFT really passed is the panel's own record. This checks integrity,
-// which is one question of several, and reporting it as "receipt valid" would
-// be the collapse this codebase keeps writing checks to prevent.
+// So the accurate claim is narrower, and it is worth stating exactly:
+//
+//   VERIFIED means the covered fields still agree with the commitment column.
+//   That detects modification by anyone who could change the fields but NOT
+//   also the commitment -- a partial edit, a bad migration, corruption in
+//   transit -- and it lets ANY HOLDER OF A COPY detect alteration by comparing
+//   commitments. It does NOT defend against whoever holds write access to the
+//   row, because they change both together.
+//
+// Closing that gap needs the commitment ANCHORED somewhere the database cannot
+// reach -- on chain, or in an attestation -- so a rewrite has to contradict a
+// record it does not control. That is not built. Saying so is the point: an
+// unanchored commitment is a real improvement over an issuer-only HMAC and is
+// not the same thing as proof.
+//
+// And under any reading it does NOT mean the receipt was ever TRUE. A
+// commitment over a false claim reproduces perfectly. Whether the payment
+// happened is the on-chain tx hash; whether BFT really passed is the panel's
+// own record. Reporting integrity as "receipt valid" would be the collapse
+// this codebase keeps writing checks to prevent.
 //
 // Exit codes carry the verdict, per the repo convention:
 //   0 VERIFIED   2 NOT_CHECKED   1 FAILED
@@ -179,8 +199,11 @@ if (computed === stored) {
   done('VERIFIED', [
     `receipt ${row.receipt_id}: the row still hashes to its stored commitment.`,
     `commitment ${computed}`,
-    'Computed with no secret. This proves the nine covered fields have not changed;',
-    'it does not prove the payment happened — that is the on-chain tx hash.',
+    'Computed with no secret. The covered fields still agree with the stored',
+    'commitment. NOTE both live in the same row and nothing anchors the commitment',
+    'externally, so this does NOT bind whoever holds write access to that row —',
+    'they would rewrite both. Compare against your own copy to close that gap.',
+    'It does not prove the payment happened either — that is the on-chain tx hash.',
     row.solana_tx_hash || row.base_sepolia_tx_hash
       ? `tx on record: ${row.base_sepolia_tx_hash || row.solana_tx_hash}`
       : 'no transaction hash on this receipt — nothing was broadcast.',
