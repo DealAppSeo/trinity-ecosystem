@@ -67,7 +67,15 @@ const DATED_ARCHIVE = /(^|[\\/])(reports?|archive|sprint-log|sprints)[\\/]\d{4}-
 // Matches the tag shapes actually in use in these repos, measured 2026-08-29:
 //   [VERIFIED 2026-08-15]   [V 2026-08-09]   [V sql:2026-07-27]
 //   [MEASURED 2026-08-21]   VERIFIED 2026-08-15   Last reviewed: 2026-08-20
-const CLAIM = /(?:\[(V|VERIFIED|MEASURED)\b[^\]]{0,40}?(\d{4}-\d{2}-\d{2})\]|\b(VERIFIED|MEASURED|Verified|verified|Last reviewed)\b:?\s+(\d{4}-\d{2}-\d{2}))/g;
+// The verb list is CASE-INSENSITIVE and accepts a `re-` prefix, and both of those
+// are load-bearing rather than tidiness. The first version spelled out
+// `VERIFIED|MEASURED|Verified|verified` — accepting lowercase "verified" but not
+// lowercase "measured". Re-dating one real claim from "verified 2026-07-08" to
+// "re-measured 2026-08-29" made this check stop seeing the file's ONLY dated claim,
+// and it reported NOT_CHECKED instead of VERIFIED. That is failing OPEN: the more
+// natural the phrasing, the more likely the claim becomes invisible to its own gate.
+// Caught 2026-08-29 by using the check, not by reading it.
+const CLAIM = /(?:\[(V|VERIFIED|MEASURED)\b[^\]]{0,40}?(\d{4}-\d{2}-\d{2})\]|\b(?:re-)?(VERIFIED|MEASURED|Last reviewed)\b:?\s+(\d{4}-\d{2}-\d{2}))/gi;
 
 // A claim is "negative" when the sentence carrying it asserts an absence.
 const NEGATIVE = /\b(no|not|never|cannot|can't|denied|blocked|absent|missing|unavailable|unreachable|does not|doesn't|is none|zero|refus\w*|fails? to)\b/i;
