@@ -2,7 +2,22 @@
   "mcpServers": {
     "agent-browser": {
       "command": "agent-browser",
-      "args": ["mcp", "--tools", "core"]
+      "args": [
+        "mcp",
+        "--tools",
+        "core"
+      ]
+    },
+    "codegraph": {
+      "type": "stdio",
+      "command": "codegraph",
+      "args": [
+        "serve",
+        "--mcp"
+      ],
+      "env": {
+        "CODEGRAPH_TELEMETRY": "0"
+      }
     }
   }
 }

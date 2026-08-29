@@ -42,6 +42,7 @@
     "check:harness-loop": "node scripts/harness-loop-test.mjs",
     "check:promotion-evidence": "node scripts/check-promotion-evidence.mjs",
     "check:prior-work": "node scripts/check-prior-work.mjs",
+    "check:drift": "node scripts/check-drift.mjs .",
     "sim:harness": "node scripts/harness-simulate.mjs",
     "sim:newcomer": "node scripts/harness-newcomer.mjs",
     "sim:adoption": "node scripts/harness-adoption.mjs",
