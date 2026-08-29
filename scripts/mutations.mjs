@@ -1033,8 +1033,12 @@ export const MUTATIONS = [
     file: 'lib/trustshell/receipt-audit.ts',
     protects:
       'the domain tag leads the preimage, so the payment and HAL preimage spaces cannot ' +
-      'collide and one audit hash cannot come to cover two different kinds of event',
-    find: '    JSON.stringify(PAYMENT_AUDIT_DOMAIN),',
+      'collide and one audit hash cannot come to cover two different kinds of event. ' +
+      'RE-POINTED 2026-08-29: the field list moved into the shared `paymentPreimage` ' +
+      'helper when the commitment preimage stopped being a second copy of it, so the tag ' +
+      'is now a parameter. The invariant is unchanged and this mutation now covers BOTH ' +
+      'the audit and the commitment preimage, which is stronger than what it replaced',
+    find: '    JSON.stringify(domain),',
     replace: "    '',",
   },
 

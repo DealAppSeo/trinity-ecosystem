@@ -98,8 +98,39 @@ export interface PaymentAuditInput {
  * a silent reinterpretation: see `PRE_V1_HASHES_DO_NOT_REPRODUCE`.
  */
 export function paymentAuditPreimage(input: PaymentAuditInput): string {
+  return paymentPreimage(PAYMENT_AUDIT_DOMAIN, input);
+}
+
+/**
+ * The field list, written ONCE and shared by both preimages.
+ *
+ * ── WHY THIS IS A HELPER AND NOT TWO LISTS ──────────────────────────────────
+ *
+ * It was two lists for about an hour, and the mutation harness caught it: the
+ * tx-hash line appeared twice, so the manifest entry that proves the no_tx
+ * invariant matched in two places and the mutation could no longer be aimed.
+ * `CAUGHT 226 · SURVIVED 0 · DRIFT 1` — a mutation that produces no evidence is
+ * not a passing test, it is an absent one.
+ *
+ * (This paragraph deliberately does NOT quote the offending line. Naming it
+ * verbatim in a comment recreates the very ambiguity it describes — which is
+ * exactly what the first draft of this comment did.)
+ *
+ * That was the symptom. The defect was that "the commitment covers exactly what
+ * the audit hash covers" lived in a COMMENT above two lists that nothing stopped
+ * from drifting apart. One list makes it true by construction, and the single
+ * remaining mutation now protects both preimages at once.
+ *
+ * ── THE DOMAIN IS A PARAMETER HERE AND NOWHERE PUBLIC ───────────────────────
+ *
+ * This function is module-private on purpose. A caller who could pass the tag
+ * could compute a commitment inside the HMAC's hash space, which is the one
+ * thing the two-domain split exists to prevent. The exported wrappers each pin
+ * their own constant, so the tag is never caller-supplied.
+ */
+function paymentPreimage(domain: string, input: PaymentAuditInput): string {
   return [
-    JSON.stringify(PAYMENT_AUDIT_DOMAIN),
+    JSON.stringify(domain),
     JSON.stringify(input.receiptId),
     JSON.stringify(input.agentName),
     JSON.stringify(input.repidScore),
@@ -247,18 +278,7 @@ export const PAYMENT_COMMITMENT_DOMAIN = 'payment_receipt_commitment/v1';
  * a caller who could pass it could compute a commitment in the HMAC's space.
  */
 export function paymentCommitmentPreimage(input: PaymentAuditInput): string {
-  return [
-    JSON.stringify(PAYMENT_COMMITMENT_DOMAIN),
-    JSON.stringify(input.receiptId),
-    JSON.stringify(input.agentName),
-    JSON.stringify(input.repidScore),
-    JSON.stringify(input.amountUSDC),
-    JSON.stringify(input.recipientAddress),
-    JSON.stringify(input.bftPassed),
-    JSON.stringify(input.consensusWeight),
-    JSON.stringify(input.solanaTxHash),
-    JSON.stringify(input.ruleHash),
-  ].join(':');
+  return paymentPreimage(PAYMENT_COMMITMENT_DOMAIN, input);
 }
 
 /**

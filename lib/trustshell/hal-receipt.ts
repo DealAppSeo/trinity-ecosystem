@@ -55,8 +55,30 @@ export function halReceiptAuditPreimage(c: HalClassificationInput, receiptId: st
   // changed later without silently reinterpreting hashes already issued. It is
   // still v1 because no HAL receipt has been minted yet — this was fixed before
   // the first row, not after.
+  return halPreimage('"hal_classification/v1"', c, receiptId);
+}
+
+/**
+ * The field list, written ONCE and shared by both preimages.
+ *
+ * It was two lists briefly, and the mutation harness caught it: the category
+ * and chain-link lines each appeared twice, so two manifest entries matched in
+ * two places and their mutations could no longer be aimed. A mutation that
+ * produces no evidence is not a passing test, it is an absent one.
+ *
+ * The symptom was the drift. The defect was that "the commitment covers exactly
+ * what the audit hash covers" lived in a comment above two lists that nothing
+ * stopped from separating. One list makes it true by construction, and each
+ * remaining mutation now protects both preimages at once.
+ *
+ * Module-private, and the domain is a parameter only here. A caller able to
+ * pass the tag could compute a commitment inside the HMAC's hash space, which
+ * is the one thing the two-domain split exists to prevent; the exported
+ * wrappers each pin their own literal.
+ */
+function halPreimage(domain: string, c: HalClassificationInput, receiptId: string): string {
   return [
-    '"hal_classification/v1"',
+    domain,
     JSON.stringify(receiptId),
     JSON.stringify(c.id),
     JSON.stringify(c.prompt_hash),
@@ -100,17 +122,7 @@ export function halReceiptAuditPreimage(c: HalClassificationInput, receiptId: st
  * a commitment inside the HMAC's space.
  */
 export function halCommitmentPreimage(c: HalClassificationInput, receiptId: string): string {
-  return [
-    '"hal_receipt_commitment/v1"',
-    JSON.stringify(receiptId),
-    JSON.stringify(c.id),
-    JSON.stringify(c.prompt_hash),
-    JSON.stringify(c.category),
-    JSON.stringify(c.confidence),
-    JSON.stringify(c.provider),
-    JSON.stringify(c.model),
-    JSON.stringify(c.previous_entry_hash),
-  ].join(':');
+  return halPreimage('"hal_receipt_commitment/v1"', c, receiptId);
 }
 
 /**
