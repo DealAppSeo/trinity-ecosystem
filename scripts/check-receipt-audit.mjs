@@ -54,6 +54,7 @@ try {
 const {
   paymentAuditPreimage, requireAuditSecret, isAbandonedDefaultSecret,
   ABANDONED_DEFAULT_SECRET, MIN_AUDIT_SECRET_LENGTH, PAYMENT_AUDIT_DOMAIN,
+  paymentCommitmentPreimage, paymentAuditInputFromRow, PAYMENT_COMMITMENT_DOMAIN,
 } = m;
 
 let passed = 0;
@@ -206,6 +207,103 @@ check('a usable secret is returned unchanged', () => {
   const padded = `  ${s}  `;
   eq(requireAuditSecret({ TRUSTRAILS_HMAC_SECRET: padded }), padded,
      'whitespace is significant in the key and must survive');
+});
+
+// ── THE KEYLESS COMMITMENT ──────────────────────────────────────────────────
+//
+// `audit_hash` is an HMAC, so only the holder of TRUSTRAILS_HMAC_SECRET can
+// re-derive it. A receipt exists to be shown to somebody else, and that
+// somebody has no secret. `commitment_hash` is the half that travels.
+//
+// The two tests that carry this block are the two ways it could be worthless:
+// a commitment in the SAME hash space as the HMAC (so a value from one could be
+// presented as the other), and a row-to-input mapping that disagrees with the
+// mint (so every verification reports tampering on an untouched row).
+
+check('the commitment lives in a different hash space from the HMAC', () => {
+  const a = paymentAuditPreimage(BASE);
+  const c = paymentCommitmentPreimage(BASE);
+  if (a === c) throw new Error('audit and commitment preimages are byte-identical');
+  truthy(a.includes(JSON.stringify(PAYMENT_AUDIT_DOMAIN)), 'audit carries its domain');
+  truthy(c.includes(JSON.stringify(PAYMENT_COMMITMENT_DOMAIN)), 'commitment carries its domain');
+  if (PAYMENT_AUDIT_DOMAIN === PAYMENT_COMMITMENT_DOMAIN) {
+    throw new Error('the two domain tags are equal, so the spaces are not separated');
+  }
+});
+
+check('the commitment covers every field the audit hash covers', () => {
+  // Field-by-field, because a commitment that omits one binds less than the
+  // audit hash and a reader comparing them would never see which.
+  const fields = ['receiptId','agentName','repidScore','amountUSDC','recipientAddress',
+                  'bftPassed','consensusWeight','solanaTxHash','ruleHash'];
+  const base = paymentCommitmentPreimage(BASE);
+  for (const f of fields) {
+    const mutated = { ...BASE };
+    // Perturb in a way that is type-appropriate, so the change is real.
+    mutated[f] = typeof BASE[f] === 'number' ? BASE[f] + 1
+               : typeof BASE[f] === 'string' ? `${BASE[f]}x`
+               : BASE[f] === null ? true : null;
+    if (paymentCommitmentPreimage(mutated) === base) {
+      throw new Error(`changing ${f} did not change the commitment preimage`);
+    }
+  }
+});
+
+check('an absent tx hash is not the string "no_tx" in the commitment either', () => {
+  // The defect this whole file was written for, re-asserted against the new
+  // preimage. Fixing it in one encoding and not the other would leave the
+  // third-party path — the one that actually travels — carrying the collision.
+  const absent = paymentCommitmentPreimage({ ...BASE, solanaTxHash: null });
+  const literal = paymentCommitmentPreimage({ ...BASE, solanaTxHash: 'no_tx' });
+  if (absent === literal) throw new Error('null and "no_tx" collide in the commitment');
+});
+
+check('a row round-trips to the input the mint hashed', () => {
+  // The mapping a third-party verifier depends on. If this disagrees with the
+  // mint by one field, every verification reports tampering on a clean row —
+  // which is worse than no verification, because it accuses.
+  const row = {
+    receipt_id: BASE.receiptId,
+    agent_name: BASE.agentName,
+    // PostgREST returns `numeric` as a STRING. A verifier that hashed "9307"
+    // where the mint hashed 9307 would report FAILED on an untouched row.
+    agent_repid_score: String(BASE.repidScore),
+    payment_amount_usdc: String(BASE.amountUSDC),
+    recipient_address: BASE.recipientAddress,
+    bft_passed: BASE.bftPassed,
+    bft_consensus_weight: BASE.consensusWeight === null ? null : String(BASE.consensusWeight),
+    solana_tx_hash: BASE.solanaTxHash,
+    rule_hash: BASE.ruleHash,
+  };
+  eq(paymentCommitmentPreimage(paymentAuditInputFromRow(row)),
+     paymentCommitmentPreimage(BASE),
+     'row-derived preimage equals the minted one');
+});
+
+check('bft_passed keeps three states through the row mapping', () => {
+  // `null` is "the panel did not evaluate" and is NOT `false`. Collapsing it
+  // would let an unevaluated receipt and a failed one share a commitment.
+  const mk = (v) => paymentCommitmentPreimage(paymentAuditInputFromRow({
+    receipt_id: 'r', agent_name: 'a', agent_repid_score: 1, payment_amount_usdc: 1,
+    recipient_address: 'x', bft_passed: v, bft_consensus_weight: null,
+    solana_tx_hash: null, rule_hash: 'h',
+  }));
+  const [t, f, n] = [mk(true), mk(false), mk(null)];
+  if (t === f || f === n || t === n) throw new Error('two of true/false/null collide');
+});
+
+check('the commitment needs no secret at all', () => {
+  // The property the whole design rests on: it must be computable with the
+  // environment empty. If this ever throws, the third-party path is gone and
+  // only the issuer can verify again.
+  const saved = process.env.TRUSTRAILS_HMAC_SECRET;
+  delete process.env.TRUSTRAILS_HMAC_SECRET;
+  try {
+    match(paymentCommitmentPreimage(BASE), /^"payment_receipt_commitment\/v1"/,
+          'computed with no secret in the environment');
+  } finally {
+    if (saved !== undefined) process.env.TRUSTRAILS_HMAC_SECRET = saved;
+  }
 });
 
 rmSync(outDir, { recursive: true, force: true });

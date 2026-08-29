@@ -66,7 +66,7 @@ try {
   process.exit(1);
 }
 
-const { halReceiptAuditPreimage, halReceiptRow } = mod;
+const { halReceiptAuditPreimage, halCommitmentPreimage, halReceiptRow } = mod;
 
 let pass = 0;
 const failures = [];
@@ -105,7 +105,7 @@ const RID = '11111111-2222-3333-4444-555555555555';
 // 1. What the receipt must NOT claim. Each of these is a retraction avoided.
 // ---------------------------------------------------------------------------
 
-const rowFull = halReceiptRow(FULL, RID, 'hash');
+const rowFull = halReceiptRow(FULL, RID, 'hash', 'commit');
 
 eq('bft_passed is NULL, not false — the panel did not vote', rowFull.bft_passed, null);
 ok(
@@ -145,8 +145,8 @@ eq('hal_prompt_hash is carried', rowFull.hal_prompt_hash, FULL.prompt_hash);
 eq('hal_previous_entry_hash is carried', rowFull.hal_previous_entry_hash, FULL.previous_entry_hash);
 eq('audit_hash is carried through', rowFull.audit_hash, 'hash');
 eq('agent_name falls back to the provider', rowFull.agent_name, 'groq');
-eq('agent_name is "unknown" when the provider is absent', halReceiptRow(SPARSE, RID, 'h').agent_name, 'unknown');
-ok('agent_name is never null — the column is NOT NULL', halReceiptRow(SPARSE, RID, 'h').agent_name != null);
+eq('agent_name is "unknown" when the provider is absent', halReceiptRow(SPARSE, RID, 'h', 'c').agent_name, 'unknown');
+ok('agent_name is never null — the column is NOT NULL', halReceiptRow(SPARSE, RID, 'h', 'c').agent_name != null);
 
 // ---------------------------------------------------------------------------
 // 3. The audit preimage. A hash that does not bind a field does not protect it.
@@ -204,6 +204,51 @@ ok(
 );
 
 eq('preimage is deterministic', halReceiptAuditPreimage(FULL, RID), base);
+
+// ── THE KEYLESS COMMITMENT ──────────────────────────────────────────────────
+//
+// `audit_hash` is an HMAC, so only the issuer can re-derive it and a HAL
+// receipt was checkable by nobody else. `commitment_hash` is the half that
+// travels. These assertions guard the two ways it could be worthless: sharing
+// the HMAC's hash space, and binding fewer fields than the audit hash does.
+
+ok('the commitment is carried onto the row', rowFull.commitment_hash === 'commit');
+
+ok('the commitment lives in a different hash space from the HMAC',
+   halReceiptAuditPreimage(FULL, RID) !== halCommitmentPreimage(FULL, RID),
+   'audit and commitment preimages are byte-identical');
+
+ok('the commitment carries its own domain tag',
+   halCommitmentPreimage(FULL, RID).startsWith('"hal_receipt_commitment/v1"'),
+   halCommitmentPreimage(FULL, RID).slice(0, 40));
+
+// Field by field. A commitment that omits one binds less than the audit hash,
+// and a reader comparing the two would never see which.
+for (const f of ['id', 'prompt_hash', 'category', 'confidence', 'provider', 'model',
+                 'previous_entry_hash']) {
+  const mutated = { ...FULL };
+  mutated[f] = typeof FULL[f] === 'number' ? FULL[f] + 1
+             : typeof FULL[f] === 'string' ? `${FULL[f]}x`
+             : FULL[f] === null ? 'set' : null;
+  ok(`the commitment covers ${f}`,
+     halCommitmentPreimage(mutated, RID) !== halCommitmentPreimage(FULL, RID),
+     `changing ${f} did not change the commitment preimage`);
+}
+
+ok('the commitment covers the receiptId',
+   halCommitmentPreimage(FULL, RID) !== halCommitmentPreimage(FULL, `${RID}x`));
+
+// The defect this file was written for, re-asserted against the new preimage.
+// Fixing it in one encoding and not the other would leave the third-party path
+// — the one that actually travels — carrying the collision.
+ok('an absent field is not the string "null" in the commitment either',
+   halCommitmentPreimage({ ...FULL, category: null }, RID) !==
+   halCommitmentPreimage({ ...FULL, category: 'null' }, RID));
+
+ok('a colon inside model cannot shift a later boundary in the commitment',
+   halCommitmentPreimage({ ...FULL, model: 'a:b', previous_entry_hash: 'c' }, RID) !==
+   halCommitmentPreimage({ ...FULL, model: 'a', previous_entry_hash: 'b:c' }, RID));
+
 
 // ---------------------------------------------------------------------------
 
