@@ -18,6 +18,7 @@
 // entirely rather than accepting every caller, which is how an "internal" route
 // stays open in exactly the environment where it matters.
 
+import { timingSafeEqual } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
@@ -59,7 +60,21 @@ export async function authenticate(req: NextRequest): Promise<Actor> {
     if (!expected) {
       throw new AuthError(503, 'INTERNAL_ROUTE_SECRET is not configured; the service path is disabled.');
     }
-    if (internalSecret !== expected) {
+    // TIMING-SAFE, and the length guard is part of the primitive rather than a
+    // nicety: `crypto.timingSafeEqual` THROWS on unequal-length buffers, so a
+    // bare call would turn a wrong-length secret into a 500 and leak the length
+    // through the status code — the opposite of the point. Compare lengths
+    // first, then bytes, and return the same 401 either way.
+    //
+    // A plain `!==` short-circuits at the first differing byte, so response time
+    // grows with how many leading characters a guess gets right. Over a network
+    // that signal is small and noisy; it is also free to remove, and this is the
+    // credential that unlocks the service principal on every internal route.
+    const provided = Buffer.from(internalSecret, 'utf8');
+    const expectedBuf = Buffer.from(expected, 'utf8');
+    const matches =
+      provided.length === expectedBuf.length && timingSafeEqual(provided, expectedBuf);
+    if (!matches) {
       throw new AuthError(401, 'Invalid internal secret.');
     }
     return { type: 'service', label: 'service:internal' };
