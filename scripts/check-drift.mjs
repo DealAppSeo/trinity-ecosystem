@@ -67,7 +67,22 @@ const DATED_ARCHIVE = /(^|[\\/])(reports?|archive|sprint-log|sprints)[\\/]\d{4}-
 // Matches the tag shapes actually in use in these repos, measured 2026-08-29:
 //   [VERIFIED 2026-08-15]   [V 2026-08-09]   [V sql:2026-07-27]
 //   [MEASURED 2026-08-21]   VERIFIED 2026-08-15   Last reviewed: 2026-08-20
-const CLAIM = /(?:\[(V|VERIFIED|MEASURED)\b[^\]]{0,40}?(\d{4}-\d{2}-\d{2})\]|\b(VERIFIED|MEASURED|Verified|verified|Last reviewed)\b:?\s+(\d{4}-\d{2}-\d{2}))/g;
+// The verb list is CASE-INSENSITIVE and accepts a `re-` prefix, and both of those
+// are load-bearing rather than tidiness. The first version spelled out
+// `VERIFIED|MEASURED|Verified|verified` — accepting lowercase "verified" but not
+// lowercase "measured". Re-dating one real claim from "verified 2026-07-08" to
+// "re-measured 2026-08-29" made this check stop seeing the file's ONLY dated claim,
+// and it reported NOT_CHECKED instead of VERIFIED. That is failing OPEN: the more
+// natural the phrasing, the more likely the claim becomes invisible to its own gate.
+// Caught 2026-08-29 by using the check, not by reading it.
+// MARKDOWN EMPHASIS SITS BETWEEN THE VERB AND THE DATE, and it hid claims.
+// `MEASURED **2026-08-21**` and `re-measured **2026-08-29**` both MISSED, because
+// `\s+` cannot cross the asterisks. These docs bold their dates constantly, so the
+// more emphatic a claim, the more likely it was invisible to its own gate. Caught
+// 2026-08-29 by writing a real claim and watching this report NOT_CHECKED — the
+// second time this check has been corrected by using it rather than reading it.
+// `[\s*_`]+` spans the separator, so plain, *italic*, **bold** and `code` all match.
+const CLAIM = /(?:\[(V|VERIFIED|MEASURED)\b[^\]]{0,40}?(\d{4}-\d{2}-\d{2})\]|\b(?:re-)?(VERIFIED|MEASURED|Last reviewed)\b:?[\s*_`]+(\d{4}-\d{2}-\d{2}))/gi;
 
 // A claim is "negative" when the sentence carrying it asserts an absence.
 const NEGATIVE = /\b(no|not|never|cannot|can't|denied|blocked|absent|missing|unavailable|unreachable|does not|doesn't|is none|zero|refus\w*|fails? to)\b/i;
