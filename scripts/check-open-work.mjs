@@ -115,8 +115,15 @@ try {
   // each hunk, and scopeMatches regexes over this whole blob — so editing one row of
   // PRIOR-WORK-INDEX.md pulled in the scope tokens of whatever rows happened to sit
   // next to it. Measured 2026-08-31: a two-row index edit reported 6 entries touched,
-  // 3 of them matched ONLY on context (`repid_score_events`, `agent_heartbeat`,
-  // `kya_compliance_receipts` appeared 0 times in added/removed lines).
+  // 3 of them matched ONLY on context — those three scope tokens appeared 0 times in
+  // the added/removed lines and fired anyway.
+  //
+  // THE TOKENS ARE DELIBERATELY NOT NAMED IN THIS COMMENT. The first version of this
+  // fix spelled all three out as evidence, and because they are added lines, -U0 made
+  // the gate match them FOR REAL — the explanation tripped the thing it explained, and
+  // CI went red on a comment. `check:live-callers` learned the same lesson: prose that
+  // quotes the pattern a scanner looks for becomes an instance of it. Describe the
+  // shape, never spell the token.
   //
   // That fired hardest on the person doing the right thing — updating an open entry —
   // and the tempting way out is to cite entries you never touched, which is a false
