@@ -2,25 +2,33 @@
 // scripts/check-hal-penalty-guard.mjs — the HAL false-positive guard must protect the
 // SCORE, not just the row.
 //
-// WHY THIS EXISTS. `hal_penalty_requires_hallucination` has been ON since 2026-05-29 and
-// had suppressed 53,690 penalties. On 2026-08-31 it was measured and none of them were
-// real: the guard stamped `penalty_suppressed: true`, set `delta = 0`, and the agent's
-// score moved anyway — 191 -> 182 in a live probe. Postgres fires BEFORE-INSERT triggers
-// in alphabetical order by trigger name, and `trg_apply_repid_score_event` sorted ahead of
-// `trg_hal_penalty_guard`, so `UPDATE repid_agents SET current_repid` had already run by
-// the time the guard zeroed anything. Three months of a protection that was never applied.
+// WHY THIS EXISTS. `hal_penalty_requires_hallucination` has been ON since 2026-05-29 to stop
+// HAL docking RepID for hallucinations it never caught. It matched on
+// `event_type = 'HAL_SCORE_EVENT'` — and HAL-driven penalties are not all written under that
+// label. Five production rows carry `hal_decision` in ('flagged','vetoed') with
+// `hallucination_caught = false` under `PREDICTION_RESOLVE` and `VALIDATION_FAILED`. The
+// guard never evaluated them and each moved a real score: -9, -9, -9, -250, -9 — **-286
+// RepID** between 2026-06-19 and 2026-08-31. Event 157669 is a TRUE claim, "the capital of
+// France is Paris", flagged by HAL, docked -9 (200 -> 191).
 //
-// That is this repo's recurring defect wearing its best disguise: a system reporting
-// success it has not earned, inside the very mechanism built to prevent exactly that.
+// So a penalty could evade its own guard by being labelled something else. The guard now
+// tests `hal_decision`, which is populated on every HAL-decided row, rather than trusting
+// the ledger label; and it zeroes `repid_delta_calculated` as well as `delta`, because
+// `apply_repid_score_event()` reads COALESCE(repid_delta_calculated, delta, 0).
+//
+// RETRACTED — this header previously claimed the guard was ENTIRELY cosmetic: that alphabetical
+// BEFORE-trigger order let `trg_apply_repid_score_event` run first, so "all 53,690 suppressed
+// penalties still docked the score". That is NOT SUPPORTED and must not be cited. On all 53,690
+// suppressed rows `repid_after - repid_before = 0` — and those two columns are the honest
+// witness, written by the applier from a live FOR UPDATE read and the UPDATE's RETURNING, after
+// every BEFORE-UPDATE trigger on `repid_agents`. The claim came from a CONSTRUCTED probe row
+// generalised to production without checking that production rows had the same shape. See
+// LESSONS A36. Trigger ordering is NOT ESTABLISHED; `trg_00_` is kept because correct ordering
+// is cheap and case 5 pins it, not because a misordering was ever shown in production.
 //
 // THE ASSERTION THAT MATTERS. Every case asserts on `repid_agents.current_repid` — what
-// happened to the score — never on the event row. A check written against the row would
-// have PASSED against the broken guard, which is how it survived undetected.
-//
-// A second live hole is covered too: the guard matched only
-// `event_type = 'HAL_SCORE_EVENT'`, so a HAL penalty written as PREDICTION_RESOLVE walked
-// past it. Event 157669 — a TRUE claim, "the capital of France is Paris", flagged by HAL —
-// took -9 that way.
+// happened to the score — never on the event row. A check written against the row would have
+// passed while those five rows were docking scores, which is how the hole survived.
 //
 // THREE OUTCOMES. VERIFIED / NOT_CHECKED / FAILED. Absent credentials are NOT_CHECKED and
 // exit 2. They are never a pass: the whole point of this file is that a green tick over an
@@ -99,10 +107,11 @@ for (const r of data) {
 if (failed.length > 0) {
   console.log(`check:hal-penalty-guard — FAILED (${failed.length} of ${data.length})`);
   console.log('');
-  console.log('  If the ordering case is the one failing, the guard trigger has been renamed');
-  console.log('  so it sorts AFTER trg_apply_repid_score_event again. The trg_00_ prefix is');
-  console.log('  load-bearing: without it the applier writes the score first and every other');
-  console.log('  case here reverts to suppressed-on-paper-only.');
+  console.log('  If the ORDERING case is the one failing, the guard trigger was renamed so it');
+  console.log('  sorts after trg_apply_repid_score_event. Restore the trg_00_ prefix — but note');
+  console.log('  that a misordering has never been demonstrated in production (LESSONS A36), so');
+  console.log('  this case is defence, not a reproduction. The four BEHAVIOURAL cases above are');
+  console.log('  the ones that would catch a real regression; read those first.');
   process.exit(1);
 }
 
