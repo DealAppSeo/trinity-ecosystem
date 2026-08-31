@@ -329,6 +329,64 @@ assume it matches `www` either way.
 When a request 403s, run `curl -sS "$HTTPS_PROXY/__agentproxy/status"` and look at
 `recentRelayFailures` before drawing any conclusion.
 
+## GitHub reach is PER SESSION, and it is not a permission
+
+**Before reporting that an agent "cannot push", read this. It cost six weeks.**
+Full account in `LESSONS.md` A35.
+
+Every surface — `git` over the managed proxy, `api.github.com`, and the GitHub
+MCP tools — is gated by **one allowlist of repositories attached to the session
+when the session was created**. It is not a token scope, not an OAuth grant, not
+network egress, and not the Claude GitHub App's repository settings.
+
+The MCP tools say so verbatim, and this is the message to trust over any 403:
+
+```
+Access denied: repository "dealappseo/repid-engine" is not configured for
+this session. Allowed repositories: dealappseo/trinity-ecosystem
+```
+
+**Push works. It has worked continuously since at least 2026-08-10** [MEASURED
+2026-08-31]. On a repo the session *does* have, `git push --dry-run -u origin
+<branch>` exits 0. Sessions holding 4–11 repos exist in **both** cloud
+environments (`Default` and `TrustMarket`), so the repo set is a property of the
+session, **not** of the environment — switching environment changes nothing.
+
+### The failure mode this creates
+
+A 403 on repo B, from a session that was given only repo A, is
+indistinguishable at a glance from a missing write scope. Task #55 recorded four
+mutually exclusive `[VERIFIED]` root causes off that one symptom — token expiry,
+zero OAuth scopes, sandbox egress blocking, session repo-binding — and only the
+last was ever true. Meanwhile ~40 branches and PRs #94/#96/#103/#127/#556 were
+being pushed from other sessions. **Diagnose with two cheap calls before
+concluding anything:**
+
+1. `git push --dry-run origin HEAD:refs/heads/probe-delete-me` in a checkout you
+   *do* have — writes nothing, and tells you whether write scope exists at all.
+2. Any GitHub MCP call on the repo you want — its error names the allowlist and
+   lists what you actually hold.
+
+### How the repos get attached
+
+At session creation, by a human: the repo picker on claude.ai/code or the
+desktop app. Two consequences worth knowing before planning around it:
+
+- **An agent cannot self-grant it.** `add_repo` and
+  `create_session(source_url=…)` are both refused by the auto-mode permission
+  classifier — deliberately, since granting repo reach is a human decision.
+  Cite this rather than looping on it.
+- **A session created with no explicit source gets NO repos at all** — its
+  `session_context` carries no `sources` array. That is the shape of every
+  scheduled/triggered run, and it is why the hourly executor could not do repo
+  work while every interactive session could. `update_trigger` cannot attach
+  sources; the binding is chosen when the session is created, so the scheduled
+  lane needs either a persistent multi-repo session
+  (`create_trigger persistent_session_id=…`) or a human-started session.
+
+**Railway and the local machine are a separate, still-open matter** — those are
+genuinely unreachable from cloud runs, and this section does not soften that.
+
 ## CI / credentials
 
 `NPM_TOKEN` on `DealAppSeo/repid-engine` must be a **repository secret** under
