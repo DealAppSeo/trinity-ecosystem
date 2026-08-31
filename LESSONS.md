@@ -2064,3 +2064,90 @@ axis. When a live surface is reachable (here: pasted Railway screenshots), read
 it — the same "run it, don't read it" instinct that catches a dormant TypeScript
 module applies to a service's own stdout, which nothing in this repo's tooling
 ever fetches on its own.
+
+---
+
+## A35 — six weeks of "grant me GitHub access" for a permission that was never missing (2026-08-31)
+
+Task #55 — *"INFRA/UNBLOCK: enable GitHub repo access for autonomous cowork
+sessions"* — sat open for six weeks at priority 94, named as the keystone
+blocking 14 of 17 pending fleet tasks, and was the stated reason the hourly
+executor logged **78 consecutive no-op runs**. It asked the human to grant push
+scope, issue a fine-grained PAT, or edit the Claude GitHub App allowlist.
+
+**All three asks were unnecessary. Push access had been working the whole time.**
+
+The falsifying measurement took one command. From a cloud session, on the one
+repo that session had been given:
+
+```
+$ git push --dry-run -u origin claude/hal-accuracy-rate-limits-xf51yt
+ * [new branch]      claude/... -> claude/...      # exit 0
+```
+
+Write scope was present. What the six weeks of notes had actually been
+measuring, every time, was a **different repo that their session had not been
+given**. The GitHub MCP tool states the real gate in as many words:
+
+```
+Access denied: repository "dealappseo/repid-engine" is not configured for
+this session. Allowed repositories: dealappseo/trinity-ecosystem
+```
+
+One per-session repo allowlist, shared by git, REST and the MCP tools, fixed at
+session creation. Not a token scope, not egress, not an App grant.
+
+### Why it stayed wrong so long
+
+The task's own history contains **four mutually exclusive root causes**, each
+recorded as `[VERIFIED]`: token expiry, zero OAuth scopes, sandbox egress
+blocking, and the session repo-binding. Each run re-derived a cause from the
+same 403 and none re-tested its predecessor. The entry that was closest to
+right ("it is the session repo binding") was then *superseded* by a later run
+asserting egress blocking, which a still later run corrected back. A reader
+arriving at any point got a confident, dated, wrong answer.
+
+Two properties of the evidence made the error survivable:
+
+- **A 403 has many parents, and the note recorded the symptom as the cause.**
+  "Push returns 403" is compatible with a missing scope, an expired token, a
+  blocked network, and a repo you simply were not given. Only the last was ever
+  true, and the message that says so was there to read all along.
+- **The disproof was sitting in the account, unqueried.** While #55 asserted a
+  total block, session `01RzELrz` held 7 repo sources and had pushed ~40
+  branches to `repid-engine`; PRs #94, #96, #103, #127 were merged across four
+  repos, and #556 went green the same morning #55 was still called a hard
+  blocker. Nobody listed the sessions. The claim was about a capability, and
+  the capability was in continuous, visible use.
+
+### The structural part — and it is not the agents' fault
+
+An agent **cannot** clear this one itself: `add_repo` and
+`create_session(source_url=…)` are both refused by the auto-mode permission
+classifier, by design, because granting repo reach is a human decision. So the
+executor was told to fix a blocker it was architecturally forbidden from
+fixing, on a task assigned to someone else, which its own selection clause
+excluded. That is a closed loop, and it ran hourly for three days. **A task an
+agent is structurally incapable of completing must not be the thing standing
+between it and all its other work** — the loop is the defect, independent of
+whether the diagnosis was right.
+
+### What generalises
+
+**Re-test a blocker before repeating it; a blocker is a claim with a date, and
+the negative ones decay fastest.** CLAUDE.md already says a negative finding
+("this does not exist", "this is denied") decays faster than a positive one,
+because anyone may fix the missing thing without touching the note. #55 is that
+rule ignored at scale: six weeks of restating an access denial that had stopped
+being true, in a file that warns about exactly this.
+
+**When a claim is about a capability, look for the capability in use.** One
+`list_sessions` call would have shown 8 sessions holding multi-repo push access.
+Checking whether the thing you claim is impossible is currently happening is
+cheaper than any amount of re-deriving why it cannot.
+
+**A no-op is not a pass — and neither is a blocked run.** The hourly executor's
+own prompt already forbade logging "no regression" over an unexamined run; it
+did not forbid restating an unexamined *blocker*, which is the same defect with
+one more level of indirection. The prompt now requires each run to say whether
+it re-tested a blocker this run or is repeating a prior claim.
