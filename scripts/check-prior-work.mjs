@@ -125,6 +125,23 @@ const RETRACTED = [
       'it applies in full. Measured 2026-08-17: 164/176 agents (93%) have a drainable gap (avg 295, max ' +
       '2000 pts) and CAN be drained down to their earned floor by the unauthenticated path',
   },
+  {
+    id: 'hal-guard-cosmetic',
+    // Targets the CLAIM, not the number. 53,690 is a valid suppression count and must stay
+    // citable; what is retracted is the assertion that those penalties moved a score. A
+    // pattern on the bare digits would fire on every honest use and teach people to skip
+    // the gate — see this file's own warning above.
+    pattern: /(prevented\s+none\s+of\s+them|suppressed\s+penalt\w*\s+still\s+docked|still\s+docked\s+the\s+score|guard\s+was\s+(entirely\s+)?cosmetic)/i,
+    claim: 'the HAL false-positive guard was cosmetic — all 53,690 suppressed penalties still docked the score',
+    truth:
+      'NOT SUPPORTED. repid_after - repid_before = 0 on 53,690 of 53,690 suppressed rows, every month ' +
+      '2026-05 to 2026-08 — and those columns are written by apply_repid_score_event() from a live ' +
+      'SELECT FOR UPDATE and the UPDATE RETURNING, after every BEFORE-UPDATE trigger on repid_agents. ' +
+      'The signature came from a constructed probe row in a rolled-back subtransaction, generalised to ' +
+      'production without checking production rows had the same shape. Trigger ordering is NOT ESTABLISHED. ' +
+      'What DOES stand: the guard matched only event_type=HAL_SCORE_EVENT, so 5 production rows written as ' +
+      'PREDICTION_RESOLVE/VALIDATION_FAILED evaded it and moved scores by -286 RepID. See LESSONS A36',
+  },
 ];
 
 /**
@@ -142,6 +159,8 @@ const ALLOWED = new Set([
   'docs/PRIOR-WORK-INDEX.md',
   'scripts/repid-replay.mjs',
   'scripts/check-prior-work.mjs',
+  // Records the 53,690 retraction beside the measurement that corrected it (LESSONS A36).
+  'scripts/check-hal-penalty-guard.mjs',
   // Records the 4.82pp retraction and reproduces the measurement that caused
   // it, so it necessarily names the number.
   'scripts/harness-adoption.mjs',

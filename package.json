@@ -10,6 +10,7 @@
     "check:auth-session": "node scripts/check-auth-session.mjs",
     "check:auth": "node scripts/check-auth-policy.mjs",
     "check:secrets": "node scripts/scan-secrets.mjs",
+    "check:hal-penalty-guard": "node scripts/check-hal-penalty-guard.mjs",
     "check:legacy-key": "node scripts/check-legacy-key.mjs",
     "check:mcp-fleet": "node scripts/mcp-fleet-smoke.mjs",
     "check:mcp-client": "node scripts/mcp-client-test.mjs",
