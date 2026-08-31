@@ -2151,3 +2151,69 @@ own prompt already forbade logging "no regression" over an unexamined run; it
 did not forbid restating an unexamined *blocker*, which is the same defect with
 one more level of indirection. The prompt now requires each run to say whether
 it re-tested a blocker this run or is repeating a prior claim.
+
+---
+
+## A36 — the false-positive guard suppressed 53,690 penalties and prevented none of them (2026-08-31)
+
+`hal_penalty_requires_hallucination` was switched on 2026-05-29 to stop HAL docking RepID
+for hallucinations it had not actually caught. By 2026-08-31 it had stamped
+`penalty_suppressed: true` on **53,690** score events.
+
+**Not one of them was protected.** Every score moved anyway.
+
+```
+insert … event_type='HAL_SCORE_EVENT', delta=-9, hallucination_caught=false
+  → row:   penalty_suppressed = true,  delta = 0     ← the guard fired
+  → agent: current_repid 191 → 182                    ← and the score moved
+```
+
+Postgres fires BEFORE-INSERT triggers in **alphabetical order by trigger name**.
+`trg_apply_repid_score_event` sorts ahead of `trg_hal_penalty_guard`, so the applier had
+already run `UPDATE repid_agents SET current_repid = …` by the time the guard zeroed
+`NEW.delta`. The guard edited a row whose effects had already been committed to another
+table. Three months of a control that reported a protection it never performed.
+
+### Why nobody saw it
+
+**Every available signal said it was working.** The config flag was on. The trigger existed
+and was correct in isolation. The metadata said `penalty_suppressed: true`. The row's
+`delta` really was `0`. A dashboard, a query, or a test written against `repid_score_events`
+would all have agreed — and all of them would have been wrong, because the damage was in a
+*different table*.
+
+That is this repo's oldest defect wearing its best disguise: **a system reporting success it
+has not earned**, hiding inside the mechanism built to catch exactly that. The guard was not
+merely broken; it was actively reassuring.
+
+It surfaced only because someone inserted a row and then read `repid_agents.current_repid`
+— asked what happened to the thing the guard was protecting, rather than what the guard said
+about itself.
+
+### The second hole, which is the one we were looking for
+
+The guard matched only `event_type = 'HAL_SCORE_EVENT'`. Live event **157669** — a TRUE
+claim, *"the capital of France is Paris"*, `hal_decision='flagged'`, `hal_score` 0.535 —
+was written as `PREDICTION_RESOLVE` and took −9 without the guard ever evaluating it. Five
+such rows exist across `PREDICTION_RESOLVE` and `VALIDATION_FAILED`.
+
+So a HAL penalty could evade its own guard **by being labelled something else**, and even
+when correctly labelled the guard did nothing. Two independent defects, in the same control,
+neither visible from the row.
+
+### What generalises
+
+**Assert on the thing being protected, not on the protector's own report.** The guard's
+output was truthful about its own actions and useless as evidence of its effect. Any check
+written against `penalty_suppressed` would have passed for three months. `check:hal-penalty-guard`
+therefore asserts on `repid_agents.current_repid` in every case — and its mutation test
+reproduces the exact original signature: `suppressed=true score moved -9`.
+
+**Trigger order is behaviour, and alphabetical order is not a design.** Two BEFORE triggers
+on one table have a hard execution dependency expressed only in their names. `trg_00_` is
+now load-bearing; a rename silently reverts the fix. That is why the check has a fifth case
+asserting the ordering itself, rather than trusting the four behavioural cases to notice.
+
+**Suppression counts are not protection counts.** 53,690 was reported for months as evidence
+the false-positive problem was handled. It measured how often the guard *ran*, never once
+whether it *worked* — the same shape as a green tick over an unexamined run.
