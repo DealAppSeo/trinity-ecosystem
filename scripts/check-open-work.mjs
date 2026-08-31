@@ -111,7 +111,18 @@ let base, paths, diffText, commitMessages, indexDiff;
 try {
   base = git(['merge-base', 'HEAD', 'origin/main']).trim();
   paths = git(['diff', '--name-only', `${base}..HEAD`]).split('\n').filter(Boolean);
-  diffText = git(['diff', `${base}..HEAD`]);
+  // -U0: NO CONTEXT LINES. `git diff` normally emits three unchanged lines around
+  // each hunk, and scopeMatches regexes over this whole blob — so editing one row of
+  // PRIOR-WORK-INDEX.md pulled in the scope tokens of whatever rows happened to sit
+  // next to it. Measured 2026-08-31: a two-row index edit reported 6 entries touched,
+  // 3 of them matched ONLY on context (`repid_score_events`, `agent_heartbeat`,
+  // `kya_compliance_receipts` appeared 0 times in added/removed lines).
+  //
+  // That fired hardest on the person doing the right thing — updating an open entry —
+  // and the tempting way out is to cite entries you never touched, which is a false
+  // citation and hollows the gate out. This file's own header says a gate that cries
+  // wolf is a gate people route around. Context is not a change.
+  diffText = git(['diff', '-U0', `${base}..HEAD`]);
   commitMessages = git(['log', '--format=%B', `${base}..HEAD`]);
   indexDiff = git(['diff', `${base}..HEAD`, '--', INDEX]);
 } catch (err) {
