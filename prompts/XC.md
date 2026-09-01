@@ -66,37 +66,77 @@ renders identically whether or not a client effect throws. **Say NOT CHECKED
 rather than inferring behaviour from healthy-looking HTML.** This is the single
 most important limit on this lane.
 
-## Current queue — verified 2026-08-15, re-check before trusting
+## Current queue — dates are per item; re-check before trusting
 
-1. **hyperdag.org's Brier-calibrated code-review table is stale.** It must
-   re-scan at least weekly for newly released models and re-rank. Design it so a
-   model added with no evidence yet ranks **NOT CHECKED, not zero** — an
-   unevidenced entrant scoring 0 is a false claim about it.
-2. **trustchat.dev/leaderboard's trust score is stale.** Check whether it can
-   read the same table as the item above *before* building it a second pipeline.
-   The likely correct shape is one source, two readers.
-3. **Redirect `aitrinitysymphony.com` → `hyperdag.org`.** It currently presents
-   as an old TrustRails.dev site. Confirm which platform serves the apex before
-   changing anything — apex and `www` are Vercel, `app.*` is Railway.
-4. **Two React lint errors, this lane's, deliberately left by another agent:**
-   `components/trustrails/SystemTrustScore.tsx:20` and
-   `components/trustrails/InstitutionalControls.tsx:123`,
-   `react-hooks/set-state-in-effect`. Fixing them means restructuring data
-   fetching in mounted components — which is exactly what no agent session can
-   observe. **If you also cannot observe them, do not change them.** Say so.
-5. **Nav ordering** (`NORTH-STAR.md`). Ten items today, evidence supports seven,
-   and it leads with Mission when the product is an install. Lead with the thing
-   that works: Connect → Run → RepID → History → Leaderboard → Agents → Settings.
+**Read the date on the item, not the date on this heading.** Items 1, 2 and 6
+were probed on **2026-09-01**; item 1 has since been taken by CC and is marked
+so — start at item 2. Items 3, 4 and 5 still carry **2026-08-15** and were NOT
+re-probed — a negative finding decays faster than a positive one, because anyone
+may fix the missing thing without touching this file.
 
-Items 1–3 live in repos outside `trinity-ecosystem`. If your session cannot
-reach them, say so in `HANDOFF:` rather than approximating the work here.
+1. **[TAKEN by CC 2026-09-01 — do not start this] TrustShell.dev's sideways
+   scroll on narrow viewports.** Left here rather than deleted, because the
+   finding is worth carrying: it was filed as three defects and turned out to be
+   **five instances of one cause**, in `DealAppSeo/trustshell` PR #91.
+
+   A flex or grid item defaults to `min-width: auto`, so it never shrinks below
+   its own content — which means every `truncate` or `overflow-x-auto` placed on
+   such an item is **inert**. The thing meant to clip or scroll grows the column
+   instead. Four of the five were invisible until the one in front of them was
+   fixed, and two measured the *identical* width, so fixing the first left the
+   page overflowing by exactly as much as before and read as a failed fix.
+
+   **The reusable part, for this lane:** scan for every offender at once rather
+   than one at a time, and skip any element already inside an `overflow-x-auto`
+   ancestor — that scrolls in its own box and is not a page overflow. Bisect the
+   viewport; a 3px overflow is invisible in a screenshot and only shows as
+   `scrollWidth > clientWidth`. And check the fix by eye afterwards: `flex-wrap`
+   cleared the footer's 6px and orphaned the external-link glyph onto a line of
+   its own, which was 0px of overflow and a worse footer.
+
+2. **[MEASURED 2026-09-01] Thirteen top-level nav links is the real problem; the
+   breakpoint is only a workaround.** `DealAppSeo/trustshell` PR #90 moved the
+   desktop row from `md` to `xl` because the row plus the logo needs 1110–1126px
+   and had been appearing at 768px, sideways-scrolling every page by 342px.
+   That stops the bleeding and costs the link row on every window under 1280px.
+   Squeezing to `px-2`/`gap-0.5` measures 998px and would fit `lg` with 26px of
+   slack — less than half a link, so one renamed label puts it back.
+
+   **The lane question is which links are top-level at all.** `NORTH-STAR.md`
+   already argues seven, not ten, and this row now carries thirteen. A shorter
+   row is the only change that makes the breakpoint stop mattering.
+   `tests/nav-fit.test.ts` trips if the count changes without a re-measurement.
+
+3. **[2026-08-15, NOT re-probed] hyperdag.org's Brier-calibrated code-review
+   table is stale.** It must re-scan at least weekly for newly released models
+   and re-rank. Design it so a model added with no evidence yet ranks **NOT
+   CHECKED, not zero** — an unevidenced entrant scoring 0 is a false claim.
+4. **[2026-08-15, NOT re-probed] trustchat.dev/leaderboard's trust score is
+   stale.** Check whether it can read the same table as item 3 *before* building
+   a second pipeline. The likely correct shape is one source, two readers.
+5. **[2026-08-15, NOT re-probed] Redirect `aitrinitysymphony.com` →
+   `hyperdag.org`.** It presented as an old TrustRails.dev site. Confirm which
+   platform serves the apex first — apex and `www` are Vercel, `app.*` is
+   Railway, and `CLAUDE.md` records the apex as a 307 to `www` as of 2026-08-28.
+6. **[RE-VERIFIED 2026-09-01, still open] Two React lint errors, this lane's,**
+   at exactly the lines previously recorded: `SystemTrustScore.tsx:20` and
+   `InstitutionalControls.tsx:123`, `react-hooks/set-state-in-effect`. Fixing
+   them means restructuring data fetching in mounted components — which is
+   exactly what no agent session can observe. **If you also cannot observe them,
+   do not change them.** Say so.
+
+Items 1 and 2 are in `DealAppSeo/trustshell`; items 3–5 are in other repos
+again. If your session cannot reach a repo, say so in `HANDOFF:` rather than
+approximating the work here.
 
 ## Gates
 
 ```bash
 npm run check          # expect exit 0
 npm run build          # Next 16 / React 19, Turbopack is the default builder
-npm run lint           # currently exits 1 on the two findings in item 4 — no others
+npm run lint           # exits 1 on the two ERRORS in item 6 and no others; the 11
+                       # import/no-anonymous-default-export warnings under
+                       # scripts/redteam/ are expected and do not fail it
 npm run test:e2e       # expect 0 FAILED
 ```
 
