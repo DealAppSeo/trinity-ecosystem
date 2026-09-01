@@ -69,25 +69,30 @@ most important limit on this lane.
 ## Current queue — dates are per item; re-check before trusting
 
 **Read the date on the item, not the date on this heading.** Items 1, 2 and 6
-were probed on **2026-09-01**. Items 3, 4 and 5 still carry **2026-08-15** and
-were NOT re-probed — a negative finding decays faster than a positive one,
-because anyone may fix the missing thing without touching this file.
+were probed on **2026-09-01**; item 1 has since been taken by CC and is marked
+so — start at item 2. Items 3, 4 and 5 still carry **2026-08-15** and were NOT
+re-probed — a negative finding decays faster than a positive one, because anyone
+may fix the missing thing without touching this file.
 
-1. **[MEASURED 2026-09-01] TrustShell.dev overflows sideways on a phone, and the
-   landing page is the worst of it.** Repo `DealAppSeo/trustshell`, not this one.
-   Bisected on a production build, 7 pages × 8 widths:
+1. **[TAKEN by CC 2026-09-01 — do not start this] TrustShell.dev's sideways
+   scroll on narrow viewports.** Left here rather than deleted, because the
+   finding is worth carrying: it was filed as three defects and turned out to be
+   **five instances of one cause**, in `DealAppSeo/trustshell` PR #91.
 
-   | page | 320px | 390px | what overflows |
-   |---|---|---|---|
-   | `/` | **+149px** | **+79px** | the ERC-8004 registry block — a 42-char address at `text-sm` in a container that will not narrow |
-   | `/agents` | +4px | +4px | the STEP strip's `-mx-1` on an `overflow-x-auto` |
-   | `/history` | +3px | — | the "Export to JSON" button in a row that does not wrap |
+   A flex or grid item defaults to `min-width: auto`, so it never shrinks below
+   its own content — which means every `truncate` or `overflow-x-auto` placed on
+   such an item is **inert**. The thing meant to clip or scroll grows the column
+   instead. Four of the five were invisible until the one in front of them was
+   fixed, and two measured the *identical* width, so fixing the first left the
+   page overflowing by exactly as much as before and read as a failed fix.
 
-   The landing page is the first thing anyone sees, and on a 320px phone it
-   scrolls 149px sideways. **Fix the address first**: it needs `break-all` or a
-   truncation with the full value still copyable, not a smaller font. Verify by
-   bisecting the viewport, not by screenshotting one width — the first two were
-   invisible in a screenshot and only showed as `scrollWidth > clientWidth`.
+   **The reusable part, for this lane:** scan for every offender at once rather
+   than one at a time, and skip any element already inside an `overflow-x-auto`
+   ancestor — that scrolls in its own box and is not a page overflow. Bisect the
+   viewport; a 3px overflow is invisible in a screenshot and only shows as
+   `scrollWidth > clientWidth`. And check the fix by eye afterwards: `flex-wrap`
+   cleared the footer's 6px and orphaned the external-link glyph onto a line of
+   its own, which was 0px of overflow and a worse footer.
 
 2. **[MEASURED 2026-09-01] Thirteen top-level nav links is the real problem; the
    breakpoint is only a workaround.** `DealAppSeo/trustshell` PR #90 moved the
