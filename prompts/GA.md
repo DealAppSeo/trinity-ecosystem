@@ -76,27 +76,84 @@ comparing it against the installed version shows the direction.
 - Lower a floor in `check:deps` to make an advisory go away. That is the exact
   move the gate exists to stop.
 
-## Current queue — verified 2026-08-15, re-check before trusting
+## Current queue — dates are per item; re-check before trusting
 
-1. **Six production advisories remain, all in the Solana cluster**
-   (`@solana/web3.js`, `@solana/spl-token`, `@solana/buffer-layout-utils`,
-   `bigint-buffer`, `jayson`, `uuid`). Every installed version is already the
-   latest published, and `bigint-buffer`'s advisory covers `*` — **no version of
-   it clears**. There is nothing to take today. The real work is a **watch**: when
-   `@solana/kit` (web3.js v2) becomes viable for `SolanaExecutor`, that is the
-   forward path. Do not manufacture a fix in the meantime.
-2. **`repid-engine`'s Dockerfile passes `BASE_SEPOLIA_PRIVATE_KEY` and the
-   Supabase service key as build `ARG`/`ENV`** (Railway build log flags
-   `SecretsUsedInArgOrEnv`, lines 11–12). A funded wallet key persisting in image
-   layers, with **no disabled-key defence behind it** — unlike the settled
-   Supabase JWT. `NORTH-STAR.md` calls this the most live credential issue open.
-   Read them at runtime only. **Different repo — needs `add_repo`.**
-3. **Dependabot's first grouped PRs.** CI is the gate: `npm run check` plus
-   `next build` plus e2e run on every PR, so a bad bump is caught before review
-   rather than by review. Majors arrive separately and need a human.
-4. **`npm run lint` exits 1** on two React findings that belong to the surface
-   lane. It is not part of `npm run check`, so CI stays green. Do not "fix" it by
-   disabling the rule.
+**Read the date on the item, not the date on this heading.** Items 1 and 2 were
+re-probed on **2026-09-01**, and item 2 came back CLOSED — it would have sent
+you to fix something already fixed. That is what re-probing is for.
+
+1. **[RE-VERIFIED 2026-09-01] Six production advisories, all still the Solana
+   cluster, and every proposed fix is still a downgrade.** `npm audit --omit=dev`
+   on 2026-09-01: 6 total (3 moderate, 3 high) —
+
+   | package | severity | npm's proposed "fix" |
+   |---|---|---|
+   | `@solana/buffer-layout-utils` | high | `@solana/spl-token@0.1.8` (MAJOR) |
+   | `@solana/spl-token` | high | `@solana/spl-token@0.1.8` (MAJOR) |
+   | `bigint-buffer` | high | `@solana/spl-token@0.1.8` (MAJOR) |
+   | `@solana/web3.js` | moderate | `@solana/web3.js@0.0.3` (MAJOR) |
+   | `jayson` | moderate | `@solana/web3.js@0.0.3` (MAJOR) |
+   | `uuid` | moderate | `@solana/web3.js@0.0.3` (MAJOR) |
+
+   Every one is a walk **backwards**, exactly as recorded. `bigint-buffer`'s
+   advisory covers `*` — no version of it clears. Nothing to take. The real work
+   is a **watch**: when `@solana/kit` (web3.js v2) becomes viable for
+   `SolanaExecutor`, that is the forward path.
+
+   **New trap, worth knowing before you report a number.** The bare `npm audit`
+   figure is now **9**, not 6. The extra three — `@libp2p/kad-dht`, `helia`,
+   `agent0-sdk` — are **dev-only** and reach nothing a user runs. Reporting 9 as
+   the production figure overstates it by half. `--omit=dev` is the honest one,
+   and it is 6.
+
+2. **[CLOSED — verified 2026-09-01] `repid-engine`'s Dockerfiles no longer pass
+   a secret as `ARG`/`ENV`.** This item said `BASE_SEPOLIA_PRIVATE_KEY` and the
+   Supabase service key were baked into image layers, and `NORTH-STAR.md` called
+   it the most live credential issue open. Grepping `^\s*(ARG|ENV)` across both
+   Dockerfiles in `DealAppSeo/repid-engine` on 2026-09-01 returns only
+   non-secret build config:
+
+   ```
+   Dockerfile.fly:59       ENV NODE_ENV=production
+   Dockerfile.selfhost:54  ENV NODE_ENV=production
+   Dockerfile.selfhost:59  ENV LOCAL_MODE=true
+   Dockerfile.selfhost:60  ENV ONLY_ATTESTATIONS_LEAVE=true
+   ```
+
+   There is no root `Dockerfile` at all; the repo carries `railway.toml` and
+   `nixpacks.toml`, so the Railway build is nixpacks, not the Dockerfile the
+   original `SecretsUsedInArgOrEnv` warning came from. **Do not re-open this on
+   the strength of that old build log.** If you want it verified end-to-end,
+   the remaining question is whether the nixpacks build receives any secret at
+   build time rather than at runtime — that is a fresh probe, not this item.
+
+3. **[2026-08-15, NOT re-probed] Dependabot's first grouped PRs.** CI is the
+   gate: `npm run check` plus `next build` plus e2e run on every PR, so a bad
+   bump is caught before review rather than by review. Majors arrive separately
+   and need a human.
+4. **[RE-VERIFIED 2026-09-01, still true] `npm run lint` exits 1** on two React
+   errors that belong to the surface lane (`SystemTrustScore.tsx:20`,
+   `InstitutionalControls.tsx:123`). It is not part of `npm run check`, so CI
+   stays green. Do not "fix" it by disabling the rule. It also prints 11
+   `import/no-anonymous-default-export` warnings under `scripts/redteam/` which
+   do not fail it — clean output is not the expected state here.
+5. **[NEW — a decision for this lane, not a task] `DealAppSeo/trustshell`'s MVP
+   walk passes 39/39 and cannot be run as shipped.** `tests/e2e/mvp-walk.mjs` is
+   the only suite that tests the whole first-user journey. It exits **2 =
+   NOT_CHECKED** on a missing `playwright`, which is not a bug: the file argues
+   deliberately that declaring the dependency would install a browser driver on
+   every PR for no gating benefit, and a gate that reddens for environmental
+   reasons gets ignored within a week.
+
+   Run manually on 2026-09-01 against `main` with playwright supplied out of
+   band, it returned **39/39 OK** — the first executed result this suite has
+   ever produced. So the reasoning holds and the cost is real: nobody was in a
+   position to know it passed.
+
+   **The lane question is whether `playwright` becomes an `optionalDependency`
+   or a documented one-line setup, not whether to gate it in CI.** Do not add it
+   to `devDependencies` and wire it into `check` — that is the failure mode the
+   file already argues against.
 
 ## Gates
 
@@ -105,7 +162,8 @@ npm run check:deps     # run FIRST; expect 5 VERIFIED, 0 FAILED
 npm run check          # expect exit 0
 npm run build          # Next 16 / React 19
 npm run test:e2e       # expect 0 FAILED
-npm audit --omit=dev   # the honest production number; expect 6 until item 1 moves
+npm audit --omit=dev   # the honest production number; expect 6 until item 1 moves.
+                       # Bare `npm audit` says 9 — three of those are dev-only.
 ```
 
 ## Report block — end every loop with exactly this, and nothing after it
