@@ -108,13 +108,14 @@ are **publicly reachable**, and they are the only way to observe the Vercel
 deployment when the Vercel API is unavailable — which is exactly the situation
 that surfaced them.
 
-**Publicly reachable is not the same as reachable from here** — but as of
-2026-08-28 these three ARE reachable from here. This paragraph said all three
-custom domains were proxy-denied to `curl` and only reachable via `pg_net`. Plain
-`curl` now gets **200** from `app.` and `www.`, and **307** from the apex. Do not
-reach for `pg_net` first any more; try the direct request, and fall back only on an
-actual `CONNECT tunnel failed`. See *Network, in cloud/remote sessions* below for
-the full re-measurement before concluding a domain is down.
+**Publicly reachable is not the same as reachable from here, and "from here"
+changes between sessions.** This paragraph has now said all three things: denied
+(pre-2026-08-28), then reachable ("do not reach for `pg_net` first any more",
+2026-08-28), and now denied again — all nine hosts, `curl: (56) CONNECT tunnel
+failed, response 403` [MEASURED 2026-09-02]. Nothing about the domains changed on
+either date. **Do not read a verdict off this file at all.** Run the two commands
+in *Network, in cloud/remote sessions* below before your first request, and let
+them tell you which path this session has.
 
 Vercel `ssoProtection` is `all_except_custom_domains`, so every `.vercel.app` URL
 302s to `vercel.com/sso-api`. You cannot fetch a preview URL from an agent
@@ -137,10 +138,23 @@ repid-engine has the same thing at `GET /health` → `deployed_commit`.
 
 ### Reaching these hosts from a sandboxed agent session
 
-**Try `curl` FIRST.** As of 2026-08-28 it reaches every surface in this document
-except `railway.app` and `api.uptimerobot.com`. `pg_net` remains the fallback for
-a host the proxy genuinely refuses — it egresses from Supabase infrastructure, so
-it is a different path, not a better one:
+**Ask the proxy what this session can reach, then try `curl`.** Whether `curl`
+works here is a property of the environment's network policy, not of the host —
+on 2026-08-28 it reached everything but two; on 2026-09-02 it reached nothing.
+One command settles it for the session you are in:
+
+```bash
+curl -sS "$HTTPS_PROXY/__agentproxy/status"
+```
+
+`recentRelayFailures` lists what has already been refused, with the reason.
+`selective` and `toolScoped` say whether denials are per-host at all: both `false`
+means a blanket policy, so one `CONNECT tunnel failed` predicts the rest and there
+is no point probing nine hosts to learn the same fact nine times.
+
+`pg_net` is the fallback for a host the proxy refuses — it egresses from Supabase
+infrastructure, so it is a different path, not a better one [VERIFIED 2026-09-02:
+reached `repid-engine-production` while `curl` could not]:
 
 ```sql
 select net.http_get(url := 'https://www.aitrinitysymphony.com/api/version',
@@ -264,50 +278,51 @@ migration — ask `pg_policies`.
 
 ## Network, in cloud/remote sessions
 
-**THIS LIST GOES STALE AND HAS. Re-test before quoting it** — a denial is a fact
-about the sandbox on a given day, not a property of the host. Two rows below were
-denied on 2026-08-15 and one of them answers today; a session that trusted the
-list would have reported a working path as blocked.
+**STOP. This section cannot tell you what you can reach.** Not because it is
+stale — because the question has no file-shaped answer. Reachability here is a
+property of **the network policy of the environment your session was created in**,
+chosen by a human at creation time and not visible in any repository. Two sessions
+on the same commit, the same day, the same hosts, get different answers.
 
-Tell the two apart by the failure shape, and never by this file:
-`curl: (56) CONNECT tunnel failed, response 403` is the **proxy** refusing.
-Any ordinary HTTP status — including `401` or `403` **in the response body** — means
-you connected and the *server* answered.
+That is the same shape as *GitHub reach is PER SESSION* below, which cost six
+weeks before anyone named it. This section had the older, wrong model — a table
+of hosts with verdicts — and so it went stale twice in the only way such a table
+can: completely.
 
-### RE-MEASURED 2026-08-28 — most of what this list called denied now answers
+| host | 2026-08-15 | 2026-08-28 | 2026-09-02 |
+|---|---|---|---|
+| `repid-engine-production.up.railway.app` | denied | **200** | **DENIED** |
+| `app.aitrinitysymphony.com` | denied | **200** | **DENIED** |
+| `www.aitrinitysymphony.com` | denied | **200** | **DENIED** |
+| `aitrinitysymphony.com` (apex) | not checked | **307** → `www` | **DENIED** |
+| `qnnpjhlxljtqyigedwkb.supabase.co` | denied | **401** (PostgREST's own) | **DENIED** |
+| `backboard.railway.app` | denied | **200** | **DENIED** |
+| `www.trustshell.dev` | — | **200** | **DENIED** |
+| `api.uptimerobot.com` | denied | denied | **DENIED** |
+| `railway.app` | denied | denied | **DENIED** |
 
-Every host below was probed with plain `curl` from a sandboxed session on
-2026-08-28. **Five of the seven rows had gone stale, all in the same direction:**
-the list said blocked, the host answers. The warning above was doing its job and
-was still not enough, because a reader who takes "denied" at face value never runs
-the probe that would correct it. So the current state, measured:
+Every cell is a real measurement on its date. **Nine of nine rows are wrong if you
+read the wrong column**, and nothing in the file tells you which column you are in.
+On 2026-09-02 `__agentproxy/status` reported `selective: false`, `toolScoped:
+false`, and `connect_rejected — gateway answered 403 to CONNECT` for all nine: a
+blanket policy, not a host list. Keep the table only as the evidence that this
+question is not answerable from a document.
 
-| host | 2026-08-28 | previously listed as |
-|---|---|---|
-| `repid-engine-production.up.railway.app` | **HTTP 200** | denied |
-| `app.aitrinitysymphony.com` | **HTTP 200** | denied (2026-08-15) |
-| `www.aitrinitysymphony.com` | **HTTP 200** | denied (2026-08-15) |
-| `aitrinitysymphony.com` (apex) | **HTTP 307** → `www` | NOT CHECKED |
-| `qnnpjhlxljtqyigedwkb.supabase.co` | **HTTP 401** (PostgREST's own) | already corrected 2026-08-27 |
-| `backboard.railway.app` | **HTTP 200** | reachable (was 403) |
-| `www.trustshell.dev` | **HTTP 200** | — |
-| `api.uptimerobot.com` | **PROXY-DENIED** | denied — still true |
-| `railway.app` | **PROXY-DENIED** | denied — still true |
+**So the 2026-08-28 conclusion is retracted, and it is worth reading why it was
+wrong even on the day it was written.** It said: *"an agent session can now read
+production directly — it was used exactly that way to establish that one of three
+Railway variables had not taken effect, a question that had previously been bounced
+back to a human."* True of that session. Stated as a durable capability, it became
+a promise this codebase could not keep: on 2026-09-02 the identical question about
+two Railway variables came up, `curl` was denied on every host, and the answer was
+guessed three times before `pg_net` finally measured it. A capability claim tied to
+one session's policy is a caveat, not a finding.
 
-**The consequence is larger than a table refresh: an agent session can now read
-production directly.** `repid-engine-production` serves `/health` (with
-`deployed_commit`) and a keyless `POST /api/v1/hal/evaluate` returns the live
-`provider_health`, including which providers were skipped and why. That answers
-"is the quorum degraded, and what exactly is wrong" in one request, with no
-dashboard and no `pg_net` round trip. It was used exactly that way on 2026-08-28
-to establish that one of three Railway variables had not taken effect — a question
-that had previously been bounced back to a human to check by hand.
-
-The `pg_net` path still works and is still the fallback. It is no longer the only
-way in.
-
-The Supabase **MCP tools work** (a different path again), so SQL queries succeed
-independently of any of the above.
+**`pg_net` and the Supabase MCP tools were the paths that worked on 2026-09-02.**
+Both egress from Supabase infrastructure rather than this sandbox, so they survive
+a policy that denies `curl` everything. That is not an argument for reaching for
+them first — they are slower and two round trips — only for not concluding a host
+is down when the proxy is what refused.
 
 **Post-hydration behaviour remains NOT CHECKABLE from here.** `curl` and `pg_net`
 both return SSR HTML and static assets, so "which commit, which surface" and "is
@@ -322,9 +337,6 @@ body** — means you connected and the *server* answered. A 3xx is also a connec
 `trustshell.dev` returns **308** to `www`, 15 bytes, and reading that as "the page
 has no `og:image`" was a real error made and caught on 2026-08-28. Follow redirects
 before concluding anything about a page's contents.
-
-The apex `aitrinitysymphony.com` was **NOT CHECKED** against the proxy — do not
-assume it matches `www` either way.
 
 When a request 403s, run `curl -sS "$HTTPS_PROXY/__agentproxy/status"` and look at
 `recentRelayFailures` before drawing any conclusion.

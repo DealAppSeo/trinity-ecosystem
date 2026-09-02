@@ -308,12 +308,15 @@ correction.
 | TRUSTSHELL-V1 §9: `@hyperdag/trustshell` and `-mcp` are the **receipt core — "the vehicle already exists"** | never installed. Both are the HAL/RepID SDK against a live backend — zero occurrences of `transcript`, `audit_hash` or `session_receipt` in either `dist/`. `trustshell verify` already means something incompatible, so the proposed CLI would have **collided** | the receipt core is `lib/trustshell/receipt/`; the CLI name is still undecided — see TRUSTSHELL-V1 §12 |
 | REPID-ENG-001: the unauthenticated score-event path causes **zero live-score drain** (the "drain a competitor to the floor" version is refuted) | the griefing test ran against a throwaway sitting **exactly on its earned floor** (`peak = current = 1000 = tier_lower_bound`), so its drainable gap was **0 by construction** — the sample measured its floor, not the path. `trg_repid_earned_floor` only clamps `current_repid` **up** to the floor | an unauthenticated caller **can** drain a targeted agent down to its earned floor. Measured 2026-08-17: **164/176 agents (93%)** have a drainable gap (avg **295**, max **2000** pts). Bounded to the floor, not to zero — `docs/RED-TEAM-REPID-ENGINE-2026-08-17.md` |
 | the HAL false-positive guard was **cosmetic** — **all 53,690** suppressed penalties **still docked the score** | the signature came from a **constructed probe row** in a rolled-back subtransaction, generalised to production without checking that production rows had the same shape — the same sample error as REPID-ENG-001 above, two rows up, made by someone who had just re-read the rule. The event row carries an honest witness nobody consulted: `apply_repid_score_event()` writes `repid_before` from a live `SELECT … FOR UPDATE` and `repid_after` from the `UPDATE`'s `RETURNING current_repid`, **after** every BEFORE-UPDATE trigger on `repid_agents` | **the suppressions held.** `repid_after - repid_before = 0` on **53,690 of 53,690**, every month 2026-05 → 2026-08. Trigger ordering is **NOT ESTABLISHED** and was never shown to misfire in production. **53,690 remains a valid suppression count** — what is retracted is the claim that those penalties moved a score. What survives: the guard's `event_type = 'HAL_SCORE_EVENT'` condition was too narrow, and **5** production rows evaded it for **−286 RepID** — LESSONS A36 |
+| an agent session **can read production directly** — `curl` reaches every surface but `railway.app` and `api.uptimerobot.com` | true of ONE session. Reachability is a property of the network policy of the environment a session was created in — chosen by a human at creation time, invisible in any repo — not of the host or of the date. Re-probed 2026-09-02: **all nine hosts** `CONNECT tunnel failed, response 403`, with `__agentproxy/status` reporting `selective: false, toolScoped: false` — a blanket policy, not a host list | **no durable statement about `curl` reachability is possible.** Ask the session: `curl -sS "$HTTPS_PROXY/__agentproxy/status"`. On 2026-09-02 `pg_net` and the Supabase MCP tools reached production when `curl` reached nothing |
 
-The last two rows are prose, not figures, so `check:prior-work`'s literal-string
-matcher cannot hold them. **`npm run check:probes` is what holds them**: a doc may
-not name a package this repo does not install without a dated `[PROBED …]` line in
-the same file. Both were one `npm install` away from being known, three milestones
-running.
+**The two `TRUSTSHELL-V1` rows** are prose, not figures, so `check:prior-work`'s
+literal-string matcher cannot hold them. **`npm run check:probes` is what holds
+them**: a doc may not name a package this repo does not install without a dated
+`[PROBED …]` line in the same file. Both were one `npm install` away from being
+known, three milestones running. (This paragraph said "the last two rows" until
+2026-09-02, when a row was appended and silently made it wrong — a positional
+reference to a table anyone may extend is a claim with no owner.)
 
 ---
 
