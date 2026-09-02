@@ -1,0 +1,55 @@
+{
+  "surface": "Trinity cross-agent validation preconditions — fleet liveness + zkRepID proof integrity",
+  "collectedAt": "2026-09-02T06:47:00.000Z",
+  "collectedBy": "claude-code session claude/cross-agent-validation",
+  "collectedVia": "Supabase MCP execute_sql against project qnnpjhlxljtqyigedwkb (v_fleet_truth, v_repid_zkp_proof_integrity, v_repid_zkp_pipeline_truth)",
+  "note": "Measured ground truth for whether the ecosystem can back a cross-agent validation verdict with a LIVE zkRepID proof from a LIVE agent. Read-only aggregate views; no agent ids or proof bytes stored here.",
+  "observations": {
+    "fleet": {
+      "source": "v_fleet_truth (recency-computed, never a status column) + agent_health_probes",
+      "live": 0,
+      "reachable": 12,
+      "total": 12,
+      "liveness_signal_all": "probe_only",
+      "reconciliation_note": "Six sources give four different counts (12 / 12 / 0 / 0 / 2) because they measure different things — this is the months-old 'which row do I read' conflict. is_reachable=12/12 (health probe HTTP 200, ~4 min old) is what Railway/UptimeRobot see; is_live=0/12 requires a heartbeat OR work log inside 10 min, and heartbeat is ~46d stale while work logs are 22h-7d stale. Every row reads liveness_signal='probe_only'.",
+      "verdict": "T12 runtime fleet is UP BUT IDLE, not dead: 12/12 answer their health probe (running code 8.2.0-reflect-wired), 0/12 are producing work or heartbeating. No agent is currently doing runtime work to be validated — but the containers are running, so the unblock is feeding verifiable tasks, not resurrecting processes."
+    },
+    "zkRepID_integrity": {
+      "source": "v_repid_zkp_proof_integrity",
+      "schemes": [
+        {
+          "scheme": "plonky3_range_check",
+          "is_real": true,
+          "proofs": 22356,
+          "eas_attested_pct": 100.0,
+          "first_seen": "2026-06-07T09:58:57Z",
+          "last_seen": "2026-09-01T21:36:08Z",
+          "note": "REAL zk proofs, 100% attested on-chain via EAS, current to yesterday. This is the scheme a validation verdict may cite."
+        },
+        {
+          "scheme": "sha256-stub",
+          "is_real": false,
+          "proofs": 56823,
+          "eas_attested_pct": 0.0,
+          "first_seen": "2026-05-22T01:35:10Z",
+          "last_seen": "2026-06-07T09:26:28Z",
+          "note": "STUB proofs from the pre-June migration, flagged is_real=false, 0% attested. MUST NOT back any verdict. Their existence is why a validator checks is_real, not row count."
+        }
+      ],
+      "verdict": "The integrity view cleanly separates 22,356 real EAS-attested plonky3 proofs from 56,823 flagged stubs. The discriminator (is_real + eas_attested_pct) is the invariant a zk-backed verdict must honour."
+    },
+    "zkRepID_pipeline": {
+      "source": "v_repid_zkp_pipeline_truth",
+      "final_proofs_total": 79179,
+      "final_proofs_with_job_id": 117,
+      "job_id_linkage_pct": 0.148,
+      "queue_completed": 81926,
+      "queue_pending": 40300,
+      "queue_failed": 7,
+      "pending_frozen_since": "2026-08-01T07:41:21Z",
+      "pending_frozen_days": 32.0,
+      "last_final_write_ts": "2026-09-01T21:36:08Z",
+      "verdict": "The pipeline is REAL but STALLED: 40,300 items pending, frozen 32 days; only 117 of 79,179 proofs are traceable to a generating job. New proof throughput is ~117 in 30 days. So the zk-backing mechanism exists and is attested, but is not flowing — a precondition to a LIVE zk-backed loop that currently fails."
+    }
+  }
+}
