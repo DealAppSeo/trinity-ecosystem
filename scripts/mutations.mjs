@@ -3114,6 +3114,45 @@ export const MUTATIONS = [
     find: 'if (contradicted > 0) {',
     replace: 'if (contradicted > 999) {',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/kernel — the trust microkernel core (KERNEL-001 / check:kernel-envelope)
+  // -------------------------------------------------------------------------
+  {
+    id: 'kernel-default-deny-removed',
+    suite: 'check:kernel-envelope',
+    file: 'lib/trustshell/kernel/policy.ts',
+    protects:
+      'DEFAULT-DENY. An action is ALLOWed only when an explicit grant covers its capability. ' +
+      'Neutering the grant check lets any ungranted capability fall through to ALLOW — the ' +
+      'classic authorization fail-open (a missing branch defaulting to yes), inside the gate ' +
+      'built to make that impossible',
+    find: '  if (!granted.includes(envelope.capability)) {',
+    replace: '  if (false) {',
+  },
+  {
+    id: 'kernel-gate-runs-on-any-verdict',
+    suite: 'check:kernel-envelope',
+    file: 'lib/trustshell/kernel/gate.ts',
+    protects:
+      'THE GATE RUNS THE ACTION ONLY ON ALLOW. Widening the ALLOW branch to also fire on VERIFY ' +
+      'means a high-risk action whose evidence has not cleared still runs the side effect — the ' +
+      'fail-open the whole "models propose, TrustShell disposes" boundary exists to prevent',
+    find: "  if (verdict.decision === 'ALLOW') {",
+    replace: "  if (verdict.decision === 'ALLOW' || verdict.decision === 'VERIFY') {",
+  },
+  {
+    id: 'kernel-laws-not-enforced',
+    suite: 'check:kernel-envelope',
+    file: 'lib/trustshell/kernel/kernel-laws.ts',
+    protects:
+      'THE IMMUTABLE KERNEL LAWS ACTUALLY FIRE. Making kernelLawViolated always return null ' +
+      'lets a granted capability buy past no-secret-exposure / no-privilege-self-escalation / etc — ' +
+      'the exact self-escalation and secret-exfiltration a prompt-injected model would attempt, ' +
+      'inside the boundary built to make it impossible',
+    find: '    if (conditionMatches(law.when, norm)) return law;',
+    replace: '    if (conditionMatches(law.when, norm)) return null;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
