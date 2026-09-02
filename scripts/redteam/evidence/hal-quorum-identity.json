@@ -1,0 +1,29 @@
+{
+  "surface": "HAL cross-LLM fact-check quorum — is each panelist's MODEL IDENTITY verifiable, or self-reported?",
+  "collectedAt": "2026-09-02T09:05:00.000Z",
+  "collectedBy": "claude-code session claude/hal-quorum-identity",
+  "collectedVia": "Supabase MCP execute_sql against project qnnpjhlxljtqyigedwkb (hal_classifications schema + rows; information_schema for attestation columns)",
+  "foldIn": "First fold-in from an analysis of Tencent/AI-Infra-Guard (see docs/AGENTIC-SECURITY-STACK.md): AIG binds a model's identity to an unforgeable attestation (a Claude thinking-signature is an AEAD-encrypted protobuf a relay cannot forge). HAL's BFT quorum assumes N DISTINCT models voted; that independence is only real if each panelist's claimed model can be verified.",
+  "note": "Read-only schema + aggregate. No prompt text, no answers, no proof bytes. The question judged: can a relay substituting one model for another inside the quorum be DETECTED, or is the model label taken on trust?",
+  "observations": {
+    "per_panelist_record": {
+      "source": "hal_classifications (one row per panelist classification)",
+      "columns": ["id", "prompt_hash", "category", "confidence", "latency_ms", "provider", "model", "created_at", "previous_entry_hash"],
+      "model_field": "SELF-REPORTED free-text string written by the router, e.g. 'fact-check-quorum:llama+glm+gemini+mistral+qwen', 'llama-3.1-8b-instant', 'fact-check-quorum:gemini+mistral'. Not an attested identity — nothing binds the string to what actually answered.",
+      "provider_field": "self-reported: deepseek, openrouter, groq, trinity-task-bridge",
+      "integrity_present": "previous_entry_hash — a hash CHAIN over the log (tamper-evidence that a row was not altered/removed AFTER the fact). It does NOT attest the model identity: a relay writing model='claude-...' produces a perfectly valid chain link.",
+      "per_panelist_attestation_column": "NONE. No signature, no model-binding token, no attestation field on hal_classifications. Confirmed against information_schema.",
+      "sample_quorum": {
+        "prompt_hash": "8e295e27d0d246e198bb83b764bacbf3",
+        "panelists": 30,
+        "note": "30 panelist rows for one prompt across deepseek/openrouter/trinity-task-bridge, each a self-reported 'fact-check-quorum:<models>' label; log hash-chained; zero per-panelist model-identity attestation."
+      }
+    },
+    "verdict_level_attestation_exists_but_is_the_wrong_layer": {
+      "source": "information_schema (hal_production_events, hal_snapshot_registry)",
+      "found": ["hal_production_events.eas_attestation_id", "hal_production_events.zkp_proof_hash", "hal_snapshot_registry.zkp_attestation_uid", "hal_snapshot_registry.zkp_attested_at"],
+      "why_it_does_not_close_the_gap": "These attest the OUTCOME/snapshot on-chain (EAS/zkp) — that a verdict was recorded and not tampered. They say nothing about WHICH MODELS produced it. A verdict can be EAS-attested and still rest on a quorum where a relay swapped gemini for a cheaper model; the attestation would sign the swapped result just as happily."
+    },
+    "verdict": "HAL's per-panelist MODEL IDENTITY is SELF-REPORTED. The log is hash-chained and the verdict is EAS/zkp-attested, but neither verifies that the N claimed models actually and distinctly answered. So the quorum's BFT independence assumption is UNVERIFIED — not breached (no forgery caught), but not checkable either. This is NOT_CHECKED until a per-panelist model-identity attestation is wired."
+  }
+}
