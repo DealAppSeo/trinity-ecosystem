@@ -117,10 +117,29 @@ either date. **Do not read a verdict off this file at all.** Run the two command
 in *Network, in cloud/remote sessions* below before your first request, and let
 them tell you which path this session has.
 
-Vercel `ssoProtection` is `all_except_custom_domains`, so every `.vercel.app` URL
-302s to `vercel.com/sso-api`. You cannot fetch a preview URL from an agent
-session. The custom domains above are exempt from **SSO** — that is why `pg_net`
-gets a 200 from them and never from a preview URL. It is not proxy exemption.
+Vercel `ssoProtection` is `all_except_custom_domains`, so no `.vercel.app` preview
+URL can be read from an agent session. The custom domains above are exempt from
+**SSO** — that is why `pg_net` gets real content from them and never from a
+preview URL. It is not proxy exemption.
+
+**The SSO gate answers 200, not 302** [MEASURED 2026-09-02 via `pg_net` against a
+preview of `trustshell-landing`]. This paragraph said `302s to
+`vercel.com/sso-api``, which is the shape you would expect and is not what
+arrives:
+
+```
+status_code : 200
+location    : https://vercel.com/sso-api?url=…&nonce=…
+body        : 339,130 bytes — Vercel's login page, none of the app
+```
+
+The `location` header is there, on a **200**. So the failure does not have the
+shape *Read a failure by its shape* below teaches you to look for, and it is the
+one case in this file where a 200 is not a connection to the thing you asked for.
+**A probe testing `status_code === 200` concludes the page loaded**, then asserts
+about a third of a megabyte of someone else's login screen. Check for a marker
+you expect in your own page — that is what settled it here: `has_claim_link` and
+`has_journey_strip` were both false while the status said success.
 
 ### Knowing WHICH COMMIT a surface is running
 
