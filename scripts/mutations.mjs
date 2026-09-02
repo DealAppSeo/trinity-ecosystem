@@ -3064,6 +3064,32 @@ export const MUTATIONS = [
     find: "  if (writeNames.has(name) && ctx.principal !== 'service') {",
     replace: '  if (writeNames.has(name) && false) {',
   },
+
+  // -------------------------------------------------------------------------
+  // scripts/redteam/probes/zkrepid-anchor-integrity.mjs — ANCHOR-001.
+  //
+  // The probe judges whether every EAS-attested zk proof resolves to a real
+  // anchored batch; it BREACHES today over 100 hollow attestations and that
+  // finding is carried in ledger.json (KNOWN_OPEN). This mutation removes the
+  // probe's failure detection so it can no longer see ANY hollow attestation.
+  // The probe then returns HELD while ledger.json still lists ANCHOR-001 open —
+  // which the runner scores LEDGER_STALE and FAILS (a security record that
+  // claims a closed hole hides the regression if it reopens). So a probe that
+  // stops detecting is caught by the same mechanism that catches a fixed-but-
+  // still-ledgered finding: the detection is load-bearing in both directions.
+  // -------------------------------------------------------------------------
+  {
+    id: 'anchor-detection-removed',
+    suite: 'check:redteam',
+    file: 'scripts/redteam/probes/zkrepid-anchor-integrity.mjs',
+    protects:
+      'ANCHOR-001 actually detects a hollow on-chain attestation. Neutering its failure filter makes ' +
+      'it report HELD over 100 proofs whose attestation UID anchors nothing — and because the finding ' +
+      'is ledgered, that HELD is a stale-ledger FAIL, so "every attested proof is anchored" can never ' +
+      'quietly come to mean "every attested proof carries a string"',
+    find: '].filter(([, n]) => Number(n) > 0);',
+    replace: '].filter(() => false);',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
