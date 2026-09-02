@@ -44,6 +44,20 @@
 // invariant holds" for "the loop is running". See PRIOR-WORK-INDEX
 // 'Formal dispute/peer-verify mechanism is unused' and 'Peer-verify seat writes nothing'.
 //
+// LIMITATION — the fabricated-accountability arm is a COARSE proxy, named here
+// because a security probe must state what it does NOT cover (independent
+// verification, 2026-09-02). That arm (breach 1 below) fires only when EVERY
+// workflow table is 0-in-30d: `anyRecentFiling` is an OR over the three tables,
+// not a per-event linkage. It cannot confirm that a recent filing CORRESPONDS to
+// the reputation events — the evidence schema carries counts, not a join key from
+// a PEER_VERIFY*/DISPUTE* score event back to the filing that should justify it
+// (the same missing task<->event key as PRIOR-WORK 'task-key-on-repid-score-
+// events'). So once any workflow table revives, this arm weakens to "some filing
+// exists somewhere" and the real question (was THIS reputation event backed by
+// THIS filing) needs a linkage the DB does not yet expose. Sound at today's ground
+// truth (all three tables dormant); a debt to pay if the pipeline revives. The
+// dead-path-dressed-as-live arm (breach 2) does not depend on this and is unaffected.
+//
 // Read-only: judges recorded aggregate counts. No agent ids, no votes, no dispute bodies.
 
 import { readFileSync, existsSync } from 'node:fs';
