@@ -3090,6 +3090,30 @@ export const MUTATIONS = [
     find: '].filter(([, n]) => Number(n) > 0);',
     replace: '].filter(() => false);',
   },
+
+  // -------------------------------------------------------------------------
+  // scripts/redteam/probes/task-status-integrity.mjs — EVERGREEN-002.
+  //
+  // The probe BREACHES today over 10 trinity_tasks marked done/verified whose own
+  // result self-declares FAILED/PENDING or fabricates the abc123 dummy commit; the
+  // finding is carried in ledger.json (KNOWN_OPEN). This mutation neuters the
+  // detection threshold so a real contradiction no longer trips it. The probe then
+  // returns HELD while ledger.json still lists EVERGREEN-002 open — LEDGER_STALE,
+  // which FAILS the suite. So a detector that stops firing is caught by the same
+  // rule that catches a fixed-but-still-ledgered finding.
+  // -------------------------------------------------------------------------
+  {
+    id: 'evergreen2-detection-disabled',
+    suite: 'check:redteam',
+    file: 'scripts/redteam/probes/task-status-integrity.mjs',
+    protects:
+      'EVERGREEN-002 actually fires on a status/content contradiction. Raising the trip threshold ' +
+      'past the real count makes it report HELD over tasks marked done while their own result says ' +
+      'FAILED/PENDING — and because the finding is ledgered, that HELD is a stale-ledger FAIL, so ' +
+      '"done means done" can never quietly come to mean "done means a row said done"',
+    find: 'if (contradicted > 0) {',
+    replace: 'if (contradicted > 999) {',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

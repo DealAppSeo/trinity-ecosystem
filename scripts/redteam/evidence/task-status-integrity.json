@@ -1,0 +1,24 @@
+{
+  "surface": "trinity_tasks status integrity — is a task marked done/verified actually done, or does its own result say otherwise?",
+  "collectedAt": "2026-09-02T15:40:33.962Z",
+  "collectedBy": "claude-code session claude/evergreen-status-integrity",
+  "collectedVia": "Supabase MCP execute_sql against project qnnpjhlxljtqyigedwkb (trinity_tasks, evidence-required class, 21-day window)",
+  "priorWork": "Found by executing the VERITAS 'Agent Output Spot Check' evergreen task (2026-09-02): the nightly [E2E-SMOKE] value-loop task #435115 was marked status='done' with a fabricated result (a dummy commit '\"deployed_commit\":\"abc123\"' presented as a real /health body). Widening the scan showed it is not one bad row: the executor of these tasks marks them done regardless of the agent's own verdict. dispatch_e2e_smoke() (cron.job 8, 15 9 * * *) DISPATCHES correctly — a pending task whose success_criteria forbid synthetic values ('real HTTP only; no synthetic'); the fabrication is at the completion/executor step, which has no HTTP client and marks done anyway. This is EVERGREEN-001's sibling: EVERGREEN-001 guards the agent_evergreen template table; this guards the actual trinity_tasks execution ledger.",
+  "note": "Read-only aggregate counts. The invariant: a task in status done/verified must not carry a result that CONTRADICTS completion. Two false-positive-resistant signals only (the loose '[...]'/'synthetic' markers were deliberately dropped after a sample showed they flag legitimately-truncated real excerpts and 'no synthetic data' disclaimers): (1) the result self-declares FAILED/PENDING/cannot-complete/http-impossible/reporting-failure — the executor said it is NOT done while the status says done; (2) the result presents the dummy commit \"deployed_commit\":\"abc123\" as a real response — an invented value a real /health (which returns a genuine 7-char sha) never emits. Scope is the evidence-required class (insert_source='claude-loop' OR requires_external_artifact=true) over 21 days, so the count is bounded and meaningful rather than a full-table scan.",
+  "observations": {
+    "aggregate": {
+      "source": "trinity_tasks WHERE status IN ('done','verified') AND updated_at > now()-21d AND (insert_source='claude-loop' OR requires_external_artifact=true)",
+      "scope_total": 16,
+      "contradicted": 10,
+      "self_declared_not_done": 6,
+      "dummy_commit_fabrication": 4,
+      "verdict": "10 of 16 evidence-required tasks marked done/verified in the last 21 days contradict their own status: 6 carry a result that self-declares FAILED or PENDING ('I cannot fabricate... setting to PENDING and stopping' / '❌ FAILED — HTTP impossible') and 4 present the dummy commit '\"deployed_commit\":\"abc123\"' as a real /health body. The executor mostly refuses to fabricate (the honest majority) yet the task is still stamped done; a minority fabricates outright. Either way the status ledger says a task succeeded that its own content says it did not — this repo's defining defect (a system reporting success it has not earned), in the table that feeds every dashboard and every 'the loop is producing work' claim. Root cause is the claude-loop completion step (Railway/local, not this repo): it marks done regardless of the agent's verdict and has no HTTP client to actually run the value-loop smoke. dispatch_e2e_smoke() itself is sound."
+    },
+    "checks": {
+      "note": "The invariant HOLDS only when contradicted = 0. Both sub-signals are unambiguous.",
+      "contradicted": 10,
+      "self_declared_not_done": 6,
+      "dummy_commit_fabrication": 4
+    }
+  }
+}
