@@ -1,16 +1,29 @@
 # TrustHarness strategy — TrustShell as a portable microkernel for trustworthy agency
 
-**Status: strategy + research synthesis, 2026-09-02 (v2, microkernel reframe). Not
-an inventory of shipped work.** This version supersedes the v1 "thin JIT trust
-layer" framing: the thin/JIT layer is still here, but it is now correctly placed
-as the *distribution mechanism* for a **microkernel**, not the whole architecture.
+**Status: strategy + research synthesis, 2026-09-02 (v3). Not an inventory of
+shipped work.** v2 reframed this as a microkernel; **v3 folds in four refinements
+from a second Grok + Chat pass and grounds the build order against live operational
+reality measured this session** (§1.5). The four v3 refinements — each of which
+changes a schema the kernel-core PR would otherwise bake in wrong: (a) **HAL sits
+outside the trusted computing base** — evidence, never authority (§2.1, §3.1); (b)
+**evidence is separated from the reputation algorithm** — canonical evidence store +
+versioned "Trust Lenses" (§3.3); (c) **four-level identity** (Principal / Capsule /
+Composition / Execution) + inheritance discount replaces a single composition hash
+(§3.2); (d) a **Personal Constitution** (hard/soft, signed, hashed) is primitive #0
+— the fences the kernel protects (§3.0). The thin/JIT layer remains, correctly
+placed as the *distribution mechanism* (§5), not the whole architecture.
+
 Where this doc names a TrustShell capability as **EXISTS / PARTIAL / NEW** it is
 graded against code/DB state measured this session; where it names an external
 mechanism it is labelled `[F]` (recovered via WebSearch of the named source —
 direct WebFetch was blanket egress-blocked this session, proxy `selective:false`)
 or `[K]` (from-knowledge). Every external-standards claim in §4 was independently
 re-verified this session (WebSearch) — see the Verification note; the softenings it
-found are already folded in.
+found are already folded in. The vision inputs synthesized here are two external
+architecture passes (referred to as **Grok** and **Chat**) plus one operational
+read from an advise-only Claude surface; where those documents and the live database
+disagreed, **the database wins** (per `trinity-preflight`) — §1.5 records where that
+happened.
 
 Read `docs/SYSTEM-MAP.md` and `docs/TRUST-HARNESS-STATUS-2026-08-17.md` first —
 this builds on them, it does not restate them.
@@ -76,6 +89,45 @@ rebuild what exists; build the boundary and the packaging.
 
 ---
 
+## 1.5 Operational reality — measured, not assumed [VERIFIED 2026-09-02, this session]
+
+An advise-only review of the Grok/Chat plans argued *"fix the fires first, treat the
+architecture as a vision-target, not a build order."* The posture is right, but that
+review ran **no live queries**; measuring its three named fires this session (Supabase
+MCP) corrects two of them and changes the build decision — build order must be
+grounded, not read from a prior doc (`CLAUDE.md`: *run it, don't read it*).
+
+| named fire | live measurement | verdict |
+|---|---|---|
+| "19,459-task peer_verify backlog" | `trinity_tasks` peer_verify by status: **no `pending` bucket** — done 98,873 / cancelled 33,257 / archived 27,612 / failed 23,061 / shadow_reject 307 / completed 46 | **NOT LIVE** — drained |
+| "dark telemetry: ANFIS/ZKP/BFT all 0/24h" | ANFIS `anfis_routing_logs` last row 2026-08-22 (0/24h); `bft_payment_evaluations` **0 total**; **`repid_zkp_proofs` 5/24h, 121/7d** | **PARTLY LIVE** — ANFIS + BFT dark; **ZKP is not** (trickle) |
+| "fleet-liveness signal conflict" | `v_fleet_truth`: **0 live of 12**; preflight view agrees (`agents_live_10m: 0`) | **LIVE** — fleet dark; canonical source (`v_fleet_truth`) already exists |
+
+Preflight verdict this session: **GO**, `global_pause=false`; `orphaned_claims: 23113`
+(the #59 release — the preflight view itself notes it "does not gate the fleet").
+
+**What this means for the build order.** The fires that *are* live (fleet dark, BFT
+dark, ANFIS dark) are all **Sean-gated or traffic-gated** — a redeploy, real traffic,
+key custody. None is fixable from a cloud/GitHub session, and **none gates building
+the kernel *contract*** (the Envelope + a deterministic gate + a receipt), which is
+precisely the thing provable by *simulation with zero fleet and zero users* (§7). So
+the two postures reconcile: **build the smallest kernel core, pre-incorporating the
+v3 refinements so nothing is rebuilt, scoped hard against the "someday" list, and
+slotted *into* the ratified sequence (Trust-Keys-first) rather than ahead of it.**
+The one live fire a cloud session *can* touch — the liveness-signal conflict — is
+itself the first test case for "trustworthiness ≠ availability" (§3.3), and its fix
+already exists (`v_fleet_truth`); it is offered as a cheap reversible win, not folded
+into the kernel.
+
+> **One claim I could not verify and therefore will not repeat:** Grok's line that
+> ERC-8004 deployments show *"lots of dead endpoints and Sybil-shaped feedback."* No
+> source was provided, and the standards-verification pass (§4) found only that
+> ERC-8004 is *Draft with live reference deployments.* Per the claim gate it stays
+> out of every doc until cited. The **architectural** lesson it motivates — keep
+> ERC-8004 as a public adapter, keep the internal truth private — stands on its own.
+
+---
+
 ## 2. The microkernel model
 
 ### 2.1 The interface/driver contract — "models propose, TrustShell disposes"
@@ -100,6 +152,33 @@ they cannot write each other:
 If the optimization plane can write the trust plane, a clever router can talk its
 way past the gate and the kernel is theatre. Enforcing that separation is a
 buildable antibody, `ROUTER-001` (§7).
+
+**Refinement (a) — HAL is evidence, never authority.** There is a third region the
+plane split must name: the **evidence plane** (HAL / VERITAS and every validator).
+HAL is *probabilistic*, so it cannot sit inside the trusted computing base. The
+correct topology is not `… → HAL → execute` with HAL in the authority path; it is:
+
+```
+   TRUSTED COMPUTING BASE (deterministic)          EVIDENCE PLANE (probabilistic)
+   ┌───────────────────────────────────┐           ┌──────────────────────────────┐
+   │ schema · identity · capability     │  asks for │ deterministic tests          │
+   │ deterministic policy · budget      │  evidence │ citation / grounding / sec   │
+   │ nonce/replay · approval enforce     │ ────────▶ │ LLM juries · heterogeneous   │
+   │ execution enforce · receipt sign    │ ◀──────── │ jury · zkML / TEE · human    │
+   └───────────────┬───────────────────┘  evidence  └──────────────────────────────┘
+                   │  (confidence, agreement, evidence-quality — NOT a verdict)
+                   ▼
+          DETERMINISTIC POLICY decides:
+          if financial_exposure > $1k: require HAL_confidence > .99
+                                        AND ≥2 independent validators AND human ASK
+```
+
+HAL reports `confidence=.984`, `validator_agreement=4/5`, `fraud_signal=false`.
+**Policy** — deterministic, mutation-tested — decides ALLOW/DENY/ASK/VERIFY from
+those numbers against the Envelope's risk class. Otherwise we have quietly placed
+probabilistic authority back inside the kernel, which is the same failure as letting
+the router write the trust plane. This is why the `VERIFY` verdict (§3.1) *requests
+evidence* and returns to policy; it never lets HAL execute.
 
 ### 2.2 The 14 interfaces, mapped to the codebase
 
@@ -135,7 +214,9 @@ decoration — it tells you which mechanisms are *deterministic and always-on* v
 |---|---|---|---|
 | Cell membrane / selective permeability | **Trust/Action Envelope + PDP** — nothing crosses without a verdict | trust | **NEW** |
 | Self / non-self (MHC) | IdentityProvider + CapabilityMinter — scoped tokens, not master keys | trust | EXISTS / **NEW** |
-| DNA — *what the organism is* | **Composition Hash** — model+tools+policy+prompt identity | trust | **NEW** (§3.2) |
+| DNA — *what the organism is* | **four-level identity** — Principal / Capsule / Composition / Execution (§3.2) | trust | **NEW** |
+| Constitution / genome constraints | **Personal Constitution** — hard rules the cortex cannot rewrite | trust | **NEW** (§3.0) |
+| Cerebellum / immune sensing | **HAL / validators** — detect error, verify outcome; **report, never decide** | evidence | EXISTS |
 | Innate immunity (always-on, fast) | deterministic fail-closed guardrails, **no LLM in the path** | trust | **PARTIAL** |
 | Adaptive immunity (learned) | redteam antibodies — a survived attack becomes a permanent probe | trust | EXISTS |
 | Antibody | a mutation-tested probe | trust | EXISTS |
@@ -151,11 +232,34 @@ biology's words.
 
 ---
 
-## 3. The three priority primitives
+## 3. The priority primitives
 
-The vision named three primitives to build first. They are the correct three, and
-they are ordered: the Envelope is the boundary, the Capsule is the thing that
-crosses it, and the Receipt is the record that turns crossings into reputation.
+The first Grok/Chat pass named three primitives; v3 prepends a fourth as **#0**,
+because the Envelope has to enforce *something*. Ordered: the **Constitution** is
+what the kernel protects, the **Envelope** is the boundary, **identity** is what
+crosses it, and the **Receipt/evidence** is the record that turns crossings into
+reputation.
+
+### 3.0 Personal Constitution — the fences the kernel protects (primitive #0)
+
+Grok's plan carries a "sovereign dial + standards hash"; Chat promotes it, and v3
+makes it primitive #0 because *the Envelope's whole job is to enforce a set of
+invariants, and those invariants need a home.* Two layers:
+
+- **Hard / constitutional** — the PAI/agents *cannot* modify these, and no volume of
+  successful outcomes can "optimize" them away: never reveal credentials; never
+  spend over the user's cap without approval; medical/`SECRET` data stays local;
+  never permanently delete without approval; never impersonate the user; never
+  change the RepID algorithm silently; never edit the Constitution itself.
+- **Soft / preference** — the PAI *may* learn these: prefer open-source/local models,
+  concise emails, stronger models for architecture, privacy over a 10% latency win.
+
+The hard layer is signed and content-hashed (`constitution-v17 → 0x81D…`); a change
+requires explicit user authorization and mints a new signed version. **Every Trust
+Receipt (§3.3) records which constitution hash governed the action** — that is the
+accountability property that makes "the agent could not have done X" checkable after
+the fact. Codebase: **NEW**. It maps onto the existing fail-closed posture: the
+Constitution is just the deterministic policy's top-priority, user-owned rule set.
 
 ### 3.1 Trust/Action Envelope — the disposition boundary
 
@@ -165,22 +269,50 @@ crosses it, and the Receipt is the record that turns crossings into reputation.
 > own validation section lists *TEE oracles* — and shipping a second "TEE" guarantees
 > a confused threat model. The renamed thing is unambiguous.
 
-A normalized, pre-execution struct for *every* proposed action — `{principal,
-capability, tool, args, context-refs, prior-action-refs, requested-scope}` — handed
-to the PolicyEngine, which returns exactly one of **ALLOW / DENY / ASK / VERIFY**.
-`ASK` routes to an approver; `VERIFY` routes to a VerificationProvider (HAL) before
-the action is allowed to proceed. This is the single chokepoint that makes "models
-propose, TrustShell disposes" concrete: the model never calls a tool directly, it
-*proposes an Envelope*. Codebase: **NEW** — but it slots directly onto the existing
-fail-closed `/pay` pattern (null threshold → 503) generalized from payments to all
-actions.
+A normalized, pre-execution struct for *every* proposed action — `{request_id,
+principal, capsule_id, composition_id, constitution_hash, capability, tool,
+args_hash, context-refs, prior-action-refs, requested-scope, data_classification,
+risk_class, reversibility, financial_exposure, max_cost, required_rep,
+required_evidence, policy_version, expiry, nonce}` — handed to the PolicyEngine,
+which returns exactly one of **ALLOW / DENY / ASK / VERIFY**. `ASK` routes to an
+approver; `VERIFY` *requests evidence* from a VerificationProvider (HAL) and returns
+to policy for the decision (§2.1 refinement (a) — HAL never executes). This is the
+single chokepoint that makes "models propose, TrustShell disposes" concrete: the
+model never calls a tool directly, it *proposes an Envelope*, and the LLM's output
+is thereby **untrusted input to a deterministic gate**.
 
-### 3.2 Agent Capsule + Composition Hash — and the live over-crediting gap
+The Envelope and its resulting Receipt (§3.3) share the same field set, so the pair
+forms a **proof-carrying request → proof-carrying receipt** that can travel across
+MCP / A2A / REST / x402 / local processes unchanged — a naming/schema discipline, no
+new build. Codebase: **NEW** — but it slots directly onto the existing fail-closed
+`/pay` pattern (null threshold → 503) generalized from payments to all actions. It
+is the academic *schema-gated orchestration* pattern (§4): planning free, execution
+validated against a machine-checkable schema.
 
-An **Agent Capsule** packages *what an agent is* — its model, tools, policies,
-skills, and memory-scope — as a resolvable unit (OASF as the vocabulary, `.skill`
-as the on-disk form). Its **Composition Hash** is the content hash of that bundle:
-change the model, and the hash changes.
+### 3.2 Four-level identity + Agent Capsule — and the live over-crediting gap
+
+**Refinement (c) — one composition hash is too coarse; use four levels.** v2 bound
+reputation to a single Composition Hash. Chat's correction is strictly better and
+solves the brittleness (a model swap should neither be ignored nor zero out a hard-
+earned score). Four identities:
+
+| level | answers | lifetime | example |
+|---|---|---|---|
+| **Principal ID** | who is this? | persistent | `agent://sean/builder` |
+| **Capsule ID** | what role/contract? | persistent across compatible builds | `Builder Capsule v4` |
+| **Composition ID** | what exactly is running? | immutable per build | Merkle hash of {model, system prompt, skills, tools, MCPs, policy, HAL config, memory modules, sandbox, deps, versions} |
+| **Execution ID** | which run did this? | ephemeral | `task-exec #93AE…` |
+
+Reputation becomes **hierarchical** — `Principal → Capsule → {Composition A, B, C} ×
+domain` — which lets a change **inherit reputation with a confidence discount**
+instead of transferring blindly or resetting. Swap Claude→Qwen only: maybe
+`942 × 0.85`. Swap model **and** disable HAL **and** add an unknown MCP **and** grant
+unrestricted shell: `942 × 0.15`. Over time the system *learns empirically* which
+component changes move reliability (changing the summarizer barely matters; changing
+the financial-calc tool matters a lot) — reputation *lineage*, analogous to software
+provenance (AIBOM, §4). An **Agent Capsule** is the on-disk manifest carrying all
+four IDs (OASF as the vocabulary, `.skill` as the on-disk form); its Composition ID
+is the content hash of the bundle.
 
 **Correction — this is not a nice-to-have; it closes a gap that is live today.**
 [MEASURED 2026-09-02 against `repid_agents`/`repid_scores`/`repid_zkp_proofs`]:
@@ -202,26 +334,60 @@ RepID-920 agent is trusted for what a *previous composition* earned.
 
 This is **structurally the same defect as `ANCHOR-001`** — an attestation that
 binds to an identity instead of to the actual artifact. So the fix is one primitive,
-not two: make the Composition Hash a first-class input to reputation, so a score is
-a claim about *this composition in this domain*, and a model-swap forces
-re-earning (or at minimum a disclosed, decayed carry-over). This turns the vision's
-Composition Hash from "a good idea others are exploring" into "the remediation for a
-gap we can measure in our own database right now." Codebase: **NEW**; ANCHOR-001 is
-the ledgered wedge.
+not two: make the **Composition ID** a first-class input to reputation, so a score
+is a claim about *this composition in this domain*, and a model-swap inherits with a
+confidence discount (above) rather than riding along at full value. This turns the
+vision's composition identity from "a good idea others are exploring" into "the
+remediation for a gap we can measure in our own database right now." Codebase:
+**NEW**; ANCHOR-001 is the ledgered wedge.
 
-### 3.3 Trust Receipt → HAL → zkRepID flywheel
+### 3.3 Trust Receipt = canonical evidence → Trust Lenses → HAL → zkRepID flywheel
 
-Every disposition emits a **universal Trust Receipt**: `{policy-version, Envelope,
-verdict, verifier-evidence, RepID-at-time, composition-hash}`, hash-chained into
-HyperDAG and EAS-anchored when consequential. Receipts are the input to HAL (which
-verifies the claims), and HAL's verified verdicts move zkRepID (which updates earned
-autonomy), which changes the next disposition. That is the flywheel: **use →
-receipt → verification → reputation → more (or less) autonomy → use.** It is also
-why HAL is a *marketplace* interface, not a single verifier: any staked verifier
-that can produce receipt-checkable evidence can compete to verify, and the
-reputation of *verifiers* is itself earned. Codebase: EAS anchoring **EXISTS**, HAL
-**EXISTS**, RepID **EXISTS**; the **receipt schema binding them is NEW** and is the
-highest-leverage small piece — it is the `AttestationSink` the whole loop turns on.
+Every disposition emits a **universal Trust Receipt**: `{who, for-whom, what,
+with-what (model+tools+MCPs), under-what-authority (capability grants +
+constitution_hash), cost, evidence (input/output hashes), verification (HAL
+results), outcome, rep-effect, composition_id, timestamps, parent-task}`, hash-
+chained into HyperDAG and EAS-anchored when consequential. It is the equivalent of a
+browser's HTTPS lock icon: the private payload stays private; only proofs or selected
+receipts are exposed.
+
+**Refinement (b) — separate canonical evidence from the scoring algorithm.** This is
+the single strongest idea in the second pass, and it is cheap in principle. Do **not**
+make zkRepID one hardcoded scoring function over the receipts. Make the receipts a
+**canonical evidence store** (outcomes, failures, abstentions, HAL results, disputes,
+payments, validators, compositions, timestamps), and make scoring a set of
+**versioned, pluggable Trust Lenses**:
+
+```
+   EVIDENCE (canonical, append-only)
+        │
+        ├── Lens: repid-standard-2.3   → score
+        ├── Lens: corporate-security    → score   (weights security higher)
+        └── Lens: user-defined          → score   (church weights stewardship;
+                                                    dev weights SWE-bench competence)
+```
+
+Evidence is the truth; scores are *interpretations*. This buys three things at once:
+you can change weights / decay / Bayesian model / EigenTrust / collusion penalties
+**without rewriting history**; different parties can apply their own trust model to
+**shared, compatible evidence** (directly aligned with the portability thesis); and
+zkRepID then proves a precise, algorithm-versioned claim — *"under lens
+`repid-standard-2.3`, evidence through 2026-09-02, domain `software.security`, capsule
+`Builder`: `reputation ≥ 900 ∧ verified_jobs ≥ 100 ∧ severe_failures = 0`"* — without
+exposing the underlying graph. Reputation becomes **portable + inspectable +
+algorithm-versioned + privacy-preserving**, which is far more defensible than one
+opaque proprietary number.
+
+That is the flywheel: **use → receipt (evidence) → verification → lens → reputation →
+more (or less) autonomy → use.** HAL stays a *marketplace* interface (any staked
+validator that produces receipt-checkable evidence can compete; validator reputation
+is itself earned), and — per §2.1(a) — HAL feeds the evidence store, it does not
+score. Codebase: EAS anchoring **EXISTS**, HAL **EXISTS**, RepID **EXISTS** (as one
+lens, keyed to identity+domain — the §3.2 gap); the **canonical-evidence receipt
+schema + the evidence/lens split is NEW** and is the highest-leverage small piece,
+because *the one thing you cannot retroactively manufacture is real historical
+evidence* — every day the kernel runs without structured receipts is reputation data
+permanently lost. Start collecting receipts before building the lenses.
 
 ---
 
@@ -291,6 +457,13 @@ folded in.
   bridging to other meshes. **SPIFFE/SPIRE (short-lived auto-rotated SVIDs) + OpenBao
   (dynamic auto-revoked secrets)** `[F]` → the reference **CapabilityMinter** driver:
   mint scoped short-lived tokens, never hand out a master credential.
+- **Attenuable capability tokens: Eclipse Biscuit / UCAN** `[K]` → **PROTOTYPE one (not
+  both), don't invent the crypto.** Both give publicly-verifiable, offline-attenuable
+  authority chains — an agent can *narrow* a token but never widen it (`Human →
+  PAI → Builder → research-subagent`, rights only shrink down the tree). That
+  monotonic-attenuation property is exactly the swarm-delegation guarantee the
+  CapabilityMinter needs; fold the prototype into Trust-Keys work (§6), pick one when
+  we get there.
 
 ### PaymentRail (interface 6)
 - **x402** `[F]` — open, HTTP-native (402), chain-agnostic (CAIP-2), now under the
@@ -299,6 +472,12 @@ folded in.
   **x402 behind a capability** = the vision's "Proof of Economic Work."
 - **x402 session spending-caps (max-spend + expiry, checked before signing)** `[F]` →
   **ADOPT** (design now; enforce when real spend flows).
+- **Higher-value job escrow: ERC-8183** `[K]` — a Feb-2026 *Draft* proposal for agentic
+  job escrow (funded job → provider submits → evaluator completes/rejects →
+  release/refund), explicitly compatible with ERC-8004 reputation. → **INTEGRATE later
+  as a separate escrow adapter**, not foundation: x402 = fast payment *transport* for
+  cent-scale calls; escrow + HAL-evaluator + dispute path for `$500`+ jobs. Draft, so
+  adapter-isolated like ERC-8004.
 
 ### AuditLedger + AttestationSink (interfaces 7, 8)
 - **Decision-BOM (policy-version + request + verdict, tamper-evident)** `[F]` →
@@ -334,6 +513,21 @@ folded in.
 - **Schema-gated orchestration ("talk freely, execute strictly")** `[F]` (arXiv) →
   **ADOPT as the Envelope's shape** — planning stays open reasoning; *nothing
   executes without schema validation.* This is the academic statement of §3.1.
+
+### Component / MCP supply-chain manifest (cross-cutting) — the incident-tied near-term ADD
+If everything is a swappable driver, then **the adapters are the attack surface.**
+Every MCP / plugin / skill / model / tool / container / capsule should carry a
+**Component Manifest**: publisher, version, source, hash/signature, permissions
+requested, network/filesystem/secrets access, dependencies, SBOM, last security scan,
+RepID, prior incidents. The Composition ID (§3.2) then becomes a **Merkle tree over
+trusted components**, and component reputation becomes its own eventual RepID market
+(reputation for MCPs/skills/tools, not just agents). → **ADOPT now, cheaply**, using
+**in-toto** (verifiable supply-chain attestations) and **SLSA** provenance `[K]` as
+adapters rather than inventing the format. This is the one item both the second-pass
+and the operational read independently flag as *build-now*, because it maps directly
+to the **#57 leaked-JWT incident** — a manifest with "secrets requested / last scan"
+would have scoped that faster — and it belongs **inside Trust-Keys work** (§6), which
+the ratified sequence already puts first.
 
 ### Skip (not our surface)
 Token vault / KMS as a product, shadow-AI discovery, compliance dashboards,
@@ -384,33 +578,61 @@ mutant is exactly that defect wearing an architecture diagram.
 ## 6. Ship now vs. ship before scale
 
 ### Ship NOW (thin, verifiable by simulation, no users required)
+0. **Personal Constitution + trust invariants** (§3.0) — the hard fences the kernel
+   protects. Tiny, and it defines *what* everything below enforces, so it comes first.
 1. **Trust/Action Envelope + out-of-agent PDP (Cedar, default-deny)** + deterministic
    fail-closed tool-gate wired to x402 (unpaid → block) and RepID (below threshold →
-   block). Mutation-test that it fails closed. *(kernel core — do this first)*
-2. **Universal Trust Receipt schema** → HyperDAG writer (+ EAS when consequential).
-   *(the AttestationSink; unlocks the §3.3 flywheel)*
-3. **`trustshell sim` harness + `check:sim-gate-hold`** (§7) — the engine that makes
+   block), with **HAL as evidence-provider only** (§2.1(a)). Mutation-test that it
+   fails closed. *(kernel core — do this first)*
+2. **Canonical-evidence Trust Receipt schema** (§3.3) → HyperDAG writer (+ EAS when
+   consequential). Store *evidence*, not a score — the lenses come later, but the
+   evidence must start accruing on day one. *(the AttestationSink; unlocks the flywheel)*
+3. **Component / MCP manifest** (§4) — publisher/version/hash/permissions/last-scan per
+   adapter; ties to Trust-Keys, maps to the #57 incident. *(cheap, incident-tied)*
+4. **`trustshell sim` harness + `check:sim-gate-hold`** (§7) — the engine that makes
    every later interface provable. *(highest leverage)*
-4. **Composition Hash as a reputation input** — close the §3.2 over-crediting gap;
-   ANCHOR-001 is the wedge.
-5. **`.skill` / Agent Capsule packaging + 3-level loader** for one capability (HAL)
+5. **Four-level identity + Composition ID as a reputation input** — close the §3.2
+   over-crediting gap with inheritance discount; ANCHOR-001 is the wedge.
+6. **`.skill` / Agent Capsule packaging + 3-level loader** for one capability (HAL)
    end-to-end, OASF vocabulary, fail-closed resolution.
-6. **`ROUTER-001`** — prove the optimization-plane router cannot write the trust plane.
-7. **Recovery-ledger + graph-cost-out driver** in ReliabilityKernel.
-8. **MCP tool-poisoning scanner** — extend `MCP-001` (manifest drift / typosquat /
+7. **`ROUTER-001`** — prove the optimization-plane router cannot write the trust plane.
+8. **Recovery-ledger + graph-cost-out driver** in ReliabilityKernel.
+9. **MCP tool-poisoning scanner** — extend `MCP-001` (manifest drift / typosquat /
    hidden-instruction / token-passthrough).
-9. **Kill switch + circuit-breaker SLOs** (revocation flag + error budget) — the
-   apoptosis mechanism.
+10. **Kill switch + circuit-breaker SLOs** (revocation flag + error budget) — apoptosis.
 
 ### Ship BEFORE scale (design now, activate on users/traffic/infra)
+- **Trust Lens marketplace** (§3.3) — the second+ scoring lenses; the evidence store
+  ships now, the pluggable algorithms wait until there's evidence to interpret.
 - **Temporal/session policy activation** (needs real session traffic to tune).
-- **CapabilityMinter on live secrets** (SPIFFE/OpenBao — needs real credential flows).
+- **CapabilityMinter on live secrets** (SPIFFE/OpenBao + a Biscuit/UCAN prototype —
+  needs real credential flows).
 - **Compartmentalized MemoryStore hardening** (needs real retrieval traffic to attack).
-- **DID/SPIFFE identity interop** and the **ERC-8004 external adapter** (needs
-  cross-venue agents; keep the Draft ERC adapter-isolated).
-- **BFT quorum activation** (code-complete, blocked on traffic — `TRUST-HARNESS-STATUS`).
+- **DID/SPIFFE identity interop**, the **ERC-8004 external adapter**, and the
+  **ERC-8183 escrow adapter** (needs cross-venue agents / high-value jobs; keep both
+  Draft ERCs adapter-isolated).
+- **2-D RepID with uncertainty intervals** (§9) — `950 ± 12` on 3 jobs ≠ `930 ± 3` on
+  8,000; make evidence-coverage first-class once there is enough evidence to have an
+  interval.
+- **Governance counterfactual-replay** — never vote a scoring-lens change without
+  replaying historical receipts through it first.
+- **Local Safe Mode** — identity/constitution/policy/secrets/receipts survive when
+  AWS/OpenAI/Supabase are unreachable; external actions fail-closed or queue.
+- **BFT quorum activation** (code-complete, blocked on traffic — `TRUST-HARNESS-STATUS`;
+  live 0 rows, §1.5).
 - **x402 session spending-cap enforcement** (enforce when real spend flows).
 - **A hardened sandbox** — only if/when untrusted agent-authored code runs at scale.
+
+### Explicitly NOT now (logged, not built)
+- **Restructuring the live 12-agent Trinity topology into "3+1 + JIT specialists."**
+  3+1 (PAI + Builder + Seller + Operator, as *capsules* not personalities) is the
+  right *product* model for the eventual PAI, but rewiring the running fleet mid-dark
+  (§1.5: 0/12 live) is sequencing risk with no upside now. The capsule model is a
+  design target; the fleet stays as-is until Sean says otherwise.
+- **The full 20-primitive roadmap** (Trust-Lens marketplace, ZK selective disclosure,
+  escrow, governance replay, reflex/verify/human paths — the last already exists as
+  `TOOL_ROUTING_MATRIX_V0`). Good thinking; not a next sprint against three
+  Sean/traffic-gated fires.
 
 ---
 
@@ -475,43 +697,72 @@ boundary, build the reputation.**
 
 ## 9. The corrections to the vision (summary)
 
-The vision is a genuine step-change over v1's framing; these four are where building
-"the best version" means *improving* it, not just adopting it:
+The visions are genuine step-changes; these are where building "the best version"
+means *improving* on them, not just adopting them. The first four are v2's; 5–8 are
+the v3 refinements from the second Grok/Chat pass; 9–10 are where v3 pushes back.
 
 1. **Rename Trust Execution Envelope → Trust/Action Envelope.** "TEE" collides with
    *Trusted Execution Environment*, which appears in ERC-8004's own validation section
    — a guaranteed confused threat model. (§3.1)
-2. **The Composition Hash closes a gap we can measure today.** [MEASURED 2026-09-02]
+2. **Composition identity closes a gap we can measure today.** [MEASURED 2026-09-02]
    no reputation column binds the agent's *composition* — its hash-shaped columns bind
    transactions, proof leaves, work statements, and anchoring, and its `capabilities`/
    `byok_provider` descriptors are neither content hashes nor score keys — so a
-   model-swap is over-credited *now*. It is the same defect as `ANCHOR-001` (bind to
-   the artifact, not the identity), so it is one primitive, not two. (§3.2)
+   model-swap is over-credited *now*. Same defect as `ANCHOR-001`. (§3.2)
 3. **"Optimization plane ≠ trust plane" is a buildable antibody, `ROUTER-001`, not a
    principle.** The learning router must be *structurally unable* to write the trust
-   plane, and that must be mutation-tested, or "models propose, TrustShell disposes"
-   is a slogan. (§2.1, §7.3)
+   plane, mutation-tested. (§2.1, §7.3)
 4. **The real risk is a 14-interface kernel with nothing proven fail-closed.** Smallest
    viable kernel first; one reference driver per interface; no interface ships without
    its adversarial sim + mutant. (§5)
+5. **HAL sits outside the trusted computing base.** HAL is probabilistic → it reports
+   evidence (confidence, agreement); deterministic policy decides. Putting HAL in the
+   authority path is the same failure as letting the router write the trust plane. (§2.1(a))
+6. **Separate canonical evidence from the scoring algorithm** (Trust Lenses). Store
+   evidence once; make scoring versioned + pluggable; prove algorithm-versioned claims.
+   Change weights without rewriting history; different parties, same evidence. (§3.3)
+7. **Four-level identity + inheritance discount** beats a single composition hash —
+   reputation transfers with a confidence discount instead of blindly or resetting. (§3.2)
+8. **Personal Constitution as primitive #0.** Hard rules the cortex cannot rewrite;
+   recorded in every receipt. The Envelope needs something to enforce. (§3.0)
+9. **Do not restructure the live 12-agent topology now.** 3+1 + JIT is the right
+   *capsule* model, not a reason to rewire a running (currently dark, §1.5) fleet.
+10. **Claim-gate the ERC-8004 "dead endpoints / Sybil-shaped" line.** Unsourced; the
+    standards pass found only "Draft with live deployments." Out of every doc until
+    cited (§1.5). The architectural lesson (8004 as public adapter) stands regardless.
 
 ---
 
 ## 10. Sequenced first PRs (all in-lane, verifiable, no merge-to-main without Sean)
 
+The ordering change from v2 is **collect evidence as early as possible** — the one
+thing that cannot be manufactured retroactively (§3.3).
+
 1. `docs/` (this doc) — the strategy of record. *(this PR)*
-2. **Trust/Action Envelope + PDP (Cedar) + fail-closed tool-gate** + its mutant — the
-   kernel core.
-3. **Universal Trust Receipt schema** → HyperDAG writer (+ EAS). *(unlocks the flywheel)*
-4. **`trustshell sim` harness + `check:sim-gate-hold`** — the measurement engine.
-5. **Composition Hash as a reputation input** (close §3.2; ANCHOR-001 is the wedge).
-6. **`ROUTER-001`** plane-separation antibody.
-7. **Agent Capsule `.skill` packaging** for HAL end-to-end (OASF vocabulary).
-8. **Recovery-ledger + graph-cost-out resolver**; extend **`MCP-001`** → tool-poisoning.
+2. **Personal Constitution + trust invariants** (§3.0) — the fences, defined first.
+3. **Trust/Action Envelope + PDP (Cedar) + fail-closed tool-gate, HAL-as-evidence**
+   + its mutant — the kernel core, one real gated action path.
+4. **Canonical-evidence Trust Receipt schema** → HyperDAG writer (+ EAS). Evidence,
+   not scores — start it accruing now.
+5. **Component / MCP manifest** (in-toto/SLSA) — folds into Trust-Keys; #57-tied.
+6. **`trustshell sim` harness + `check:sim-gate-hold`** — the measurement engine.
+7. **Four-level identity + Composition ID as a reputation input** (close §3.2).
+8. **`ROUTER-001`** plane-separation antibody.
+9. **Agent Capsule `.skill` packaging** for HAL end-to-end (OASF vocabulary).
+10. **Recovery-ledger + graph-cost-out resolver**; extend **`MCP-001`** → tool-poisoning.
+
+**Sequencing note — this slots INTO the ratified plan, it does not replace it.** The
+advise-only read cites a ratified order (`CONSOLIDATED_BUILD_PLAN_2026-07-28`:
+Trust-Keys custody → Meta-Agent MVP → unfreeze #59 → mobile). I have **not
+re-verified that plan this session** [not checked] — so before building, Sean should
+confirm whether Trust-Keys is still #1. If it is, items 2/3/5 (Constitution,
+capability-minting, component manifest) *are* Trust-Keys work and lead; the rest
+follow. The kernel core does not jump the custody queue.
 
 **Sean-gated:** activating any gate on live traffic, real x402 spend, CapabilityMinter
-on live secrets, DID/ERC-8004 interop, the fleet executor. Everything in 1–8 is
-buildable and provable against simulation without users.
+on live secrets, DID/ERC-8004/ERC-8183 interop, the fleet executor, and any change to
+the 12-agent topology. Everything in 1–10 is buildable and provable against simulation
+without users.
 
 ---
 
@@ -540,3 +791,19 @@ summarized.
 Nothing here is claimed as shipped that is not graded EXISTS in §1/§2.2; §3–§10 are
 proposals. This doc supersedes the v1 "thin JIT layer" framing of 2026-09-02 (same
 date) — the thin layer is retained as §5, correctly placed as distribution.
+
+**v3 provenance (2026-09-02).** v3 folds in a second Grok + Chat architecture pass
+plus one operational read from an advise-only Claude surface. The four schema-shaping
+refinements (§0 header: HAL-outside-TCB, evidence/lens split, four-level identity,
+Personal Constitution) and the component/MCP manifest are adopted; ten "someday"
+primitives are logged not built (§6); two vision points are pushed back on (§9.9–9.10).
+The **operational reality in §1.5 is [VERIFIED 2026-09-02, this session]** against live
+`qnnpjhlxljtqyigedwkb` via Supabase MCP — surface = cloud/scheduled, access = GitHub
+yes / Railway no / Supabase yes, preflight verdict GO. It corrects the advise-only
+read's fire list: the peer_verify backlog is drained (0 pending) and the ZKP emitter
+is a trickle (5/24h), not dark; ANFIS + BFT are dark and the fleet is 0/12 live, but
+all three are Sean/traffic-gated and none blocks the kernel contract. Where the vision
+docs and the database disagreed, the database won (per `trinity-preflight`). The one
+figure I could not source — ERC-8004 "dead endpoints / Sybil-shaped feedback" — is
+excluded per the claim gate. The ratified build sequence (`CONSOLIDATED_BUILD_PLAN`)
+is referenced but **not re-verified this session** and is flagged as such in §10.
