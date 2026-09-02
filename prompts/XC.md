@@ -124,7 +124,11 @@ may fix the missing thing without touching this file.
      unwired one, and `app/market/page.tsx` already reports it honestly.
    - **Stake — dormant, but not empty.** `stake_deposits` 52 rows, newest
      2026-08-08 (~25 days); `agent_stakes` 4; `repid_mvp_stakes` 5. NORTH-STAR
-     says "cut **or gate**"; the data supports gating, not deleting.
+     says "cut **or gate**"; the data supports gating, not deleting. This does
+     not reopen the `agent_kya_registry` ↔ `stake_deposits` join-key gap — that
+     is a separate, already-filed OPEN item (`agent_kya_registry.id` is bigint,
+     `stake_deposits.builder_id` is uuid, no bridging column) and is unaffected
+     by this row-count re-probe.
 
    **The near-miss is the part to carry.** The first pass measured
    `marketplace_listings`, `marketplace_offers` and `agent_listings` — all
