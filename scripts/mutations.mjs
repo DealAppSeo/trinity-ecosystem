@@ -3116,6 +3116,35 @@ export const MUTATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // scripts/redteam/evidence/dispute-pipeline-truth.json — DISPUTE-001.
+  //
+  // DISPUTE-001 HELDs today (the dispute/peer-verify mechanism is honestly
+  // dormant), so — unlike ANCHOR-001 / EVERGREEN-002, which BREACH-and-ledger —
+  // a CODE mutation that neuters detection would leave it HELD and unledgered and
+  // SURVIVE. Its detection is proven the way FLEET-001's is: inject the exact
+  // attack into the EVIDENCE and confirm the probe fires. This flips the
+  // reputation ledger's peer-verify event count from 0 to a positive number while
+  // every workflow table stays 0-in-30d — standing moved through a dispute/peer-
+  // verify path with no auditable filing. An intact DISPUTE-001 BREACHES (a new,
+  // unledgered finding -> check:redteam exit 1 -> CAUGHT); a probe whose
+  // fabricated-accountability detector was removed would not notice and SURVIVE,
+  // exposing the regression. The mutated JSON stays valid (5 is a number), so the
+  // mutant is a live attack, not an INVALID parse error.
+  // -------------------------------------------------------------------------
+  {
+    id: 'dispute-fabricated-accountability-undetected',
+    suite: 'check:redteam',
+    file: 'scripts/redteam/evidence/dispute-pipeline-truth.json',
+    protects:
+      'DISPUTE-001 actually fires when reputation is moved through a dispute/peer-verify path ' +
+      'that left no filing. Injecting peer-verify reputation events while every workflow table ' +
+      'is 0-in-30d must BREACH — so "peer verification affects standing" can never quietly come ' +
+      'to mean "standing changed and nothing recorded it"',
+    find: '"peer_verify_events": 0',
+    replace: '"peer_verify_events": 5',
+  },
+
+  // -------------------------------------------------------------------------
   // lib/trustshell/kernel — the trust microkernel core (KERNEL-001 / check:kernel-envelope)
   // -------------------------------------------------------------------------
   {
