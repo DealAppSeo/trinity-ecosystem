@@ -91,9 +91,9 @@ export default {
     const fleet = ev.observations?.fleet ?? {};
     const pipe = ev.observations?.zkRepID_pipeline ?? {};
     const readiness =
-      `readiness (NOT part of this verdict): fleet ${fleet.live ?? '?'}/${fleet.total ?? '?'} live; ` +
+      `readiness (NOT part of this verdict): fleet ${fleet.reachable ?? '?'}/${fleet.total ?? '?'} reachable but ${fleet.live ?? '?'}/${fleet.total ?? '?'} working (up-but-idle, not dead); ` +
       `zk queue pending ${pipe.queue_pending ?? '?'}, frozen ${pipe.pending_frozen_days ?? '?'}d. ` +
-      `A LIVE zk-backed loop needs both cleared; the discriminator invariant below holds independently.`;
+      `A LIVE zk-backed loop needs tasks fed + queue thawed; the discriminator invariant below holds independently.`;
 
     if (breaches.length > 0) {
       return breached(

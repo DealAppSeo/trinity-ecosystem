@@ -6,10 +6,13 @@
   "note": "Measured ground truth for whether the ecosystem can back a cross-agent validation verdict with a LIVE zkRepID proof from a LIVE agent. Read-only aggregate views; no agent ids or proof bytes stored here.",
   "observations": {
     "fleet": {
-      "source": "v_fleet_truth (recency-computed, never a status column)",
+      "source": "v_fleet_truth (recency-computed, never a status column) + agent_health_probes",
       "live": 0,
+      "reachable": 12,
       "total": 12,
-      "verdict": "T12 runtime fleet is DEAD — 0 of 12 live. No agent is currently doing runtime work to be validated, and none is available to validate a peer."
+      "liveness_signal_all": "probe_only",
+      "reconciliation_note": "Six sources give four different counts (12 / 12 / 0 / 0 / 2) because they measure different things — this is the months-old 'which row do I read' conflict. is_reachable=12/12 (health probe HTTP 200, ~4 min old) is what Railway/UptimeRobot see; is_live=0/12 requires a heartbeat OR work log inside 10 min, and heartbeat is ~46d stale while work logs are 22h-7d stale. Every row reads liveness_signal='probe_only'.",
+      "verdict": "T12 runtime fleet is UP BUT IDLE, not dead: 12/12 answer their health probe (running code 8.2.0-reflect-wired), 0/12 are producing work or heartbeating. No agent is currently doing runtime work to be validated — but the containers are running, so the unblock is feeding verifiable tasks, not resurrecting processes."
     },
     "zkRepID_integrity": {
       "source": "v_repid_zkp_proof_integrity",

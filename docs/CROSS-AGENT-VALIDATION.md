@@ -20,13 +20,23 @@ that any honest cross-validation design must sit on rather than wish away:
 
 | thing | measured | consequence |
 |---|---|---|
-| **T12 runtime fleet** | **0 of 12 live** (`v_fleet_truth`) | No runtime agent is producing work to validate, and none is available to validate a peer. T12 cross-validation is REVIVAL-design, not a live claim. |
+| **T12 runtime fleet** | **12/12 reachable, 0/12 working** (`agent_health_probes` + `v_fleet_truth`) | Containers are UP (health probe 200, ~4 min old, code `8.2.0-reflect-wired`) but IDLE — every row reads `liveness_signal='probe_only'`, heartbeat ~46d stale, work logs 22h–7d stale. **Not dead.** No agent is producing work to validate, but reviving the loop means **feeding tasks, not resurrecting processes.** |
 | **zkRepID proofs** | **22,356 real, 100% EAS-attested** (`plonky3_range_check`) + **56,823 stubs** flagged `is_real=false` (`sha256-stub`) | A real, on-chain-attested scheme exists to back a verdict — AND a large stub set that must never be cited. The discriminator (`is_real`) is the whole game. |
 | **zk pipeline** | **40,300 pending, frozen 32 days**; ~117 new proofs in 30d | The backing mechanism is real but STALLED. A LIVE zk-backed loop is precondition-blocked until the queue thaws. |
 
+**The fleet row is where "conflicting findings" come from, so read it precisely.**
+Six sources answer "how many T12 agents are live" with four different numbers —
+`agent_health_probes` OK <24h = **12**, `v_fleet_truth.is_reachable` = **12**,
+`v_fleet_truth.is_live` = **0**, `agent_heartbeat` <24h = **0**, `trinity_agent_logs`
+work <24h = **2**. None is lying; they measure different things (process responds
+vs. heartbeat vs. work-log recency). The honest one-liner: **all 12 are reachable,
+all 12 are idle.** Collapsing "reachable" into "live" is the exact defect this repo
+names; a dedicated fleet-truth probe that reports this three-way and BREACHES on the
+collapse is the antibody, tracked separately from this zkRepID-backing work.
+
 So: the invariant that makes zk-backing meaningful **holds** (XVAL-001 = HELD),
-the fleet is **dead**, and the pipeline is **frozen**. The design below is built
-to be honest about all three at once.
+the fleet is **up but idle** (reachable, not working), and the pipeline is
+**frozen**. The design below is built to be honest about all three at once.
 
 ---
 
@@ -98,17 +108,20 @@ never quietly come to mean "backed by a 2026-05 placeholder."
 - WIRED: the discriminator (real vs stub, attested vs not) is measurable now and
   gated by XVAL-001. A validator CAN, today, check whether a cited proof is real.
 - BLOCKED, on measured conditions, not on code:
-  - *fleet dead (0/12)* — there is no live agent whose standing needs proving to a
-    live peer. Reviving ≥1 agent is the unblock; it is a runtime/infra action,
-    Sean-gated per the executor's fences.
+  - *fleet idle (0/12 working, though 12/12 reachable)* — the containers are up,
+    but no agent is producing work whose standing needs proving to a peer. The
+    unblock is **feeding verifiable tasks**, not resurrecting processes — much
+    cheaper than the "revive a dead fleet" framing earlier drafts used. Dispatching
+    tasks that agents actually execute is a runtime action, Sean-gated per the
+    executor's fences.
   - *queue frozen (40,300 pending, 32d)* — NEW proofs are not flowing, so a
     freshly-earned verdict cannot get a fresh proof. Thawing the queue is the
     unblock.
 
 The design does not pretend around either. A claim that "cross-validation is
-operational and zk-backed" while the fleet is 0/12 or the queue is frozen is
-exactly the unearned-success defect this repo names — and it is the one XVAL-001's
-readiness line and this section exist to stop.
+operational and zk-backed" while the fleet is idle (0/12 working) or the queue is
+frozen is exactly the unearned-success defect this repo names — and it is the one
+XVAL-001's readiness line and this section exist to stop.
 
 ---
 
@@ -130,7 +143,7 @@ second (enforceable now, live once the fleet and queue clear).
 ## What this is NOT
 
 - Not a claim that T12 agents are currently validating each other — they are
-  0/12 live.
+  0/12 working (12/12 reachable, but idle).
 - Not a claim that verdicts are currently zk-backed end-to-end — the queue is
   frozen; only the discriminator that would make it trustworthy is live.
 - Not a new orchestration layer. It is criteria + backing bolted onto the lane
