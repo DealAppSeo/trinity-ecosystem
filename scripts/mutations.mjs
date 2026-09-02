@@ -3038,6 +3038,32 @@ export const MUTATIONS = [
     find: '      refusesToIssue({\n        providerAttempted: false,\n        vetoed: event.vetoed,\n      })',
     replace: '      false',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/mcp/fleet.ts — the MCP tool server's authority gate (MCP-001).
+  //
+  // The tool menu a principal is shown (toolsFor) and the tools it can actually
+  // run (executeTool's write gate) are computed in two places. MCP-001 pins them
+  // equal, so a caller can never run a mutating tool it was never advertised — the
+  // AI-Infra-Guard `mcp_tool_rug_pull` / `mcp_excessive_permissions` threat, on an
+  // endpoint holding the service key. This mutation removes the write gate: the
+  // write tools stay HIDDEN from the user's tools/list but become EXECUTABLE by a
+  // user, which is precisely the rug-pull the probe drives handleRpc to catch. It
+  // stays a valid, compiling program (a dead branch, not deleted code), so the
+  // runner scores it CAUGHT rather than INVALID.
+  // -------------------------------------------------------------------------
+  {
+    id: 'mcp-write-gate-removed',
+    suite: 'check:redteam',
+    file: 'lib/mcp/fleet.ts',
+    protects:
+      'a write tool is service-only on BOTH surfaces. Dropping the executeTool authority ' +
+      'check leaves register_node / heartbeat_node absent from the user menu yet runnable by ' +
+      'a user — a tool the client never approved mutating the fleet registry through the ' +
+      'service key. This is the MCP rug-pull MCP-001 exists to make impossible',
+    find: "  if (writeNames.has(name) && ctx.principal !== 'service') {",
+    replace: '  if (writeNames.has(name) && false) {',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

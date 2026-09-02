@@ -141,6 +141,38 @@ one:
 `/readiness` and `/bind` already pass this frame; it is written down here so the
 next endpoint does too.
 
+### For an MCP tool server, add these (folded in from AI-Infra-Guard `data/mcp/`)
+
+MCP's consent model is list-then-call: a client reads `tools/list`, a human or
+policy approves that menu, then calls tools. Every item below is a way the tool
+that *runs* diverges from the tool that was *approved* — the highest-severity
+category in `.claude/skills/*` (an unauthenticated or unapproved write channel
+into an agent loop), and one this ecosystem now has a live MCP server for
+(`lib/mcp/`, served at `app/api/mcp/fleet`).
+
+7. **Rug-pull / effective authority.** Is the set a principal is *shown*
+   (`tools/list`) exactly the set it can *run* (`tools/call` that reaches a
+   handler)? A tool executable but unadvertised is a hidden authority the client
+   never approved; a privileged tool must be off-limits on *both* surfaces, not
+   just hidden from the menu. **Enforced executably by `MCP-001`** — it drives the
+   real request path as both principals and BREACHES on any divergence, and the
+   mutation `mcp-write-gate-removed` proves the guard is not vacuous.
+8. **Tool poisoning / description injection.** A tool's `description` or schema is
+   itself model-visible text. Can it carry instructions (exfiltrate, call another
+   tool, ignore a policy) that the model acts on at call time?
+9. **Tool-result injection.** A tool RETURNS content into the model. Is that
+   content treated as data, or can it smuggle new instructions (item 4 of the base
+   checklist, applied to tool output specifically)?
+10. **Re-consent on change.** If a tool's name, description, or schema changes
+    after approval, is approval re-sought — or does the old consent silently cover
+    the new tool? (The static form of the rug-pull: pin the tool definition to
+    what was approved.)
+
+`app/api/mcp/fleet` passes 7 today (`MCP-001` HELD): writes are service-only on
+both surfaces, and unlisted names answer "Unknown tool" rather than dispatching.
+8–10 are design gates for the next tool added, and candidate probes as the surface
+grows (e.g. a tool whose description is assembled from evaluated content).
+
 ---
 
 ## Sequenced plan — what to do, in order
