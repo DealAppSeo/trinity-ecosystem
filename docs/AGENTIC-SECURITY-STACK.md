@@ -153,9 +153,12 @@ next endpoint does too.
    Run the managed path against `www.trustshell.dev` and the engine; each PoC
    becomes an evidence file + a probe here. Config and CI template staged in
    `scripts/redteam/tools/strix.md`.
-3. **Wire Strix diff-mode into CI (needs the STRIX_API_KEY secret).** The
-   workflow template is staged and disabled; enable it once the secret exists so
-   every PR gets a security diff-review at the charter's evidence bar.
+3. **PR review is LIVE via the GitHub App — no workflow needed** [MEASURED
+   2026-09-02: `strix-security[bot]` reviewed `#158` and returned "No security
+   issues found"]. The staged `.github/workflows/strix-diff.yml` template is the
+   SELF-HOSTED/CLI alternative only (needs `STRIX_API_KEY`), for running the
+   open-source CLI in CI alongside a probe-porting step — not required for basic
+   PR scanning.
 4. **smolagents principles as gates, not a dependency.** The effective-authority
    checklist above is item one; the PoC bar is the report template for the ledger.
 
@@ -166,8 +169,10 @@ CI secret. Everything in step 1 is live in this PR.
 
 ## What this is NOT
 
-- Not a claim that TrustShell currently passes ABC, resists all prompt
-  injection, or has been Strix-tested. Those are the work, not the status.
+- Not a claim that TrustShell currently passes ABC or resists all prompt
+  injection — those are the work, not the status. (Strix's GitHub App HAS now
+  reviewed one trinity-ecosystem PR clean, 2026-09-02; that is one automated
+  diff review, not a full-surface pentest.)
 - Not an install. `npx skills add usestrix/strix` and the managed run are yours
   to trigger with your account; this PR only stages the ground.
 - Not a replacement for the charter or the ledger — it points at them. They are

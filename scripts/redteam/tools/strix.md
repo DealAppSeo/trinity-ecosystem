@@ -70,11 +70,21 @@ npx skills add usestrix/strix
 A server that fails to connect is skipped without failing the run; point Strix
 at a different file with `STRIX_MCP_CONFIG`.
 
-**CI template — staged and OFF until the secret exists.** Do not commit this
-live: it needs a repository secret `STRIX_API_KEY` (Settings → Secrets and
-variables → **Actions**, not Variables — see `CLAUDE.md` § CI), and a workflow
-that runs Strix on every PR against an empty secret fails every PR. Enable it by
-adding the secret, then dropping this in as `.github/workflows/strix-diff.yml`:
+**PR review is ALREADY LIVE via the GitHub App — you do NOT need a workflow for
+it** [MEASURED 2026-09-02]. Once `strix cloud integrations install github` is
+done, `strix-security[bot]` posts an automated security review on each PR by
+itself: it reviewed `trinity-ecosystem#158` and returned *"No security issues
+found"* with no workflow file and no repo secret. Prefer that path; it is
+least-privilege (a per-repo App install), needs no `STRIX_API_KEY` in CI, and is
+what this repo now runs.
+
+**CI template — the SELF-HOSTED / CLI alternative, staged and OFF.** Use this only
+if you want the open-source CLI in your own CI instead of (or alongside) the App —
+e.g. to run a probe-porting step in the same job. It needs a repository secret
+`STRIX_API_KEY` (Settings → Secrets and variables → **Actions**, not Variables —
+see `CLAUDE.md` § CI); a workflow that runs Strix against an empty secret fails
+every PR, so keep it off until the secret exists, then drop it in as
+`.github/workflows/strix-diff.yml`:
 
 ```yaml
 # .github/workflows/strix-diff.yml  — ENABLE ONLY AFTER STRIX_API_KEY EXISTS
