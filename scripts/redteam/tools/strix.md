@@ -113,6 +113,8 @@ The `|| true` is deliberate: Strix findings are **collector output**, not a
 verdict (charter §1). They land as evidence + a probe here; a probe going
 BREACHED is what fails CI, not Strix's own severity.
 
+**Before you enable ANY workflow in this repo, read two OPEN index items** — adding a `.github/workflows/*` file here has bitten twice: the repo's Actions approval gate holds **bot-attributed** runs as `action_required` (created, never started — silent), and there is an unexplained gap where `pull_request` runs stopped being created for some pushes. A Strix autofix PR is bot-authored, so it will hit the first one. Neither is a reason not to add the workflow; they are reasons to expect a manual `workflow_dispatch` may be needed and to not read a missing run as a pass. See `docs/PRIOR-WORK-INDEX.md` (OPEN): *Repo Actions approval gate holds bot-attributed runs* and *Why pull_request runs stopped for User-attributed pushes after 16:28*.
+
 So Strix is run **by an operator (managed or local), or an external agent with
 Docker and egress** — and its output is fed back here through the loop below.
 
