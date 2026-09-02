@@ -1,0 +1,49 @@
+{
+  "surface": "T12 runtime fleet — liveness reconciliation, judged from the CANONICAL instrument v_agent_state",
+  "collectedAt": "2026-09-02T07:21:00.000Z",
+  "collectedBy": "claude-code session claude/hal-accuracy-rate-limits",
+  "collectedVia": "Supabase MCP execute_sql against project qnnpjhlxljtqyigedwkb (v_agent_state canonical; v_fleet_truth / agent_health_probes / agent_heartbeat / trinity_agent_logs for the source-divergence table)",
+  "priorWork": "Builds on PRIOR-WORK-INDEX 'HAL volume stopped 2026-07-17 — the fleet is NOT down; it is UP AND IDLE' (slug hal-volume-stopped-2026-07-17, owner T12). That entry ROOT-CAUSED the idleness (task pipeline stopped 2026-07-18; heartbeat writes removed 2026-07-17 so v_fleet_truth.is_live is a FALSE NEGATIVE) and named the canonical instrument v_agent_state, saying explicitly: do NOT read v_fleet_truth for liveness. This evidence honours that — the verdict is read from v_agent_state; v_fleet_truth appears only in the divergence table as one of the sources that MISLEADS.",
+  "note": "The months-old 'depends what file/row you check' conflict, pinned. Six sources answer the SAME question with FOUR different numbers because they measure different things — but only ONE is canonical (v_agent_state, probe-fed, evidence-bearing). The rule this backs: a signal that is NOT the canonical instrument (a health probe, a removed heartbeat, a row count) must never be reported as liveness; and an agent holding no task (current_task_id null) is IDLE, never working. Read-only aggregate; no secrets.",
+  "observations": {
+    "canonical": {
+      "source": "v_agent_state (migration 20260827100500; state built from agent_health_probes loop_count/last_iteration_at/current_task_id, fed ~every 5 min)",
+      "states": { "working": 0, "idle": 12, "wedged": 0, "down": 0, "unknown": 0 },
+      "total": 12,
+      "all_idle_evidence": "loop advancing, no task held",
+      "all_current_task_id_null": true,
+      "loop_count_range": [5684, 5755],
+      "loop_count_note": "loop_count was ~1624 on 2026-08-27 and is ~5750 now — the loops have advanced continuously for 6 days; the fleet is unambiguously UP and LOOPING.",
+      "min_since_iteration_max": 2.5,
+      "one_liner": "12/12 idle: the loop is advancing (last iteration ~2 min ago, loop_count climbing) but every agent holds no task (current_task_id null). Up and looping, starving for tasks — proven at the mechanism level, not inferred."
+    },
+    "per_agent": {
+      "source": "v_agent_state",
+      "agents": [
+        { "agent_name": "trinity-apm",     "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5755, "current_task_id": null, "min_since_iter": 2.2 },
+        { "agent_name": "trinity-chesed",  "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5750, "current_task_id": null, "min_since_iter": 2.2 },
+        { "agent_name": "trinity-gcm",     "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5752, "current_task_id": null, "min_since_iter": 2.2 },
+        { "agent_name": "trinity-hdm",     "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5750, "current_task_id": null, "min_since_iter": 2.2 },
+        { "agent_name": "trinity-mel",     "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5684, "current_task_id": null, "min_since_iter": 2.5 },
+        { "agent_name": "trinity-nexus",   "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5751, "current_task_id": null, "min_since_iter": 2.2 },
+        { "agent_name": "trinity-orch",    "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5753, "current_task_id": null, "min_since_iter": 2.2 },
+        { "agent_name": "trinity-shofet",  "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5748, "current_task_id": null, "min_since_iter": 2.1 },
+        { "agent_name": "trinity-sophia",  "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5752, "current_task_id": null, "min_since_iter": 2.2 },
+        { "agent_name": "trinity-torch",   "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5746, "current_task_id": null, "min_since_iter": 2.1 },
+        { "agent_name": "trinity-veritas", "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5743, "current_task_id": null, "min_since_iter": 2.0 },
+        { "agent_name": "trinity-w3c",     "state": "idle", "evidence": "loop advancing, no task held", "loop_count": 5754, "current_task_id": null, "min_since_iter": 2.2 }
+      ]
+    },
+    "source_divergence": {
+      "note": "Same question, six sources, four counts — kept as the teaching artifact. Only v_agent_state is canonical; the rest each answer a narrower question, and v_fleet_truth.is_live is a KNOWN false negative (heartbeat removed 2026-07-17).",
+      "sources": [
+        { "source": "v_agent_state (canonical)",        "count": "12 idle / 0 working", "verdict": "AUTHORITATIVE — probe-fed, evidence-bearing, holds the task discriminator" },
+        { "source": "agent_health_probes ok < 24h",     "count": "12 reachable",        "verdict": "process answers a health check — what Railway/UptimeRobot see; not liveness" },
+        { "source": "v_fleet_truth.is_reachable",        "count": "12 reachable",        "verdict": "same reachability notion" },
+        { "source": "trinity_agent_logs work < 24h",     "count": "2 of 19",             "verdict": "wrote a log row recently; narrow and mixes non-T12 infra" },
+        { "source": "v_fleet_truth.is_live",             "count": "0",                   "verdict": "KNOWN FALSE NEGATIVE — ignores the probe, counts a removed heartbeat as death. Do NOT read for liveness." },
+        { "source": "agent_heartbeat < 24h / < 10m",     "count": "0",                   "verdict": "self-reported heartbeat, deliberately removed 2026-07-17 — absence of a signal you turned off is not evidence of absence" }
+      ]
+    }
+  }
+}
