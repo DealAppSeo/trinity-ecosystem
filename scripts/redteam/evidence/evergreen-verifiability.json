@@ -1,0 +1,51 @@
+{
+  "surface": "agent_evergreen — the 24 designed evergreen loop-tasks: do they claim more than they can show?",
+  "collectedAt": "2026-09-02T08:12:00.000Z",
+  "collectedBy": "claude-code session claude/hal-accuracy-rate-limits",
+  "collectedVia": "Supabase MCP execute_sql against project qnnpjhlxljtqyigedwkb (agent_evergreen)",
+  "priorWork": "Companion to FLEET-001 (docs/FLEET-TRUTH.md). The fleet is up-but-idle; agent_evergreen is where verifiable work would be fed. This judges whether the table reports work it cannot show — the 'verifiably being done, not theater' contract.",
+  "note": "Read-only aggregate + per-task self-consistency flags. The contract: a task is DONE only when it writes a fresh, independently-judgeable artifact to its output_location; a status column, a success_rate, or a quality score is NOT evidence of work. This evidence judges the in-table self-consistency (a success claim requires an actual run and a shown output); confirming the artifact at output_location is real is a deeper check named in the probe's recipe.",
+  "observations": {
+    "aggregate": {
+      "source": "agent_evergreen",
+      "rows_total": 24,
+      "status_active": 24,
+      "ever_ran": 0,
+      "success_rate_gt_0": 0,
+      "quality_scored": 0,
+      "has_output_preview": 0,
+      "has_output_location": 24,
+      "most_recent_run": null,
+      "verdict": "24 tasks all marked status='active', but 0 have EVER run (last_run NULL on all), 0 report success_rate>0, 0 carry an output preview. 'active' means ENABLED, not executing. The loop has never produced a verifiable output, so 'are its outputs real' is NOT YET CHECKABLE — and, honestly, NO row currently claims success it cannot show (nothing is theater yet because nothing has run)."
+    },
+    "per_task": {
+      "note": "agent.task -> output_location, with the two self-consistency flags. A row is INCONSISTENT (theater) if it claims success (success_rate>0 OR quality-scored OR has_preview) while ever_ran=false.",
+      "tasks": [
+        { "agent": "ANTIGRAV", "task": "micro_task_generation", "category": "support", "output_location": "task_chunks", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "ANTIGRAV", "task": "performance_optimization", "category": "optimization", "output_location": "perf_reports", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "ANTIGRAV", "task": "prototype_generation", "category": "development", "output_location": "/prototypes/", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "APM", "task": "build_in_public_posts", "category": "content", "output_location": "social_queue", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "APM", "task": "linkedin_content_drafts", "category": "content", "output_location": "content_drafts", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "APM", "task": "user_feedback_synthesis", "category": "research", "output_location": "feedback_insights", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "GCM", "task": "body_double_sessions", "category": "support", "output_location": "focus_sessions", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "GCM", "task": "energy_check_nudges", "category": "support", "output_location": "energy_log", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "GCM", "task": "habit_gamification", "category": "support", "output_location": "habit_streaks", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "HDM", "task": "arbitrage_monitoring", "category": "optimization", "output_location": "arbitrage_opportunities", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "HDM", "task": "daily_prioritization", "category": "optimization", "output_location": "trinity_tasks", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "HDM", "task": "velocity_audit", "category": "optimization", "output_location": "velocity_metrics", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "MEL", "task": "bug_triage_priority", "category": "development", "output_location": "bug_priority", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "MEL", "task": "code_review_suggestions", "category": "development", "output_location": "review_comments", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "MEL", "task": "documentation_updates", "category": "development", "output_location": "/docs/", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "NEXUS", "task": "api_health_monitoring", "category": "optimization", "output_location": "health_dashboard", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "NEXUS", "task": "integration_maintenance", "category": "development", "output_location": "integration_status", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "NEXUS", "task": "mcp_protocol_development", "category": "development", "output_location": "/mcp-server/", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "TORCH", "task": "competitor_monitoring", "category": "research", "output_location": "competitor_intel", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "TORCH", "task": "learning_loop_analysis", "category": "research", "output_location": "learning_insights", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "TORCH", "task": "zkp_repid_research", "category": "research", "output_location": "/research/zkp/", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "VERITAS", "task": "consensus_verification", "category": "validation", "output_location": "consensus_scores", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "VERITAS", "task": "hallucination_monitoring", "category": "validation", "output_location": "hallucination_log", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false },
+        { "agent": "VERITAS", "task": "output_validation", "category": "validation", "output_location": "validation_log", "status": "active", "success_rate": 0, "ever_ran": false, "has_preview": false }
+      ]
+    }
+  }
+}

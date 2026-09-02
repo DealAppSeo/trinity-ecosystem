@@ -112,10 +112,15 @@ part 1 shows lying. Each task must satisfy, and a probe must be able to check:
 4. **A trust/reputation output is backed by a real zk proof** (`is_real=true`,
    attested — `XVAL-001`), not a self-reported number.
 
-**PROPOSED probe `EVERGREEN-001`** (not built here): reads `agent_evergreen` and
-BREACHES if any row reports success without a corresponding fresh, judged artifact.
-Today it would report NOT_CHECKED (0/24 ever ran) with the collection recipe — an
-honest "the loop isn't running yet", not a green light.
+**BUILT — probe `EVERGREEN-001`** (`scripts/redteam/probes/evergreen-verifiability.mjs`):
+reads `agent_evergreen` and BREACHES if any task reports `success_rate>0` while it has
+never run (a score with no run) or shows no output (a success with nothing to point at).
+Today it lands **NOT_CHECKED** — 24/24 tasks marked `active`, 0 ever ran, so there is no
+output whose reality can be judged and, honestly, no row yet claims success it cannot
+show. It is **mutation-tested**: fabricating a `success_rate=0.95` on a never-run task
+flips it to BREACH / suite exit 1. It flips to HELD once tasks run and their claimed
+successes are shown — so the loop is guarded against theater from its first execution,
+not after someone notices.
 
 ### Gated (yours) vs not (mine)
 
