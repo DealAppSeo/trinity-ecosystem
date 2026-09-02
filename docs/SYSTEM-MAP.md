@@ -96,7 +96,7 @@ The other identity tables are **static / legacy** — do not mistake one for the
 | `agents` | 12 | 181d | legacy (the original T12 set) |
 | `agent_repid` | 87 | 88d | legacy RepID table, superseded |
 | `agent_kya_registry`, `kya_compliance_receipts`, `trustshell_agents`, `trustshell_agent_sbt` | 12 / 12 / 12 / 4 | 141–159d | static one-time records |
-| `human_agent_bindings` | **0** | never | **empty — see §8 (genuine gap candidate)** |
+| `human_agent_bindings` | **0** | never | functional but unexercised — see §7 (`/bind` works, signature-gated) |
 
 **Structural caveat:** these tables do **not** share a uniform join key (`agents`
 has no `agent_id`; `agent_kya_registry.id` is bigint vs uuid elsewhere), which is *why*
@@ -175,6 +175,7 @@ or you measured the wrong thing. **Check here before calling anything a gap.** [
 | "HAL is broken (only 11 rows/7d)" | idle-by-design; tracks *score-event* volume, calls real providers, wrote today. The 147k is the historical corpus. |
 | "79k proofs but 56k are stubs → the prover is faking it" | temporal split: stubs stopped 2026-06-07; recent proofs are all real plonky3. |
 | "REPID-ENG-001: the external score path is unauthenticated" | **CLOSED in production** — both paths now return 401 (auth added Sprint A8). The redteam evidence is stale; refresh it. |
+| "`human_agent_bindings`=0 → `/bind` is broken" | **not broken** — `POST /human/bind` [`repid-engine` `byok.ts:370`] authenticates the human principal, checks a signature via `bindOwnerToAgent`, and can be feature-flag-disabled (503). Full lifecycle exists (message→bind→delete) + a UI client. 0 rows = **functional but unexercised** (needs an authed human with a registered-wallet signature; wallet registration is optional/recent per `trustshell/docs/KNOWN-LIMITS.md`), not a dead-ended bridge. |
 
 ---
 
@@ -201,11 +202,7 @@ Each EXISTS + is WIRED + does NOT COMMUNICATE, and is not explained by §7.
    same window. Routing is unaffected (measurement-only), but the ANFIS-vs-static agreement
    corpus is frozen 11 days — env-disabled or a silently-swallowed insert. **Bridge:**
    find why the write stopped (env flag or the swallowed error); it's an observability loss.
-4. **`human_agent_bindings` = 0 ever.** The `/bind` claim surface exists and is wired
-   (engine `DELETE /human/bind/:agentId` etc.), but no human has ever bound to an agent.
-   **NOT yet fully classified** — verify whether the *bind* (not unbind) path works
-   end-to-end or is only recently shipped/never-exercised before calling it broken.
-5. **`agent_evergreen` never ran** (24 tasks, `last_run` NULL) — a *wired-but-dark* loop;
+4. **`agent_evergreen` never ran** (24 tasks, `last_run` NULL) — a *wired-but-dark* loop;
    the unblock is running the dispatcher (Sean-gated). `EVERGREEN-001` guards it.
 
 ---
