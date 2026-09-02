@@ -152,7 +152,7 @@ jobs:
       # once per run.
       - name: restore history scan state
         if: always() && github.event_name != 'pull_request'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .secret-history-state.json
           key: secret-history-${{ github.run_id }}-${{ github.run_attempt }}
@@ -167,7 +167,7 @@ jobs:
 
       - name: save history scan state
         if: always() && github.event_name != 'pull_request'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .secret-history-state.json
           key: secret-history-${{ github.run_id }}-${{ github.run_attempt }}
