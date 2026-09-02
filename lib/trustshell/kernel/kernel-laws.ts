@@ -10,17 +10,29 @@
 // supplied) constitution. (docs/TRUSTHARNESS-STRATEGY.md §3.0; the user's brief:
 // "Separate immutable Kernel Laws from the user's Personal Constitution".)
 //
-// WHY THESE FIVE. They are the invariants a compromised model must never be able
-// to reach past, and — crucially — each is expressed over the `capability` /
-// `tool` the action names, NOT over a self-attested risk field. `capability` is
-// exact-matched against the caller's minted grant (policy.ts), so it cannot be
-// lied about the way `financialExposure` or `reversibility` can; a Kernel Law is
-// therefore NON-EVADABLE by mis-declaration, which is the property that makes it
+// WHY THESE FIVE. Each is expressed over the `capability` / `tool` the action
+// names, NOT over a self-attested risk field. `capability` is exact-matched
+// against the caller's minted grant (policy.ts), so it cannot be lied about the
+// way `financialExposure` or `reversibility` can; a Kernel Law is therefore
+// NON-EVADABLE by risk-field mis-declaration, which is the property that makes it
 // a law rather than a preference. (This is the load-bearing half of the
-// declared-Envelope boundary documented in policy.ts / constitution.ts.)
+// declared-Envelope boundary documented in policy.ts / constitution.ts.) A held
+// capability CANNOT buy past a Kernel Law: the law fires even when the capability
+// is granted. There is no self-grant, no escalation, no exception.
 //
-// A held capability CANNOT buy past a Kernel Law: the law fires even when the
-// capability is granted. There is no self-grant, no escalation, no exception.
+// WHAT A KERNEL LAW IS — AND IS NOT (read before trusting one). A law is a
+// DENYLIST over enumerated capability/tool NAME TOKENS, matched case-insensitively
+// (kernelLawViolated lowercases before comparing, so `Credentials.Reveal` is
+// caught). It is a name matcher, NOT a semantic guard: its coverage is exactly the
+// substrings listed below, so a capability that means the same thing under a name
+// NOT listed (`creds.dump`, `vault.export-all`) is NOT caught by a law. That is by
+// design and is bounded by a stronger control: a capability only reaches a law
+// after it has been MINTED and passes default-deny (policy.ts step 3), and the
+// authoritative guarantee is that dangerous capabilities are never minted — that
+// is the CapabilityMinter interface's job (TTL, attenuate-only, a later PR). The
+// Kernel Laws are the belt over those braces: a backstop that denies the NAMED
+// dangerous capabilities even if one is somehow minted. They are not, and do not
+// claim to be, a complete semantic classifier of dangerous intent.
 
 import type { TrustActionEnvelope } from './envelope';
 import type { Condition } from './constitution';
@@ -113,10 +125,19 @@ export const KERNEL_LAWS: readonly KernelLaw[] = Object.freeze([
 /**
  * The first Kernel Law an envelope violates, or null. Total and deterministic.
  * Evaluated by `dispose` before anything else and independent of any grant.
+ *
+ * Matching is CASE-INSENSITIVE over `capability`/`tool` so a law cannot be evaded
+ * by capitalisation. Only a normalized copy is compared — the real envelope is
+ * untouched. (Coverage is still the enumerated names; see the file header.)
  */
 export function kernelLawViolated(e: TrustActionEnvelope): KernelLaw | null {
+  const norm: TrustActionEnvelope = {
+    ...e,
+    capability: e.capability.toLowerCase(),
+    tool: e.tool.toLowerCase(),
+  };
   for (const law of KERNEL_LAWS) {
-    if (conditionMatches(law.when, e)) return law;
+    if (conditionMatches(law.when, norm)) return law;
   }
   return null;
 }

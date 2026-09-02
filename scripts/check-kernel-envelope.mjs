@@ -226,6 +226,27 @@ await check('kernelLawViolated is a pure function returning the first matching l
   truthy(Object.isFrozen(KERNEL_LAWS), 'KERNEL_LAWS is frozen (immutable at runtime)');
 });
 
+await check('Kernel Laws match CASE-INSENSITIVELY (no capitalisation evasion)', async () => {
+  for (const cap of ['Credentials.Reveal', 'CAPABILITY.GRANT', 'Kernel.Bypass']) {
+    const { res, ran } = await run({ ...base(), capability: cap }, { grantedCapabilities: [cap] });
+    eq(res.decision, 'DENY', `${cap} must be denied despite capitalisation`);
+    eq(ran, 0, 'action not run');
+  }
+});
+
+await check('BOUNDARY: laws are a NAME denylist — a synonym not listed is not law-caught (documented, tested)', async () => {
+  // The honest finite-coverage boundary: a differently-named capability with the
+  // same intent is NOT caught by a Kernel Law. It is still default-denied unless
+  // minted; the authoritative control is that dangerous capabilities are never
+  // minted (CapabilityMinter, later). Pinned so the limitation is visible, not a
+  // silent gap ("a caveat is a debt").
+  const unlistedUngranted = await run({ ...base(), capability: 'creds.dump' }, { grantedCapabilities: [] });
+  eq(unlistedUngranted.res.decision, 'DENY', 'an unlisted synonym is still default-denied when ungranted');
+  const unlistedGranted = await run({ ...base(), capability: 'creds.dump' }, { grantedCapabilities: ['creds.dump'] });
+  eq(unlistedGranted.res.decision, 'ALLOW', 'but if MINTED it passes — no law names it (the denylist boundary)');
+  eq(unlistedGranted.ran, 1, 'and runs — the guarantee here is that such a capability is never minted');
+});
+
 // ── require_approval ──────────────────────────────────────────────────────────
 
 await check('overspend without approval => ASK, action not run', async () => {

@@ -3150,8 +3150,8 @@ export const MUTATIONS = [
       'lets a granted capability buy past no-secret-exposure / no-privilege-self-escalation / etc — ' +
       'the exact self-escalation and secret-exfiltration a prompt-injected model would attempt, ' +
       'inside the boundary built to make it impossible',
-    find: '    if (conditionMatches(law.when, e)) return law;',
-    replace: '    if (conditionMatches(law.when, e)) return null;',
+    find: '    if (conditionMatches(law.when, norm)) return law;',
+    replace: '    if (conditionMatches(law.when, norm)) return null;',
   },
 ];
 
