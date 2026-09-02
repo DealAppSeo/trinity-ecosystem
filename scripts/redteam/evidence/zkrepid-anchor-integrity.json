@@ -1,0 +1,34 @@
+{
+  "surface": "zkRepID on/off-chain proof anchoring — does every 'EAS-attested' real proof resolve to a real anchored batch that covers it?",
+  "collectedAt": "2026-09-02T14:13:05.544Z",
+  "collectedBy": "claude-code session claude/zkrepid-anchor-integrity",
+  "collectedVia": "Supabase MCP execute_sql against project qnnpjhlxljtqyigedwkb (repid_zkp_proofs LEFT JOIN eas_anchor_batches ON eas_attestation_uid = eas_uid)",
+  "priorWork": "Companion to XVAL-001 (scripts/redteam/probes/cross-agent-validation.mjs), which guards the SCHEME-level real/stub discriminator (a stub is never is_real or attested). This guards the ROW-level on-chain BINDING: a proof counted as EAS-attested (non-null eas_attestation_uid) must resolve to an eas_anchor_batches row that is actually anchored (merkle_root + tx_hash + status='anchored') and whose id-range covers the proof. XVAL asserts the attested % is high; this asserts each attested row's UID is not hollow.",
+  "note": "Read-only aggregate counts only — no proof bytes, no agent ids, no attestation UIDs stored (the one orphan UID is described by its shape/date, not its value). The invariant: eas_attestation_uid present ⇒ a matching anchored batch exists that covers this proof's id. 'batch_id_range' is the cheap in-DB coverage check (proof id within [proof_id_min, proof_id_max]); confirming the proof's poseidon2_leaf is a member of the batch's merkle_root, and that tx_hash resolves on base-sepolia, are the deeper off-chain checks named in the probe's recipe.",
+  "observations": {
+    "aggregate": {
+      "source": "repid_zkp_proofs (is_real=true, eas_attestation_uid not null) LEFT JOIN eas_anchor_batches",
+      "attested_real_proofs": 22360,
+      "proofs_no_batch": 100,
+      "distinct_uids_no_batch": 1,
+      "no_batch_oldest": "2026-06-07T09:58:57.584Z",
+      "no_batch_newest": "2026-06-16T19:36:03.514Z",
+      "no_batch_created_last_24h": 0,
+      "batch_missing_root": 0,
+      "batch_missing_txhash": 0,
+      "batch_not_anchored": 0,
+      "proof_outside_batch_range": 0,
+      "total_batches": 237,
+      "batches_fully_anchored": 237,
+      "verdict": "22,260 of 22,360 attested real proofs resolve to a fully-anchored batch (merkle_root + tx_hash + status='anchored') whose id-range covers the proof — the on-chain binding is sound for those. BUT 100 proofs (all created 2026-06-07..06-16 at the plonky3 cutover, 0 in the last 24h) share ONE eas_attestation_uid that has NO row in eas_anchor_batches: they read as EAS-attested while their attestation resolves to no anchored batch on-chain. That is 100 proofs whose 'attested' claim is hollow — bounded and historical (not recurring; all 237 batches minted since are fully anchored), but real: '100% EAS-attested' overstates the on-chain guarantee by exactly these 100 rows."
+    },
+    "checks": {
+      "note": "Each key is a way the on-chain attestation claim can be hollow. The invariant HOLDS only when every count here is 0. proofs_no_batch is the one that is currently non-zero.",
+      "proofs_no_batch": 100,
+      "batch_missing_root": 0,
+      "batch_missing_txhash": 0,
+      "batch_not_anchored": 0,
+      "proof_outside_batch_range": 0
+    }
+  }
+}

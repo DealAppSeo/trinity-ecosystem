@@ -65,6 +65,14 @@
       "reviewBy": "2026-09-17",
       "firstSeen": "2026-08-17",
       "report": "docs/RED-TEAM-ERC8004-2026-08-17.md"
+    },
+    {
+      "id": "ANCHOR-001",
+      "owner": "Sean",
+      "severity": "Medium",
+      "reason": "zkRepID's '22,360 real proofs, 100% EAS-attested' overstates the on-chain guarantee by exactly 100 proofs. MEASURED 2026-09-02 (Supabase MCP, repid_zkp_proofs LEFT JOIN eas_anchor_batches ON eas_attestation_uid=eas_uid): 22,260/22,360 attested real proofs resolve to a fully-anchored batch (merkle_root + tx_hash + status='anchored', proof id within [proof_id_min,proof_id_max]) — sound. But 100 proofs share ONE eas_attestation_uid that has NO row in eas_anchor_batches: they read as EAS-attested (non-null UID) while the UID anchors nothing on-chain. Bounded and historical, not recurring: all 100 were created 2026-06-07..06-16 at the plonky3 cutover (sha256-stub stopped 2026-06-07), 0 in the last 24h, and all 237 batches minted since are fully anchored. Impact: audit/on-chain-claim accuracy, NOT score fabrication (the proofs are is_real=true plonky3 with real proof_bytes/zk_commitment; only their on-chain attestation is hollow). Fix is an engine/data action, not doable from this repo (repid-engine + its batch anchoring writer own eas_anchor_batches, not push-attached here): either backfill the missing eas_anchor_batches row for that June UID if it was in fact anchored on-chain (recover tx_hash + merkle_root), or null eas_attestation_uid on those 100 rows so '100% attested' stops counting them. Accepted as a known, owned, bounded debt: it is not spreading and does not touch recent proofs; ANCHOR-001 re-runs on every campaign and will FAIL the moment a fresh proof joins the hollow population.",
+      "reviewBy": "2026-10-02",
+      "firstSeen": "2026-09-02"
     }
   ]
 }
