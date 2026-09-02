@@ -403,10 +403,19 @@ concluding anything:**
 At session creation, by a human: the repo picker on claude.ai/code or the
 desktop app. Two consequences worth knowing before planning around it:
 
-- **An agent cannot self-grant it.** `add_repo` and
-  `create_session(source_url=…)` are both refused by the auto-mode permission
-  classifier — deliberately, since granting repo reach is a human decision.
-  Cite this rather than looping on it.
+- **Reading a public repo is NOT gated — `add_repo` serves it** [MEASURED
+  2026-09-02]. This corrects the older claim that `add_repo` "is refused by the
+  auto-mode permission classifier": that is true only of **attaching** a repo
+  (push access, the GitHub MCP tools). For a *public* repo, `add_repo owner/repo`
+  returns "read access is already available … anonymous git reads" and a plain
+  `GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 <url>` works — no attach, no human
+  step. Three external repos (`uiuc-kang-lab/agentic-benchmarks`,
+  `usestrix/strix`, `huggingface/smolagents`) were read this way. So do NOT tell a
+  user an external public repo is unreachable — clone it. **What still needs a
+  human** is *attach with credentials* (`add_repo access:"push"` for private
+  repos, PRs/issues via MCP, `register_repo_root`) and `create_session(source_url=…)`;
+  those were not re-tested this session, so treat "self-grant of push/attach is
+  refused" as UNVERIFIED-as-of-today rather than settled.
 - **A session created with no explicit source gets NO repos at all** — its
   `session_context` carries no `sources` array. That is the shape of every
   scheduled/triggered run, and it is why the hourly executor could not do repo
