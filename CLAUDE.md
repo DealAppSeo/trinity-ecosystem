@@ -35,6 +35,13 @@ that are **not discoverable from the code** and that have already cost someone a
 wasted hour. Architecture narrative lives in `CLAUDE_HANDOFF_TRINITY.md`; current
 task state in `SESSION_SUMMARY.md`; the failure log in `LESSONS.md`.
 
+**Also read `docs/SYSTEM-MAP.md` before working on any code** — the measured,
+living system-of-record: every component's EXISTS / WIRED / COMMUNICATING status
+across all three repos + the DB + the live surfaces, the "looks-like-a-gap-but-isn't"
+ledger (so you don't re-derive that `agent_services`→`service_contracts`,
+`agents`→`repid_agents`, `anfis`≠`llm_call_log`), and the genuine gaps. It is dated
+and `check:drift`-guarded so it stays honest; re-measure a row when you touch it.
+
 **Everything here is a snapshot. Re-verify before relying on it.** This file has
 already been wrong once — see LESSONS A4.
 
