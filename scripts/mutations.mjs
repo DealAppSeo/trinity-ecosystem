@@ -3183,10 +3183,11 @@ export const MUTATIONS = [
     suite: 'check:kernel-slice',
     file: 'lib/trustshell/runtime/file-executor.ts',
     protects:
-      'PATH-SAFETY. Dropping the scratch-root check lets an authorized fs.write escape via ' +
-      'path traversal — a capability to write becomes a capability to write ANYWHERE',
-    find: "    if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {",
-    replace: "    if (rel === '' || rel.startsWith('..NEVER') || isAbsolute(rel)) {",
+      'PATH-SAFETY. Making the containment check pass everything lets an authorized fs.write ' +
+      'escape via traversal or a symlinked directory — a capability to write becomes a ' +
+      'capability to write ANYWHERE (defeats both the lexical and the real-path guard)',
+    find: "  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));",
+    replace: '  return true;',
   },
 ];
 

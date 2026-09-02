@@ -84,7 +84,9 @@ export interface RunInput {
 
 export interface RunOutput {
   readonly receipt: TrustReceipt;
-  /** Did the real side effect run on THIS call? (false on a replay.) */
+  /** Was the executor invoked on THIS call? True iff the verdict was ALLOW and the
+   *  action ran (committed OR errored); false on any block, malformed input, or a
+   *  replay. A file lands only when `receipt.outcome === 'committed'`. */
   readonly executed: boolean;
   /** True when this requestId had already been processed. */
   readonly replay: boolean;

@@ -14,7 +14,7 @@
 // args-binding (args must hash to the Envelope's argsHash) and path-safety (a
 // write cannot escape the scratch root). Exit 0 VERIFIED, 1 a property regressed.
 
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { compileAndImport } from './redteam/compile.mjs';
@@ -192,10 +192,31 @@ await check('PATH-SAFETY: an authorized write cannot escape the scratch root', a
   const { out } = await run(proposalFor(args), args); // granted + ALLOW
   eq(out.receipt.decision, 'ALLOW', 'the capability is authorized');
   eq(out.receipt.outcome, 'error', 'but the executor refuses the traversal');
+  // The error disposition: the executor WAS invoked (ALLOW), it ran and errored.
+  eq(out.executed, true, 'executed=true on an ALLOW that errors (the effect ran, did not commit)');
   const escaped = join(sandbox, '..', 'escaped.txt');
   const leaked = existsSync(escaped);
   if (leaked) rmSync(escaped, { force: true }); // defensive: never leave a stray file (matters if this regresses)
   truthy(!leaked, 'nothing was written outside the root');
+});
+
+await check('PATH-SAFETY: a symlinked directory inside the root cannot be used to escape', async () => {
+  // Plant a symlink INSIDE the sandbox pointing OUT of it, then try to write
+  // through it. A purely lexical check would follow the link; the real-path guard
+  // must refuse. (This is the case independent verification flagged.)
+  const outside = join(scratch, 'sym-outside');
+  mkdirSync(outside, { recursive: true });
+  mkdirSync(sandbox, { recursive: true });
+  const link = join(sandbox, 'link');
+  try {
+    symlinkSync(outside, link, 'dir');
+  } catch {
+    return; // symlinks unsupported on this filesystem — skip rather than false-fail
+  }
+  const args = { path: 'link/via-symlink.txt', contents: 'escape' };
+  const { out } = await run(proposalFor(args), args); // granted + ALLOW
+  eq(out.receipt.outcome, 'error', 'a write through a symlinked directory is refused');
+  truthy(!existsSync(join(outside, 'via-symlink.txt')), 'nothing escaped via the symlink');
 });
 
 // ── 4. HAL cannot authorize ───────────────────────────────────────────────────
@@ -228,7 +249,10 @@ await check('EVERY DISPOSITION PRODUCES A RECEIPT (committed and blocked alike)'
   for (const { out } of [committed, blocked]) {
     truthy(out.receipt && typeof out.receipt.integrityHash === 'string', 'a receipt exists');
     truthy(verifyReceiptIntegrity(out.receipt), 'and its integrity verifies');
-    eq(out.receipt.executed === (out.receipt.outcome === 'committed'), true, 'executed iff committed');
+    // `executed` means the executor was INVOKED — true iff the verdict was ALLOW.
+    // (A committed outcome is a strict subset: ALLOW that also succeeded.)
+    eq(out.receipt.executed, out.receipt.decision === 'ALLOW', 'executed iff the verdict was ALLOW');
+    if (out.receipt.outcome === 'committed') truthy(out.receipt.executed, 'a commit implies executed');
     truthy(out.receipt.constitutionFingerprint.startsWith('cfp-'), 'records which constitution governed it');
     truthy(out.receipt.composition.length > 0, 'and the acting composition');
   }

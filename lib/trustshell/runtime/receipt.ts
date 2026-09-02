@@ -52,7 +52,9 @@ export interface ReceiptBody {
   readonly decision: Decision;
   readonly firedRule: string | null;
   readonly evidence: ReceiptEvidence | null;
-  /** Did the real side effect run? */
+  /** Was the executor INVOKED? True exactly when the verdict was ALLOW and the
+   *  action ran — whether it `committed` or `error`ed. A file lands on disk iff
+   *  `outcome === 'committed'`; `executed` is the weaker "we ran the effect". */
   readonly executed: boolean;
   readonly outcome: Outcome;
   readonly outcomeDetail: string;
