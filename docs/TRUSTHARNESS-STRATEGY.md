@@ -101,23 +101,33 @@ grounded, not read from a prior doc (`CLAUDE.md`: *run it, don't read it*).
 |---|---|---|
 | "19,459-task peer_verify backlog" | `trinity_tasks` peer_verify by status: **no `pending` bucket** — done 98,873 / cancelled 33,257 / archived 27,612 / failed 23,061 / shadow_reject 307 / completed 46 | **NOT LIVE** — drained |
 | "dark telemetry: ANFIS/ZKP/BFT all 0/24h" | ANFIS `anfis_routing_logs` last row 2026-08-22 (0/24h); `bft_payment_evaluations` **0 total**; **`repid_zkp_proofs` 5/24h, 121/7d** | **PARTLY LIVE** — ANFIS + BFT dark; **ZKP is not** (trickle) |
-| "fleet-liveness signal conflict" | `v_fleet_truth`: **0 live of 12**; preflight view agrees (`agents_live_10m: 0`) | **LIVE** — fleet dark; canonical source (`v_fleet_truth`) already exists |
+| "fleet-liveness signal conflict" | `v_fleet_truth`: `is_live` **0/12** — but `probe_ok`/`is_reachable` **12/12**, probed 3.5 min ago; `minutes_since_ping` ≈ 47 days | **NOT DARK — up and idle** (see below) |
 
 Preflight verdict this session: **GO**, `global_pause=false`; `orphaned_claims: 23113`
 (the #59 release — the preflight view itself notes it "does not gate the fleet").
 
-**What this means for the build order.** The fires that *are* live (fleet dark, BFT
-dark, ANFIS dark) are all **Sean-gated or traffic-gated** — a redeploy, real traffic,
-key custody. None is fixable from a cloud/GitHub session, and **none gates building
-the kernel *contract*** (the Envelope + a deterministic gate + a receipt), which is
-precisely the thing provable by *simulation with zero fleet and zero users* (§7). So
+**Correction, caught by `check:open-work` (PRIOR-WORK: `hal-volume-stopped-2026-07-17`).**
+My first read of this row said "fleet dark, 0/12 live" — wrong, and wrong in the exact
+way the OPEN index and `trinity-preflight` warn about. `is_live=0/12` is a **known
+false negative**: agent-side heartbeat writes were deliberately removed 2026-07-17, so
+`minutes_since_ping` sits at ≈ 47 days on every agent, while the *reachability* probe
+shows all 12 `probe_ok=true` / `is_reachable=true`, last probed 3.5 min ago. The fleet
+is **up and idle, not down** — *absence of a signal you turned off is not evidence of
+absence.* The honest fleet signal is `probe_ok`/`is_reachable`, never `is_live` or any
+static `status` column; this is owned open work (owner T12), cited here, not re-derived.
+
+**What this means for the build order.** The genuinely-dark surfaces are the
+*telemetry* ones — BFT (0 rows) and ANFIS routing (11 days stale) — and both are
+**traffic-gated**, not fixable from a cloud/GitHub session. The fleet processes are up
+but idle (a separate, Sean-gated supply matter). **None of this gates building the
+kernel *contract*** (the Envelope + a deterministic gate + a receipt), which is
+precisely the thing provable by *simulation with zero traffic and zero users* (§7). So
 the two postures reconcile: **build the smallest kernel core, pre-incorporating the
 v3 refinements so nothing is rebuilt, scoped hard against the "someday" list, and
-slotted *into* the ratified sequence (Trust-Keys-first) rather than ahead of it.**
-The one live fire a cloud session *can* touch — the liveness-signal conflict — is
-itself the first test case for "trustworthiness ≠ availability" (§3.3), and its fix
-already exists (`v_fleet_truth`); it is offered as a cheap reversible win, not folded
-into the kernel.
+slotted *into* the ratified sequence (Trust-Keys-first) rather than ahead of it.** The
+liveness-signal confusion is itself a live illustration of "trustworthiness ≠
+availability" (§3.3): consumers must read reachability, not a turned-off heartbeat —
+but that is documented open work, not a fire this doc reopens.
 
 > **One claim I could not verify and therefore will not repeat:** Grok's line that
 > ERC-8004 deployments show *"lots of dead endpoints and Sybil-shaped feedback."* No
@@ -626,9 +636,9 @@ mutant is exactly that defect wearing an architecture diagram.
 ### Explicitly NOT now (logged, not built)
 - **Restructuring the live 12-agent Trinity topology into "3+1 + JIT specialists."**
   3+1 (PAI + Builder + Seller + Operator, as *capsules* not personalities) is the
-  right *product* model for the eventual PAI, but rewiring the running fleet mid-dark
-  (§1.5: 0/12 live) is sequencing risk with no upside now. The capsule model is a
-  design target; the fleet stays as-is until Sean says otherwise.
+  right *product* model for the eventual PAI, but rewiring the running fleet (up and
+  idle per §1.5, a Sean-gated supply matter) is sequencing risk with no upside now.
+  The capsule model is a design target; the fleet stays as-is until Sean says otherwise.
 - **The full 20-primitive roadmap** (Trust-Lens marketplace, ZK selective disclosure,
   escrow, governance replay, reflex/verify/human paths — the last already exists as
   `TOOL_ROUTING_MATRIX_V0`). Good thinking; not a next sprint against three
@@ -726,7 +736,7 @@ the v3 refinements from the second Grok/Chat pass; 9–10 are where v3 pushes ba
 8. **Personal Constitution as primitive #0.** Hard rules the cortex cannot rewrite;
    recorded in every receipt. The Envelope needs something to enforce. (§3.0)
 9. **Do not restructure the live 12-agent topology now.** 3+1 + JIT is the right
-   *capsule* model, not a reason to rewire a running (currently dark, §1.5) fleet.
+   *capsule* model, not a reason to rewire a running (up-and-idle, §1.5) fleet.
 10. **Claim-gate the ERC-8004 "dead endpoints / Sybil-shaped" line.** Unsourced; the
     standards pass found only "Draft with live deployments." Out of every doc until
     cited (§1.5). The architectural lesson (8004 as public adapter) stands regardless.
@@ -801,9 +811,12 @@ The **operational reality in §1.5 is [VERIFIED 2026-09-02, this session]** agai
 `qnnpjhlxljtqyigedwkb` via Supabase MCP — surface = cloud/scheduled, access = GitHub
 yes / Railway no / Supabase yes, preflight verdict GO. It corrects the advise-only
 read's fire list: the peer_verify backlog is drained (0 pending) and the ZKP emitter
-is a trickle (5/24h), not dark; ANFIS + BFT are dark and the fleet is 0/12 live, but
-all three are Sean/traffic-gated and none blocks the kernel contract. Where the vision
-docs and the database disagreed, the database won (per `trinity-preflight`). The one
+is a trickle (5/24h), not dark; ANFIS + BFT telemetry are dark; and the fleet is **up
+and idle, not dark** (`is_live=0/12` is a known false negative per OPEN
+`hal-volume-stopped-2026-07-17` — `probe_ok`/`is_reachable` 12/12; `check:open-work`
+caught the first draft's "0/12 live = dark" misread). All are Sean/traffic-gated and
+none blocks the kernel contract. Where the vision docs and the database disagreed, the
+database won (per `trinity-preflight`). The one
 figure I could not source — ERC-8004 "dead endpoints / Sybil-shaped feedback" — is
 excluded per the claim gate. The ratified build sequence (`CONSOLIDATED_BUILD_PLAN`)
 is referenced but **not re-verified this session** and is flagged as such in §10.
