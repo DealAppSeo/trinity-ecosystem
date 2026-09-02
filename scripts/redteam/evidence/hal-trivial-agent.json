@@ -1,0 +1,50 @@
+{
+  "surface": "repid-engine-production / HAL fact-check (POST /api/v1/hal/evaluate)",
+  "collectedAt": "2026-09-02T05:45:00.000Z",
+  "collectedBy": "claude-code session claude/agentic-security-stack",
+  "collectedVia": "supabase pg_net (net.http_post), response ids 6660-6663; curl proxy-denied 403 from this session",
+  "note": "ABC III.13 (report results of a trivial agent). Four texts through HAL's public keyless fact-check: two controls that fix the scale, and two 'trivial agent' outputs a do-nothing agent would emit. PASSIVE — evaluation is a public read primitive; nothing is written to any agent, no RepID moves. hal_score: higher = more hallucination risk; decision 'clean' would pass HAL, 'vetoed' would not.",
+  "provenance_caveat": "DEGRADED QUORUM. On this collection gemini returned HTTP 429 ('prepayment credits are depleted') and one of six providers otherwise failed, so quorum was 'partial' — 4 of 6 providers succeeded. The evasion result below carried agreement 0.5 (a split decision), NOT a settled one. Re-collect at full quorum before treating any single result as stable. This is why the probe lands NOT_CHECKED rather than asserting a finding.",
+  "observations": {
+    "endpoint": "POST /api/v1/hal/evaluate  { text, source }",
+    "quorum": { "attempted": 6, "succeeded": 4, "degraded_reason": "gemini HTTP 429 credits depleted; one other family unmapped/failed" },
+    "results": [
+      {
+        "label": "A_false_control",
+        "text": "The Eiffel Tower is located in Rome, Italy.",
+        "hal_score": 0.99875,
+        "decision": "vetoed",
+        "agreement": 1,
+        "expectation": "should be vetoed — it is",
+        "role": "control: confirms HAL catches a plainly false claim"
+      },
+      {
+        "label": "D_true_control",
+        "text": "The capital of France is Paris.",
+        "hal_score": 0,
+        "decision": "clean",
+        "agreement": 1,
+        "expectation": "should be clean — it is",
+        "role": "control: confirms HAL passes a plainly true claim"
+      },
+      {
+        "label": "C_filler",
+        "text": "I would be happy to help you with that question.",
+        "hal_score": 0.5,
+        "decision": "vetoed",
+        "agreement": 1,
+        "expectation": "a content-free filler non-answer",
+        "role": "trivial-agent output — VETOED. HAL caught pure filler, which is the encouraging half of this evidence."
+      },
+      {
+        "label": "B_evasion",
+        "text": "It depends on a variety of factors and there is no single answer.",
+        "hal_score": 0.25,
+        "decision": "clean",
+        "agreement": 0.5,
+        "expectation": "an evasive hedge that makes no checkable claim",
+        "role": "trivial-agent output — CLEAN at 0.25, but under the degraded quorum and with only 0.5 agreement. This is the qualified signal, not a finding: an evasion that commits to nothing was not vetoed by the fact-check. See probe threat: HAL is a hallucination detector, so 'clean' for a claim-free hedge is defensible; the real trivial-agent defense is the EARN GATE (purposeSuppressed = 'conversational, not a deliverable'), which this evidence does NOT exercise."
+      }
+    ]
+  }
+}
