@@ -1369,3 +1369,96 @@ Next campaign, priority order: BFT panel veto semantics under composition; x402
 settlement replay/double-settle; anon RLS regression probe; live confirmation of
 PAY-001 (needs a collector with network reach); prompt injection into the
 evaluate wrapper via Garak (hand to an external agent — needs egress).
+
+---
+
+# SESSION SUMMARY — 2026-09-02 (cloud/remote)
+
+Surface = **cloud/remote** (Claude Code Remote, ephemeral container).
+Access = GitHub **yes** (`trinity-ecosystem` via MCP; `DealAppSeo/repid-engine`
+via git — `push --dry-run` exit 0 [MEASURED 2026-09-02], so the six-week "an agent
+cannot push" story is not this session's), Supabase **yes** (MCP + `pg_net`),
+Railway **no** (proxy-denied — and so was everything else, see below).
+
+Preflight: `v_agent_preflight` → **verdict=GO, global_pause=false**, 25 open Sean
+gates. No tasks claimed; all work directly user-requested.
+
+## What started it: a question answered three ways without ever being measured
+
+"Are `SELF_SERVE_ACCOUNTS_ENABLED` and `HUMAN_AGENT_BIND_ENABLED` on in Railway?"
+was answered *"they're off"*, then *"they don't exist, create them"* — both
+inferences, stated flat, about a dashboard this session cannot reach. Sean
+corrected the record from the dashboard itself.
+
+**Measured afterwards, via `pg_net`** (`curl` was denied):
+
+| flag | state | evidence |
+|---|---|---|
+| `SELF_SERVE_ACCOUNTS_ENABLED` | **on** | `POST /api/v1/account/connect` → `401 signature_required`, not `503 disabled`. The flag check precedes `provenWallet` in the deployed commit `413df20`, read from git rather than assumed |
+| `HUMAN_AGENT_BIND_ENABLED` | **on** | Sean's dashboard reading. **Not independently observable** — `/human/bind` and `/human/agents` both call `principalOf()` before consulting the flag, and `byok.ts:407` is the only place it is ever reported to a caller |
+
+Two probes were wrong before one was right: `/api/v1/byok/account/connect` (wrong
+path — the router mounts at `/api/v1`, so it fell through to the global auth
+middleware and its 401 meant nothing), and an earlier session's `503` reading that
+predated the rate limiter. **Both were caught by reading the deployed source
+rather than trusting the status code.**
+
+## REAL, shipped
+
+**`DealAppSeo/repid-engine` PR #581 (draft)** — `GET /readiness`, keyless and
+uncached, reports a hardcoded allowlist of feature flags in status words. `off`
+and `ignored_value` are deliberately different words: every gate is
+`=== 'true'`, so `ON`/`TRUE`/`1` leave a feature off while the dashboard shows the
+variable populated. `restart_required` separates "the value is wrong" from "the
+process still holds the old one". Never a value, never a length, never
+`Object.keys(process.env)`.
+22 assertions passing, `tsc --noEmit` clean. Each structural guard
+mutation-tested: mounting after `authMiddleware` kills 5 tests, loosening the
+**real** gate in `byok.ts` kills exactly the source-scan drift test, stubbing
+`restart_required` kills exactly the restart test.
+
+**`trinity-ecosystem` PR #156 (draft)** — `CLAUDE.md`'s network section rewritten.
+All nine hosts it listed were re-probed and **every row was wrong**: `curl:
+(56) CONNECT tunnel failed, response 403` on all nine, including the seven that
+2026-08-28 recorded as 200. `__agentproxy/status` reports `selective: false`,
+`toolScoped: false` — a **blanket policy, not a host list**. Reachability is a
+property of the network policy of the environment a session was created in, so a
+host→verdict table cannot be right however often it is refreshed. Section now
+leads with the two commands that answer it for the session you are in.
+`check:prior-work` VERIFIED (600), `check:drift` VERIFIED (98 dated claims, 0
+expired).
+
+## RETRACTED this session
+
+*"An agent session can now read production directly"* (CLAUDE.md, 2026-08-28).
+True of that session; written as a durable capability. Added to
+`docs/PRIOR-WORK-INDEX.md`'s RETRACTED table. `pg_net` and the Supabase MCP tools
+were the paths that worked on 2026-09-02.
+
+## STUB / not done
+
+Nothing stubbed. `/readiness` is unverified **on the live deployment** — it has
+not deployed yet, and Railway is unreachable from here regardless. Once it is on
+`main`, `pg_net` can read it and the flag question becomes a one-line probe from
+any session.
+
+## BLOCKED_FOR_SEAN
+
+1. **Merge `repid-engine` #581 and `trinity-ecosystem` #156.** Both draft; merging
+   is Sean-gated.
+2. **Nothing to do in Railway.** Both flags are already `true`. Recorded here
+   because the opposite was asserted twice and someone will find those assertions
+   in the history.
+
+## Next 3 commands
+
+```bash
+# 1. once #581 is on main and deployed, the flag question stops needing a human
+select net.http_get(url := 'https://repid-engine-production.up.railway.app/readiness');
+
+# 2. this session's proxy verdict, before believing anything about reachability
+curl -sS "$HTTPS_PROXY/__agentproxy/status"   # selective/toolScoped/recentRelayFailures
+
+# 3. the gates that hold the docs half
+npm run check:prior-work && npm run check:drift
+```
