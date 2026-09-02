@@ -9,11 +9,12 @@
 //
 // FAIL-CLOSED IS THE WHOLE POINT, SO IT IS BELT AND BRACES:
 //   * A malformed Envelope never reaches policy — it is a DENY at normalization.
-//   * `dispose` is total (policy.ts) and should never throw, but if some future
-//     edit makes it throw, the catch here treats that as DENY and does not run
-//     the action. A gate that let a thrown authorizer error fall through to
-//     execution would be a fail-OPEN reached by a bug — the exact shape this repo
-//     names as its defining defect.
+//   * `dispose` is total (policy.ts property 4 — it coerces a malformed context
+//     to DENY rather than throwing), so the catch here is genuine DEFENCE-IN-DEPTH
+//     against a FUTURE edit that reintroduces a throw: it treats any thrown error
+//     as DENY and does not run the action. A gate that let a thrown authorizer
+//     error fall through to execution would be a fail-OPEN reached by a bug — the
+//     exact shape this repo names as its defining defect.
 //   * The action runs inside the ALLOW branch and nowhere else. There is no code
 //     path that both skips the verdict and calls `action`.
 

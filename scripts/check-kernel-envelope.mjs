@@ -24,6 +24,7 @@ import { compileAndImport } from './redteam/compile.mjs';
 const KERNEL = [
   'lib/trustshell/kernel/envelope.ts',
   'lib/trustshell/kernel/constitution.ts',
+  'lib/trustshell/kernel/kernel-laws.ts',
   'lib/trustshell/kernel/policy.ts',
   'lib/trustshell/kernel/gate.ts',
   'lib/trustshell/kernel/index.ts',
@@ -41,6 +42,8 @@ const {
   guardedExecute,
   normalizeEnvelope,
   constitutionFingerprint,
+  KERNEL_LAWS,
+  kernelLawViolated,
 } = K;
 
 let passed = 0;
@@ -147,23 +150,80 @@ await check('a non-object proposal is rejected, not coerced', async () => {
   }
 });
 
-// ── hard rules outrank grants ─────────────────────────────────────────────────
+// ── Kernel Laws: immutable, unconditional, outrank grants ─────────────────────
 
-await check('a constitutional DENY outranks a held capability', async () => {
+await check('a Kernel Law DENY outranks a held capability (secret exposure)', async () => {
   const p = base();
   p.capability = 'credentials.reveal';
-  // Even if the caller somehow holds the capability, the hard rule wins.
+  // Even if the caller somehow holds the capability, the immutable law wins.
   const { res, ran } = await run(p, { grantedCapabilities: ['credentials.reveal'] });
-  eq(res.decision, 'DENY', 'credential-exfiltration must be denied regardless of grant');
-  eq(res.verdict.firedRule, 'no-credential-exfiltration', 'and name the rule that fired');
+  eq(res.decision, 'DENY', 'credential exposure must be denied regardless of grant');
+  eq(res.verdict.firedRule, 'no-secret-exposure', 'and name the Kernel Law that fired');
+  truthy(res.verdict.reasons.join(' ').includes('immutable'), 'and mark it immutable');
   eq(ran, 0, 'action not run');
 });
 
-await check('the credential rule also fires on a tool-name match', async () => {
+await check('the secret-exposure law also fires on a tool-name match', async () => {
   const p = base();
   p.tool = 'shell.reveal-secret';
   const { res } = await run(p, { grantedCapabilities: [p.capability] });
   eq(res.decision, 'DENY', 'a reveal-secret tool must be denied');
+});
+
+// ── conformance invariants (the brief's point 9, kernel-core subset) ──────────
+
+await check('NO PRIVILEGE AMPLIFICATION: an escalation capability is denied even if granted', async () => {
+  for (const cap of ['capability.grant', 'capability.mint', 'privilege.escalate', 'authority.grant']) {
+    const p = { ...base(), capability: cap };
+    const { res, ran } = await run(p, { grantedCapabilities: [cap] });
+    eq(res.decision, 'DENY', `${cap} must be denied by a Kernel Law even when granted`);
+    eq(res.verdict.firedRule, 'no-privilege-self-escalation', `${cap} names the escalation law`);
+    eq(ran, 0, 'action not run');
+  }
+});
+
+await check('NO ENVELOPE BYPASS: a gate-bypass capability is denied even if granted', async () => {
+  const p = { ...base(), capability: 'kernel.bypass' };
+  const { res, ran } = await run(p, { grantedCapabilities: ['kernel.bypass'] });
+  eq(res.decision, 'DENY', 'a bypass capability must be denied by a Kernel Law');
+  eq(res.verdict.firedRule, 'no-envelope-bypass', 'names the bypass law');
+  eq(ran, 0, 'action not run');
+});
+
+await check('evidence rewriting and silent constitution change are denied laws', async () => {
+  const rw = await run({ ...base(), capability: 'evidence.delete' }, { grantedCapabilities: ['evidence.delete'] });
+  eq(rw.res.verdict.firedRule, 'no-evidence-rewriting', 'evidence rewrite denied by law');
+  const cc = await run({ ...base(), capability: 'constitution.write' }, { grantedCapabilities: ['constitution.write'] });
+  eq(cc.res.verdict.firedRule, 'no-silent-constitution-change', 'constitution edit denied by law');
+});
+
+await check('HAL CANNOT AUTHORIZE: strong evidence cannot flip a DENY to ALLOW', async () => {
+  // A Kernel Law violation with forged confidence 1.0 — evidence is consulted
+  // only on the high-risk VERIFY branch, reached only AFTER law/deny/grant, so it
+  // can never turn a DENY into an ALLOW.
+  const lawViolation = await run(
+    { ...base(), capability: 'credentials.reveal', riskClass: 'high' },
+    { grantedCapabilities: ['credentials.reveal'], evidence: { confidence: 1.0 } }
+  );
+  eq(lawViolation.res.decision, 'DENY', 'a law DENY stands despite confidence 1.0');
+  eq(lawViolation.ran, 0, 'action not run');
+  // Same for default-deny: ungranted + confidence 1.0 must not ALLOW.
+  const ungranted = await run(
+    { ...base(), riskClass: 'high' },
+    { grantedCapabilities: [], evidence: { confidence: 1.0 } }
+  );
+  eq(ungranted.res.decision, 'DENY', 'ungranted + confidence 1.0 must still DENY, not ALLOW');
+  eq(ungranted.ran, 0, 'action not run');
+});
+
+await check('kernelLawViolated is a pure function returning the first matching law', async () => {
+  const norm = normalizeEnvelope({ ...base(), capability: 'secret.export' });
+  truthy(norm.ok, 'valid envelope');
+  const law = kernelLawViolated(norm.envelope);
+  truthy(law && law.id === 'no-secret-exposure', 'names the law');
+  const clean = kernelLawViolated(normalizeEnvelope(base()).envelope);
+  eq(clean, null, 'a clean envelope violates no law');
+  truthy(Object.isFrozen(KERNEL_LAWS), 'KERNEL_LAWS is frozen (immutable at runtime)');
 });
 
 // ── require_approval ──────────────────────────────────────────────────────────
@@ -205,6 +265,56 @@ await check('an irreversible delete needs approval', async () => {
   p.reversibility = 'irreversible';
   const { res } = await run(p, { grantedCapabilities: ['repo.branch.delete'] });
   eq(res.decision, 'ASK', 'irreversible delete must ASK');
+});
+
+// ── C-1: dispose is TOTAL — a malformed context DENYs, never throws ───────────
+
+await check('dispose is total: a malformed/absent context DENYs, does not throw', async () => {
+  const env = normalizeEnvelope(base()).envelope;
+  for (const ctx of [undefined, null, {}, { grantedCapabilities: null }, { grantedCapabilities: 'nope' }]) {
+    let v;
+    try {
+      v = dispose(env, DEFAULT_CONSTITUTION, ctx);
+    } catch (e) {
+      throw new Error(`dispose threw on ctx=${JSON.stringify(ctx)}: ${e.message}`);
+    }
+    eq(v.decision, 'DENY', `a malformed ctx (${JSON.stringify(ctx)}) must DENY (no grants)`);
+  }
+  // and end-to-end through the gate, the action never runs on a broken ctx.
+  const { res, ran } = await run(base(), {});
+  eq(res.decision, 'DENY', 'gate with empty ctx DENYs');
+  eq(ran, 0, 'action not run');
+});
+
+// ── C-2: the declared-Envelope boundary, pinned as a visible, honest fact ─────
+
+await check('BOUNDARY: a granted caller can evade a risk gate by under-declaring — documented, not hidden', async () => {
+  // Honest declaration → the approval gate fires (as designed).
+  const honest = await run(
+    { ...base(), capability: 'repo.branch.delete', reversibility: 'irreversible' },
+    { grantedCapabilities: ['repo.branch.delete'] }
+  );
+  eq(honest.res.decision, 'ASK', 'an honestly-declared irreversible delete ASKs');
+
+  // Mis-declared reversibility on the SAME granted capability → ALLOW+runs. This
+  // is the kernel's boundary: it fails closed over what the Envelope DECLARES; it
+  // does not verify the declaration is truthful. Binding self-attested risk fields
+  // needs a trusted Envelope constructor (a later interface). Pinned here so the
+  // limitation is a tested fact, not a silent gap ("a caveat is a debt").
+  const lying = await run(
+    { ...base(), capability: 'repo.branch.delete', reversibility: 'reversible' },
+    { grantedCapabilities: ['repo.branch.delete'] }
+  );
+  eq(lying.res.decision, 'ALLOW', 'a mis-declared reversibility slips the approval gate (the documented boundary)');
+  eq(lying.ran, 1, 'and the action runs — this is expected until risk fields are trust-bound');
+
+  // What CANNOT be evaded by declaration: the capability itself. A Kernel Law on
+  // the capability holds no matter what risk fields are declared.
+  const cannotEvade = await run(
+    { ...base(), capability: 'credentials.reveal', reversibility: 'reversible', riskClass: 'low', financialExposure: 0 },
+    { grantedCapabilities: ['credentials.reveal'] }
+  );
+  eq(cannotEvade.res.decision, 'DENY', 'a Kernel Law on the capability cannot be evaded by declaring benign risk');
 });
 
 // ── HAL is evidence, not authority ────────────────────────────────────────────
@@ -292,7 +402,10 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  'check:kernel-envelope — VERIFIED. The gate fails closed: default-deny, malformed=>DENY,\n' +
-    '  hard rules outrank grants, require_approval blocks with ASK, high risk needs evidence\n' +
-    '  policy (not HAL) accepts, and the action runs on ALLOW and no other verdict.\n'
+  'check:kernel-envelope — VERIFIED. The gate fails closed: immutable Kernel Laws first\n' +
+    '  (no secret exposure / privilege self-escalation / evidence rewrite / silent constitution\n' +
+    '  change / gate bypass — even when granted), default-deny, malformed=>DENY, dispose total,\n' +
+    '  require_approval=>ASK, HAL evidence cannot flip a DENY, action runs on ALLOW and no other\n' +
+    '  verdict. Documented boundary: risk gates key on self-attested fields (evadable until a\n' +
+    '  trusted Envelope constructor binds them) — pinned as a tested fact, not a silent gap.\n'
 );

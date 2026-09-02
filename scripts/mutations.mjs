@@ -3127,7 +3127,7 @@ export const MUTATIONS = [
       'Neutering the grant check lets any ungranted capability fall through to ALLOW — the ' +
       'classic authorization fail-open (a missing branch defaulting to yes), inside the gate ' +
       'built to make that impossible',
-    find: '  if (!ctx.grantedCapabilities.includes(envelope.capability)) {',
+    find: '  if (!granted.includes(envelope.capability)) {',
     replace: '  if (false) {',
   },
   {
@@ -3140,6 +3140,18 @@ export const MUTATIONS = [
       'fail-open the whole "models propose, TrustShell disposes" boundary exists to prevent',
     find: "  if (verdict.decision === 'ALLOW') {",
     replace: "  if (verdict.decision === 'ALLOW' || verdict.decision === 'VERIFY') {",
+  },
+  {
+    id: 'kernel-laws-not-enforced',
+    suite: 'check:kernel-envelope',
+    file: 'lib/trustshell/kernel/kernel-laws.ts',
+    protects:
+      'THE IMMUTABLE KERNEL LAWS ACTUALLY FIRE. Making kernelLawViolated always return null ' +
+      'lets a granted capability buy past no-secret-exposure / no-privilege-self-escalation / etc — ' +
+      'the exact self-escalation and secret-exfiltration a prompt-injected model would attempt, ' +
+      'inside the boundary built to make it impossible',
+    find: '    if (conditionMatches(law.when, e)) return law;',
+    replace: '    if (conditionMatches(law.when, e)) return null;',
   },
 ];
 

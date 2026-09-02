@@ -5,13 +5,33 @@
 // something is the Constitution. It is primitive #0 because it is the fixed point
 // the whole kernel protects. (docs/TRUSTHARNESS-STRATEGY.md §3.0.)
 //
-// TWO LAYERS, ONE OF THEM IMMOVABLE.
-//   * HARD rules are constitutional: the cortex (the PAI / any agent) can never
-//     learn or argue its way past them. They are what stops a prompt-injected
-//     model from granting itself a credential or raising its own spend limit.
+// TWO LAYERS, PLUS THE KERNEL LAWS ABOVE THEM.
+//   * HARD rules are the USER's constitutional rules: the cortex can never learn
+//     or argue its way past them, and they gate high-consequence actions (spend,
+//     irreversible deletes) with a required human approval.
 //   * SOFT preferences are learnable (prefer local models, concise emails). They
 //     are recorded here so the same object is the whole policy identity, but the
 //     kernel core does not act on them — the router does, later.
+//   * The truly immovable invariants — no secret exposure, no privilege self-
+//     escalation, no evidence rewriting, no silent Constitution change, no gate
+//     bypass — are NOT here. They are the Kernel Laws (kernel-laws.ts), which the
+//     kernel enforces before any Constitution and which no caller can supply or
+//     omit. Credential exfiltration used to live here; it is now the Kernel Law
+//     `no-secret-exposure`, because it is not the user's to edit.
+//
+// THE DECLARED-ENVELOPE BOUNDARY (read before trusting a `require_approval`).
+// A Kernel Law keys on `capability`/`tool`, which is exact-matched against the
+// caller's minted grant, so it CANNOT be evaded by mis-declaration. A Personal
+// Constitution `require_approval` rule keys on self-attested RISK fields
+// (`financialExposure`, `reversibility`, `riskClass`) that the PROPOSER supplies.
+// A caller who already holds the relevant capability can therefore UNDER-DECLARE
+// those fields — claim `financialExposure: 0`, or `reversibility: 'reversible'` —
+// to slip past the approval gate. So these gates bind honesty, not a lying model:
+// they are sound only when the Envelope's risk fields are truthfully derived. The
+// component that makes that binding — a trusted Envelope constructor / risk
+// classifier that the proposer does not control — is a NAMED LATER INTERFACE, not
+// this file. What holds regardless: the capability match (no self-grant) and the
+// Kernel Laws.
 //
 // DECLARATIVE ON PURPOSE. A hard rule is DATA (a condition + an effect), not a
 // predicate function, so the Constitution is fully serializable — it can be
@@ -99,24 +119,16 @@ export function conditionMatches(cond: Condition, e: TrustActionEnvelope): boole
 }
 
 /**
- * The default Personal Constitution. Small on purpose — three real hard rules
- * that each map to a stated invariant. Adding rules is how a lane records "this
- * boundary is now load-bearing"; the shape, not the exact list, is the primitive.
+ * The default Personal Constitution. Small on purpose — the two hard rules are
+ * the USER's high-consequence approval gates (absolute denials of secret
+ * exposure et al. are Kernel Laws, not here). Adding rules is how a lane records
+ * "this boundary is now load-bearing"; the shape, not the exact list, is the
+ * primitive. Both rules key on self-attested risk fields — see the
+ * declared-Envelope boundary in the file header.
  */
 export const DEFAULT_CONSTITUTION: Constitution = {
   version: 'constitution-v0',
   hard: [
-    {
-      id: 'no-credential-exfiltration',
-      forbids: 'never reveal a credential or secret to a caller',
-      effect: 'deny',
-      when: {
-        anyOf: [
-          { field: 'capability', op: 'eq', value: 'credentials.reveal' },
-          { field: 'tool', op: 'contains', value: 'reveal-secret' },
-        ],
-      },
-    },
     {
       id: 'overspend-needs-approval',
       forbids: 'spending at or above 100 (constitution unit) requires human approval',

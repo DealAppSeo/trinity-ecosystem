@@ -6,32 +6,53 @@
 // always produce the same verdict, which is the property a mutation test and an
 // adversarial probe can pin. (docs/TRUSTHARNESS-STRATEGY.md §2.1, §3.1.)
 //
-// FOUR PROPERTIES THIS FILE EXISTS TO HOLD, each the kind that regresses quietly:
+// FIVE PROPERTIES THIS FILE EXISTS TO HOLD, each the kind that regresses quietly:
+//
+//   0. KERNEL LAWS FIRST, AND UNCONDITIONALLY. Before any caller-supplied rule,
+//      `dispose` checks the immutable Kernel Laws (kernel-laws.ts). They are NOT
+//      a parameter — a caller cannot pass a weakened set — so no secret exposure,
+//      privilege self-escalation, evidence rewriting, silent Constitution change,
+//      or gate bypass can be authorized regardless of grant or constitution.
 //
 //   1. DEFAULT-DENY. An action is ALLOWed only when an explicit grant covers its
 //      capability AND nothing else blocks it. The absence of a rule is never a
 //      yes. Most authorization bugs are a missing branch defaulting to allow;
 //      here the final branch is deny.
 //
-//   2. HARD RULES OUTRANK GRANTS. A minted capability cannot buy past a
-//      constitutional `deny` — the credential-exfiltration rule fires even if the
-//      caller holds the capability. Grants say "you may act in this area"; hard
-//      rules say "never this", and never wins.
+//   2. LAWS AND HARD RULES OUTRANK GRANTS. A minted capability cannot buy past a
+//      Kernel Law or a constitutional `deny` — they fire even if the caller holds
+//      the capability. Grants say "you may act in this area"; laws say "never
+//      this", and never wins.
 //
 //   3. HAL IS EVIDENCE, NOT AUTHORITY. A high-risk action routes to VERIFY, and
 //      the DETERMINISTIC policy — not HAL — decides whether the evidence HAL
 //      returned (a confidence number) clears the bar. Policy consumes evidence;
 //      it never lets a probabilistic verifier issue the verdict. Putting HAL in
 //      the authority path is the same failure as letting the router write the
-//      trust plane.
+//      trust plane. Evidence cannot flip a DENY to ALLOW: it is consulted only on
+//      the high-risk VERIFY branch, which is reached only AFTER laws/deny/grant.
 //
-//   4. TOTALITY. `dispose` never throws. A caller that wraps it and treats a
-//      thrown error as "allow" would convert a bug into a fail-open; there is no
-//      throw to catch. Any state it cannot make sense of falls through to DENY.
+//   4. TOTALITY. `dispose` never throws — a malformed context (missing
+//      `grantedCapabilities`, a null ctx) is coerced to "no grants / no approvals
+//      / no evidence" and falls through to DENY, not to a thrown error a caller
+//      might treat as allow. The gate's try/catch (gate.ts) is then genuine
+//      defence-in-depth against a FUTURE edit, not a load-bearing catch for
+//      today's inputs.
+//
+// THE DECLARED-ENVELOPE BOUNDARY. Kernel Laws and the grant check key on
+// `capability`/`tool`, which is exact-matched — non-evadable. The Constitution's
+// `require_approval` / high-risk `VERIFY` gates key on self-attested risk fields
+// the proposer supplies (`financialExposure`, `reversibility`, `riskClass`), so a
+// caller holding the capability can under-declare them to slip past. Those gates
+// bind honesty; binding them against a lying proposer needs a trusted Envelope
+// constructor (a later interface), not this file. Documented, tested (check:
+// kernel-envelope), and honest — the kernel fails closed over what the Envelope
+// DECLARES.
 
 import type { TrustActionEnvelope } from './envelope';
 import type { Constitution, HardRule } from './constitution';
 import { conditionMatches } from './constitution';
+import { kernelLawViolated } from './kernel-laws';
 
 export type Decision = 'ALLOW' | 'DENY' | 'ASK' | 'VERIFY';
 
@@ -87,7 +108,25 @@ export function dispose(
 ): Verdict {
   const reasons: string[] = [];
 
-  // (1) Hard DENY rules first — a minted capability cannot buy past these.
+  // Totality: coerce a malformed/absent context to "no grants / approvals /
+  // evidence" so this function never throws (property 4). A missing grant list is
+  // simply the strongest fail-closed case — nothing is granted, so nothing but a
+  // block can result.
+  const granted = Array.isArray(ctx?.grantedCapabilities) ? ctx.grantedCapabilities : [];
+  const approvals = new Set(Array.isArray(ctx?.approvals) ? ctx.approvals : []);
+
+  // (0) KERNEL LAWS — immutable, unconditional, before any caller-supplied rule.
+  //     Not a parameter; no grant buys past one.
+  const law = kernelLawViolated(envelope);
+  if (law) {
+    return {
+      decision: 'DENY',
+      reasons: [`kernel law '${law.id}' forbids this (immutable): ${law.law}`],
+      firedRule: law.id,
+    };
+  }
+
+  // (1) Constitutional hard DENY rules — a minted capability cannot buy past these.
   for (const rule of constitution.hard) {
     if (rule.effect === 'deny' && conditionMatches(rule.when, envelope)) {
       return {
@@ -100,7 +139,6 @@ export function dispose(
 
   // (2) require_approval rules — each must be satisfied by a presented approval,
   //     otherwise the action is blocked with ASK (never silently allowed).
-  const approvals = new Set(ctx.approvals ?? []);
   const unmet: HardRule[] = [];
   for (const rule of constitution.hard) {
     if (rule.effect === 'require_approval' && conditionMatches(rule.when, envelope)) {
@@ -118,12 +156,12 @@ export function dispose(
 
   // (3) DEFAULT-DENY: an ALLOW requires an explicit grant for this capability.
   //     No grant, no allow — the absence of a rule is never a yes.
-  if (!ctx.grantedCapabilities.includes(envelope.capability)) {
+  if (!granted.includes(envelope.capability)) {
     return {
       decision: 'DENY',
       reasons: [
         `no granted capability covers '${envelope.capability}' ` +
-          `(caller holds: ${ctx.grantedCapabilities.length ? ctx.grantedCapabilities.join(', ') : 'none'})`,
+          `(caller holds: ${granted.length ? granted.join(', ') : 'none'})`,
       ],
     };
   }
@@ -133,8 +171,8 @@ export function dispose(
   //     deterministically, decides whether it clears the bar. Absent or weak
   //     evidence → VERIFY (blocks), never ALLOW.
   if (envelope.riskClass === 'high') {
-    const threshold = ctx.verifyThreshold ?? DEFAULT_VERIFY_THRESHOLD;
-    const conf = ctx.evidence?.confidence;
+    const threshold = ctx?.verifyThreshold ?? DEFAULT_VERIFY_THRESHOLD;
+    const conf = ctx?.evidence?.confidence;
     if (typeof conf !== 'number' || !Number.isFinite(conf) || conf < threshold) {
       return {
         decision: 'VERIFY',

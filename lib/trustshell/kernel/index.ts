@@ -1,11 +1,13 @@
 // lib/trustshell/kernel/index.ts — the Trust Microkernel core.
 //
-// The smallest viable kernel (docs/TRUSTHARNESS-STRATEGY.md §5): the Personal
-// Constitution (what it protects), the Trust/Action Envelope (the one path to a
-// side effect), the deterministic policy engine (dispose → ALLOW/DENY/ASK/VERIFY),
-// and the fail-closed gate (runs an action only on ALLOW). Everything else —
-// Cedar as a swappable PolicyEngine driver, capability-minting, the Trust Receipt
-// AttestationSink — is a later interface behind this boundary.
+// The smallest viable kernel (docs/TRUSTHARNESS-STRATEGY.md §5): the immutable
+// Kernel Laws (what the kernel protects unconditionally), the Personal
+// Constitution (the user's editable rules), the Trust/Action Envelope (the one
+// path to a side effect), the deterministic policy engine (dispose →
+// ALLOW/DENY/ASK/VERIFY, Kernel Laws first), and the fail-closed gate (runs an
+// action only on ALLOW). Everything else — Cedar as a swappable PolicyEngine
+// driver, TTL capability-minting, the Trust Receipt AttestationSink, the Envelope
+// state machine — is a later interface behind this boundary.
 
 export type {
   TrustActionEnvelope,
@@ -36,6 +38,9 @@ export {
   conditionMatches,
   constitutionFingerprint,
 } from './constitution';
+
+export type { KernelLaw } from './kernel-laws';
+export { KERNEL_LAWS, kernelLawViolated } from './kernel-laws';
 
 export type {
   Decision,
