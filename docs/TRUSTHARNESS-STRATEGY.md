@@ -184,14 +184,21 @@ change the model, and the hash changes.
 
 **Correction — this is not a nice-to-have; it closes a gap that is live today.**
 [MEASURED 2026-09-02 against `repid_agents`/`repid_scores`/`repid_zkp_proofs`]:
-reputation attaches to `agent_id` / `canonical_agent_id` / `agent_name` +
-`domain_accuracy`. **There is no model, tool-set, policy, or composition column in
-any reputation table** — the only hashes present are `mint_tx_hash`,
-`last_reputation_tx_hash` (transaction hashes) and `work_statement_hash` (which binds
-a *work statement*, not the composition that produced it). Consequence: **an agent
-that keeps its `agent_id` but swaps its underlying model or tools carries its full
-earned RepID into a materially different system.** A RepID-920 agent is trusted for
-what a *previous composition* earned.
+reputation keys on `agent_id` / `canonical_agent_id` / `agent_name` +
+`domain_accuracy`. **No reputation column binds the agent's *composition*** — the
+model+tools+policy+prompt that produced the work. Being precise about what *is*
+there, because the gap is a claim of absence and this project retracts those first:
+every hash/commitment-shaped column present — `mint_tx_hash`,
+`last_reputation_tx_hash` (transaction hashes), and on `repid_zkp_proofs`
+`merkle_root`, `poseidon2_leaf`, `zk_commitment`, `work_statement_hash`,
+`eas_attestation_uid` — binds a transaction, a proof leaf, a work statement, or the
+on-chain anchoring; **none is a content hash of the composition.** `repid_agents`
+*does* carry `capabilities` (jsonb) and `byok_provider` (text), but these are
+free-form descriptors, not a content hash, and the score does not key on them — they
+can change under a fixed `agent_id` while the earned RepID rides along unchanged.
+Consequence: **an agent that keeps its `agent_id` but swaps its underlying model or
+tools carries its full earned RepID into a materially different system.** A
+RepID-920 agent is trusted for what a *previous composition* earned.
 
 This is **structurally the same defect as `ANCHOR-001`** — an attestation that
 binds to an identity instead of to the actual artifact. So the fix is one primitive,
@@ -475,9 +482,11 @@ The vision is a genuine step-change over v1's framing; these four are where buil
    *Trusted Execution Environment*, which appears in ERC-8004's own validation section
    — a guaranteed confused threat model. (§3.1)
 2. **The Composition Hash closes a gap we can measure today.** [MEASURED 2026-09-02]
-   no reputation table keys on model/tools/composition — a model-swap is over-credited
-   *now*. It is the same defect as `ANCHOR-001` (bind to the artifact, not the
-   identity), so it is one primitive, not two. (§3.2)
+   no reputation column binds the agent's *composition* — its hash-shaped columns bind
+   transactions, proof leaves, work statements, and anchoring, and its `capabilities`/
+   `byok_provider` descriptors are neither content hashes nor score keys — so a
+   model-swap is over-credited *now*. It is the same defect as `ANCHOR-001` (bind to
+   the artifact, not the identity), so it is one primitive, not two. (§3.2)
 3. **"Optimization plane ≠ trust plane" is a buildable antibody, `ROUTER-001`, not a
    principle.** The learning router must be *structurally unable* to write the trust
    plane, and that must be mutation-tested, or "models propose, TrustShell disposes"
@@ -519,8 +528,15 @@ standard"; x402 "crypto/stablecoin-settlement-oriented"; MCP scope-elevation "dr
 guidance (SEP-835 is a proposal)". Items are tagged `[F]` (fetched via search) or
 `[K]` (from-knowledge). TrustShell capability grades (EXISTS/PARTIAL/NEW) are
 grounded in code/DB measured this session — the composition-hash gap in §3.2 is
-[MEASURED 2026-09-02] against `repid_agents`/`repid_scores`/`repid_zkp_proofs`. The
-two X.com links in the brief were unreachable and are deliberately not summarized.
+[MEASURED 2026-09-02] against `repid_agents`/`repid_scores`/`repid_zkp_proofs`. Those
+grades and that measurement were **independently re-verified by a separate agent**
+(checker ≠ doer): it confirmed every EXISTS grade is present and no NEW capability
+already exists in code (the adjacent `lib/trustshell/authority-policy.ts` is a
+reputation-authority calculator, not the tool-gating PDP graded NEW), and it caught
+one imprecision in the first draft's §3.2 — an incomplete hash enumeration — which
+is corrected above to "no *composition*-binding hash" rather than "only three hashes
+exist." The two X.com links in the brief were unreachable and are deliberately not
+summarized.
 Nothing here is claimed as shipped that is not graded EXISTS in §1/§2.2; §3–§10 are
 proposals. This doc supersedes the v1 "thin JIT layer" framing of 2026-09-02 (same
 date) — the thin layer is retained as §5, correctly placed as distribution.
