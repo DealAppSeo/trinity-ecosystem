@@ -103,9 +103,42 @@ may fix the missing thing without touching this file.
    slack — less than half a link, so one renamed label puts it back.
 
    **The lane question is which links are top-level at all.** `NORTH-STAR.md`
-   already argues seven, not ten, and this row now carries thirteen. A shorter
-   row is the only change that makes the breakpoint stop mattering.
-   `tests/nav-fit.test.ts` trips if the count changes without a re-measurement.
+   argues seven, not ten, and this row now carries thirteen. A shorter row is the
+   only change that makes the breakpoint stop mattering. `tests/nav-fit.test.ts`
+   trips if the count changes without a re-measurement.
+
+   **[MEASURED 2026-09-02] Do not apply NORTH-STAR's cut list mechanically — it
+   predates three of the thirteen and one of its three cuts no longer holds.**
+   Today's row maps to its table as: its **seven keeps are all present**
+   (Connect, Run, RepID, History, Leaderboard, Agents, Settings); its three cuts
+   are present (Stake, Market, Mission); and **PAI, Claim (`/bind`) and Preview
+   are newer than the document and were never assessed by it.** `/bind` is the
+   ownership-claim surface — do not cut it as an unassessed extra.
+
+   Re-probed, its two evidence-based cuts read differently now:
+
+   - **Market — "no evidence found. Either wire it or drop it" is answered: it
+     is wired.** `agent_services` holds 38 active rows across 7 service types,
+     newest 2026-07-30. What is true is that `total_fulfilled` sums to **0** —
+     38 things listed, none ever bought. That is a usage problem, not an
+     unwired one, and `app/market/page.tsx` already reports it honestly.
+   - **Stake — dormant, but not empty.** `stake_deposits` 52 rows, newest
+     2026-08-08 (~25 days); `agent_stakes` 4; `repid_mvp_stakes` 5. NORTH-STAR
+     says "cut **or gate**"; the data supports gating, not deleting. This does
+     not reopen the `agent_kya_registry` ↔ `stake_deposits` join-key gap — that
+     is a separate, already-filed OPEN item (`agent_kya_registry.id` is bigint,
+     `stake_deposits.builder_id` is uuid, no bridging column) and is unaffected
+     by this row-count re-probe.
+
+   **The near-miss is the part to carry.** The first pass measured
+   `marketplace_listings`, `marketplace_offers` and `agent_listings` — all
+   genuinely 0 rows — and was one step from reporting `/market` dead. The page
+   reads none of them. Confirm which table the SURFACE queries before concluding
+   anything about the surface.
+
+   `HANDOFF:` NORTH-STAR.md is read-only for this lane and its Market row is now
+   stale in its stated form. Whoever owns that file should carry the measurement
+   above into it rather than leaving the next reader to re-derive it.
 
 3. **[2026-08-15, NOT re-probed] hyperdag.org's Brier-calibrated code-review
    table is stale.** It must re-scan at least weekly for newly released models
