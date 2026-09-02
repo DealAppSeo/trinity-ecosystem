@@ -3153,6 +3153,42 @@ export const MUTATIONS = [
     find: '    if (conditionMatches(law.when, norm)) return law;',
     replace: '    if (conditionMatches(law.when, norm)) return null;',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/runtime — the vertical slice (SLICE-001 / check:kernel-slice)
+  // -------------------------------------------------------------------------
+  {
+    id: 'slice-idempotency-not-recorded',
+    suite: 'check:kernel-slice',
+    file: 'lib/trustshell/runtime/execute.ts',
+    protects:
+      'NO REPLAY / DOUBLE EXECUTION. Not recording a completed request means the next call ' +
+      'with the same requestId re-runs the real side effect — the exact double-commit the ' +
+      'idempotency ledger exists to prevent',
+    find: '  ledger.put(envelope.requestId, receipt);\n  return { receipt, executed, replay: false };',
+    replace: '  return { receipt, executed, replay: false };',
+  },
+  {
+    id: 'slice-args-binding-removed',
+    suite: 'check:kernel-slice',
+    file: 'lib/trustshell/runtime/execute.ts',
+    protects:
+      'ARGS-BINDING. Skipping the argsHash check lets the executor act on arguments swapped ' +
+      'after authorization — the Envelope authorized one thing, a different thing runs',
+    find: '  if (hashArgs(input.args) !== envelope.argsHash) {',
+    replace: '  if (false) {',
+  },
+  {
+    id: 'slice-path-safety-removed',
+    suite: 'check:kernel-slice',
+    file: 'lib/trustshell/runtime/file-executor.ts',
+    protects:
+      'PATH-SAFETY. Making the containment check pass everything lets an authorized fs.write ' +
+      'escape via traversal or a symlinked directory — a capability to write becomes a ' +
+      'capability to write ANYWHERE (defeats both the lexical and the real-path guard)',
+    find: "  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));",
+    replace: '  return true;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
