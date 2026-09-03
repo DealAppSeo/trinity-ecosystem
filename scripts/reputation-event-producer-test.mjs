@@ -67,7 +67,7 @@ async function refuses(fn, mustMention, m) {
 // A SHA-256 stand-in — declares parametersKnown:false (it is NOT Poseidon2) but
 // computes, so the statement/witness plumbing is testable before the real params.
 const toyDigest = async (...parts) => {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(parts.join('')));
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(parts.join('\u001f')));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
 };
 const toyScheme = {
