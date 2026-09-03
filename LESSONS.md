@@ -2245,3 +2245,74 @@ survives. 53,690 was cited for months as evidence the false-positive problem was
 measured how often the guard *ran*. That it also happened to *work* was established here for
 the first time, by looking at `repid_after - repid_before` rather than at the guard's own
 stamp.
+
+---
+
+## A37 — the py-brain fix that made the manifest match the wreckage (2026-09-03)
+
+**A34 item 2 says the py-brain build was FIXED on 2026-08-26. Every deploy since
+has failed.** The diagnosis in A34 was right and its fix was insufficient, and the
+gap between those two facts is the lesson.
+
+A34 found the real culprit: the 2026-04-17 commit titled `restore: full
+trinity-ecosystem codebase`, which deleted rather than restored. It then wrote a
+new `trinity-science/requirements.txt` listing what `backtest.py`,
+`signal_fetcher.py` and `veto_engine.py` import — `requests`, `numpy`, `supabase`
+— and explicitly declined "a resurrection of the old, much larger dependency set
+(`crewai`, `pydantic`, `opentelemetry`, `arize-phoenix`, coinbase cdp sdk)".
+
+That reads like discipline. It was the wrong call, for a reason visible only by
+asking a question A34 never asked: **what is the service?**
+
+The same commit deleted `main.py`, `Dockerfile`, `pyproject.toml`, `app/` and
+`py-brain/`. Those three remaining scripts are not the service — they are what was
+left after it was removed. So the fix made the manifest consistent with the debris
+and declared the build repaired, while the thing Railway builds — a FastAPI app
+whose Dockerfile runs `uvicorn main:app` — was still missing its Dockerfile and
+its entrypoint. **A build cannot succeed because its dependency list is now
+accurate about the wrong files.**
+
+Restored from `fdefbd8` (branch `claude/fix-deployment-build-TBvZW`), the last
+commit carrying the whole subtree. The declined dependency set had to come back
+with it: `fastapi`, `uvicorn`, `torch`, `torch_geometric` are what this service
+needs, and that version is a superset of A34's three, so nothing was lost.
+
+**The general form: a fix that restores CONSISTENCY is not a fix that restores
+FUNCTION.** A34 asked "what do the files present import?" when the question was
+"what is supposed to be here?". The first has a tidy answer that passes review;
+only the second reaches the deploy. When a component has been damaged, enumerate
+what it USED to contain before making its remnants self-consistent — `git log
+--diff-filter=D` over the suspect commit answers it in one command.
+
+**Second-order: A34 declared FIXED without a green deploy.** Nothing in it names
+an artifact showing a build succeeding — the same fake-pass shape this file
+records over and over, at the one step that would have caught it. A build fix is
+VERIFIED by a build, not by the plausibility of the diff. This entry cannot claim
+better: the sandbox denied every host all session, so the restore is verified only
+to the point that the files are present and the entrypoint the Dockerfile names
+now exists. **Whether py-brain deploys green is NOT CHECKED** and belongs to
+whoever can read the Railway dashboard.
+
+### Two further defects the restore surfaced, both pre-existing
+
+**`py_compile` is not a name resolver.** All 21 restored files compiled, and two
+undefined names survived that check: `app/anfis_router.py` used `os.getenv` with
+no `import os`, and `/anfis/v2/reward` used an `anfis_sim` the file never
+constructed. Both sit inside function bodies, so the module imports, the service
+boots, and three endpoints raise at request time. `pyflakes` found both in one
+run. Compiling proves a file parses; it says nothing about whether the names
+resolve. Fixed in #177 — the missing controller lines were recoverable verbatim
+from `203c417`, so this was a second restore, not a design decision.
+
+**A security review cut short by a fast merge is NOT_CHECKED, not a pass.** #175
+was merged 13 seconds after opening; Strix's review completed afterwards and found
+an unauthenticated `POST /anfis/config` that rewrites a process-wide reward weight,
+and a CORS allowlist containing `"*"` with `allow_credentials=True` — which makes
+Starlette reflect any origin, so the explicit list governs nothing. Both verified
+here independently before acting (arbitrary and `null` origins came back reflected
+with credentials). Both were pre-existing in `fdefbd8`, so the restore did not
+introduce them — it re-shipped them, which is the same exposure. A third of the
+same root cause, unauthenticated `POST /anfis/v2/approve` writing an arbitrary
+agent's `system_prompt`, Strix identified but could not demonstrate and so did not
+file; it was gated too. Fixed in #178, fail-closed. **Merging before the review
+lands converts a control into a formality.**
