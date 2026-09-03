@@ -3116,6 +3116,35 @@ export const MUTATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // scripts/redteam/evidence/dispute-pipeline-truth.json — DISPUTE-001.
+  //
+  // DISPUTE-001 HELDs today (the dispute/peer-verify mechanism is honestly
+  // dormant), so — unlike ANCHOR-001 / EVERGREEN-002, which BREACH-and-ledger —
+  // a CODE mutation that neuters detection would leave it HELD and unledgered and
+  // SURVIVE. Its detection is proven the way FLEET-001's is: inject the exact
+  // attack into the EVIDENCE and confirm the probe fires. This flips the
+  // reputation ledger's peer-verify event count from 0 to a positive number while
+  // every workflow table stays 0-in-30d — standing moved through a dispute/peer-
+  // verify path with no auditable filing. An intact DISPUTE-001 BREACHES (a new,
+  // unledgered finding -> check:redteam exit 1 -> CAUGHT); a probe whose
+  // fabricated-accountability detector was removed would not notice and SURVIVE,
+  // exposing the regression. The mutated JSON stays valid (5 is a number), so the
+  // mutant is a live attack, not an INVALID parse error.
+  // -------------------------------------------------------------------------
+  {
+    id: 'dispute-fabricated-accountability-undetected',
+    suite: 'check:redteam',
+    file: 'scripts/redteam/evidence/dispute-pipeline-truth.json',
+    protects:
+      'DISPUTE-001 actually fires when reputation is moved through a dispute/peer-verify path ' +
+      'that left no filing. Injecting peer-verify reputation events while every workflow table ' +
+      'is 0-in-30d must BREACH — so "peer verification affects standing" can never quietly come ' +
+      'to mean "standing changed and nothing recorded it"',
+    find: '"peer_verify_events": 0',
+    replace: '"peer_verify_events": 5',
+  },
+
+  // -------------------------------------------------------------------------
   // lib/trustshell/kernel — the trust microkernel core (KERNEL-001 / check:kernel-envelope)
   // -------------------------------------------------------------------------
   {
@@ -3229,6 +3258,69 @@ export const MUTATIONS = [
       'one history position and one silently overwrites the other',
     find: '      await headRootStore.advance(event.subject, prevRoot, newRoot);',
     replace: '      void 0;',
+  },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/evidence — the canonical evidence layer (check:canonical-evidence)
+  //
+  // Strategy §3.3: evidence is the truth, a versioned lens is the interpretation.
+  // These protect the two halves of that split — an append-only, tamper-evident
+  // evidence store, and a lens that actually reads it and stamps its own version.
+  // -------------------------------------------------------------------------
+  {
+    id: 'evidence-store-not-append-only',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/canonical-evidence.ts',
+    protects:
+      'APPEND-ONLY. Evidence you can overwrite is not evidence. Turning append into an ' +
+      'in-place write at index 0 means a second row replaces the first — the history the ' +
+      'whole evidence/lens split rests on silently collapses to the latest row',
+    find: '    this.rows.push(row);',
+    replace: '    this.rows[0] = row;',
+  },
+  {
+    id: 'evidence-integrity-not-verified',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/canonical-evidence.ts',
+    protects:
+      'INTEGRITY IS CHECKABLE. Making verifyEvidenceIntegrity always return true means a row ' +
+      'edited after sealing still reads as authentic — the tamper-evidence the integrity hash ' +
+      'exists to provide becomes decorative',
+    find: '  return evidenceIntegrityHash(body) === integrityHash;',
+    replace: '  return true;',
+  },
+  {
+    id: 'evidence-lens-ignores-domain',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/trust-lens.ts',
+    protects:
+      'A LENS READS THE EVIDENCE IT IS ASKED FOR. Dropping the domain filter makes a ' +
+      'domain-scoped reading silently weigh out-of-domain rows — a "software.security" score ' +
+      'computed partly from payments evidence, which the versioned-claim shape exists to prevent',
+    find: '      const scoped = domain ? rows.filter((r) => r.domain === domain) : rows;',
+    replace: '      const scoped = rows;',
+  },
+  {
+    id: 'evidence-lens-drops-version',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/trust-lens.ts',
+    protects:
+      'A READING NAMES ITS LENS. Blanking the version means a score can no longer say which ' +
+      'algorithm produced it — the "under lens repid-standard-2.3, evidence through <date>" ' +
+      'claim collapses back into one unversioned opaque number',
+    find: '        lensVersion: version,',
+    replace: "        lensVersion: '',",
+  },
+  {
+    id: 'evidence-store-all-leaks-array',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/canonical-evidence.ts',
+    protects:
+      'APPEND-ONLY HOLDS AT RUNTIME, not just in the type. Returning the live internal array from ' +
+      'all() (instead of a copy) hands a caller store.all()[0]=x / .splice(...) — an overwrite-and-' +
+      'delete path that defeats append-only exactly where the readonly type says it cannot',
+    find: '    return this.rows.slice();',
+    replace: '    return this.rows;',
   },
 ];
 

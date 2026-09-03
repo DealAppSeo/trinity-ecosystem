@@ -88,6 +88,11 @@ headroom.db
 # temp compile dir for measure:pay-custody-shadow
 .measure-pay-shadow-*/
 
+# temp compile dir for scripts/redteam/compile.mjs (check:redteam, check:kernel-slice,
+# check:canonical-evidence, …). Its siblings above are ignored; this one was not, so a
+# `git add -A` after a probe/mutation run staged dozens of compiled .js artifacts.
+.redteam-probe-*/
+
 # agent-browser runtime output (screenshots, HAR, traces, video). Derived
 # artefacts of a dev tool; the daemon writes here because ./agent-browser.json
 # sets screenshotDir. Machine-local config lives in ~/.agent-browser/, not here.

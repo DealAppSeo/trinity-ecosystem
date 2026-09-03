@@ -91,6 +91,7 @@
     "check:trust": "node scripts/check-trust-foundation.mjs",
     "check:kernel-envelope": "node scripts/check-kernel-envelope.mjs",
     "check:kernel-slice": "node scripts/check-kernel-slice.mjs",
+    "check:canonical-evidence": "node scripts/check-canonical-evidence.mjs",
     "check:custody-shadow": "node scripts/check-custody-shadow.mjs",
     "check:pay-custody-shadow": "node scripts/check-pay-custody-shadow.mjs",
     "check:deps": "node scripts/check-deps.mjs",
