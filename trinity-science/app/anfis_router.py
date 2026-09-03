@@ -1,3 +1,4 @@
+import os
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -57,6 +58,10 @@ rule1 = ctrl.Rule(truth_score['high'], reward['reward'])
 rule2 = ctrl.Rule(truth_score['low'], reward['punish'])
 # 3. Complex Task + Medium Truth => Neutral (Forgiving of hardness)
 rule3 = ctrl.Rule(task_complexity['complex'] & truth_score['medium'], reward['neutral'])
+
+# Control System
+anfis_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+anfis_sim = ctrl.ControlSystemSimulation(anfis_ctrl)
 
 # ==========================================
 # 2. CO-FOUNDER MATCHER (The Matchmaker)
