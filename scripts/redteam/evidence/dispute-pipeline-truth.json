@@ -1,0 +1,52 @@
+{
+  "surface": "GA dispute / handoff / peer-verification pipeline — liveness and reputation-linkage ground truth",
+  "collectedAt": "2026-09-02T23:15:00.000Z",
+  "collectedBy": "claude-code session claude/ga-dispute-pipeline-antibody",
+  "collectedVia": "Supabase MCP execute_sql against project qnnpjhlxljtqyigedwkb (agent_handoffs, peer_verification_votes, dispute_claims, dispute_validation_queue, repid_score_events)",
+  "note": "Measured ground truth for whether the formal dispute / handoff / peer-verification mechanism is a LIVE accountability signal that moves reputation. Read-only aggregate counts and recency; no agent ids, no votes, no dispute bodies stored here. Prior work: PRIOR-WORK-INDEX rows 'Formal dispute/peer-verify mechanism is unused' (GA, 2026-08-26) and 'Peer-verify seat writes nothing' (Sean/DDL, 2026-08-15).",
+  "observations": {
+    "workflow_tables": {
+      "source": "count(*), max(ts), count(*) filter (ts > now()-30d) per table",
+      "note": "The 'one concept, disjoint pipelines' cluster. A dispute/handoff/peer-verify feature must be wired to the LIVE path, never one of these — all three are dormant (0 rows in 30 days).",
+      "tables": [
+        { "table": "agent_handoffs", "role": "workflow", "rows_total": 4, "rows_30d": 0, "last_row": "2026-07-01T03:41:29Z", "claimed_live": false },
+        { "table": "peer_verification_votes", "role": "workflow", "rows_total": 21210, "rows_30d": 0, "last_row": "2026-07-21T09:16:32Z", "claimed_live": false },
+        { "table": "dispute_claims", "role": "workflow", "rows_total": 0, "rows_30d": 0, "last_row": null, "claimed_live": false }
+      ]
+    },
+    "queue_table": {
+      "source": "dispute_validation_queue: count(*), 30d, daily histogram",
+      "table": "dispute_validation_queue",
+      "role": "queue",
+      "rows_total": 34,
+      "rows_30d": 10,
+      "last_row": "2026-08-28T12:05:01Z",
+      "max_per_day_30d": 1,
+      "daily_signature": "nightly-smoke",
+      "claimed_live": false,
+      "note": "The only member of the group taking recent rows — but at <=1 row/day (2026-08-17..08-28, gaps on 08-19/08-22), the same nightly-smoke signature as HAL/trinity_tasks, and it STOPPED 2026-08-28 (the smoke trickle itself has ceased). Recent rows here are the e2e smoke test, NOT real dispute traffic. This is 'live' only in the sense a heartbeat is live."
+    },
+    "reputation_ledger": {
+      "source": "repid_score_events (152,230 rows, 16 distinct event_type)",
+      "total_events": 152230,
+      "distinct_types": 16,
+      "dispute_or_peerverify_named_types": 0,
+      "peer_verify_events": 0,
+      "dispute_events": 0,
+      "note": "The formal dispute/peer-verify pipeline moves reputation ZERO times: no PEER_VERIFY* and no DISPUTE* event type exists at all across 152,230 rows. So 'accountable peer verification / dispute resolution' cannot be claimed on the strength of this ledger. Reviving the PEER_VERIFY* writer is Sean-gated (unapplied migration 20260815190000_work_seat_event_types.sql) + needs a repid-engine change + a DID->repid_agents.id mapping + a live fleet.",
+      "adjacent_conflict_mechanisms": {
+        "note": "Conflict-ADJACENT event types that are NOT the formal dispute/peer-verify pipeline; recorded so they are not conflated with it. All long-dormant except VALIDATION_FAILED, whose 30d activity is the same nightly-smoke as the queue table (10/30d, last 2026-08-28).",
+        "types": [
+          { "event_type": "VALIDATION_FAILED", "rows_total": 36, "rows_30d": 10, "last_seen": "2026-08-28T12:05:06Z", "characterization": "nightly-smoke (matches dispute_validation_queue), stopped 2026-08-28" },
+          { "event_type": "VALIDATOR_REWARD", "rows_total": 31, "rows_30d": 0, "last_seen": "2026-07-25T03:16:17Z", "characterization": "dormant" },
+          { "event_type": "CHALLENGE_WIN", "rows_total": 20, "rows_30d": 0, "last_seen": "2026-05-07T08:59:55Z", "characterization": "long-dormant" },
+          { "event_type": "CHALLENGE_LOSS", "rows_total": 15, "rows_30d": 0, "last_seen": "2026-04-17T11:19:39Z", "characterization": "long-dormant" },
+          { "event_type": "PEACEMAKER", "rows_total": 2, "rows_30d": 0, "last_seen": "2026-04-15T07:40:02Z", "characterization": "long-dormant" },
+          { "event_type": "VALIDATOR_PENALTY", "rows_total": 1, "rows_30d": 0, "last_seen": "2026-06-03T20:50:36Z", "characterization": "long-dormant" },
+          { "event_type": "CHALLENGE_DRAW", "rows_total": 1, "rows_30d": 0, "last_seen": "2026-04-15T06:34:18Z", "characterization": "long-dormant" }
+        ]
+      }
+    },
+    "verdict": "The formal dispute / handoff / peer-verification mechanism is DORMANT end-to-end: all three workflow tables are 0-in-30d, the only recent activity is dispute_validation_queue's <=1/day nightly-smoke (stopped 2026-08-28), and repid_score_events carries 0 dispute/peer-verify events across 152,230 rows. It may not be presented as a live accountability signal, and no reputation may be moved through a dispute/peer-verify path that has no corresponding filing. Live wiring is fenced outside a cloud session (Sean-gated DDL + repid-engine writer + DID mapping + a live fleet)."
+  }
+}
