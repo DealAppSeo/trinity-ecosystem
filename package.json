@@ -71,6 +71,7 @@
     "check:assigned-contract": "node scripts/assigned-contract-test.mjs",
     "check:raw-bytes": "node scripts/check-raw-control-bytes.mjs",
     "check:outcome-reputation": "node scripts/outcome-reputation-test.mjs",
+    "check:reputation-producer": "node scripts/reputation-event-producer-test.mjs",
     "check:auditor-grant": "node scripts/auditor-grant-test.mjs",
     "check:bft-judge": "node scripts/bft-judge-test.mjs",
     "check:handoff": "node scripts/handoff-test.mjs",
