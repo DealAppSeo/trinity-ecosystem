@@ -1,10 +1,28 @@
-# trinity-science — dependencies for backtest.py / signal_fetcher.py / veto_engine.py
-#
-# This file did not exist in the tree (see LESSONS.md for how it was lost and
-# what it broke). Rebuilt from what the three current files actually import —
-# not from the much larger dependency set (crewai, pydantic, opentelemetry,
-# arize-phoenix, coinbase cdp sdk...) an earlier, larger version of this
-# service once needed, none of which any current file imports.
-requests>=2.31.0,<3
-numpy>=1.26.0,<2.3
-supabase>=2.4.0,<3
+# Core API
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-dotenv>=1.0.1
+
+# ANFIS / ML Core — keep these exact
+torch==2.2.0
+torch_geometric==2.5.0
+scikit-fuzzy==0.4.2
+matplotlib>=3.7.0
+numpy>=1.26.0,<2.0.0
+scipy>=1.10.0
+scikit-learn>=1.2.0
+networkx>=3.2.1
+
+# Data / API
+pydantic>=2.10,<3.0.0
+requests>=2.32.3
+supabase>=2.11.0
+structlog>=24.1.0
+prometheus_client>=0.20.0
+python-dateutil>=2.8.0
+
+# Observability (lightweight)
+opentelemetry-api>=1.25.0
+opentelemetry-sdk>=1.25.0
+opentelemetry-exporter-otlp>=1.25.0
+opentelemetry-semantic-conventions>=0.54b1

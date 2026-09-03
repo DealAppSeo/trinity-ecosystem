@@ -1,0 +1,337 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Trinity Science Division API",
+        "version": "1.0.0",
+        "description": "The mathematical brain of the Trinity Ecosystem, providing ANFIS decision making and GNN-based context ranking."
+    },
+    "paths": {
+        "/anfis/decide": {
+            "post": {
+                "summary": "Make a fuzzy logic decision based on task parameters.",
+                "operationId": "decide_anfis",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AnfisInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Decision result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AnfisOutput"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/gnn/rank": {
+            "post": {
+                "summary": "Rank artifact relevance using Graph Neural Networks.",
+                "operationId": "rank_gnn",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GnnInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ranked artifacts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GnnOutput"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/anfis/reward": {
+            "post": {
+                "summary": "Calculate reward multiplier using Adaptive ANFIS.",
+                "operationId": "calculate_reward",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RewardInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reward calculation result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RewardOutput"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/anfis/config": {
+            "post": {
+                "summary": "Update ANFIS configuration (Governance).",
+                "operationId": "update_config",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RewardConfig"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Configuration updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "$ref": "#/components/schemas/RewardConfig"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/market/bid": {
+            "post": {
+                "summary": "Get competitive bids for compute tasks (Arbitrage).",
+                "operationId": "get_market_bids",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MarketBidRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Winning bid and alternatives",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MarketBidResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AnfisInput": {
+                "type": "object",
+                "properties": {
+                    "latency_ms": {
+                        "type": "number",
+                        "description": "Current system latency"
+                    },
+                    "user_reputation": {
+                        "type": "number",
+                        "description": "User's RepID score (0-100)"
+                    },
+                    "task_complexity": {
+                        "type": "number",
+                        "description": "Estimated task complexity (0-1)"
+                    },
+                    "user_preference_accuracy": {
+                        "type": "number",
+                        "description": "User preference for accuracy over speed (0-1)"
+                    },
+                    "timeout_ms": {
+                        "type": "integer",
+                        "description": "Optional client-side timeout tolerance",
+                        "default": 5000
+                    }
+                },
+                "required": [
+                    "latency_ms",
+                    "user_reputation",
+                    "task_complexity"
+                ]
+            },
+            "AnfisOutput": {
+                "type": "object",
+                "properties": {
+                    "should_query_user": {
+                        "type": "boolean"
+                    },
+                    "interaction_type": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "shallow_check",
+                            "deep_clarification",
+                            "email_notification",
+                            "sms_notification"
+                        ],
+                        "description": "The specific type of opportunity/interaction recommended."
+                    },
+                    "query_depth": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "shallow",
+                            "deep"
+                        ]
+                    },
+                    "score": {
+                        "type": "number"
+                    },
+                    "reason": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "should_query_user",
+                    "score",
+                    "reason"
+                ]
+            },
+            "GnnInput": {
+                "type": "object",
+                "properties": {
+                    "task_embedding": {
+                        "type": "array",
+                        "items": {
+                            "type": "number"
+                        }
+                    },
+                    "candidate_node_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "task_embedding",
+                    "candidate_node_ids"
+                ]
+            },
+            "GnnOutput": {
+                "type": "object",
+                "properties": {
+                    "ranked_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Node IDs sorted by relevance"
+                    },
+                    "scores": {
+                        "type": "array",
+                        "items": {
+                            "type": "number"
+                        }
+                    }
+                },
+                "required": [
+                    "ranked_ids"
+                ]
+            },
+            "RewardInput": {
+                "type": "object",
+                "properties": {
+                    "action_type": {
+                        "type": "string",
+                        "description": "Type of action (e.g. REFERRAL, STAKE, COMPUTE)"
+                    },
+                    "network_need": {
+                        "type": "number",
+                        "description": "Current network urgency (0-1)"
+                    },
+                    "saturation": {
+                        "type": "number",
+                        "description": "Network saturation/decay factor (0-1)"
+                    },
+                    "diversity_score": {
+                        "type": "number",
+                        "description": "User's Shannon Entropy score (0-1)"
+                    }
+                },
+                "required": [
+                    "action_type",
+                    "network_need",
+                    "saturation",
+                    "diversity_score"
+                ]
+            },
+            "RewardOutput": {
+                "type": "object",
+                "properties": {
+                    "base_value": {
+                        "type": "number"
+                    },
+                    "multiplier": {
+                        "type": "number"
+                    },
+                    "final_amount": {
+                        "type": "number"
+                    },
+                    "reason": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "base_value",
+                    "multiplier",
+                    "final_amount",
+                    "reason"
+                ]
+            },
+            "RewardConfig": {
+                "type": "object",
+                "properties": {
+                    "decay_rate": {
+                        "type": "number"
+                    },
+                    "network_need_weight": {
+                        "type": "number"
+                    },
+                    "diversity_weight": {
+                        "type": "number"
+                    }
+                }
+            }
+        }
+    }
+}
