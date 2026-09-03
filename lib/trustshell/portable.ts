@@ -158,6 +158,30 @@ export type {
 } from './harness/loop';
 
 // ---------------------------------------------------------------------------
+// The canonical evidence layer (strategy §3.3): evidence is the truth, a
+// versioned Trust Lens is the interpretation. Value-exported (not type-only) so
+// `check:dormancy` counts these as reachable rather than inert — the same rule
+// the kernel and spine blocks above were written to obey.
+export {
+  EVIDENCE_METRICS,
+  sealEvidenceRow,
+  evidenceIntegrityHash,
+  verifyEvidenceIntegrity,
+  evidenceFromReceipt,
+  InMemoryEvidenceStore,
+} from './evidence/canonical-evidence';
+export type {
+  EvidenceMetric,
+  CanonicalEvidenceRow,
+  EvidenceRowBody,
+  SealedEvidenceRow,
+  ReceiptClassification,
+  EvidenceStore,
+} from './evidence/canonical-evidence';
+export { makeRepidLens, repidStandard23Lens } from './evidence/trust-lens';
+export type { TrustLens, LensReading, LensConfig } from './evidence/trust-lens';
+
+// ---------------------------------------------------------------------------
 // The verification spine.
 //
 // Exported 2026-08-16 because it was NOT, and the comment above `runAgentLoop`

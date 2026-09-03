@@ -3189,6 +3189,58 @@ export const MUTATIONS = [
     find: "  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));",
     replace: '  return true;',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/evidence — the canonical evidence layer (check:canonical-evidence)
+  //
+  // Strategy §3.3: evidence is the truth, a versioned lens is the interpretation.
+  // These protect the two halves of that split — an append-only, tamper-evident
+  // evidence store, and a lens that actually reads it and stamps its own version.
+  // -------------------------------------------------------------------------
+  {
+    id: 'evidence-store-not-append-only',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/canonical-evidence.ts',
+    protects:
+      'APPEND-ONLY. Evidence you can overwrite is not evidence. Turning append into an ' +
+      'in-place write at index 0 means a second row replaces the first — the history the ' +
+      'whole evidence/lens split rests on silently collapses to the latest row',
+    find: '    this.rows.push(row);',
+    replace: '    this.rows[0] = row;',
+  },
+  {
+    id: 'evidence-integrity-not-verified',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/canonical-evidence.ts',
+    protects:
+      'INTEGRITY IS CHECKABLE. Making verifyEvidenceIntegrity always return true means a row ' +
+      'edited after sealing still reads as authentic — the tamper-evidence the integrity hash ' +
+      'exists to provide becomes decorative',
+    find: '  return evidenceIntegrityHash(body) === integrityHash;',
+    replace: '  return true;',
+  },
+  {
+    id: 'evidence-lens-ignores-domain',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/trust-lens.ts',
+    protects:
+      'A LENS READS THE EVIDENCE IT IS ASKED FOR. Dropping the domain filter makes a ' +
+      'domain-scoped reading silently weigh out-of-domain rows — a "software.security" score ' +
+      'computed partly from payments evidence, which the versioned-claim shape exists to prevent',
+    find: '      const scoped = domain ? rows.filter((r) => r.domain === domain) : rows;',
+    replace: '      const scoped = rows;',
+  },
+  {
+    id: 'evidence-lens-drops-version',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/trust-lens.ts',
+    protects:
+      'A READING NAMES ITS LENS. Blanking the version means a score can no longer say which ' +
+      'algorithm produced it — the "under lens repid-standard-2.3, evidence through <date>" ' +
+      'claim collapses back into one unversioned opaque number',
+    find: '        lensVersion: version,',
+    replace: "        lensVersion: '',",
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
