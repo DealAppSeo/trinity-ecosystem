@@ -1,0 +1,39 @@
+[project]
+name = "trinity-science"
+version = "0.1.0"
+description = "The Scientific Brain of the Trinity Ecosystem (GNN/ANFIS Microservice)"
+authors = [{ name = "Trinity Science Team", email = "science@trinity.ai" }]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-dotenv>=1.0.1",
+    "torch==2.2.0",
+    "torch_geometric==2.5.0",
+    "scikit-fuzzy==0.4.2",
+    "numpy>=1.26.0,<2.0.0",
+    "scipy>=1.10.0",
+    "scikit-learn>=1.2.0",
+    "networkx>=3.2.1",
+    "pydantic>=2.10,<3.0.0",
+    "requests>=2.32.3",
+    "supabase>=2.11.0",
+    "structlog>=24.1.0",
+    "prometheus_client>=0.20.0",
+    "python-dateutil>=2.8.0",
+    "opentelemetry-api>=1.25.0",
+    "opentelemetry-sdk>=1.25.0",
+    "opentelemetry-exporter-otlp>=1.25.0",
+    "opentelemetry-semantic-conventions>=0.54b1",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "httpx>=0.27.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
