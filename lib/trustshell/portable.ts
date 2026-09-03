@@ -222,6 +222,18 @@ export type {
   AcceptanceState,
 } from './identity/acceptance-loop';
 
+// Stage B — the reputation-event producer. Turns a verdict's outcome events into
+// appended, self-checked history transitions (docs/AGENT-LOOP-SCOPE.md). The
+// missing link between an outcome and a committed reputation event; value-
+// exported so `check:dormancy` counts it reachable.
+export { produceTransitions, InMemoryHeadRootStore } from './identity/reputation-event-producer';
+export type {
+  WriterBinding,
+  HeadRootStore,
+  ProduceTransitionsInput,
+  ProducedTransition,
+} from './identity/reputation-event-producer';
+
 /**
  * What a zk RepID operation COSTS, in hash calls — the only unit that survives
  * the change of hash function. See `identity/cost.ts`: the production

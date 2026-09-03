@@ -3189,6 +3189,47 @@ export const MUTATIONS = [
     find: "  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));",
     replace: '  return true;',
   },
+
+  // -------------------------------------------------------------------------
+  // lib/trustshell/identity/reputation-event-producer.ts — Stage B (check:reputation-producer)
+  //
+  // The producer closes outcome -> committed event. These protect the three
+  // ratified decisions: no self-report, a stand-in root stays flagged, and the
+  // verifier-held head only advances on a transition that checked out.
+  // -------------------------------------------------------------------------
+  {
+    id: 'producer-allows-doer-self-report',
+    suite: 'check:reputation-producer',
+    file: 'lib/trustshell/identity/reputation-event-producer.ts',
+    protects:
+      'NO SELF-REPORT. Neutering the doer-subject guard lets a reputation event about the doer ' +
+      'be appended through the verdict path — the actor whose work was judged earning its own ' +
+      'outcome, the exact self-report an earned-reputation layer exists to replace',
+    find: '    if (e.subject === doerDid) {',
+    replace: '    if (false) {',
+  },
+  {
+    id: 'producer-parameters-known-faked',
+    suite: 'check:reputation-producer',
+    file: 'lib/trustshell/identity/reputation-event-producer.ts',
+    protects:
+      'A STAND-IN ROOT STAYS FLAGGED. Forcing parametersKnown:true on the result means a root ' +
+      'computed under a SHA-256 stand-in reads as if it came from real Poseidon2 — a durable ' +
+      'store would persist a fabricated root believing its parameters were settled',
+    find: 'parametersKnown: scheme.parametersKnown',
+    replace: 'parametersKnown: true',
+  },
+  {
+    id: 'producer-head-not-advanced',
+    suite: 'check:reputation-producer',
+    file: 'lib/trustshell/identity/reputation-event-producer.ts',
+    protects:
+      'THE VERIFIER-HELD HEAD ADVANCES ON A VALID APPEND. Dropping the advance leaves the head ' +
+      'at its old root, so the next event re-appends from the same prevRoot — two events land on ' +
+      'one history position and one silently overwrites the other',
+    find: '      await headRootStore.advance(event.subject, prevRoot, newRoot);',
+    replace: '      void 0;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();
