@@ -239,6 +239,44 @@ await check('EVIDENCE_METRICS is the closed runtime set', async () => {
   truthy(EVIDENCE_METRICS.includes('latency'), 'including latency');
 });
 
+// ── hardening from independent verification (F1/F2/F3) ──────────────────────
+await check('all() returns a COPY — the internal history cannot be mutated through it', async () => {
+  const store = new InMemoryEvidenceStore();
+  store.append(row({ taskId: 't1' }));
+  store.append(row({ taskId: 't2' }));
+  const snap = store.all();
+  snap.length = 0; // try to delete the history through the returned array
+  snap.push(row({ taskId: 'injected' }));
+  eq(store.all().length, 2, 'the store is unaffected — append-only holds at runtime, not just in the type');
+  eq(store.all()[0].taskId, 't1', 'and the original rows are intact and ordered');
+});
+
+await check('an UNRECOGNIZED metric bears on nothing instead of crashing the lens', async () => {
+  // A corrupted persisted row could carry a metric the type forbids. The lens
+  // must treat it as unclassified, never throw mid-reading.
+  const bogus = row({ metric: 'not_a_real_metric' });
+  const reading = repidStandard23Lens.apply([bogus], NOW);
+  eq(reading.metrics.x402SuccessRate.state, 'unmeasured', 'an unknown metric contributes to no dimension');
+  eq(reading.rowsConsidered, 1, 'the row is counted but bears on nothing');
+});
+
+await check('a lens with no id or version is refused at construction', async () => {
+  let threw = false;
+  try {
+    makeRepidLens('', '2.3');
+  } catch {
+    threw = true;
+  }
+  eq(threw, true, 'an empty lensId is refused — a reading with no lens identity is not a claim');
+  threw = false;
+  try {
+    makeRepidLens('x', '');
+  } catch {
+    threw = true;
+  }
+  eq(threw, true, 'an empty lensVersion is refused too');
+});
+
 console.log(`\ncheck:canonical-evidence — ${passed} passed, ${failures.length} failed`);
 if (failures.length > 0) process.exit(1);
 console.log('check:canonical-evidence — VERIFIED');

@@ -98,6 +98,12 @@ const RATE_METRICS: Record<Exclude<EvidenceMetric, 'latency'>, keyof EarnedMetri
  * prior is another call with a different config — over the SAME evidence.
  */
 export function makeRepidLens(id: string, version: string, config: LensConfig = {}): TrustLens {
+  // A reading with no lens identity is not a claim (the whole point of a versioned
+  // lens), so a lens with no id or version is refused at construction rather than
+  // producing anonymous readings. Independent verification flagged the footgun.
+  if (!id || !version) {
+    throw new Error('a Trust Lens must have a non-empty id and version — a reading with no lens identity is not a claim');
+  }
   return {
     id,
     version,
@@ -122,7 +128,13 @@ export function makeRepidLens(id: string, version: string, config: LensConfig = 
             latencyObs.push({ observedAt: r.observedAt, latencyMs: r.latencyMs });
           }
         } else if (r.metric !== null) {
-          rateObs[r.metric].push({ observedAt: r.observedAt, success: r.success, domain: r.domain });
+          // `in rateObs` guards the DB/HTTP boundary: the type forbids an unknown
+          // metric, but a corrupted persisted row could carry one, and indexing a
+          // missing bucket would crash the whole reading. An unrecognized metric
+          // bears on nothing — treated as unclassified, exactly like `null`, never
+          // faked into a signal. (Independent verification flagged the crash.)
+          const bucket = rateObs[r.metric];
+          if (bucket) bucket.push({ observedAt: r.observedAt, success: r.success, domain: r.domain });
         }
       }
 

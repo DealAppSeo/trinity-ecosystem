@@ -3241,6 +3241,17 @@ export const MUTATIONS = [
     find: '        lensVersion: version,',
     replace: "        lensVersion: '',",
   },
+  {
+    id: 'evidence-store-all-leaks-array',
+    suite: 'check:canonical-evidence',
+    file: 'lib/trustshell/evidence/canonical-evidence.ts',
+    protects:
+      'APPEND-ONLY HOLDS AT RUNTIME, not just in the type. Returning the live internal array from ' +
+      'all() (instead of a copy) hands a caller store.all()[0]=x / .splice(...) — an overwrite-and-' +
+      'delete path that defeats append-only exactly where the readonly type says it cannot',
+    find: '    return this.rows.slice();',
+    replace: '    return this.rows;',
+  },
 ];
 
 export const SUITES = [...new Set(MUTATIONS.map((m) => m.suite))].sort();

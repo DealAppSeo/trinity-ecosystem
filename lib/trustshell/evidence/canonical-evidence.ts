@@ -219,7 +219,12 @@ export class InMemoryEvidenceStore implements EvidenceStore {
     this.rows.push(row);
   }
   all(): readonly SealedEvidenceRow[] {
-    return this.rows;
+    // A COPY, never the live array. `readonly` is a compile-time promise only —
+    // erased at runtime — so returning `this.rows` would hand a caller
+    // `store.all()[0] = tampered` / `.splice(...)`, an overwrite-and-delete path
+    // that defeats append-only exactly where the type says it cannot. Independent
+    // verification found this; `forSubject` already copied, and now so does this.
+    return this.rows.slice();
   }
   forSubject(who: string): readonly SealedEvidenceRow[] {
     return this.rows.filter((r) => r.who === who);
