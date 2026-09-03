@@ -1,6 +1,8 @@
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+
+from .auth import require_internal_service
 from pydantic import BaseModel
 import numpy as np
 import skfuzzy as fuzz
@@ -215,7 +217,7 @@ async def suggest_directive(data: SuggestionInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/approve")
+@router.post("/approve", dependencies=[Depends(require_internal_service)])
 async def approve_suggestion(data: ApproveInput):
     """
     Approves the pending suggestion for an agent.

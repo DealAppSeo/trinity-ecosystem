@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
 from typing import List, Literal, Optional, Dict, Union
 import os
@@ -66,6 +66,7 @@ async def run_heartbeat():
         await asyncio.sleep(30)
 
 from app.anfis_router import router as anfis_router
+from app.auth import require_internal_service
 from models import MultiplicativeGNN
 import torch
 
@@ -215,13 +216,12 @@ origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://controller.aitrinitysymphony.com", # Production Vercel
-    "*" # Allow all for now to ensure smooth launch
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -302,7 +302,7 @@ async def calculate_reward(input_data: RewardInput):
         reason=reason
     )
 
-@app.post("/anfis/config")
+@app.post("/anfis/config", dependencies=[Depends(require_internal_service)])
 async def update_config(config: RewardConfig):
     """
     Update the Reward Configuration (Governance/Controller).
