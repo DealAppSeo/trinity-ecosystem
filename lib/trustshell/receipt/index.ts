@@ -22,6 +22,7 @@ export {
   verifyReceiptSignature,
   checkReceipt,
   formatMarker,
+  attestationPreimage,
   type SignatureCheck,
   type ReceiptCheck,
 } from './sign';

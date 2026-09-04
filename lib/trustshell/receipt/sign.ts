@@ -23,7 +23,34 @@
 
 import { sign, verify, type Did, type KeyPair } from '../identity/did';
 import { auditHashFor, markerFor, recomputeReceipt } from './build';
+import { AUDIT_DOMAIN } from './types';
 import type { AttestationKind, Marker, SessionReceipt } from './types';
+
+/**
+ * The signed preimage binds `kind` to `auditHash`.
+ *
+ * THE DEFECT THIS CLOSES. Until now the signature covered `auditHash` alone, and
+ * `auditHash` covers `core` — but `attestation.kind` is in neither. So a `self`
+ * receipt could be relabelled `org`, and every check still passed: the signature
+ * verified (its message was unchanged), `recomputeReceipt` agreed (the core was
+ * unchanged), `independentlyAttested` flipped to true, and `formatMarker` dropped
+ * its "(self-attested)" suffix. A reader got the stronger claim with no forgery
+ * required — the exact SSL-padlock-as-trust-badge failure this module warns about.
+ *
+ * TRUSTSHELL-V1.md recorded this as a known limit and said "binding custody into
+ * the signature is a schema change". It is not: nothing STORED changes. The
+ * binding goes into the message that gets signed, not into the receipt. The
+ * `Attestation` shape is byte-identical to before.
+ *
+ * Sub-domained off `AUDIT_DOMAIN` exactly as `auditHashForRuleset` does, so an
+ * attestation signature can never be replayed as a receipt hash or vice versa.
+ */
+export function attestationPreimage(
+  kind: Exclude<AttestationKind, 'unsigned'>,
+  auditHash: string
+): string {
+  return `${AUDIT_DOMAIN}:attestation|${kind}|${auditHash}`;
+}
 
 /**
  * Sign `auditHash`, not the core.
@@ -54,7 +81,9 @@ export async function signReceipt(
     attestation: {
       kind,
       signerDid: signer.did,
-      signature: await sign(signer.privateKey, auditHash),
+      // Bound, not bare: see `attestationPreimage`. Signing `auditHash` alone is
+      // what let `kind` be edited after the fact.
+      signature: await sign(signer.privateKey, attestationPreimage(kind, auditHash)),
     },
   };
 }
@@ -67,10 +96,21 @@ export interface SignatureCheck {
   /** Present when the outcome is not VERIFIED. */
   reason: string | null;
   /**
-   * True only for `kind: 'org'`. Surfaced so a UI cannot render a self-attested
-   * receipt with the same chrome as an independently attested one.
+   * True only for `kind: 'org'` WHOSE SIGNATURE ACTUALLY COVERS THAT KIND.
+   * Surfaced so a UI cannot render a self-attested receipt with the same chrome
+   * as an independently attested one — and so a relabelled one cannot either.
    */
   independentlyAttested: boolean;
+  /**
+   * Whether the signature covers `attestation.kind`.
+   *
+   * False for legacy signatures written before the binding existed. Those are
+   * still genuine signatures over `auditHash` — the bytes are intact and that is
+   * reported as VERIFIED — but they say NOTHING about `kind`, so the receipt
+   * cannot claim independent attestation on their strength. Fails closed: an
+   * unbound `org` label is treated as unproven rather than trusted.
+   */
+  kindBound: boolean;
 }
 
 /**
@@ -84,7 +124,7 @@ export interface SignatureCheck {
  */
 export async function verifyReceiptSignature(receipt: SessionReceipt): Promise<SignatureCheck> {
   const { kind, signerDid, signature } = receipt.attestation;
-  const base = { kind, signerDid, independentlyAttested: kind === 'org' };
+  const base = { kind, signerDid, independentlyAttested: false, kindBound: false };
 
   if (kind === 'unsigned' || signature === null || signerDid === null) {
     return {
@@ -106,9 +146,20 @@ export async function verifyReceiptSignature(receipt: SessionReceipt): Promise<S
     };
   }
 
+  // Two acceptable messages, tried in order of strength. The bound form proves
+  // `kind` was fixed at signing time; the legacy bare form proves only that the
+  // core is intact. Trying bound FIRST matters: a legacy-only check would accept
+  // a relabelled receipt, which is the whole defect.
   let ok: boolean;
+  let kindBound = false;
   try {
-    ok = await verify(signerDid, receipt.auditHash, signature);
+    ok = await verify(signerDid, attestationPreimage(kind, receipt.auditHash), signature);
+    if (ok) {
+      kindBound = true;
+    } else {
+      // Pre-binding signature. Genuine, but silent about `kind`.
+      ok = await verify(signerDid, receipt.auditHash, signature);
+    }
   } catch (err) {
     // A malformed DID is a caller bug, not a failed verification. Reporting it
     // as FAILED would let a typo read as "not authorized" and hide the real
@@ -124,7 +175,19 @@ export async function verifyReceiptSignature(receipt: SessionReceipt): Promise<S
     return { ...base, outcome: 'FAILED', reason: 'signature does not verify against signerDid' };
   }
 
-  return { ...base, outcome: 'VERIFIED', reason: null };
+  // Independence is granted only when the signature actually covers the label.
+  const independentlyAttested = kind === 'org' && kindBound;
+
+  return {
+    ...base,
+    kindBound,
+    independentlyAttested,
+    outcome: 'VERIFIED',
+    reason: kindBound
+      ? null
+      : `signature predates attestation-kind binding, so it does not attest to kind='${kind}'; ` +
+        're-sign to bind it',
+  };
 }
 
 export interface ReceiptCheck {
@@ -200,6 +263,10 @@ export function formatMarker(receipt: SessionReceipt, check: ReceiptCheck): stri
     `${receipt.core.spend.outputTokens.toLocaleString('en-US')} out`,
   ].filter((p): p is string => p !== null);
 
-  const attest = receipt.attestation.kind === 'self' ? ' (self-attested)' : '';
+  // Conservative: the suffix is dropped ONLY for a receipt whose signature
+  // actually proves independent attestation. A relabelled or legacy-signed
+  // receipt still reads "(self-attested)", because that is all its signature
+  // supports — the label alone is not evidence.
+  const attest = check.signature.independentlyAttested ? '' : ' (self-attested)';
   return `${glyph} ${check.outcome.replace('_', ' ')}  ${parts.join(' · ')}  ${receipt.receiptId}${attest}`;
 }

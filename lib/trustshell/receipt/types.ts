@@ -174,7 +174,13 @@ export interface Attestation {
   kind: AttestationKind;
   /** did:key of the signer. null when unsigned. */
   signerDid: string | null;
-  /** bs58 Ed25519 over `auditHash`. null when unsigned. */
+  /**
+   * bs58 Ed25519 over `${AUDIT_DOMAIN}:attestation|${kind}|${auditHash}`, which
+   * binds the attestation kind so a `self` receipt cannot be relabelled `org`.
+   * Signatures written before that binding covered bare `auditHash`; they still
+   * verify, but `verifyReceiptSignature` reports `kindBound: false` and refuses
+   * to grant `independentlyAttested` on their strength. null when unsigned.
+   */
   signature: string | null;
 }
 

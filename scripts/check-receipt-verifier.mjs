@@ -192,11 +192,19 @@ await tamper('marker upgraded to VERIFIED', (r) => { r.marker = 'VERIFIED'; }, '
   const bad = JSON.parse(JSON.stringify(signed));
   bad.attestation.kind = 'org'; // claim independent attestation over a self-signature
   const r = await runVerifier(bad, transcriptPath);
-  // The signature still verifies — the key really did sign this hash — so the
-  // verifier reports it as org-attested. That is a REAL limit of self-custody
-  // and is asserted here so nobody later mistakes it for a caught forgery.
-  ok('known limit: attestation.kind is not itself signed',
-     r.out.includes('org-attested'), r.out);
+  // THIS ASSERTION IS INVERTED FROM WHAT IT USED TO SAY [2026-09-04].
+  //
+  // It read: "known limit: attestation.kind is not itself signed", asserting the
+  // verifier reported `org-attested` for a relabelled self-signature — a real
+  // limit, pinned so nobody mistook it for a caught forgery. It is no longer a
+  // limit. `kind` is now inside the signed message, so editing it leaves a
+  // signature over a message nobody signed and the escalation is CAUGHT.
+  //
+  // The assertion is kept pointing at the same tamper rather than deleted: a
+  // security property that was once absent is exactly the one worth keeping a
+  // live test on, and inverting it means a regression re-reads as a failure here.
+  eq('caught: a self receipt relabelled org no longer verifies', overallOf(r.out), 'FAILED');
+  ok('caught: and it is not reported as org-attested', !r.out.includes('org-attested'), r.out);
 }
 {
   const bad = JSON.parse(JSON.stringify(signed));

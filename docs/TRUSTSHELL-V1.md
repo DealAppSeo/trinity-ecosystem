@@ -430,10 +430,35 @@ What actually closes §8:
   the tool prints it as `NOT CHECKED` rather than omitting it. Nor is the
   *author* independent — same repo, same hand. That is M6.
 
-  **One known limit, asserted rather than hidden:** `attestation.kind` is
-  outside the signed payload, so a `self` receipt can be relabelled `org` and
-  the signature still verifies. Only the audit hash is signed. Binding custody
-  into the signature is a schema change.
+  **That known limit is CLOSED [2026-09-04], and the reason it stayed open is
+  worth more than the fix.** It read: *"`attestation.kind` is outside the signed
+  payload, so a `self` receipt can be relabelled `org` and the signature still
+  verifies. Only the audit hash is signed. Binding custody into the signature is
+  a schema change."* The defect was real — one text edit promoted a receipt from
+  "I checked my own homework" to "an org attested this", and every check passed:
+  the signature verified over an unchanged message, the core still hashed to the
+  signed `auditHash`, `independentlyAttested` flipped true, and the one-liner
+  dropped its "(self-attested)" disclosure.
+
+  **But "a schema change" was wrong, and that sentence is why it sat unfixed.**
+  Nothing STORED had to change. The binding belongs in the message that gets
+  signed, not in the receipt: signatures are now over
+  `${AUDIT_DOMAIN}:attestation|${kind}|${auditHash}`, sub-domained exactly as
+  `auditHashForRuleset` already was. The `Attestation` shape is byte-identical.
+  A cost estimate that nobody re-checked kept a known security limit open —
+  price the fix before recording it as a limit.
+
+  Editing `kind` now leaves a signature over a message nobody signed, so it does
+  not verify AT ALL — a relabelled receipt is `FAILED`, not merely "not
+  independent". Pre-binding signatures still verify (the bytes really are
+  intact) but report `kindBound: false` and cannot earn `independentlyAttested`,
+  so the legacy path fails closed rather than grandfathering the escalation.
+
+  Mutation-tested both ways in `scripts/check-receipt.mjs`: with the binding
+  removed, a relabelled receipt verifies again and the two `relabel:` assertions
+  go red. The weaker assertion — "is not independently attested" — was written
+  first and does NOT gate the fix; it holds either way. That is recorded here
+  because a non-gating security test is the failure this repo keeps finding.
 - **`@hyperdag/trust-demo@0.1.0`** (packed, verified locally, unpublished) —
   already verifies a proof and rejects three tampers. This is the padlock's
   substance: a stranger can check the claim without trusting the issuer.
