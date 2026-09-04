@@ -1,0 +1,232 @@
+<title>Proof Without Stake</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#F7F8FA;
+    --raise:#FFFFFF;
+    --ink:#141A22;
+    --muted:#6B7684;
+    --rule:#DCE1E8;
+    --accent:#2F5D8C;
+    --accent-wash:#E8EFF6;
+    --caution:#9A5B3D;
+    --caution-wash:#F5EBE5;
+    --serif:'Spectral',Georgia,'Times New Roman',serif;
+    --sans:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0F141A; --raise:#161D25; --ink:#E6EAF0; --muted:#8A95A3;
+      --rule:#242E39; --accent:#7FA9D8; --accent-wash:#17222E;
+      --caution:#C98A6A; --caution-wash:#241A15;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0F141A; --raise:#161D25; --ink:#E6EAF0; --muted:#8A95A3;
+    --rule:#242E39; --accent:#7FA9D8; --accent-wash:#17222E;
+    --caution:#C98A6A; --caution-wash:#241A15;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:var(--sans); font-size:17px; line-height:1.65;
+    margin:0; padding:clamp(28px,5vw,72px) clamp(20px,5vw,40px);
+    -webkit-font-smoothing:antialiased;
+  }
+  .sheet{max-width:720px; margin:0 auto; display:flex; flex-direction:column; gap:44px}
+  .eyebrow{
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 14px;
+  }
+  h1{
+    font-family:var(--serif); font-weight:600; font-size:clamp(38px,6.5vw,54px);
+    line-height:1.08; letter-spacing:-.015em; margin:0 0 18px; text-wrap:balance;
+  }
+  .standfirst{
+    font-family:var(--serif); font-size:20px; line-height:1.55; color:var(--muted);
+    margin:0; max-width:60ch;
+  }
+  h2{
+    font-family:var(--serif); font-weight:600; font-size:25px; line-height:1.25;
+    margin:0 0 6px; text-wrap:balance;
+  }
+  .section{display:flex; flex-direction:column; gap:16px}
+  p{margin:0; max-width:66ch}
+  a{color:var(--accent)}
+  strong{font-weight:600}
+  .term{font-family:var(--mono); font-size:.9em; color:var(--accent)}
+
+  /* the quote is the thesis — it gets the one big gesture */
+  blockquote{
+    margin:0; padding:30px 0 26px; border-top:2px solid var(--ink);
+    border-bottom:1px solid var(--rule);
+  }
+  blockquote p{
+    font-family:var(--serif); font-size:clamp(22px,3.4vw,29px); line-height:1.38;
+    margin:0 0 18px; text-wrap:balance; max-width:none;
+  }
+  blockquote .em{font-style:italic; color:var(--accent)}
+  cite{
+    font-style:normal; font-family:var(--mono); font-size:12px;
+    letter-spacing:.06em; color:var(--muted); display:block;
+  }
+
+  table{width:100%; border-collapse:collapse; font-size:15.5px}
+  .scroll{overflow-x:auto}
+  th{
+    text-align:left; font-family:var(--mono); font-weight:500; font-size:11px;
+    letter-spacing:.11em; text-transform:uppercase; color:var(--muted);
+    padding:0 14px 9px 0; border-bottom:1px solid var(--rule); white-space:nowrap;
+  }
+  td{padding:12px 14px 12px 0; border-bottom:1px solid var(--rule); vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td:first-child{font-weight:600}
+  .num{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+
+  /* the one place boldness is spent: the rule that must not be broken */
+  .split{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:1px; background:var(--rule); border:1px solid var(--rule);
+  }
+  .split > div{background:var(--raise); padding:20px 22px; display:flex; flex-direction:column; gap:9px}
+  .split h3{
+    font-family:var(--mono); font-size:11px; letter-spacing:.11em; text-transform:uppercase;
+    margin:0; font-weight:500;
+  }
+  .yes h3{color:var(--accent)}
+  .no{background:var(--caution-wash) !important}
+  .no h3{color:var(--caution)}
+  .split p{font-size:15px; max-width:none}
+
+  .status{background:var(--accent-wash); padding:22px 24px; display:flex; flex-direction:column; gap:14px}
+  .status .note{font-size:14px; color:var(--muted); max-width:none}
+  .stamp{
+    font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--muted);
+    text-transform:uppercase;
+  }
+  footer{
+    border-top:1px solid var(--rule); padding-top:20px; font-size:13.5px; color:var(--muted);
+    display:flex; flex-direction:column; gap:8px;
+  }
+  footer p{max-width:none}
+  ul{margin:0; padding-left:20px; display:flex; flex-direction:column; gap:7px}
+  li{max-width:64ch}
+  @media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important}}
+</style>
+
+<div class="sheet">
+
+  <header>
+    <p class="eyebrow">Trust infrastructure for machine-generated mathematics</p>
+    <h1>Proof Without Stake</h1>
+    <p class="standfirst">In July 2026 a language model produced a counterexample to the Jacobian conjecture, open since 1939. It was machine-checked in Lean overnight. The mathematicians who examined it named a precise missing ingredient — and it is one you can build.</p>
+  </header>
+
+  <blockquote>
+    <p>Language models have a habit of bridging gaps with plausible-sounding filler, <span class="em">because unlike a human colleague, the model risks no reputation by being wrong.</span></p>
+    <cite>Kevin Buzzard, Imperial College London — creator of the Lean proof assistant, to <em>Fortune</em>, 21 July 2026</cite>
+  </blockquote>
+
+  <section class="section">
+    <h2>The diagnosis is mechanical, not moral</h2>
+    <p>Buzzard is not saying models are careless. He is naming an incentive: a mathematician who publishes filler pays for it for the rest of their career, and a model pays nothing. The filler is the rational output of a system with nothing at risk.</p>
+    <p>That reframes the problem. It is not solved by better models — a stronger model with no stake still has no reason to mark the difference between a step it verified and a step it made plausible. It is solved by giving the claimant something to lose, and by making the difference between those two kinds of step <em>checkable</em>.</p>
+  </section>
+
+  <section class="section">
+    <h2>Leiden asked for three things</h2>
+    <p>In June 2026, sixteen researchers across fifteen universities published the Leiden Declaration on Artificial Intelligence and Mathematics, calling for guardrails around <strong>transparency, attribution, and peer review</strong> before AI reshapes what mathematical knowledge means. Those three map onto components that already run in production.</p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Leiden asks for</th><th>Mechanism</th><th>Status today</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Transparency</td>
+            <td>Tool-call receipts — what ran, on what input, returning what, hashed in order</td>
+            <td><span class="num">5</span> receipts recorded. Effectively unbuilt.</td>
+          </tr>
+          <tr>
+            <td>Attribution</td>
+            <td>Zero-knowledge proofs of reputation tier, anchored on-chain via EAS</td>
+            <td><span class="num">22,364</span> live proofs, <span class="num">100%</span> anchored</td>
+          </tr>
+          <tr>
+            <td>Peer review</td>
+            <td>Cross-model fact-check quorum with a reward-requires-evidence floor</td>
+            <td>Running; scores <span class="num">0.21%</span> of its traffic</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="stamp">Measured against the production database, 4 September 2026</p>
+  </section>
+
+  <section class="section">
+    <h2>Security glass, not a window</h2>
+    <p>Full transparency is the wrong target: a working reasoning trace is commercially sensitive and often personally identifying. The useful shape is selective disclosure — three layers, of which only one is public.</p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Visible to</th><th>What it establishes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Receipt</td><td>Anyone</td><td><em>That</em> the claim was checked, by what, and when</td></tr>
+          <tr><td>Commitment</td><td>Anyone</td><td>The trace existed at claim time and has not been edited since</td></tr>
+          <tr><td>Trace</td><td>The owner alone</td><td><em>How</em> the result was reached — tools, inputs, dead ends, order</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The commitment is what makes the private layer worth anything. Without it an owner-only trace is unfalsifiable — it could be written after the fact. With it, the owner can reveal any slice later and prove it is what was committed before the outcome was known. Show your work; prove you did not backdate it.</p>
+  </section>
+
+  <section class="section">
+    <h2>The line that must not be crossed</h2>
+    <p>The obvious product is a generated explanation of the model's reasoning — it is what mathematicians say is missing, and it is what people would pay for. Building it would be a mistake, and precisely the mistake Buzzard describes.</p>
+    <div class="split">
+      <div class="yes">
+        <h3>Checkable</h3>
+        <p>Which tool ran, with which input, returning which output, in which order — each hashed. This is the work itself, and a third party can re-run it.</p>
+      </div>
+      <div class="no">
+        <h3>Not checkable</h3>
+        <p>That a narrative about the reasoning reflects the computation that actually happened. Chain-of-thought prose is a story told about the work, not the work.</p>
+      </div>
+    </div>
+    <p>Present both if useful, but never let the second carry the verification. A generated explanation offered as evidence is plausible-sounding filler wearing the costume of transparency — the original defect, now harder to detect because it looks like the cure.</p>
+  </section>
+
+  <section class="section">
+    <h2>What a reputation should reward</h2>
+    <p>Buzzard's closing observation has a design consequence that is easy to miss:</p>
+    <blockquote>
+      <p>The monuments of the field are named for the people who <span class="em">posed</span> them, not the people who settled them. It is not a coincidence.</p>
+      <cite>On why machine-generated questions are "boring or obviously true or obviously false"</cite>
+    </blockquote>
+    <p>Reputation systems reward solving, because solving is what is easy to detect. Mathematics has always paid its highest credit to <em>asking</em> — Riemann, Keller — and asking is the one capability the article reports machines are still poor at.</p>
+    <p>A posed-problem class is unusually well behaved as a scoring mechanism, because its reward is deferred and externally triggered:</p>
+    <ul>
+      <li>A question is registered, hashed and timestamped. Nothing is awarded.</li>
+      <li>Reward fires only when <em>someone else's</em> work resolves it, scaled by the difficulty that resolution revealed.</li>
+      <li>It cannot be farmed. Trivial questions are never resolved, so they never pay; impossible ones behave identically.</li>
+    </ul>
+    <p>The anti-gaming property arrives for free from the deferral, and it is the one reward path that raw model capability cannot capture.</p>
+  </section>
+
+  <section class="section">
+    <h2>Where this actually stands</h2>
+    <div class="status">
+      <p><strong>Built and live.</strong> Reputation scoring with an earned-floor ratchet and an anti-Sybil counterparty gate, across <span class="num">184</span> agents. <span class="num">22,364</span> Plonky3 range-check proofs, every one anchored on-chain, most recent <span class="num">3 September 2026</span>. A cross-model fact-check quorum that refuses to pay a clean verdict reached with zero provider evidence.</p>
+      <p><strong>Not built.</strong> The receipt layer, which is the load-bearing half of everything above — <span class="num">5</span> rows. The commitment scheme is designed, not shipped. The posed-problem class does not exist.</p>
+      <p class="note">An earlier draft of this page reported the receipt count as zero, taken from a second-hand summary. It is five. The figure was re-measured directly before publishing, which is the same discipline the page argues for.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Quotations from Eva Roytburg, <em>Mathematicians grapple with a "very rapid and very unsettling change" as AI cracks yet another century-old problem</em>, Fortune, 21 July 2026. The counterexample holds the Jacobian determinant at <span class="num">−2</span> at every point in space while sending three distinct points to one destination.</p>
+    <p>All figures measured against the live production database on 4 September 2026 and stated with that date attached, because a number without one is an assertion.</p>
+  </footer>
+
+</div>
