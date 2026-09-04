@@ -79,10 +79,42 @@ const db = createClient(url, key, { auth: { persistSession: false } });
 const { data, error } = await db.rpc('check_hal_penalty_guard');
 
 if (error) {
+  // TRANSPORT IS NOT A VERDICT [2026-09-04].
+  //
+  // This branch reported FAILED for EVERY rpc error, including `TypeError: fetch
+  // failed` — a request that never reached Postgres. That made an unreachable
+  // network indistinguishable from "the guard function is gone", which is the
+  // finding this file exists to raise. Two consequences, both bad:
+  //
+  //   - A fresh clone, an offline session, or any runner without egress to the
+  //     database reports FAILED on a guard nobody looked at. This file's own
+  //     header sets the rule — "absent credentials are NOT_CHECKED and exit 2 …
+  //     a green tick over an unexamined guard is the failure mode" — and the red
+  //     direction breaks it just as thoroughly, by teaching readers that this
+  //     check's red is background noise.
+  //   - It is the same conflation that cost the cascade path 12 days: NOT
+  //     CHECKED scored as a verdict it had not earned.
+  //
+  // So: an error the DATABASE returned is still FAILED, "does not exist" very
+  // much included. An error that means we never got an answer is NOT_CHECKED.
+  const msg = error.message ?? String(error);
+  const neverReached =
+    /fetch failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|network|Failed to fetch|timeout/i.test(
+      msg
+    );
+
+  if (neverReached) {
+    console.log('check:hal-penalty-guard — NOT_CHECKED');
+    console.log(`  could not reach the database: ${msg}`);
+    console.log('  The request never got an answer, so this says NOTHING about the guard.');
+    console.log('  Not a pass and not a failure — re-run where the database is reachable.');
+    process.exit(2);
+  }
+
   // A missing function is itself a finding: the regression was removed or never applied.
   console.log('check:hal-penalty-guard — FAILED');
-  console.log(`  rpc check_hal_penalty_guard() errored: ${error.message}`);
-  if (/does not exist/i.test(error.message)) {
+  console.log(`  rpc check_hal_penalty_guard() errored: ${msg}`);
+  if (/does not exist/i.test(msg)) {
     console.log('  The function is absent. Re-apply migration check_hal_penalty_guard_fn,');
     console.log('  or restore it from trinity_changelog id=182.');
   }

@@ -250,16 +250,35 @@ if (expectedAudit) {
       ]);
       const sig = b58decode(a.signature);
       if (sig.length !== 64) throw new Error(`signature must be 64 bytes, got ${sig.length}`);
-      const good = await crypto.subtle.verify(
-        { name: 'Ed25519' },
-        key,
-        sig.slice().buffer,
-        new TextEncoder().encode(receipt.auditHash)
-      );
+
+      // TWO ACCEPTABLE MESSAGES, STRONGEST FIRST.
+      //
+      // Current signatures cover `${AUDIT_DOMAIN}:attestation|${kind}|${auditHash}`,
+      // which BINDS the attestation kind. Before that binding existed the signature
+      // covered bare `auditHash`, and `kind` sat outside everything signed — so a
+      // `self` receipt could be relabelled `org` and still verify. Editing `kind`
+      // now leaves a signature over a message nobody signed.
+      //
+      // The legacy form is still accepted, because those signatures are genuine and
+      // the bytes really are intact. It is reported differently: it proves the core,
+      // it does NOT attest to the label. Silently treating the two alike would
+      // grandfather the escalation this binding exists to stop.
+      const encoded = (m) => new TextEncoder().encode(m);
+      const check = (m) => crypto.subtle.verify({ name: 'Ed25519' }, key, sig.slice().buffer, encoded(m));
+
+      let good = await check(`${AUDIT_DOMAIN}:attestation|${a.kind}|${receipt.auditHash}`);
+      const kindBound = good;
+      if (!good) good = await check(receipt.auditHash);
+
       record(
         'signature',
         good ? 'VERIFIED' : 'FAILED',
-        good ? `${a.kind}-attested by ${a.signerDid.slice(0, 24)}…` : 'does not verify against signerDid'
+        !good
+          ? 'does not verify against signerDid'
+          : kindBound
+            ? `${a.kind}-attested by ${a.signerDid.slice(0, 24)}…`
+            : `signed by ${a.signerDid.slice(0, 24)}… — pre-binding signature, so it does ` +
+              `NOT attest to kind='${a.kind}'; treat as self-attested`
       );
     } catch (err) {
       // A malformed DID is a caller problem, not a failed signature. Conflating

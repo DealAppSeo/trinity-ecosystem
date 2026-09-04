@@ -311,6 +311,56 @@ eq('signature: self-attested is NOT independently attested', goodSig.independent
 const orgSigned = await signReceipt(r1, dev, 'org');
 eq('signature: org attestation is flagged independent', (await verifyReceiptSignature(orgSigned)).independentlyAttested, true);
 
+// ---------------------------------------------------------------------------
+// ATTESTATION-KIND BINDING — a `self` receipt must not be wearable as `org`.
+//
+// The defect, recorded in TRUSTSHELL-V1.md as a known limit: the signature
+// covered `auditHash`, and `auditHash` covers `core` — but `attestation.kind` is
+// in NEITHER. So editing one word promoted a receipt from "I checked my own
+// homework" to "an org attested this", and every check still passed: the
+// signature verified over an unchanged message, recomputeReceipt agreed the core
+// was intact, independentlyAttested flipped true, and the one-liner dropped its
+// "(self-attested)" disclosure. No forgery needed — just a text edit.
+//
+// The doc said closing it was "a schema change". It was not: nothing stored
+// changed. The kind is now bound into the MESSAGE that gets signed.
+{
+  const relabelled = { ...signed, attestation: { ...signed.attestation, kind: 'org' } };
+  const c = await verifyReceiptSignature(relabelled);
+  // FAILED, not merely "not independent". Because the kind is inside the signed
+  // message, editing it leaves a signature over a message nobody signed — so it
+  // does not verify at all. Asserting the weaker property would NOT gate the fix:
+  // mutation-tested, `independentlyAttested === false` still holds when the
+  // binding is removed, because the legacy path never grants independence either.
+  eq('relabel: a self receipt relabelled org FAILS signature verification', c.outcome, 'FAILED');
+  eq('relabel: a self receipt relabelled org is NOT independently attested', c.independentlyAttested, false);
+  eq('relabel: the relabelled signature is not bound to its kind', c.kindBound, false);
+
+  // The rendered one-liner is what a human actually reads, so it is asserted
+  // separately — a correct flag behind a misleading string is still misleading.
+  const rendered = formatMarker(relabelled, await checkReceipt(relabelled));
+  ok('relabel: the marker still discloses self-attestation', rendered.includes('(self-attested)'));
+
+  // Downgrade is equally unearned. org -> self must not read as bound either,
+  // or "kindBound" would just mean "kind === the one I signed with", which is
+  // trivially true and would let the org -> self direction through.
+  const downgraded = { ...orgSigned, attestation: { ...orgSigned.attestation, kind: 'self' } };
+  const d = await verifyReceiptSignature(downgraded);
+  eq('relabel: an org receipt relabelled self FAILS too', d.outcome, 'FAILED');
+  eq('relabel: an org receipt relabelled self is not bound', d.kindBound, false);
+
+  // And the genuine article must still earn the strong reading, or the fix has
+  // simply broken org attestation instead of protecting it.
+  const orgCheck = await verifyReceiptSignature(orgSigned);
+  eq('binding: a genuine org signature is bound to its kind', orgCheck.kindBound, true);
+  eq('binding: a genuine org signature still VERIFIES', orgCheck.outcome, 'VERIFIED');
+  ok(
+    'binding: a genuine org receipt renders without the self-attested suffix',
+    !formatMarker(orgSigned, await checkReceipt(orgSigned)).includes('(self-attested)')
+  );
+  eq('binding: a genuine self signature is bound too', (await verifyReceiptSignature(signed)).kindBound, true);
+}
+
 // A signature from the wrong key must fail.
 {
   const forged = { ...signed, attestation: { ...signed.attestation, signerDid: other.did } };
