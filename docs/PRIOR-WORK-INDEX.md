@@ -42,6 +42,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | Failures and their root causes | `LESSONS.md` | — |
 | The RepID/HAL data model and its known defects | `docs/ROADMAP-HYBRID-REPID.md` | live queries |
 | Harness profile / settings authority model | `docs/HARNESS-SPEC.md` | — |
+| The external case for reputational stake in machine proof (Leiden alignment, selective disclosure, receipts-not-prose) | `docs/PROOF-WITHOUT-STAKE.html` | the Fortune source, quoted inline |
 | TrustShell spec and milestone ledger — M1–M6 built, every one having falsified something the spec asserted | `docs/TRUSTSHELL-V1.md` | the spec's own unbuilt half, which is a plan not a description |
 | Agent memory: recall path, both halves of the bug | `docs/AGENT-MEMORY-SPEC.md` | — |
 | MCP fleet discovery endpoint | `docs/MCP-FLEET.md` | — |
