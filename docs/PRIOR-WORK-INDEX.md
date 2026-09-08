@@ -45,6 +45,7 @@ part of `npm run check`, so it fails the same gate everything else does.
 | The external case for reputational stake in machine proof (Leiden alignment, selective disclosure, receipts-not-prose) | `docs/PROOF-WITHOUT-STAKE.html` | the Fortune source, quoted inline |
 | TrustShell spec and milestone ledger — M1–M6 built, every one having falsified something the spec asserted | `docs/TRUSTSHELL-V1.md` | the spec's own unbuilt half, which is a plan not a description |
 | Agent memory: recall path, both halves of the bug | `docs/AGENT-MEMORY-SPEC.md` | — |
+| Every agent / operator wallet address, and which of them is verified against committed code | `docs/AGENT-ADDRESSES.md` | grepping `scripts/` — the addresses are scattered there and one of them is malformed |
 | MCP fleet discovery endpoint | `docs/MCP-FLEET.md` | — |
 | The `/canvas` tldraw editor: what is installed, and why persistence and agent access are absent | `docs/CANVAS.md` | the tldraw docs site, which is proxy-blocked here and describes a different version |
 | The scoped first slice of the PAI/Founder-OS "one recursive experiment" directive — what's built already, what's deferred, who owns what | `docs/NEXUS-BRAIN-SPRINT-PLAN.md` | re-deriving a 12-table memory schema before the one loop it's meant to serve has run once |

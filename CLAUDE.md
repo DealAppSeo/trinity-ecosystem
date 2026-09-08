@@ -42,6 +42,14 @@ ledger (so you don't re-derive that `agent_services`→`service_contracts`,
 `agents`→`repid_agents`, `anfis`≠`llm_call_log`), and the genuine gaps. It is dated
 and `check:drift`-guarded so it stays honest; re-measure a row when you touch it.
 
+**Every wallet address is in `docs/AGENT-ADDRESSES.md`** — the 12 T12 agents by
+squad, the deployer (old and current), the custodian, the two ERC-8004 role
+addresses and the IdentityRegistry. It exists because that table was supplied by
+hand across several sessions while the addresses sat scattered and unnamed in
+`repid-engine/scripts/` and `src/services/`. Writing it down immediately caught
+one that is **39 hex characters** and cannot work. Addresses only: private keys
+are named by variable, never by value. Do not re-ask for this list; grep it.
+
 **Everything here is a snapshot. Re-verify before relying on it.** This file has
 already been wrong once — see LESSONS A4.
 
