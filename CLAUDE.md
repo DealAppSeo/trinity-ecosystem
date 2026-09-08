@@ -1,5 +1,23 @@
 # CLAUDE.md — operational ground truth
 
+## TRUE NORTH — read this before any assignment
+
+**The operating rules for every agent on this system live in
+`DealAppSeo/repid-engine/LESSONS.md`.** Read it first, whichever repo you started in.
+It is injected verbatim into every XC/GA dispatch and is the one place a lesson is
+durable across all of them.
+
+**Two tiers, and this file is the internal one.** `LESSONS.md` plus each repo's own
+entry point are a dated operating log that changes without notice — for our agents.
+The published contract for outside developers building on the ecosystem is
+**`hyperdag-protocol/BUILDERS.md`**. Never answer an outside builder from the internal
+tier; a gap in `BUILDERS.md` is a gap to fix there.
+
+**This section deliberately names no sibling repos.** A per-repo list of all siblings is
+N tables of N rows — adding a Trust\* surface would mean editing every other repo, and
+forgetting fails silently: the new surface is unlisted, nothing breaks, and an agent
+landing there sees no pointer. A star, not a mesh.
+
 ## FIRST: read `docs/PRIOR-WORK-INDEX.md`
 
 **Before you plan, build, or quote a number.** It lists what is already CLOSED
