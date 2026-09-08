@@ -1,286 +1,46 @@
 // app/page.tsx
 //
-// Inline styles, not Tailwind utility classes. Tailwind v4 is in dependencies
-// and wired through postcss.config.mjs, but app/globals.css never does
-// `@import "tailwindcss"`, so no utilities are generated and every utility
-// class renders as nothing. That is exactly what this page used to be: eleven
-// lines of boilerplate whose classes produced no styling at all.
+// The AI Trinity Symphony vision page, restored to the domain it belongs to.
 //
-// The dashboard is inline-styled for the same reason. Adding the Tailwind
-// import would pull in a preflight reset across every existing surface, which
-// is a visual decision rather than a fix — see docs/E2E-AUDIT.md.
+// WHY THIS FILE CHANGED [MEASURED 2026-09-08]
+// -------------------------------------------------------------------------
+// aitrinitysymphony.com and www. are attached to the Vercel project
+// `ai-trinity-symphony-landing`, and that project builds THIS repo. Its root
+// route was a TrustRails page (added 2026-08-23 in 5f2bb83 as a NEW file, so
+// nothing was overwritten), which meant the Trinity domain served TrustRails:
+// `/` titled "TrustRails — KYA for autonomous agents", `/dashboard` titled
+// "TrustRails", and /api/version reporting TRUSTRAILS_HMAC_SECRET.
+//
+// Sean's actual vision page lived in DealAppSeo/aitrinitysymphony-landing as a
+// static index.html that NO Vercel project built. This is a faithful port of
+// that file — same copy, same CSS, same lead-capture form.
+//
+// The TrustRails page is not lost: `git show 5f2bb83:app/page.tsx` recovers it,
+// and it is unrelated to the live trustrails.dev, which is a different project
+// (`trustrails`) built from a different repo (`trustrails-dev`) and is UP.
+//
+// The markup is injected rather than hand-converted to JSX so the port is
+// byte-faithful to the source file. `body` selectors are raised to `html body`
+// because app/globals.css also styles body and would otherwise win.
+// -------------------------------------------------------------------------
 
 import type { Metadata } from 'next';
+import LeadCapture from './lead-capture';
 
 export const metadata: Metadata = {
-  title: 'TrustRails — KYA for autonomous agents',
-  description:
-    'Every agent earns a RepID score through audited financial behaviour. ' +
-    'Spending limits expand as trust is earned, and every payment leaves a compliance receipt.',
+  title: "AI Trinity Symphony \u2014 Orchestrated Intelligence",
+  description: "8 AI agents working in concert. 82% cost reduction. Helping people help people.",
 };
 
-const BG = '#020817';
-const PANEL = '#0f172a';
-const BORDER = '#1e293b';
-const TEXT = '#f1f5f9';
-const MUTED = '#64748b';
-const ACCENT = '#22c55e';
+const STYLE = "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400&display=swap');\n\n    :root {\n      --base: #0a0a0f;\n      --surface: #12121a;\n      --elevated: #1a1a24;\n      --border: #1e1e2e;\n      --text: #e4e4e7;\n      --muted: #71717a;\n      --accent: #8b5cf6;\n      --accent-glow: rgba(139, 92, 246, 0.3);\n      --gold: #f59e0b;\n    }\n    \n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    \n    html body {\n      font-family: 'Outfit', system-ui, sans-serif;\n      background: var(--base);\n      color: var(--text);\n      min-height: 100vh;\n      overflow-x: hidden;\n    }\n    \n    /* Subtle grid background */\n    body::before {\n      content: '';\n      position: fixed;\n      inset: 0;\n      background-image: \n        linear-gradient(rgba(139, 92, 246, 0.03) 1px, transparent 1px),\n        linear-gradient(90deg, rgba(139, 92, 246, 0.03) 1px, transparent 1px);\n      background-size: 60px 60px;\n      pointer-events: none;\n      z-index: 0;\n    }\n    \n    .container {\n      position: relative;\n      z-index: 1;\n      max-width: 1200px;\n      margin: 0 auto;\n      padding: 0 24px;\n    }\n    \n    /* Navigation */\n    nav {\n      padding: 24px 0;\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n    }\n    \n    .logo {\n      font-weight: 600;\n      font-size: 1.25rem;\n      letter-spacing: -0.02em;\n      display: flex;\n      align-items: center;\n      gap: 12px;\n    }\n    \n    .logo-icon {\n      width: 36px;\n      height: 36px;\n      background: linear-gradient(135deg, var(--accent), #6d28d9);\n      border-radius: 8px;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      font-size: 18px;\n    }\n    \n    .nav-status {\n      display: flex;\n      align-items: center;\n      gap: 8px;\n      font-size: 0.875rem;\n      color: var(--muted);\n    }\n    \n    .status-dot {\n      width: 8px;\n      height: 8px;\n      background: #22c55e;\n      border-radius: 50%;\n      animation: pulse 2s ease-in-out infinite;\n    }\n    \n    @keyframes pulse {\n      0%, 100% { opacity: 1; }\n      50% { opacity: 0.5; }\n    }\n    \n    /* Hero */\n    .hero {\n      padding: 80px 0 60px;\n      text-align: center;\n    }\n    \n    .hero-badge {\n      display: inline-flex;\n      align-items: center;\n      gap: 8px;\n      padding: 8px 16px;\n      background: var(--surface);\n      border: 1px solid var(--border);\n      border-radius: 100px;\n      font-size: 0.875rem;\n      color: var(--muted);\n      margin-bottom: 32px;\n    }\n    \n    .hero-badge span {\n      color: var(--gold);\n      font-weight: 500;\n    }\n    \n    h1 {\n      font-size: clamp(2.5rem, 8vw, 4.5rem);\n      font-weight: 700;\n      letter-spacing: -0.03em;\n      line-height: 1.1;\n      margin-bottom: 24px;\n    }\n    \n    h1 .highlight {\n      background: linear-gradient(135deg, var(--accent), #a78bfa);\n      -webkit-background-clip: text;\n      -webkit-text-fill-color: transparent;\n      background-clip: text;\n    }\n    \n    .hero-sub {\n      font-size: 1.25rem;\n      color: var(--muted);\n      max-width: 600px;\n      margin: 0 auto 48px;\n      line-height: 1.6;\n    }\n    \n    /* Stats bar */\n    .stats {\n      display: flex;\n      justify-content: center;\n      gap: 48px;\n      flex-wrap: wrap;\n      margin-bottom: 60px;\n    }\n    \n    .stat {\n      text-align: center;\n    }\n    \n    .stat-value {\n      font-size: 2rem;\n      font-weight: 700;\n      font-family: 'JetBrains Mono', monospace;\n      color: var(--text);\n    }\n    \n    .stat-value.accent { color: var(--accent); }\n    .stat-value.gold { color: var(--gold); }\n    \n    .stat-label {\n      font-size: 0.875rem;\n      color: var(--muted);\n      margin-top: 4px;\n    }\n    \n    /* Email capture */\n    .capture {\n      max-width: 480px;\n      margin: 0 auto;\n    }\n    \n    .capture-form {\n      display: flex;\n      gap: 12px;\n      margin-bottom: 16px;\n    }\n    \n    .capture-form input {\n      flex: 1;\n      padding: 16px 20px;\n      background: var(--surface);\n      border: 1px solid var(--border);\n      border-radius: 12px;\n      color: var(--text);\n      font-size: 1rem;\n      font-family: inherit;\n      outline: none;\n      transition: border-color 0.2s;\n    }\n    \n    .capture-form input:focus {\n      border-color: var(--accent);\n    }\n    \n    .capture-form input::placeholder {\n      color: var(--muted);\n    }\n    \n    .capture-form button {\n      padding: 16px 32px;\n      background: var(--accent);\n      color: white;\n      border: none;\n      border-radius: 12px;\n      font-size: 1rem;\n      font-weight: 600;\n      font-family: inherit;\n      cursor: pointer;\n      transition: transform 0.15s, background 0.2s;\n      white-space: nowrap;\n    }\n    \n    .capture-form button:hover {\n      background: #7c3aed;\n      transform: translateY(-2px);\n    }\n    \n    .capture-note {\n      font-size: 0.875rem;\n      color: var(--muted);\n    }\n    \n    /* Agent grid */\n    .agents-section {\n      padding: 80px 0;\n    }\n    \n    .section-label {\n      text-align: center;\n      font-size: 0.875rem;\n      color: var(--muted);\n      text-transform: uppercase;\n      letter-spacing: 0.1em;\n      margin-bottom: 16px;\n    }\n    \n    .section-title {\n      text-align: center;\n      font-size: 2rem;\n      font-weight: 600;\n      margin-bottom: 48px;\n    }\n    \n    .agents-grid {\n      display: grid;\n      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));\n      gap: 16px;\n    }\n    \n    .agent-card {\n      background: var(--surface);\n      border: 1px solid var(--border);\n      border-radius: 12px;\n      padding: 20px;\n      transition: transform 0.2s, border-color 0.2s;\n    }\n    \n    .agent-card:hover {\n      transform: translateY(-4px);\n      border-color: var(--accent);\n    }\n    \n    .agent-header {\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      margin-bottom: 12px;\n    }\n    \n    .agent-name {\n      font-weight: 600;\n      font-size: 1.125rem;\n      font-family: 'JetBrains Mono', monospace;\n    }\n    \n    .agent-status {\n      display: flex;\n      align-items: center;\n      gap: 6px;\n      font-size: 0.75rem;\n      color: #22c55e;\n    }\n    \n    .agent-status::before {\n      content: '';\n      width: 6px;\n      height: 6px;\n      background: currentColor;\n      border-radius: 50%;\n    }\n    \n    .agent-role {\n      font-size: 0.875rem;\n      color: var(--muted);\n      line-height: 1.5;\n    }\n    \n    /* Ethics section */\n    .ethics-grid {\n      display: grid;\n      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));\n      gap: 24px;\n      margin-bottom: 80px;\n    }\n    \n    .ethics-card {\n      background: var(--surface);\n      border: 1px solid var(--border);\n      border-radius: 16px;\n      padding: 28px;\n      text-align: center;\n      transition: transform 0.2s, border-color 0.2s;\n    }\n    \n    .ethics-card:hover {\n      transform: translateY(-4px);\n      border-color: var(--accent);\n    }\n    \n    .ethics-icon {\n      font-size: 2.5rem;\n      margin-bottom: 16px;\n    }\n    \n    .ethics-card h3 {\n      font-size: 1.125rem;\n      font-weight: 600;\n      margin-bottom: 12px;\n      color: var(--text);\n    }\n    \n    .ethics-card p {\n      font-size: 0.875rem;\n      color: var(--muted);\n      line-height: 1.6;\n    }\n    \n    /* Mission */\n    .mission {\n      padding: 80px 0;\n      text-align: center;\n    }\n    \n    .mission-quote {\n      font-size: clamp(1.5rem, 4vw, 2.5rem);\n      font-weight: 300;\n      font-style: italic;\n      color: var(--text);\n      max-width: 800px;\n      margin: 0 auto 24px;\n      line-height: 1.4;\n    }\n    \n    .mission-source {\n      color: var(--muted);\n      font-size: 1rem;\n    }\n    \n    /* Footer */\n    footer {\n      padding: 40px 0;\n      border-top: 1px solid var(--border);\n      text-align: center;\n    }\n    \n    .footer-links {\n      display: flex;\n      justify-content: center;\n      gap: 32px;\n      margin-bottom: 24px;\n      flex-wrap: wrap;\n    }\n    \n    .footer-links a {\n      color: var(--muted);\n      text-decoration: none;\n      font-size: 0.875rem;\n      transition: color 0.2s;\n    }\n    \n    .footer-links a:hover {\n      color: var(--text);\n    }\n    \n    .footer-copy {\n      font-size: 0.875rem;\n      color: var(--muted);\n    }\n    \n    /* Success state */\n    .success-message {\n      display: none;\n      padding: 16px 24px;\n      background: rgba(34, 197, 94, 0.1);\n      border: 1px solid rgba(34, 197, 94, 0.3);\n      border-radius: 12px;\n      color: #22c55e;\n      text-align: center;\n    }\n    \n    .success-message.show {\n      display: block;\n    }\n    \n    /* Mobile */\n    @media (max-width: 640px) {\n      .capture-form {\n        flex-direction: column;\n      }\n      \n      .stats {\n        gap: 32px;\n      }\n      \n      .nav-status span {\n        display: none;\n      }\n    }\n  ";
+const BODY = "<div class=\"container\">\n    <nav>\n      <div class=\"logo\">\n        <div class=\"logo-icon\">\u26a1</div>\n        AI Trinity Symphony\n      </div>\n      <div class=\"nav-status\">\n        <div class=\"status-dot\"></div>\n        <span>8 agents online</span>\n      </div>\n    </nav>\n    \n    <section class=\"hero\">\n      <div class=\"hero-badge\">\n        <span>3 patents pending</span> \u00b7 Launching December 2025\n      </div>\n      \n      <h1>\n        <span class=\"highlight\">Orchestrated AI</span><br>\n        Working in Concert\n      </h1>\n      \n      <p class=\"hero-sub\">\n        8 specialized agents coordinating autonomously. \n        Truth-verified. Ethics-checked. Byzantine fault tolerant.\n        The safest, most ethical AI orchestration \u2014 built to help people help people.\n      </p>\n      \n      <div class=\"stats\">\n        <div class=\"stat\">\n          <div class=\"stat-value accent\">8</div>\n          <div class=\"stat-label\">AI Agents</div>\n        </div>\n        <div class=\"stat\">\n          <div class=\"stat-value gold\">100%</div>\n          <div class=\"stat-label\">Ethics-Checked</div>\n        </div>\n        <div class=\"stat\">\n          <div class=\"stat-value\">82%</div>\n          <div class=\"stat-label\">Cost Reduction</div>\n        </div>\n        <div class=\"stat\">\n          <div class=\"stat-value accent\">$0.47</div>\n          <div class=\"stat-label\">Daily Cost</div>\n        </div>\n      </div>\n      \n      <div class=\"capture\">\n        <form class=\"capture-form\" id=\"waitlist-form\">\n          <input type=\"email\" name=\"email\" placeholder=\"Enter your email\" required>\n          <button type=\"submit\">Get Early Access</button>\n        </form>\n        <p class=\"capture-note\">Join the waitlist. No spam. Unsubscribe anytime.</p>\n        <div class=\"success-message\" id=\"success-msg\">\n          \u2713 You're on the list. We'll be in touch soon.\n        </div>\n      </div>\n    </section>\n    \n    <section class=\"agents-section\">\n      <p class=\"section-label\">Our Commitment</p>\n      <h2 class=\"section-title\">Safe & Ethical AI by Design</h2>\n      \n      <div class=\"ethics-grid\">\n        <div class=\"ethics-card\">\n          <div class=\"ethics-icon\">\ud83d\udee1\ufe0f</div>\n          <h3>Truth-Verified</h3>\n          <p>Every output passes through VERITAS \u2014 our dedicated truth agent that eliminates hallucinations using subjective logic constraints.</p>\n        </div>\n        \n        <div class=\"ethics-card\">\n          <div class=\"ethics-icon\">\u2696\ufe0f</div>\n          <h3>Ethics-First</h3>\n          <p>Philippians 4:8 encoded into every decision. If it's not true, noble, right, pure, lovely, or admirable \u2014 it doesn't ship.</p>\n        </div>\n        \n        <div class=\"ethics-card\">\n          <div class=\"ethics-icon\">\ud83d\udd12</div>\n          <h3>Byzantine Fault Tolerant</h3>\n          <p>No single point of failure. Multi-agent consensus prevents bad actors. RepID scoring rewards accuracy, punishes deception.</p>\n        </div>\n        \n        <div class=\"ethics-card\">\n          <div class=\"ethics-icon\">\ud83d\udc41\ufe0f</div>\n          <h3>Human Oversight Always</h3>\n          <p>AI serves humans, never the reverse. Emergency stops, audit trails, and human override on every critical decision.</p>\n        </div>\n      </div>\n    </section>\n    \n    <section class=\"agents-section\">\n      <p class=\"section-label\">The Symphony</p>\n      <h2 class=\"section-title\">8 Specialized Agents, One Mission</h2>\n      \n      <div class=\"agents-grid\">\n        <div class=\"agent-card\">\n          <div class=\"agent-header\">\n            <span class=\"agent-name\">HDM</span>\n            <span class=\"agent-status\">Online</span>\n          </div>\n          <p class=\"agent-role\">Strategy & Research \u2014 Long-term planning, patent analysis, market intelligence</p>\n        </div>\n        \n        <div class=\"agent-card\">\n          <div class=\"agent-header\">\n            <span class=\"agent-name\">APM</span>\n            <span class=\"agent-status\">Online</span>\n          </div>\n          <p class=\"agent-role\">ANFIS Routing \u2014 Intelligent task distribution, cost optimization, free-tier arbitrage</p>\n        </div>\n        \n        <div class=\"agent-card\">\n          <div class=\"agent-header\">\n            <span class=\"agent-name\">MEL</span>\n            <span class=\"agent-status\">Online</span>\n          </div>\n          <p class=\"agent-role\">Execution & Voice \u2014 Task completion, voice synthesis, user interaction</p>\n        </div>\n        \n        <div class=\"agent-card\">\n          <div class=\"agent-header\">\n            <span class=\"agent-name\">VERITAS</span>\n            <span class=\"agent-status\">Online</span>\n          </div>\n          <p class=\"agent-role\">Truth & Ethics \u2014 Fact verification, hallucination prevention, alignment checking</p>\n        </div>\n        \n        <div class=\"agent-card\">\n          <div class=\"agent-header\">\n            <span class=\"agent-name\">NEXUS</span>\n            <span class=\"agent-status\">Online</span>\n          </div>\n          <p class=\"agent-role\">Coordination \u2014 Agent sync, message routing, swarm orchestration</p>\n        </div>\n        \n        <div class=\"agent-card\">\n          <div class=\"agent-header\">\n            <span class=\"agent-name\">TORCH</span>\n            <span class=\"agent-status\">Online</span>\n          </div>\n          <p class=\"agent-role\">Pattern Learning \u2014 ANFIS training, trend analysis, system optimization</p>\n        </div>\n        \n        <div class=\"agent-card\">\n          <div class=\"agent-header\">\n            <span class=\"agent-name\">GCM</span>\n            <span class=\"agent-status\">Online</span>\n          </div>\n          <p class=\"agent-role\">Graphics & Content \u2014 Visual generation, media creation, design assets</p>\n        </div>\n        \n        <div class=\"agent-card\">\n          <div class=\"agent-header\">\n            <span class=\"agent-name\">ANT</span>\n            <span class=\"agent-status\">Online</span>\n          </div>\n          <p class=\"agent-role\">Complex Reasoning \u2014 Advanced builds, code generation, architecture decisions</p>\n        </div>\n      </div>\n    </section>\n    \n    <section class=\"mission\">\n      <p class=\"mission-quote\">\n        \"Whatever is true, whatever is noble, whatever is right, whatever is pure, whatever is lovely, whatever is admirable\u2014if anything is excellent or praiseworthy\u2014think about such things.\"\n      </p>\n      <p class=\"mission-source\">Philippians 4:8 \u2014 Our Design Principle</p>\n    </section>\n    \n    <footer>\n      <div class=\"footer-links\">\n        <a href=\"https://aidebate.io\" target=\"_blank\">AIDebate.io</a>\n        <a href=\"https://purposehub.ai\" target=\"_blank\">PurposeHub.AI</a>\n        <a href=\"https://imagebearer.org\" target=\"_blank\">ImageBearer.org</a>\n        <a href=\"https://hyperdag.org\" target=\"_blank\">HyperDAG.org</a>\n      </div>\n      <p class=\"footer-copy\">\u00a9 2025 AI Trinity Symphony. Helping people help people.</p>\n    </footer>\n  </div>";
 
-function Panel({
-  title,
-  body,
-  tag,
-  tagColor,
-}: {
-  title: string;
-  body: string;
-  tag: string;
-  tagColor: string;
-}) {
+export default function Page() {
   return (
-    <div
-      style={{
-        background: PANEL,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 14,
-        padding: 22,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <h3 style={{ color: TEXT, fontSize: 16, fontWeight: 700, margin: 0 }}>{title}</h3>
-        <span
-          style={{
-            marginLeft: 'auto',
-            color: tagColor,
-            border: `1px solid ${tagColor}55`,
-            background: `${tagColor}14`,
-            borderRadius: 999,
-            padding: '2px 10px',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 0.3,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {tag}
-        </span>
-      </div>
-      <p style={{ color: '#94a3b8', fontSize: 13.5, lineHeight: 1.6, margin: 0 }}>{body}</p>
-    </div>
-  );
-}
-
-export default function Home() {
-  return (
-    <main
-      style={{
-        background: BG,
-        minHeight: '100vh',
-        padding: '48px 24px',
-        fontFamily: 'Inter, system-ui, sans-serif',
-      }}
-    >
-      <div style={{ maxWidth: 980, margin: '0 auto' }}>
-        {/* Header */}
-        <header style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 44 }}>
-          <span style={{ fontSize: 30 }}>🔐</span>
-          <div>
-            <h1 style={{ color: TEXT, fontSize: 22, fontWeight: 800, margin: 0 }}>TrustRails</h1>
-            <p style={{ color: MUTED, fontSize: 13, margin: 0 }}>
-              The SSL trust layer for autonomous agent finance
-            </p>
-          </div>
-          <a
-            href="/dashboard"
-            style={{
-              marginLeft: 'auto',
-              background: '#14532d',
-              color: '#86efac',
-              border: '1px solid #166534',
-              borderRadius: 8,
-              padding: '10px 18px',
-              fontSize: 13.5,
-              fontWeight: 600,
-              textDecoration: 'none',
-            }}
-          >
-            Open dashboard →
-          </a>
-        </header>
-
-        {/* Thesis */}
-        <section style={{ marginBottom: 44 }}>
-          <h2
-            style={{
-              color: TEXT,
-              fontSize: 34,
-              lineHeight: 1.22,
-              fontWeight: 800,
-              margin: '0 0 16px',
-              maxWidth: 760,
-            }}
-          >
-            Banks have KYC for people. The agentic economy needs KYA.
-          </h2>
-          <p style={{ color: '#94a3b8', fontSize: 16, lineHeight: 1.65, maxWidth: 720, margin: 0 }}>
-            AI agents are already moving money. Nobody has answered who is accountable when one
-            makes a mistake. TrustRails gives every agent a RepID score earned through audited
-            behaviour — spending limits expand as trust is earned, and every payment leaves a
-            compliance receipt you can check.
-          </p>
-        </section>
-
-        {/* Honest capability state */}
-        <section style={{ marginBottom: 20 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: 12,
-              marginBottom: 14,
-              flexWrap: 'wrap',
-            }}
-          >
-            <h3 style={{ color: TEXT, fontSize: 15, fontWeight: 700, margin: 0 }}>
-              What is actually running
-            </h3>
-            <span style={{ color: MUTED, fontSize: 12.5 }}>
-              Live, simulated and not-yet-wired are labelled separately — on purpose.
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
-              gap: 16,
-            }}
-          >
-            <Panel
-              title="KYA registry"
-              tag="LIVE"
-              tagColor={ACCENT}
-              body="Agents registered and scored against institutional policy. Backed by real records, and it is what actually blocks a non-compliant payment today."
-            />
-            <Panel
-              title="RepID scoring"
-              tag="LIVE"
-              tagColor={ACCENT}
-              body="A 0–10,000 institutional credit score that decides vault access and transaction limits, recalculated from observed behaviour."
-            />
-            <Panel
-              title="Compliance receipts"
-              tag="LIVE"
-              tagColor={ACCENT}
-              body="Every authorised payment writes a tamper-evident receipt with a rule hash and an audit hash over the whole record."
-            />
-            <Panel
-              title="Solana settlement"
-              tag="DEVNET"
-              tagColor="#38bdf8"
-              body="USDC transfers on devnet carrying an on-chain compliance memo. When a transfer cannot be broadcast the receipt records SIMULATED — it never invents a transaction hash."
-            />
-            <Panel
-              title="BFT consensus veto"
-              tag="NOT WIRED"
-              tagColor="#f59e0b"
-              body="The engine is built — three independent providers, golden-ratio vote weights, Pythagorean Comma veto — but it does not yet gate the payment path. Receipts record BFT as NOT CHECKED rather than claiming a vote that never ran."
-            />
-            <Panel
-              title="ZKP attestation · Fireblocks"
-              tag="STUB"
-              tagColor="#a78bfa"
-              body="Both are labelled architecture stubs. They demonstrate the integration shape and make no claim to be performing real proofs or custody calls."
-            />
-          </div>
-        </section>
-
-        {/* Why the labels */}
-        <section
-          style={{
-            background: PANEL,
-            border: `1px solid ${BORDER}`,
-            borderLeft: '3px solid #f59e0b',
-            borderRadius: 12,
-            padding: '18px 22px',
-            marginBottom: 40,
-          }}
-        >
-          <p style={{ color: '#cbd5e1', fontSize: 13.5, lineHeight: 1.65, margin: 0 }}>
-            <strong style={{ color: TEXT }}>Why a status label on every row.</strong> A compliance
-            system that only ever reports success is not a compliance system. A check that did not
-            run is <em>not checked</em> — never <em>passed</em>. The same rule governs the receipts:
-            they distinguish confirmed from submitted from simulated instead of collapsing all three
-            into a green tick.
-          </p>
-        </section>
-
-        {/* Demos */}
-        <section style={{ marginBottom: 40 }}>
-          <h3 style={{ color: TEXT, fontSize: 15, fontWeight: 700, margin: '0 0 14px' }}>
-            Try the guardrails
-          </h3>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <a
-              href="/api/trustrails/demo/villain"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                background: '#7f1d1d',
-                color: '#fca5a5',
-                border: '1px solid #991b1b',
-                borderRadius: 8,
-                padding: '10px 16px',
-                fontSize: 13,
-                textDecoration: 'none',
-              }}
-            >
-              ⛔ Guardrail demo — three non-compliant agents, all blocked
-            </a>
-            <a
-              href="/api/trustrails/demo"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                background: '#14532d',
-                color: '#86efac',
-                border: '1px solid #166534',
-                borderRadius: 8,
-                padding: '10px 16px',
-                fontSize: 13,
-                textDecoration: 'none',
-              }}
-            >
-              ✅ Full compliance demo — block, execute, grant vault access
-            </a>
-          </div>
-          <p style={{ color: MUTED, fontSize: 12.5, marginTop: 10, marginBottom: 0 }}>
-            Both return JSON. The guardrail demo blocks on real KYA and RepID checks, not on a
-            scripted response.
-          </p>
-        </section>
-
-        <footer
-          style={{
-            borderTop: `1px solid ${BORDER}`,
-            paddingTop: 20,
-            display: 'flex',
-            gap: 20,
-            flexWrap: 'wrap',
-            alignItems: 'center',
-          }}
-        >
-          <a href="/dashboard" style={{ color: '#86efac', fontSize: 13, textDecoration: 'none' }}>
-            Dashboard
-          </a>
-          <span style={{ color: MUTED, fontSize: 12.5 }}>
-            Solana devnet · ERC-8004 registries on Base Sepolia
-          </span>
-        </footer>
-      </div>
-    </main>
+    <>
+      <style dangerouslySetInnerHTML={{ __html: STYLE }} />
+      <div dangerouslySetInnerHTML={{ __html: BODY }} />
+      <LeadCapture />
+    </>
   );
 }
